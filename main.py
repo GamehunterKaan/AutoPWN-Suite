@@ -2,10 +2,10 @@
 import argparse
 from logging import exception
 import nmap
-argparser = argparse.ArgumentParser()
 
+argparser = argparse.ArgumentParser()
 argparser.add_argument("-o", "--output", help="Output file name. (Default:autopwn.log)")
-argparser.add_argument("-t", "--target", help="Target range to scan.")
+argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.1 or 192.168.0.0/24)")
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)")
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)")
 
@@ -25,6 +25,7 @@ if not args.target:
     raise exception("No targets specified!")
 
 targetarg = args.target
+"""
 target_octets = targetarg.split('.')
 targets = []
 
@@ -33,30 +34,24 @@ if not target_octets[3].isdigit():
         targets.append(str(target_octets[0]) + '.' + str(target_octets[1]) + '.' + str(target_octets[2]) + '.' + str(i))
 else:
     targets.append(targetarg)
-
+"""
 def TestPing(target):
     nm = nmap.PortScanner()
     resp = nm.scan(hosts=target, arguments="-sn")
-    if len(nm.all_hosts()) != 0:
-        return True
-    else:
-        return False
+    return nm.all_hosts()
 
 def TestArp(target):
     nm = nmap.PortScanner()
     resp = nm.scan(hosts=target, arguments="-sn -PR")
-    if len(nm.all_hosts()) != 0:
-        return True
-    else:
-        return False
+    return nm.all_hosts()
 
 if scantype == 'ping':
-    for target in targets:
-        if TestPing(target):
-            print("Target " + target + " is up!") 
+    uphosts = TestPing(targetarg)
+    for host in uphosts:
+        print("Target " + host + " is up!")
 elif scantype == 'arp':
-    for target in targets:
-        if TestArp(target):
-            print("Target " + target + " is up!") 
+    uphosts = TestArp(targetarg)
+    for host in uphosts:
+        print("Target " + host + " is up!")
 else:
     raise exception("Unknown scan type : " + scantype)
