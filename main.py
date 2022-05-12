@@ -21,6 +21,19 @@ if args.scantype:
 else:
     scantype = 'arp'
 
+if not args.target:
+    raise exception("No targets specified!")
+
+targetarg = args.target
+target_octets = targetarg.split('.')
+targets = []
+
+if not target_octets[3].isdigit():
+    for i in range(1,256):
+        targets.append(str(target_octets[0]) + '.' + str(target_octets[1]) + '.' + str(target_octets[2]) + '.' + str(i))
+else:
+    targets.append(targetarg)
+
 def TestPing(target):
     nm = nmap.PortScanner()
     resp = nm.scan(hosts=target, arguments="-sn")
@@ -38,10 +51,12 @@ def TestArp(target):
         return False
 
 if scantype == 'ping':
-    if TestPing(args.target):
-        print("Target " + args.target + " is up!") 
+    for target in targets:
+        if TestPing(target):
+            print("Target " + target + " is up!") 
 elif scantype == 'arp':
-    if TestArp(args.target):
-        print("Target " + args.target + " is up!") 
+    for target in targets:
+        if TestArp(target):
+            print("Target " + target + " is up!") 
 else:
     raise exception("Unknown scan type : " + scantype)
