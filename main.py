@@ -8,7 +8,6 @@ argparser.add_argument("-o", "--output", help="Output file name. (Default:autopw
 argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.1 or 192.168.0.0/24)")
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)")
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)")
-
 args = argparser.parse_args()
 
 if args.output:
@@ -25,6 +24,7 @@ if not args.target:
     raise exception("No targets specified!")
 
 targetarg = args.target
+
 """
 target_octets = targetarg.split('.')
 targets = []
@@ -35,6 +35,7 @@ if not target_octets[3].isdigit():
 else:
     targets.append(targetarg)
 """
+
 def TestPing(target):
     nm = nmap.PortScanner()
     resp = nm.scan(hosts=target, arguments="-sn")
