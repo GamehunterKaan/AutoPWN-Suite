@@ -6,18 +6,18 @@ AutoPWN Suite is my brand new project for scanning vulnerabilities and exploitin
 # Installation
 
 You will need [nmap](https://nmap.org) in order to use this tool.
-To install nmap you can run;
-  On Debian based distros (Kali/Parrot etc.):
 
-  ```
-  sudo apt install nmap
-  ```
+On Debian based distros (Kali/Parrot etc.):
 
-  On Arch based distros (BlackArch/ArchAttack etc.):
+```
+sudo apt install nmap
+```
 
-  ```
-  sudo pacman -S nmap
-  ```
+On Arch based distros (BlackArch/ArchAttack etc.):
+
+```
+sudo pacman -S nmap
+```
 
 After installing nmap you can just clone the repo
 
