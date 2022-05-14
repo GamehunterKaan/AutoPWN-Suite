@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 #https://stackoverflow.com/a/287944
 class bcolors:
     HEADER = '\033[95m'
@@ -10,23 +12,20 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def print_blue(text):
-    print(bcolors.BLUE + str(text) + bcolors.ENDC)
-
-def print_cyan(text):
-    print(bcolors.CYAN + str(text) + bcolors.ENDC)
-
-def print_green(text):
-    print(bcolors.GREEN + str(text) + bcolors.ENDC)
-
-def print_yellow(text):
-    print(bcolors.YELLOW + str(text) + bcolors.ENDC)
-
-def print_red(text):
-    print(bcolors.RED + str(text) + bcolors.ENDC)
-
-def print_bold(text):
-    print(bcolors.BOLD + str(text) + bcolors.ENDC)
-
-def print_underline(text):
-    print(bcolors.UNDERLINE + str(text) + bcolors.ENDC)
+def print_colored(text,color):
+    if color == 'blue':
+        print(bcolors.BLUE + str(text) + bcolors.ENDC)
+    elif color == 'cyan':
+        print(bcolors.CYAN + str(text) + bcolors.ENDC)
+    elif color == 'green':
+        print(bcolors.GREEN + str(text) + bcolors.ENDC)
+    elif color == 'yellow':
+        print(bcolors.YELLOW + str(text) + bcolors.ENDC)
+    elif color == 'red':
+        print(bcolors.RED + str(text) + bcolors.ENDC)
+    elif color == 'bold':
+        print(bcolors.BOLD + str(text) + bcolors.ENDC)
+    elif color == 'underline':
+        print(bcolors.UNDERLINE + str(text) + bcolors.ENDC)
+    elif color == 'no_new_line':
+        print(str(text), end='')
