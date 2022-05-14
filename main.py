@@ -64,6 +64,9 @@ else:
 
 
 def TestPing(target):
+    print_colored("\n---------------------------------------------------------", green)
+    print_colored("\tDoing host discovery on " + str(target) + "...", green)
+    print_colored("---------------------------------------------------------\n", green)
     nm = PortScanner()
     resp = nm.scan(hosts=target, arguments="-sn")
     return nm.all_hosts()
