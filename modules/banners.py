@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from random import choice
-from color import *
+from modules.color import print_colored
 
 def print_banner():
     banner1 = """

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser
-from nmap import PortScanner
 from socket import socket, AF_INET, SOCK_DGRAM
 from os import getuid
 from logging import exception
-from color import print_colored
-from banners import print_banner
+from modules.nmap import PortScanner
+from modules.color import print_colored
+from modules.banners import print_banner
 
 argparser = ArgumentParser(description="AutoPWN Suite")
 argparser.add_argument("-o", "--output", help="Output file name. (Default:autopwn.log)")
