@@ -3,6 +3,7 @@ import argparse
 from logging import exception
 import scapy.all as scapy
 import nmap
+from color import *
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument("-o", "--output", help="Output file name. (Default:autopwn.log)")
@@ -26,22 +27,11 @@ if not args.target:
 
 targetarg = args.target
 
-"""
-target_octets = targetarg.split('.')
-targets = []
-
-if not target_octets[3].isdigit():
-    for i in range(1,256):
-        targets.append(str(target_octets[0]) + '.' + str(target_octets[1]) + '.' + str(target_octets[2]) + '.' + str(i))
-else:
-    targets.append(targetarg)
-
-
 def TestPing(target):
     nm = nmap.PortScanner()
     resp = nm.scan(hosts=target, arguments="-sn")
     return nm.all_hosts()
-"""
+
 def TestArp(target):
     nm = nmap.PortScanner()
     resp = nm.scan(hosts=target, arguments="-sn -PR")
@@ -65,34 +55,45 @@ def PortScan(target):
 
         return lport
 
-if scantype == 'ping':
-    uphosts = TestPing(targetarg)
-    for host in uphosts:
-        print("Target " + host + " is up!")
-    wannaportscan = input("Would you like to run a port scan on these hosts? (Y/N)\n")
-    if wannaportscan == 'Y':
-        for host in uphosts:
-            print("Running a portscan for host " + host + "...")
-            ports = PortScan(host)
+print_yellow("#########################################################\n")
 
+if scantype == 'ping':
+    results = TestPing(targetarg)
+    for host in results:
+        print(host)
+    print_blue("\nWould you like to run a port scan on these hosts? (Y/N)")
+    wannaportscan = input()
+    if wannaportscan == 'Y':
+        for host in results:
+            print_green("\n---------------------------------------------------------")
+            print_green("Running a portscan for host " + str(host) + "...")
+            print_green("---------------------------------------------------------")
+            ports = PortScan(host)
+            if ports == 0:
+                print_red("\nTarget " + str(host) + " seems to have no open ports.")
+            else:
+                for port in ports:
+                    print("Port " + str(port) + " is open on " + str(host))
+    print_yellow("\n#########################################################")
 
 elif scantype == 'arp':
     results = TestArp(targetarg)
     for host in results:
         print(host)
-    wannaportscan = input("Would you like to run a port scan on these hosts? (Y/N)\n")
+    print_blue("\nWould you like to run a port scan on these hosts? (Y/N)")
+    wannaportscan = input()
     if wannaportscan == 'Y':
         for host in results:
-            print("\n---------------------------------------------------------")
-            print("Running a portscan for host " + str(host) + "...")
-            print("---------------------------------------------------------")
+            print_green("\n---------------------------------------------------------")
+            print_green("Running a portscan for host " + str(host) + "...")
+            print_green("---------------------------------------------------------")
             ports = PortScan(host)
             if ports == 0:
-                print("\nTarget " + str(host) + " seems to have no open ports.")
+                print_red("\nTarget " + str(host) + " seems to have no open ports.")
             else:
-                print("\n")
                 for port in ports:
                     print("Port " + str(port) + " is open on " + str(host))
-                print("\n")
+    print_yellow("\n#########################################################")
+
 else:
     raise exception("Unknown scan type : " + scantype)
