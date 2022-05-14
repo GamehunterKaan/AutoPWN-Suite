@@ -1,5 +1,6 @@
 # AutoPWN-Suite
-AutoPWN Suite is my brand new project for scanning vulnerabilities and exploiting systems automatically.
+
+AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems automatically.
 
 ![Screenshot](images/autopwn.png)
 
@@ -43,3 +44,7 @@ options:
                         Scan type. (Ping or ARP)
   -y, --yesplease       Don't ask for anything. (Full automatic mode)
 ```
+
+# Legal
+
+You may not rent or lease, distribute, modify, sell or transfer the software to a third party. AutoPWN Suite is free for distribution, and modification with the condition that credit is provided to the creator and not used for commercial use. You may not use software for illegal or nefarious purposes. No liability for consequential damages to the maximum extent permitted by all applicable laws.
