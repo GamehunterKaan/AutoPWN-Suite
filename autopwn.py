@@ -75,12 +75,24 @@ def PortScan(target):
     print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
     print_colored("---------------------------------------------------------\n", colors.green)
     nm = PortScanner()
-    resp = nm.scan(hosts=target, arguments="-sS --host-timeout 60 -Pn")
+    resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn")
     return nm
 
 def AnalyseScanResults(nm,target):
     try:
         nm[target]
+
+        try:
+            mac = nm[target]['addresses']['mac']
+        except:
+            mac = 'Unknown'
+
+        try:
+            vendor = nm[target]['vendor'][mac]
+        except:
+            vendor = 'Unknown'
+
+        print_colored("MAC Address : %s\tVendor : %s\n" % (mac, vendor),colors.yellow)
         if nm[target]['status']['reason'] == 'localhost-response' or nm[target]['status']['reason'] == 'user-set':
             print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
         if len(nm[target].all_protocols()) == 0:
@@ -99,6 +111,21 @@ def UserWantsPortScan():
         while True:
             wannaportscan = input().lower()
             if wannaportscan == 'y' or wannaportscan == 'yes':
+                return True
+                break
+            elif wannaportscan == 'n' or wannaportscan == 'no':
+                return False
+            else:
+                print("Please say Y or N!")
+
+def UserWantsVersionScan():
+    if DontAskForConfirmation:
+        return True
+    else:
+        print_colored("\nWould you like to run a version scan? (Y/N)", colors.blue)
+        while True:
+            wannaversioncan = input().lower()
+            if wannaversioncan == 'y' or wannaversioncan == 'yes':
                 return True
                 break
             elif wannaportscan == 'n' or wannaportscan == 'no':
