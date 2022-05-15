@@ -7,6 +7,8 @@ from modules.nmap import PortScanner
 from modules.color import print_colored, colors
 from modules.banners import print_banner
 
+__author__ = 'GamehunterKaan'
+
 argparser = ArgumentParser(description="AutoPWN Suite")
 argparser.add_argument("-o", "--output", help="Output file name. (Default:autopwn.log)")
 argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.1 or 192.168.0.0/24)")
@@ -53,6 +55,7 @@ else:
         print_colored("Please specify a target.", colors.cyan)
         targetarg = input()
 
+HostArray = []
 
 def TestPing(target):
     print_colored("\n---------------------------------------------------------", colors.green)
@@ -135,6 +138,7 @@ def AnalyseScanResults(nm,target):
 
                 print('Port : %s\tState : %s\tService : %s\tProduct : %s\tVersion : %s\n'
                  %      (port, state, service, product, version))
+                HostArray.insert(len(HostArray), [target, port, service, product, version])
     except:
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
 
@@ -175,6 +179,7 @@ def PostScanStuff(hosts):
         for host in hosts:
             PortScanResults = PortScan(host)
             AnalyseScanResults(PortScanResults,host)
+
 def main():
     if scantype == 'ping':
         results = TestPing(targetarg)
@@ -184,6 +189,7 @@ def main():
     elif scantype == 'arp':
         results = TestArp(targetarg)
         PostScanStuff(results)
+        print(HostArray)
 
     else:
         raise exception("Unknown scan type : " + scantype)
