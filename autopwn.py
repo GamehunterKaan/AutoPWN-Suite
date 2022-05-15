@@ -75,7 +75,7 @@ def PortScan(target):
     print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
     print_colored("---------------------------------------------------------\n", colors.green)
     nm = PortScanner()
-    resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn")
+    resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn")
     return nm
 
 def AnalyseScanResults(nm,target):
@@ -92,14 +92,48 @@ def AnalyseScanResults(nm,target):
         except:
             vendor = 'Unknown'
 
-        print_colored("MAC Address : %s\tVendor : %s\n" % (mac, vendor),colors.yellow)
+        print_colored("MAC Address : %s\tVendor : %s\n" % (mac, vendor), colors.yellow)
         if nm[target]['status']['reason'] == 'localhost-response' or nm[target]['status']['reason'] == 'user-set':
             print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
         if len(nm[target].all_protocols()) == 0:
             print_colored("Target " + str(host) + " seems to have no open ports.", colors.red)
         for proto in nm[target].all_protocols():
             for port in nm[target][proto].keys():
-                print('\tPort : %s\tState : %s' % (port, nm[str(target)][proto][port]['state']))
+                                
+                try:
+                    if not len(nm[str(target)][proto][int(port)]['state']) == 0:
+                        state = nm[str(target)][proto][int(port)]['state']
+                    else:
+                        state = 'Unknown'
+                except:
+                    state = 'Unknown'
+                
+                try:
+                    if not len(nm[str(target)][proto][int(port)]['name']) == 0:
+                        service = nm[str(target)][proto][int(port)]['name']
+                    else:
+                        service = 'Unknown'
+                except:
+                    service = 'Unknown'
+
+                try:
+                    if not len(nm[str(target)][proto][int(port)]['product']) == 0:
+                        product = nm[str(target)][proto][int(port)]['product']
+                    else:
+                        product = 'Unknown'
+                    
+                except:
+                    product = 'Unknown'
+
+                try:
+                    if not len(nm[str(target)][proto][int(port)]['version']) == 0:
+                        version = nm[str(target)][proto][int(port)]['version']
+                    else:
+                        version = 'Unknown'
+                except:
+                    version = 'Unknown'
+
+                print('Port : %s\tState : %s\tService : %s\tProduct : %s\tVersion : %s\n' % (port, state, service, product, version))
     except:
         print_colored("Target " + str(host) + " seems to have no open ports.", colors.red)
 
@@ -111,21 +145,6 @@ def UserWantsPortScan():
         while True:
             wannaportscan = input().lower()
             if wannaportscan == 'y' or wannaportscan == 'yes':
-                return True
-                break
-            elif wannaportscan == 'n' or wannaportscan == 'no':
-                return False
-            else:
-                print("Please say Y or N!")
-
-def UserWantsVersionScan():
-    if DontAskForConfirmation:
-        return True
-    else:
-        print_colored("\nWould you like to run a version scan? (Y/N)", colors.blue)
-        while True:
-            wannaversioncan = input().lower()
-            if wannaversioncan == 'y' or wannaversioncan == 'yes':
                 return True
                 break
             elif wannaportscan == 'n' or wannaportscan == 'no':
