@@ -96,7 +96,7 @@ def AnalyseScanResults(nm,target):
         if nm[target]['status']['reason'] == 'localhost-response' or nm[target]['status']['reason'] == 'user-set':
             print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
         if len(nm[target].all_protocols()) == 0:
-            print_colored("Target " + str(host) + " seems to have no open ports.", colors.red)
+            print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
         for proto in nm[target].all_protocols():
             for port in nm[target][proto].keys():
                                 
@@ -136,7 +136,7 @@ def AnalyseScanResults(nm,target):
                 print('Port : %s\tState : %s\tService : %s\tProduct : %s\tVersion : %s\n'
                  %      (port, state, service, product, version))
     except:
-        print_colored("Target " + str(host) + " seems to have no open ports.", colors.red)
+        print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
 
 def UserWantsPortScan():
     if DontAskForConfirmation:
@@ -168,23 +168,25 @@ def UserWantsVulnerabilityDetection():
             else:
                 print("Please say Y or N!")
 
-if scantype == 'ping':
-    results = TestPing(targetarg)
-    for host in results:
-        print(host)
-    if UserWantsPortScan():
-        for host in results:
-            PortScanResults = PortScan(host)
-            AnalyseScanResults(PortScanResults,host)
-
-elif scantype == 'arp':
-    results = TestArp(targetarg)
-    for host in results:
+def PostScanStuff(hosts):
+    for host in hosts:
         print("\t\t" + host)
     if UserWantsPortScan():
-        for host in results:
+        for host in hosts:
             PortScanResults = PortScan(host)
             AnalyseScanResults(PortScanResults,host)
+def main():
+    if scantype == 'ping':
+        results = TestPing(targetarg)
+        PostScanStuff(results)
+        
 
-else:
-    raise exception("Unknown scan type : " + scantype)
+    elif scantype == 'arp':
+        results = TestArp(targetarg)
+        PostScanStuff(results)
+
+    else:
+        raise exception("Unknown scan type : " + scantype)
+
+if __name__ == '__main__':
+    main()
