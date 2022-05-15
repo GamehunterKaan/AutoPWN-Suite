@@ -75,7 +75,7 @@ def PortScan(target):
     print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
     print_colored("---------------------------------------------------------\n", colors.green)
     nm = PortScanner()
-    resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn")
+    resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn")
     return nm
 
 def AnalyseScanResults(nm,target):
@@ -133,7 +133,8 @@ def AnalyseScanResults(nm,target):
                 except:
                     version = 'Unknown'
 
-                print('Port : %s\tState : %s\tService : %s\tProduct : %s\tVersion : %s\n' % (port, state, service, product, version))
+                print('Port : %s\tState : %s\tService : %s\tProduct : %s\tVersion : %s\n'
+                 %      (port, state, service, product, version))
     except:
         print_colored("Target " + str(host) + " seems to have no open ports.", colors.red)
 
@@ -148,6 +149,21 @@ def UserWantsPortScan():
                 return True
                 break
             elif wannaportscan == 'n' or wannaportscan == 'no':
+                return False
+            else:
+                print("Please say Y or N!")
+
+def UserWantsVulnerabilityDetection():
+    if DontAskForConfirmation:
+        return True
+    else:
+        print_colored("\nWould you like to do a vulnerability detection? (Y/N)", colors.blue)
+        while True:
+            wannavulnerabilitydetection = input().lower()
+            if wannavulnerabilitydetection == 'y' or wannavulnerabilitydetection == 'yes':
+                return True
+                break
+            elif wannavulnerabilitydetection == 'n' or wannavulnerabilitydetection == 'no':
                 return False
             else:
                 print("Please say Y or N!")
