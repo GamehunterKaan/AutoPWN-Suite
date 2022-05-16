@@ -6,6 +6,7 @@ from logging import exception
 from modules.nmap import PortScanner
 from modules.color import print_colored, colors
 from modules.banners import print_banner
+from modules.searchvuln import SearchSploits
 
 __author__ = 'GamehunterKaan'
 
@@ -55,8 +56,6 @@ else:
         print_colored("Please specify a target.", colors.cyan)
         targetarg = input()
 
-HostArray = []
-
 def TestPing(target):
     print_colored("\n---------------------------------------------------------", colors.green)
     print_colored("\tDoing host discovery on " + str(target) + "...", colors.green)
@@ -84,6 +83,7 @@ def PortScan(target):
 def AnalyseScanResults(nm,target):
     try:
         nm[target]
+        HostArray = []
 
         try:
             mac = nm[target]['addresses']['mac']
@@ -138,9 +138,23 @@ def AnalyseScanResults(nm,target):
 
                 print('Port : %s\tState : %s\tService : %s\tProduct : %s\tVersion : %s\n'
                  %      (port, state, service, product, version))
-                HostArray.insert(len(HostArray), [target, port, service, product, version])
+                if state == 'open':
+                    HostArray.insert(len(HostArray), [target, port, service, product, version])
+
+
     except:
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
+    # print(HostArray)
+    # for part in HostArray:
+    #     print(part[0])
+    #     print(part[1])
+    #     print(part[2])
+    #     print(part[3])
+    #     print(part[4])
+    if len(HostArray) > 0:
+        SearchSploits(HostArray)
+    else:
+        print("Skipping vulnerability detection for " + str(target))
 
 def UserWantsPortScan():
     if DontAskForConfirmation:
@@ -157,21 +171,6 @@ def UserWantsPortScan():
             else:
                 print("Please say Y or N!")
 
-def UserWantsVulnerabilityDetection():
-    if DontAskForConfirmation:
-        return True
-    else:
-        print_colored("\nWould you like to do a vulnerability detection? (Y/N)", colors.blue)
-        while True:
-            wannavulnerabilitydetection = input().lower()
-            if wannavulnerabilitydetection == 'y' or wannavulnerabilitydetection == 'yes':
-                return True
-                break
-            elif wannavulnerabilitydetection == 'n' or wannavulnerabilitydetection == 'no':
-                return False
-            else:
-                print("Please say Y or N!")
-
 def PostScanStuff(hosts):
     for host in hosts:
         print("\t\t" + host)
@@ -184,12 +183,10 @@ def main():
     if scantype == 'ping':
         results = TestPing(targetarg)
         PostScanStuff(results)
-        
 
     elif scantype == 'arp':
         results = TestArp(targetarg)
         PostScanStuff(results)
-        print(HostArray)
 
     else:
         raise exception("Unknown scan type : " + scantype)
