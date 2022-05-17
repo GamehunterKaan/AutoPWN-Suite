@@ -144,13 +144,7 @@ def AnalyseScanResults(nm,target):
 
     except:
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
-    # print(HostArray)
-    # for part in HostArray:
-    #     print(part[0])
-    #     print(part[1])
-    #     print(part[2])
-    #     print(part[3])
-    #     print(part[4])
+
     if len(HostArray) > 0:
         SearchSploits(HostArray)
     else:

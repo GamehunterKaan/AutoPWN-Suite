@@ -1,5 +1,6 @@
 from csv import reader
 from modules.color import print_colored, colors
+from modules.nvdlib.nvdlib import searchCPE
 
 def GenerateKeywords(HostArray):
     keywords = []
@@ -10,6 +11,7 @@ def GenerateKeywords(HostArray):
         product = str(port[3])
         version = str(port[4])
         templist = []
+        dontsearch = ['ssh', 'vnc', 'http', 'https', 'ftp', 'sftp', 'smtp', 'smb', 'smbv2']
 
         if service == 'Unknown':
             service = ''
@@ -19,15 +21,10 @@ def GenerateKeywords(HostArray):
         
         if version == 'Unknown':
             version = ''
-        
-        query1 = (product + ' ' + version).rstrip()
-        query2 = (service + ' ' + version).rstrip()
 
-        if not product == '':
+        if product.lower() not in dontsearch and not product == '':
+            query1 = (product + ' ' + version).rstrip()
             templist.append(query1)
-        
-        if not service == '':
-            templist.append(query2)
 
         for entry in templist:
             if entry not in keywords and not entry == '':
@@ -40,15 +37,10 @@ def SearchSploits(HostArray):
     print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]), colors.red)
     print_colored("---------------------------------------------------------", colors.red)
     keywords = GenerateKeywords(HostArray)
-    exploitsfile = open('modules/exploits.csv', 'rt')
-    exploitreader = reader(exploitsfile, delimiter = ',')
-    for row in exploitreader:
-        for keyword in keywords:
-            if keyword in row[2]:
-                path = row[1]
-                desc = row[2]
-                exptype = row[5]
-                platform = row[6]
-                if exptype == 'remote' and platform == 'linux':
-                    print("ExploitDB path : %s\t Description : %s\tType : %s\tPlatform : %s\n"
-                        % (path, desc, exptype, platform))
+    for keyword in keywords:
+        #https://github.com/vehemont/nvdlib
+        print("Searching vulnerabilities for : " + keyword)
+        ApiResponse = searchCPE(keyword = keyword, cves=True)
+        for CPE in ApiResponse:
+            if not len(CPE.vulnerabilities) == 0:
+                print("Title : %s\tCVEs : %s" % (CPE.title, CPE.vulnerabilities))
