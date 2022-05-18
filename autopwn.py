@@ -17,8 +17,6 @@ argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)")
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 args = argparser.parse_args()
 
-print_banner()
-
 if not getuid() == 0:
     print_colored("This script requires root permissions.", colors.red)
     exit()
@@ -55,6 +53,8 @@ else:
     else:
         print_colored("Please specify a target.", colors.cyan)
         targetarg = input()
+
+print_banner()
 
 def TestPing(target):
     print_colored("\n---------------------------------------------------------", colors.green)
