@@ -1,4 +1,3 @@
-from csv import reader
 from modules.color import print_colored, colors
 from modules.nvdlib.nvdlib import searchCPE
 
@@ -37,10 +36,13 @@ def SearchSploits(HostArray):
     print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]), colors.red)
     print_colored("---------------------------------------------------------", colors.red)
     keywords = GenerateKeywords(HostArray)
+    print("Searching vulnerability database for %s keywords..." % (len(keywords)))
     for keyword in keywords:
         #https://github.com/vehemont/nvdlib
-        print("Searching vulnerabilities for : " + keyword)
-        ApiResponse = searchCPE(keyword = keyword, cves=True)
+        ApiResponse = searchCPE(keyword = str(keyword), cves=True)
+        printedCVEs = []
         for CPE in ApiResponse:
-            if not len(CPE.vulnerabilities) == 0:
-                print("Title : %s\tCVEs : %s" % (CPE.title, CPE.vulnerabilities))
+            if (not CPE.vulnerabilities[0] == '' and not set(CPE.vulnerabilities[0:3]).issubset(printedCVEs)):
+                print("Title : %s\tCVEs : %s" % (CPE.title, CPE.vulnerabilities[0:3]))
+                for CVE in CPE.vulnerabilities:
+                    printedCVEs.append(CVE)

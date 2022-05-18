@@ -35,7 +35,7 @@ def __get(product, parameters, limit, key, verbose):
             raise LookupError(raw['message'])
     except JSONDecodeError:
         print('Invalid search criteria syntax: ' + str(raw))
-        print('Attempted search criteria: ' + parameters)
+        print('Attempted search criteria: ' + str(parameters))
         exit()
     
     time.sleep(delay) 
