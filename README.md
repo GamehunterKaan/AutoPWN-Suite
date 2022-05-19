@@ -1,33 +1,39 @@
-# AutoPWN-Suite
+# AutoPWN Suite
 
 AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems automatically.
 
-![Screenshot](images/autopwn.png)
+## How does it work?
 
-# Installation
+AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of softwares running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of "keywords" to search [NIST vulnerability database](https://www.nist.gov/).
+
+### Sample output
+
+AutoPWN Suite has a very user friendly easy to read output.
+
+![Screenshot](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/autopwn.png)
+
+### Installation
 
 You will need [nmap](https://nmap.org) in order to use this tool.
 
-On Debian based distros (Kali/Parrot etc.):
+On Debian based distros (Kali/Parrot etc):
 
 ```
 sudo apt install nmap
 ```
 
-On Arch based distros (BlackArch/ArchAttack etc.):
+On Arch based distros (BlackArch/ArchAttack etc):
 
 ```
 sudo pacman -S nmap
 ```
 
-After installing nmap you can just clone the repo
+After installing nmap you can just clone the repo.
 
 ```
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 ```
-
-
-# Usage
+### Usage
 
 ```
 usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-st SCANTYPE] [-y]
@@ -45,6 +51,16 @@ options:
   -y, --yesplease       Don't ask for anything. (Full automatic mode)
 ```
 
-# Legal
+### Contributing to AutoPWN Suite
+
+I would be glad if you are willing to contribute this project. I am looking forward to merge your pull request unless its something that is not needed or just a personal preference.
+
+
+### Legal
 
 You may not rent or lease, distribute, modify, sell or transfer the software to a third party. AutoPWN Suite is free for distribution, and modification with the condition that credit is provided to the creator and not used for commercial use. You may not use software for illegal or nefarious purposes. No liability for consequential damages to the maximum extent permitted by all applicable laws.
+
+
+### Support or Contact
+
+Having trouble using this tool? You can reach me out on [discord](https://github.com/GamehunterKaan/GamehunterKaan/blob/main/README.md) or create an issue!
