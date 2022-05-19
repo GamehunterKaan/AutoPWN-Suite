@@ -2,6 +2,7 @@
 from random import choice
 from modules.color import print_colored
 
+#https://patorjk.com/software/taag/
 def print_banner():
     banner1 = """
 
@@ -50,10 +51,8 @@ def print_banner():
 
     blue = 'blue'
     cyan = 'cyan'
-    green = 'green'
     yellow = 'yellow'
     red = 'red'
-    bold = 'bold'
 
     banner = choice([
         banner1,

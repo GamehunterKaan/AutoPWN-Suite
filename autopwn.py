@@ -145,7 +145,6 @@ def AnalyseScanResults(nm,target):
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
     return HostArray
 
-
 def UserWantsPortScan():
     if DontAskForConfirmation:
         return True
@@ -175,7 +174,6 @@ def UserWantsVulnerabilityDetection():
                 return False
             else:
                 print("Please say Y or N!")
-
 
 def PostScanStuff(hosts):
     for host in hosts:
