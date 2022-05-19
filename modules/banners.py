@@ -53,6 +53,7 @@ def print_banner():
     cyan = 'cyan'
     yellow = 'yellow'
     red = 'red'
+    bold = 'bold'
 
     banner = choice([
         banner1,
