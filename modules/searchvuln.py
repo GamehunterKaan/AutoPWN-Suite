@@ -1,4 +1,4 @@
-from modules.color import print_colored, colors
+from modules.color import print_colored, colors, bcolors
 from modules.nvdlib.nvdlib import searchCPE
 
 def GenerateKeywords(HostArray):
@@ -32,17 +32,20 @@ def GenerateKeywords(HostArray):
     return keywords
 
 def SearchSploits(HostArray):
-    print_colored("---------------------------------------------------------", colors.red)
+    print_colored("\n---------------------------------------------------------", colors.red)
     print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]), colors.red)
     print_colored("---------------------------------------------------------", colors.red)
     keywords = GenerateKeywords(HostArray)
-    print("Searching vulnerability database for %s keywords..." % (len(keywords)))
+    if len(keywords) == 0:
+        print_colored("Insufficient information for " + str(HostArray[0][0]), colors.red)
+    else:
+        print("Searching vulnerability database for %s keywords..." % (len(keywords)))
     for keyword in keywords:
         #https://github.com/vehemont/nvdlib
         ApiResponse = searchCPE(keyword = str(keyword), cves=True)
         printedCVEs = []
         for CPE in ApiResponse:
             if (not CPE.vulnerabilities[0] == '' and not set(CPE.vulnerabilities[0:3]).issubset(printedCVEs)):
-                print("Title : %s\tCVEs : %s" % (CPE.title, CPE.vulnerabilities[0:3]))
+                print(bcolors.cyan + "Product : " + bcolors.endc + CPE.title + bcolors.cyan + "\tCVEs : " + bcolors.endc + str(CPE.vulnerabilities[0:3]))
                 for CVE in CPE.vulnerabilities:
                     printedCVEs.append(CVE)

@@ -81,9 +81,9 @@ def PortScan(target):
     return nm
 
 def AnalyseScanResults(nm,target):
+    HostArray = []
     try:
         nm[target]
-        HostArray = []
 
         try:
             mac = nm[target]['addresses']['mac']
@@ -136,19 +136,15 @@ def AnalyseScanResults(nm,target):
                 except:
                     version = 'Unknown'
 
-                print('Port : %s\tState : %s\tService : %s\tProduct : %s\tVersion : %s\n'
+                print('Port : %s\tState : %s\tService : %s\tProduct : %s\tVersion : %s'
                  %      (port, state, service, product, version))
                 if state == 'open':
                     HostArray.insert(len(HostArray), [target, port, service, product, version])
 
-
     except:
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
+    return HostArray
 
-    if len(HostArray) > 0:
-        SearchSploits(HostArray)
-    else:
-        print("Skipping vulnerability detection for " + str(target))
 
 def UserWantsPortScan():
     if DontAskForConfirmation:
@@ -165,13 +161,35 @@ def UserWantsPortScan():
             else:
                 print("Please say Y or N!")
 
+def UserWantsVulnerabilityDetection():
+    if DontAskForConfirmation:
+        return True
+    else:
+        print_colored("\nWould you like to do a version based vulnerability detection? (Y/N)", colors.blue)
+        while True:
+            wannaportscan = input().lower()
+            if wannaportscan == 'y' or wannaportscan == 'yes':
+                return True
+                break
+            elif wannaportscan == 'n' or wannaportscan == 'no':
+                return False
+            else:
+                print("Please say Y or N!")
+
+
 def PostScanStuff(hosts):
     for host in hosts:
         print("\t\t" + host)
     if UserWantsPortScan():
         for host in hosts:
             PortScanResults = PortScan(host)
-            AnalyseScanResults(PortScanResults,host)
+            PortArray = AnalyseScanResults(PortScanResults,host)
+            if len(PortArray) > 0:
+                if UserWantsVulnerabilityDetection():
+                    SearchSploits(PortArray)
+            else:
+                print("Skipping vulnerability detection for " + str(host))
+
 
 def main():
     if scantype == 'ping':

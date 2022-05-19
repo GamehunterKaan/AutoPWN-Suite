@@ -21,6 +21,7 @@ class colors:
     bold = 'bold'
     underline = 'underline'
     no_new_line = 'no_new_line'
+    endc = 'endc'
 
 def print_colored(text,color):
     if color == 'blue':
