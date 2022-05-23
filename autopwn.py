@@ -10,7 +10,6 @@ from modules.searchvuln import SearchSploits
 
 __author__ = 'GamehunterKaan'
 
-
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
 argparser.add_argument("-o", "--output", help="Output file name. (Default:autopwn.log)")
@@ -18,12 +17,6 @@ argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)")
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 args = argparser.parse_args()
-
-
-#dont run the script if the user does not have root permissions
-if not getuid() == 0:
-    print_colored("This script requires root permissions.", colors.red)
-    exit()
 
 #get output file name
 if args.output:
@@ -66,6 +59,15 @@ else:
 #print a beautiful banner
 print_banner()
 
+def is_root():
+    if getuid() == 0:
+        return True #return True if the user is root
+    else:
+        return False
+
+if is_root() == False:
+    print_colored("It's recommended to run this script as root since it's more silent and accurate.", colors.red)
+
 #do a ping scan using nmap
 def TestPing(target):
     print_colored("\n---------------------------------------------------------", colors.green)
@@ -90,7 +92,10 @@ def PortScan(target):
     print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
     print_colored("---------------------------------------------------------\n", colors.green)
     nm = PortScanner()
-    resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn")
+    if is_root():
+        resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn")
+    else:
+        resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn")
     return nm
 
 #analyse and print scan results
@@ -212,11 +217,18 @@ def main():
         PostScanStuff(results)
 
     elif scantype == 'arp':
-        results = TestArp(targetarg)
+        if is_root():
+            results = TestArp(targetarg)
+        else:
+            print_colored("Not running as root! Running ping scan instead...", colors.red) #Yell at the user for not running as root!
+            results = TestPing(targetarg)
         PostScanStuff(results)
 
     else:
-        raise exception("Unknown scan type : " + scantype)
+        if is_root():
+            print_colored("Unknown scan type: %s! Using arp scan instead..." % (args.scantype), colors.red)
+        else:
+            print_colored("Unknown scan type: %s! Using ping scan instead..." % (args.scantype), colors.red)
 
 #only run the script if its not imported as a module (directly interpreted with python3)
 if __name__ == '__main__':
