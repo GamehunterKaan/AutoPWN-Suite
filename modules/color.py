@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 #https://stackoverflow.com/a/287944
+
+#colors
 class bcolors:
     header = '\033[95m'
     blue = '\033[94m'
@@ -12,6 +14,7 @@ class bcolors:
     bold = '\033[1m'
     underline = '\033[4m'
 
+#colors but string
 class colors:
     blue = 'blue'
     cyan = 'cyan'
@@ -23,6 +26,7 @@ class colors:
     no_new_line = 'no_new_line'
     endc = 'endc'
 
+#print the text with specified color
 def print_colored(text,color):
     if color == 'blue':
         print(bcolors.blue + str(text) + bcolors.endc)

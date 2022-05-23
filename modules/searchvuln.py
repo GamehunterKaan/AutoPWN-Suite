@@ -1,6 +1,7 @@
 from modules.color import print_colored, colors, bcolors
 from modules.nvdlib.nvdlib import searchCPE
 
+#generate keywords to search for from the information gathered from the target
 def GenerateKeywords(HostArray):
     keywords = []
     for port in HostArray:
@@ -10,8 +11,10 @@ def GenerateKeywords(HostArray):
         product = str(port[3])
         version = str(port[4])
         templist = []
+        #dont search if keyword is equal to any of these
         dontsearch = ['ssh', 'vnc', 'http', 'https', 'ftp', 'sftp', 'smtp', 'smb', 'smbv2']
 
+        #if any of these equal to 'Unknown' set them to empty string
         if service == 'Unknown':
             service = ''
         
@@ -42,10 +45,12 @@ def SearchSploits(HostArray):
         print("Searching vulnerability database for %s keywords..." % (len(keywords)))
     for keyword in keywords:
         #https://github.com/vehemont/nvdlib
+        #search the NIST vulnerabilities database for the generated keywords
         ApiResponse = searchCPE(keyword = str(keyword), cves=True)
         printedCVEs = []
         for CPE in ApiResponse:
             if (not CPE.vulnerabilities[0] == '' and not set(CPE.vulnerabilities[0:3]).issubset(printedCVEs)):
+                #only print the first 3 CVEs
                 print(bcolors.cyan + "Product : " + bcolors.endc + CPE.title + bcolors.cyan + "\tCVEs : " + bcolors.endc + str(CPE.vulnerabilities[0:3]))
                 for CVE in CPE.vulnerabilities:
                     printedCVEs.append(CVE)

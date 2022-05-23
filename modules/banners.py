@@ -55,6 +55,7 @@ def print_banner():
     red = 'red'
     bold = 'bold'
 
+    #pick a random banner
     banner = choice([
         banner1,
         banner2,
@@ -62,6 +63,7 @@ def print_banner():
         banner4
     ])
 
+    #pick a random color
     color = choice([
         blue,
         cyan,
@@ -69,6 +71,7 @@ def print_banner():
         red
     ])
 
+    #print it
     print_colored("\nDeveloped by GamehunterKaan.", bold)
     print_colored("\n------------------------------------------------------------------------------------------------------------------------", bold)
     print_colored(banner, color)

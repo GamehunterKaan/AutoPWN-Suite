@@ -10,6 +10,8 @@ from modules.searchvuln import SearchSploits
 
 __author__ = 'GamehunterKaan'
 
+
+#parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
 argparser.add_argument("-o", "--output", help="Output file name. (Default:autopwn.log)")
 argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.1 or 192.168.0.0/24)")
@@ -17,20 +19,25 @@ argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)")
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 args = argparser.parse_args()
 
+
+#dont run the script if the user does not have root permissions
 if not getuid() == 0:
     print_colored("This script requires root permissions.", colors.red)
     exit()
 
+#get output file name
 if args.output:
     outfile = args.output
 else:
     outfile = 'autopwn.log'
 
+#get scan type
 if args.scantype:
     scantype = args.scantype.lower()
 else:
     scantype = 'arp'
 
+#check if user wants to do automatic scan
 if args.yesplease:
     DontAskForConfirmation = True
 else:
@@ -42,8 +49,10 @@ def DetectPrivateIPAdress():
     return s.getsockname()[0]
 
 def DetectNetworkRange(ip):
+    #split the IP address into 4 pieces and replace last part with 0/24
     return str(ip.split('.')[0]) + '.' + str(ip.split('.')[1]) + '.' + ip.split('.')[2] + '.0/24'
 
+#use the 2 functions above if user doesn't specify an IP address and enabled automatic scan
 if args.target:
     targetarg = args.target
 else:
@@ -54,8 +63,10 @@ else:
         print_colored("Please specify a target.", colors.cyan)
         targetarg = input()
 
+#print a beautiful banner
 print_banner()
 
+#do a ping scan using nmap
 def TestPing(target):
     print_colored("\n---------------------------------------------------------", colors.green)
     print_colored("\tDoing host discovery on " + str(target) + "...", colors.green)
@@ -64,6 +75,7 @@ def TestPing(target):
     resp = nm.scan(hosts=target, arguments="-sn")
     return nm.all_hosts()
 
+#do a arp scan using nmap
 def TestArp(target):
     print_colored("\n---------------------------------------------------------", colors.green)
     print_colored("\tDoing host discovery on " + str(target) + "...", colors.green)
@@ -72,6 +84,7 @@ def TestArp(target):
     resp = nm.scan(hosts=target, arguments="-sn -PR")
     return nm.all_hosts()
 
+#run a port scan on target using nmap
 def PortScan(target):
     print_colored("\n---------------------------------------------------------", colors.green)
     print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
@@ -80,6 +93,7 @@ def PortScan(target):
     resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn")
     return nm
 
+#analyse and print scan results
 def AnalyseScanResults(nm,target):
     HostArray = []
     try:
@@ -145,6 +159,7 @@ def AnalyseScanResults(nm,target):
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
     return HostArray
 
+#ask the user if they want to scan ports
 def UserWantsPortScan():
     if DontAskForConfirmation:
         return True
@@ -160,6 +175,7 @@ def UserWantsPortScan():
             else:
                 print("Please say Y or N!")
 
+#ask the user if they want to do a vulnerability check
 def UserWantsVulnerabilityDetection():
     if DontAskForConfirmation:
         return True
@@ -175,6 +191,7 @@ def UserWantsVulnerabilityDetection():
             else:
                 print("Please say Y or N!")
 
+#post scan stuff
 def PostScanStuff(hosts):
     for host in hosts:
         print("\t\t" + host)
@@ -188,7 +205,7 @@ def PostScanStuff(hosts):
             else:
                 print("Skipping vulnerability detection for " + str(host))
 
-
+#main function
 def main():
     if scantype == 'ping':
         results = TestPing(targetarg)
@@ -201,5 +218,6 @@ def main():
     else:
         raise exception("Unknown scan type : " + scantype)
 
+#only run the script if its not imported as a module (directly interpreted with python3)
 if __name__ == '__main__':
     main()
