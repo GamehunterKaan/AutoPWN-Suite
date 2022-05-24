@@ -57,6 +57,18 @@ def is_root():
 if is_root() == False:
     print_colored("It's recommended to run this script as root since it's more silent and accurate.", colors.red)
 
+try:
+    args.speed = int(args.speed)
+except ValueError:
+    print_colored("Speed must be a number!", colors.red)
+    args.speed = 2
+    print_colored("Using default speed : %d" % args.speed, colors.cyan) #Use default speed if user specified invalid speed value type
+
+if not args.speed <= 5 or not args.speed >= 0:
+    print_colored("Invalid speed specified : %d" % args.speed, colors.red)
+    args.speed = 2
+    print_colored("Using default speed : %d" % args.speed, colors.cyan) #Use default speed if user specified invalid speed value
+
 #do a ping scan using nmap
 def TestPing(target):
     print_colored("\n---------------------------------------------------------", colors.green)
@@ -82,9 +94,9 @@ def PortScan(target):
     print_colored("---------------------------------------------------------\n", colors.green)
     nm = PortScanner()
     if is_root():
-        resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O")
+        resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T%s" % (args.speed))
     else:
-        resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn")
+        resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn -T%s" % (args.speed))
     return nm
 
 #analyse and print scan results
