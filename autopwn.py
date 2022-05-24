@@ -12,23 +12,12 @@ __author__ = 'GamehunterKaan'
 
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
-argparser.add_argument("-o", "--output", help="Output file name. (Default:autopwn.log)")
+argparser.add_argument("-o", "--output", help="Output file name. (Default : autopwn.log)", default="autopwn.log")
 argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.1 or 192.168.0.0/24)")
-argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)")
+argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)", default="arp")
+argparser.add_argument("-s", "--speed", help="Scan speed. (0-5)", default=2)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 args = argparser.parse_args()
-
-#get output file name
-if args.output:
-    outfile = args.output
-else:
-    outfile = 'autopwn.log'
-
-#get scan type
-if args.scantype:
-    scantype = args.scantype.lower()
-else:
-    scantype = 'arp'
 
 #check if user wants to do automatic scan
 if args.yesplease:
@@ -237,11 +226,11 @@ def PostScanStuff(hosts):
 
 #main function
 def main():
-    if scantype == 'ping':
+    if args.scantype == 'ping':
         results = TestPing(targetarg)
         PostScanStuff(results)
 
-    elif scantype == 'arp':
+    elif args.scantype == 'arp':
         if is_root():
             results = TestArp(targetarg)
         else:
