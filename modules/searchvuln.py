@@ -1,5 +1,7 @@
 from modules.color import print_colored, colors, bcolors
 from modules.nvdlib.nvdlib import searchCPE, getCVE
+from textwrap import wrap
+from os import get_terminal_size
 
 #generate keywords to search for from the information gathered from the target
 def GenerateKeywords(HostArray):
@@ -98,13 +100,18 @@ def SearchSploits(HostArray,CPEArray):
                             exploitability = CVEDetails.v2exploitability
                         except:
                             exploitability = "Could not fetch exploitability for " + str(CVE)
-                    
+
                     try:
                         details = CVEDetails.url
                     except:
                         details = "Could not fetch details for " + str(CVE)
 
-                    print("│\t\tDescription : %s" % (description))
+                    termsize = get_terminal_size()
+                    wrapped_description = wrap(description, termsize.columns - 50)
+
+                    print("│\t\tDescription : ")
+                    for wrapped_part in wrapped_description:
+                        print("│\t\t\t%s" % wrapped_part)
                     print("│\t\tSeverity : %s - %s" % (severity, score))
                     print("│\t\tExploitability : %s" % (exploitability))
                     print("│\t\tDetails : %s" % (details))
