@@ -1,5 +1,5 @@
 from modules.color import print_colored, colors, bcolors
-from modules.nvdlib.nvdlib import searchCPE, getCVE
+from modules.nvdlib.nvdlib import searchCPE, searchCVE, getCVE
 from textwrap import wrap
 from os import get_terminal_size
 
@@ -44,137 +44,61 @@ def SearchSploits(HostArray,CPEArray):
     if len(keywords) and len(CPEArray) == 0:
         print_colored("Insufficient information for " + str(HostArray[0][0]), colors.red)
     else:
-        print("Searching vulnerability database for %s keywords and %s CPEs..." % (len(keywords),len(CPEArray)))
+        print("Searching vulnerability database for %s keyword(s) and %s CPE(s)..." % (len(keywords),len(CPEArray)))
         for keyword in keywords:
             #https://github.com/vehemont/nvdlib
             #search the NIST vulnerabilities database for the generated keywords
-            ApiResponse = searchCPE(keyword = str(keyword), cves=True)
+            ApiResponseCPE = searchCPE(keyword = str(keyword))
             tempTitleList = []
             TitleList = []
-            tempCVEList = []
-            AllCVEs = []
-            for CPE in ApiResponse:
+            for CPE in ApiResponseCPE:
                 tempTitleList.append(CPE.title)
-                for CVE in CPE.vulnerabilities:
-                    tempCVEList.append(CVE)
-            
-            for cve in tempCVEList:
-                if cve not in AllCVEs and not cve == '':
-                    AllCVEs.append(cve)
 
             for title in tempTitleList:
                 if title not in TitleList and not title == '':
                     TitleList.append(title)
-
-            if len(TitleList) > 0:
-                ProductTitle = min(TitleList)
-                print_colored("\n┌─[ %s ]" % ProductTitle, colors.cyan)
-                for CVE in AllCVEs:
-                    print_colored("│\n├─────%s\n│" % (CVE), colors.bold)
-                    CVEDetails = getCVE(CVE)
-                    try:
-                        description = str(CVEDetails.cve.description.description_data[0].value)
-                    except:
-                        description = "Could not fetch description for " + str(CVE)
-
-                    try:
-                        severity = CVEDetails.v3severity
-                    except:
-                        try:
-                            severity = CVEDetails.v2severity
-                        except:
-                            severity = "Could not fetch severity for " + str(CVE)
-
-                    try:
-                        score = CVEDetails.v3score
-                    except:
-                        try:
-                            score = CVEDetails.v2score
-                        except:
-                            score = "Could not fetch score for " + str(CVE)
-
-                    try:
-                        exploitability = CVEDetails.v3exploitability
-                    except:
-                        try:
-                            exploitability = CVEDetails.v2exploitability
-                        except:
-                            exploitability = "Could not fetch exploitability for " + str(CVE)
-
-                    try:
-                        details = CVEDetails.url
-                    except:
-                        details = "Could not fetch details for " + str(CVE)
-
-                    termsize = get_terminal_size()
-                    wrapped_description = wrap(description, termsize.columns - 50)
-
-                    print("│\t\tDescription : ")
-                    for wrapped_part in wrapped_description:
-                        print("│\t\t\t%s" % wrapped_part)
-                    print("│\t\tSeverity : %s - %s" % (severity, score))
-                    print("│\t\tExploitability : %s" % (exploitability))
-                    print("│\t\tDetails : %s" % (details))
-
-        for cpe in CPEArray:
-            #search the NIST vulnerabilities database for CPEs
-            ApiResponse = searchCPE(cpeMatchString=cpe, cves=True)
-            tempTitleList = []
-            TitleList = []
-            tempCVEList = []
-            AllCVEs = []
-            for CPE in ApiResponse:
-                tempTitleList.append(CPE.title)
-                for CVE in CPE.vulnerabilities:
-                    tempCVEList.append(CVE)
             
-            for cve in tempCVEList:
-                if cve not in AllCVEs and not cve == '':
-                    AllCVEs.append(cve)
-
-            for title in tempTitleList:
-                if title not in TitleList and not title == '':
-                    TitleList.append(title)
-
             if len(TitleList) > 0:
                 ProductTitle = min(TitleList)
                 print_colored("\n┌─[ %s ]" % ProductTitle, colors.cyan)
-                for CVE in AllCVEs:
-                    print_colored("│\n├─────%s\n│" % (CVE), colors.bold)
-                    CVEDetails = getCVE(CVE)
+
+                ApiResponseCVE = searchCVE(keyword = str(keyword))
+                
+                for CVE in ApiResponseCVE:
+                    print_colored("│\n├─────%s\n│" % (CVE.id), colors.bold)
                     try:
-                        description = str(CVEDetails.cve.description.description_data[0].value)
+                        description = str(CVE.cve.description.description_data[0].value)
                     except:
-                        description = "Could not fetch description for " + str(CVE)
+                        description = "Could not fetch description for " + str(CVE.id)
 
                     try:
-                        severity = CVEDetails.v3severity
+                        severity = CVE.v3severity
                     except:
                         try:
-                            severity = CVEDetails.v2severity
+                            severity = CVE.v2severity
                         except:
-                            severity = "Could not fetch severity for " + str(CVE)
+                            severity = "Could not fetch severity for " + str(CVE.id)
 
                     try:
-                        score = CVEDetails.v3score
+                        score = CVE.v3score
                     except:
                         try:
-                            score = CVEDetails.v2score
+                            score = CVE.v2score
                         except:
-                            score = "Could not fetch score for " + str(CVE)
+                            score = "Could not fetch score for " + str(CVE.id)
 
                     try:
-                        exploitability = CVEDetails.v3exploitability
+                        exploitability = CVE.v3exploitability
                     except:
                         try:
-                            exploitability = CVEDetails.v2exploitability
+                            exploitability = CVE.v2exploitability
                         except:
-                            exploitability = "Could not fetch exploitability for " + str(CVE)
+                            exploitability = "Could not fetch exploitability for " + str(CVE.id)
 
                     try:
-                        details = CVEDetails.url
+                        details = CVE.url
                     except:
-                        details = "Could not fetch details for " + str(CVE)
+                        details = "Could not fetch details for " + str(CVE.id)
 
                     termsize = get_terminal_size()
                     wrapped_description = wrap(description, termsize.columns - 50)
