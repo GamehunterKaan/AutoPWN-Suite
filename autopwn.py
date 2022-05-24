@@ -93,7 +93,7 @@ def PortScan(target):
     print_colored("---------------------------------------------------------\n", colors.green)
     nm = PortScanner()
     if is_root():
-        resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn")
+        resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O")
     else:
         resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn")
     return nm
@@ -114,7 +114,23 @@ def AnalyseScanResults(nm,target):
         except:
             vendor = 'Unknown'
 
-        print_colored("MAC Address : %s\tVendor : %s\n" % (mac, vendor), colors.yellow)
+        try:
+            os = nm[target]['osmatch'][0]['name']
+        except:
+            vendor = 'Unknown'
+
+        try:
+            accuracy = nm[target]['osmatch'][0]['accuracy']
+        except:
+            vendor = 'Unknown'
+
+        try:
+            ostype = nm[target]['osmatch'][0]['osclass'][0]['type']
+        except:
+            vendor = 'Unknown'
+
+        print_colored("MAC Address : %s\tVendor : %s" % (mac, vendor), colors.yellow)
+        print_colored("OS : %s\tAccuracy : %s\tType : %s\n" % (os, accuracy,ostype), colors.yellow)
         if nm[target]['status']['reason'] == 'localhost-response' or nm[target]['status']['reason'] == 'user-set':
             print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
         if len(nm[target].all_protocols()) == 0:
