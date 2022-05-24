@@ -41,7 +41,7 @@ def SearchSploits(HostArray):
     print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]), colors.red)
     print_colored("---------------------------------------------------------", colors.red)
     keywords = GenerateKeywords(HostArray)
-    if len(keywords):
+    if len(keywords) <= 0:
         print_colored("Insufficient information for " + str(HostArray[0][0]), colors.red)
     else:
         print("Searching vulnerability database for %s keyword(s)..." % (len(keywords)))
