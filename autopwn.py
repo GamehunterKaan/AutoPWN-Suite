@@ -15,7 +15,7 @@ argparser = ArgumentParser(description="AutoPWN Suite")
 argparser.add_argument("-o", "--output", help="Output file name. (Default : autopwn.log)", default="autopwn.log")
 argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.1 or 192.168.0.0/24)")
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)", default="arp")
-argparser.add_argument("-s", "--speed", help="Scan speed. (0-5)", default=2)
+argparser.add_argument("-s", "--speed", help="Scan speed. (0-5)", default=3)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 args = argparser.parse_args()
 
@@ -61,12 +61,12 @@ try:
     args.speed = int(args.speed)
 except ValueError:
     print_colored("Speed must be a number!", colors.red)
-    args.speed = 2
+    args.speed = 3
     print_colored("Using default speed : %d" % args.speed, colors.cyan) #Use default speed if user specified invalid speed value type
 
 if not args.speed <= 5 or not args.speed >= 0:
     print_colored("Invalid speed specified : %d" % args.speed, colors.red)
-    args.speed = 2
+    args.speed = 3
     print_colored("Using default speed : %d" % args.speed, colors.cyan) #Use default speed if user specified invalid speed value
 
 #do a ping scan using nmap
@@ -94,9 +94,9 @@ def PortScan(target):
     print_colored("---------------------------------------------------------\n", colors.green)
     nm = PortScanner()
     if is_root():
-        resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T%s" % (args.speed))
+        resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T %d" % (args.speed))
     else:
-        resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn -T%s" % (args.speed))
+        resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn -T %d" % (args.speed))
     return nm
 
 #analyse and print scan results
@@ -188,7 +188,7 @@ def AnalyseScanResults(nm,target):
 
     except:
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
-    return HostArray,CPEArray
+    return HostArray, CPEArray
 
 #ask the user if they want to scan ports
 def UserWantsPortScan():
