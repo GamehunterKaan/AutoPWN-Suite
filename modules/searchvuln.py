@@ -34,20 +34,29 @@ def GenerateKeywords(HostArray):
 
     return keywords
 
-def SearchSploits(HostArray):
+def SearchSploits(HostArray,CPEArray):
     print_colored("\n---------------------------------------------------------", colors.red)
     print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]), colors.red)
     print_colored("---------------------------------------------------------", colors.red)
     keywords = GenerateKeywords(HostArray)
-    if len(keywords) == 0:
+    if len(keywords) and len(CPEArray) == 0:
         print_colored("Insufficient information for " + str(HostArray[0][0]), colors.red)
     else:
-        print("Searching vulnerability database for %s keywords..." % (len(keywords)))
+        print("Searching vulnerability database for %s keywords and %s CPEs..." % (len(keywords),len(CPEArray)))
     for keyword in keywords:
         #https://github.com/vehemont/nvdlib
         #search the NIST vulnerabilities database for the generated keywords
         ApiResponse = searchCPE(keyword = str(keyword), cves=True)
         printedCVEs = []
+        for CPE in ApiResponse:
+            if (not CPE.vulnerabilities[0] == '' and not set(CPE.vulnerabilities[0:3]).issubset(printedCVEs)):
+                #only print the first 3 CVEs
+                print(bcolors.cyan + "Product : " + bcolors.endc + CPE.title + bcolors.cyan + "\tCVEs : " + bcolors.endc + str(CPE.vulnerabilities[0:3]))
+                for CVE in CPE.vulnerabilities:
+                    printedCVEs.append(CVE)
+    for cpe in CPEArray:
+        #search the NIST vulnerabilities database for CPEs
+        ApiResponse = searchCPE(cpeMatchString=cpe, cves=True)
         for CPE in ApiResponse:
             if (not CPE.vulnerabilities[0] == '' and not set(CPE.vulnerabilities[0:3]).issubset(printedCVEs)):
                 #only print the first 3 CVEs

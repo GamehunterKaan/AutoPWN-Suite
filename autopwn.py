@@ -101,6 +101,7 @@ def PortScan(target):
 #analyse and print scan results
 def AnalyseScanResults(nm,target):
     HostArray = []
+    CPEArray = []
     try:
         nm[target]
 
@@ -117,17 +118,25 @@ def AnalyseScanResults(nm,target):
         try:
             os = nm[target]['osmatch'][0]['name']
         except:
-            vendor = 'Unknown'
+            os = 'Unknown'
 
         try:
             accuracy = nm[target]['osmatch'][0]['accuracy']
         except:
-            vendor = 'Unknown'
+            accuracy = 'Unknown'
 
         try:
             ostype = nm[target]['osmatch'][0]['osclass'][0]['type']
         except:
-            vendor = 'Unknown'
+            ostype = 'Unknown'
+
+        try:
+            cpes = nm[target]['osmatch'][0]['osclass'][0]['cpe']
+        except:
+            cpes = []
+
+        for cpe in cpes:
+            CPEArray.insert(len(CPEArray), cpe)
 
         print_colored("MAC Address : %s\tVendor : %s" % (mac, vendor), colors.yellow)
         print_colored("OS : %s\tAccuracy : %s\tType : %s\n" % (os, accuracy,ostype), colors.yellow)
@@ -178,7 +187,7 @@ def AnalyseScanResults(nm,target):
 
     except:
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
-    return HostArray
+    return HostArray,CPEArray
 
 #ask the user if they want to scan ports
 def UserWantsPortScan():
@@ -219,10 +228,10 @@ def PostScanStuff(hosts):
     if UserWantsPortScan():
         for host in hosts:
             PortScanResults = PortScan(host)
-            PortArray = AnalyseScanResults(PortScanResults,host)
+            PortArray, CPEArray = AnalyseScanResults(PortScanResults,host)
             if len(PortArray) > 0:
                 if UserWantsVulnerabilityDetection():
-                    SearchSploits(PortArray)
+                    SearchSploits(PortArray,CPEArray)
             else:
                 print("Skipping vulnerability detection for " + str(host))
 
@@ -236,15 +245,21 @@ def main():
         if is_root():
             results = TestArp(targetarg)
         else:
+            #switch over to ping scan if user is not root
             print_colored("Not running as root! Running ping scan instead...", colors.red) #Yell at the user for not running as root!
             results = TestPing(targetarg)
         PostScanStuff(results)
 
     else:
+        #if specified scan type is invalid, decide which scan type to use depending on user privilege
         if is_root():
             print_colored("Unknown scan type: %s! Using arp scan instead..." % (args.scantype), colors.red)
+            results = TestArp(targetarg)
+            PostScanStuff(results)
         else:
             print_colored("Unknown scan type: %s! Using ping scan instead..." % (args.scantype), colors.red)
+            results = TestPing(targetarg)
+            PostScanStuff(results)
 
 #only run the script if its not imported as a module (directly interpreted with python3)
 if __name__ == '__main__':
