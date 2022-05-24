@@ -102,7 +102,6 @@ def PortScan(target):
 #analyse and print scan results
 def AnalyseScanResults(nm,target):
     HostArray = []
-    CPEArray = []
     try:
         nm[target]
 
@@ -130,14 +129,6 @@ def AnalyseScanResults(nm,target):
             ostype = nm[target]['osmatch'][0]['osclass'][0]['type']
         except:
             ostype = 'Unknown'
-
-        try:
-            cpes = nm[target]['osmatch'][0]['osclass'][0]['cpe']
-        except:
-            cpes = []
-
-        for cpe in cpes:
-            CPEArray.insert(len(CPEArray), cpe)
 
         print_colored("MAC Address : %s\tVendor : %s" % (mac, vendor), colors.yellow)
         print_colored("OS : %s\tAccuracy : %s\tType : %s\n" % (os, accuracy,ostype), colors.yellow)
@@ -188,7 +179,7 @@ def AnalyseScanResults(nm,target):
 
     except:
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
-    return HostArray, CPEArray
+    return HostArray
 
 #ask the user if they want to scan ports
 def UserWantsPortScan():
@@ -229,10 +220,10 @@ def PostScanStuff(hosts):
     if UserWantsPortScan():
         for host in hosts:
             PortScanResults = PortScan(host)
-            PortArray, CPEArray = AnalyseScanResults(PortScanResults,host)
+            PortArray = AnalyseScanResults(PortScanResults,host)
             if len(PortArray) > 0:
                 if UserWantsVulnerabilityDetection():
-                    SearchSploits(PortArray,CPEArray)
+                    SearchSploits(PortArray)
             else:
                 print("Skipping vulnerability detection for " + str(host))
 

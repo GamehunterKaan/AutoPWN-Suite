@@ -36,15 +36,15 @@ def GenerateKeywords(HostArray):
 
     return keywords
 
-def SearchSploits(HostArray,CPEArray):
+def SearchSploits(HostArray):
     print_colored("\n---------------------------------------------------------", colors.red)
     print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]), colors.red)
     print_colored("---------------------------------------------------------", colors.red)
     keywords = GenerateKeywords(HostArray)
-    if len(keywords) and len(CPEArray) == 0:
+    if len(keywords):
         print_colored("Insufficient information for " + str(HostArray[0][0]), colors.red)
     else:
-        print("Searching vulnerability database for %s keyword(s) and %s CPE(s)..." % (len(keywords),len(CPEArray)))
+        print("Searching vulnerability database for %s keyword(s)..." % (len(keywords)))
         for keyword in keywords:
             #https://github.com/vehemont/nvdlib
             #search the NIST vulnerabilities database for the generated keywords
