@@ -37,18 +37,20 @@ git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 ### Usage
 
 ```
-usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-st SCANTYPE] [-y]
+usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-st SCANTYPE] [-s SPEED] [-y]
 
 AutoPWN Suite
 
 options:
   -h, --help            show this help message and exit
   -o OUTPUT, --output OUTPUT
-                        Output file name. (Default:autopwn.log)
+                        Output file name. (Default : autopwn.log)
   -t TARGET, --target TARGET
                         Target range to scan. (192.168.0.1 or 192.168.0.0/24)
   -st SCANTYPE, --scantype SCANTYPE
                         Scan type. (Ping or ARP)
+  -s SPEED, --speed SPEED
+                        Scan speed. (0-5)
   -y, --yesplease       Don't ask for anything. (Full automatic mode)
 ```
 
