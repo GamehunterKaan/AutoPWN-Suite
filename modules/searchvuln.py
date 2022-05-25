@@ -60,38 +60,38 @@ def SearchSploits(HostArray):
             
             if len(TitleList) > 0:
                 ProductTitle = min(TitleList)
-                print_colored("\n┌─[ %s ]" % ProductTitle, colors.cyan)
+                print_colored("\n\n┌─[ %s ]" % ProductTitle, colors.yellow)
 
                 ApiResponseCVE = searchCVE(keyword = str(keyword))
                 
                 for CVE in ApiResponseCVE:
-                    print_colored("│\n├─────%s\n│" % (CVE.id), colors.bold)
+                    print("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
                     try:
                         description = str(CVE.cve.description.description_data[0].value)
                     except:
                         description = "Could not fetch description for " + str(CVE.id)
 
                     try:
-                        severity = CVE.v3severity
+                        severity = str(CVE.v3severity)
                     except:
                         try:
-                            severity = CVE.v2severity
+                            severity = str(CVE.v2severity)
                         except:
                             severity = "Could not fetch severity for " + str(CVE.id)
 
                     try:
-                        score = CVE.v3score
+                        score = str(CVE.v3score)
                     except:
                         try:
-                            score = CVE.v2score
+                            score = str(CVE.v2score)
                         except:
                             score = "Could not fetch score for " + str(CVE.id)
 
                     try:
-                        exploitability = CVE.v3exploitability
+                        exploitability = str(CVE.v3exploitability)
                     except:
                         try:
-                            exploitability = CVE.v2exploitability
+                            exploitability = str(CVE.v2exploitability)
                         except:
                             exploitability = "Could not fetch exploitability for " + str(CVE.id)
 
@@ -103,9 +103,9 @@ def SearchSploits(HostArray):
                     termsize = get_terminal_size()
                     wrapped_description = wrap(description, termsize.columns - 50)
 
-                    print("│\t\tDescription : ")
+                    print("│\t\t" + bcolors.cyan + "Description : " + bcolors.endc)
                     for wrapped_part in wrapped_description:
                         print("│\t\t\t%s" % wrapped_part)
-                    print("│\t\tSeverity : %s - %s" % (severity, score))
-                    print("│\t\tExploitability : %s" % (exploitability))
-                    print("│\t\tDetails : %s" % (details))
+                    print("│\t\t" + bcolors.cyan + "Severity : " + bcolors.endc + severity + " - " + score)
+                    print("│\t\t" + bcolors.cyan + "Exploitability : " + bcolors.endc + exploitability)
+                    print("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
