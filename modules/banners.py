@@ -1,4 +1,3 @@
-from random import choice
 from modules.color import print_colored, colors
 
 #https://patorjk.com/software/taag/
