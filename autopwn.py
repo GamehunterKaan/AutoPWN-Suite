@@ -4,7 +4,7 @@ from socket import socket, AF_INET, SOCK_DGRAM
 from os import getuid
 from logging import exception
 from modules.nmap import PortScanner
-from modules.color import print_colored, colors
+from modules.color import print_colored, colors, bcolors
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
 
@@ -172,8 +172,14 @@ def AnalyseScanResults(nm,target):
                 except:
                     version = 'Unknown'
 
-                print('Port : %s\tState : %s\tService : %s\tProduct : %s\tVersion : %s'
-                 %      (port, state, service, product, version))
+                print(
+                    bcolors.cyan + "Port : " + bcolors.endc + str(port) + 
+                    bcolors.cyan + "\tState : " + bcolors.endc + str(state) +
+                    bcolors.cyan + "\tService : " + bcolors.endc + str(service) +
+                    bcolors.cyan + "\tProduct : " + bcolors.endc + str(product) +
+                    bcolors.cyan + "\tVersion : " + bcolors.endc + str(version)
+                )
+
                 if state == 'open':
                     HostArray.insert(len(HostArray), [target, port, service, product, version])
 
