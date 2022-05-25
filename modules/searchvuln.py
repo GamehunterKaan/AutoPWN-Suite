@@ -2,6 +2,7 @@ from modules.color import print_colored, colors, bcolors
 from modules.nvdlib.nvdlib import searchCPE, searchCVE, getCVE
 from textwrap import wrap
 from os import get_terminal_size
+from requests.exceptions import JSONDecodeError
 
 #generate keywords to search for from the information gathered from the target
 def GenerateKeywords(HostArray):
@@ -48,64 +49,70 @@ def SearchSploits(HostArray):
         for keyword in keywords:
             #https://github.com/vehemont/nvdlib
             #search the NIST vulnerabilities database for the generated keywords
-            ApiResponseCPE = searchCPE(keyword = str(keyword))
-            tempTitleList = []
-            TitleList = []
-            for CPE in ApiResponseCPE:
-                tempTitleList.append(CPE.title)
+            print("Searching vulnerability database for keyword %s... CTRL-C to skip" % (keyword))
+            try:
+                ApiResponseCPE = searchCPE(keyword = str(keyword))
+                tempTitleList = []
+                TitleList = []
+                for CPE in ApiResponseCPE:
+                    tempTitleList.append(CPE.title)
 
-            for title in tempTitleList:
-                if title not in TitleList and not title == '':
-                    TitleList.append(title)
-            
-            if len(TitleList) > 0:
-                ProductTitle = min(TitleList)
-                print_colored("\n\n┌─[ %s ]" % ProductTitle, colors.yellow)
-
-                ApiResponseCVE = searchCVE(keyword = str(keyword))
+                for title in tempTitleList:
+                    if title not in TitleList and not title == '':
+                        TitleList.append(title)
                 
-                for CVE in ApiResponseCVE:
-                    print("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
-                    try:
-                        description = str(CVE.cve.description.description_data[0].value)
-                    except:
-                        description = "Could not fetch description for " + str(CVE.id)
+                if len(TitleList) > 0:
+                    ProductTitle = min(TitleList)
+                    print_colored("\n\n┌─[ %s ]" % ProductTitle, colors.yellow)
 
-                    try:
-                        severity = str(CVE.v3severity)
-                    except:
+                    ApiResponseCVE = searchCVE(keyword = str(keyword))
+                    
+                    for CVE in ApiResponseCVE:
+                        print("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
                         try:
-                            severity = str(CVE.v2severity)
+                            description = str(CVE.cve.description.description_data[0].value)
                         except:
-                            severity = "Could not fetch severity for " + str(CVE.id)
+                            description = "Could not fetch description for " + str(CVE.id)
 
-                    try:
-                        score = str(CVE.v3score)
-                    except:
                         try:
-                            score = str(CVE.v2score)
+                            severity = str(CVE.v3severity)
                         except:
-                            score = "Could not fetch score for " + str(CVE.id)
+                            try:
+                                severity = str(CVE.v2severity)
+                            except:
+                                severity = "Could not fetch severity for " + str(CVE.id)
 
-                    try:
-                        exploitability = str(CVE.v3exploitability)
-                    except:
                         try:
-                            exploitability = str(CVE.v2exploitability)
+                            score = str(CVE.v3score)
                         except:
-                            exploitability = "Could not fetch exploitability for " + str(CVE.id)
+                            try:
+                                score = str(CVE.v2score)
+                            except:
+                                score = "Could not fetch score for " + str(CVE.id)
 
-                    try:
-                        details = CVE.url
-                    except:
-                        details = "Could not fetch details for " + str(CVE.id)
+                        try:
+                            exploitability = str(CVE.v3exploitability)
+                        except:
+                            try:
+                                exploitability = str(CVE.v2exploitability)
+                            except:
+                                exploitability = "Could not fetch exploitability for " + str(CVE.id)
 
-                    termsize = get_terminal_size()
-                    wrapped_description = wrap(description, termsize.columns - 50)
+                        try:
+                            details = CVE.url
+                        except:
+                            details = "Could not fetch details for " + str(CVE.id)
 
-                    print("│\t\t" + bcolors.cyan + "Description : " + bcolors.endc)
-                    for wrapped_part in wrapped_description:
-                        print("│\t\t\t%s" % wrapped_part)
-                    print("│\t\t" + bcolors.cyan + "Severity : " + bcolors.endc + severity + " - " + score)
-                    print("│\t\t" + bcolors.cyan + "Exploitability : " + bcolors.endc + exploitability)
-                    print("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
+                        termsize = get_terminal_size()
+                        wrapped_description = wrap(description, termsize.columns - 50)
+
+                        print("│\t\t" + bcolors.cyan + "Description : " + bcolors.endc)
+                        for wrapped_part in wrapped_description:
+                            print("│\t\t\t%s" % wrapped_part)
+                        print("│\t\t" + bcolors.cyan + "Severity : " + bcolors.endc + severity + " - " + score)
+                        print("│\t\t" + bcolors.cyan + "Exploitability : " + bcolors.endc + exploitability)
+                        print("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
+            except JSONDecodeError:
+                print_colored("An error occurred while trying to fetch details for " + str(keyword), colors.red)
+            except KeyboardInterrupt:
+                print_colored("Skipping vulnerability detection for keyword " + str(keyword), colors.red)
