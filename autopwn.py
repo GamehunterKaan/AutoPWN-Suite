@@ -255,4 +255,7 @@ def main():
 
 #only run the script if its not imported as a module (directly interpreted with python3)
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print_colored("Ctrl+C pressed. Exiting.", colors.red)
