@@ -3,10 +3,11 @@ from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
 from os import getuid
 from logging import exception
-from modules.nmap import PortScanner
 from modules.color import print_colored, colors, bcolors
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
+from modules.scanner import TestArp, TestPing, AnalyseScanResults, PortScan, DiscoverHosts
+from modules.outfile import InitializeOutput, output
 
 __author__ = 'GamehunterKaan'
 
@@ -19,11 +20,9 @@ argparser.add_argument("-s", "--speed", help="Scan speed. (0-5)", default=3)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 args = argparser.parse_args()
 
-#check if user wants to do automatic scan
-if args.yesplease:
-    DontAskForConfirmation = True
-else:
-    DontAskForConfirmation = False
+outputfile = args.output
+InitializeOutput(context=args.output)
+DontAskForConfirmation = args.yesplease
 
 def DetectPrivateIPAdress():
     s = socket(AF_INET, SOCK_DGRAM)
@@ -45,8 +44,13 @@ else:
         print_colored("Please specify a target.", colors.cyan)
         targetarg = input()
 
+scantype = args.scantype
+scanspeed = int(args.speed)
+
 #print a beautiful banner
 print_banner()
+
+output.OutputBanner(targetarg, scantype, scanspeed)
 
 def is_root():
     if getuid() == 0:
@@ -69,124 +73,6 @@ if not args.speed <= 5 or not args.speed >= 0:
     args.speed = 3
     print_colored("Using default speed : %d" % args.speed, colors.cyan) #Use default speed if user specified invalid speed value
 
-#do a ping scan using nmap
-def TestPing(target):
-    print_colored("\n---------------------------------------------------------", colors.green)
-    print_colored("\tDoing host discovery on " + str(target) + "...", colors.green)
-    print_colored("---------------------------------------------------------\n", colors.green)
-    nm = PortScanner()
-    resp = nm.scan(hosts=target, arguments="-sn")
-    return nm.all_hosts()
-
-#do a arp scan using nmap
-def TestArp(target):
-    print_colored("\n---------------------------------------------------------", colors.green)
-    print_colored("\tDoing host discovery on " + str(target) + "...", colors.green)
-    print_colored("---------------------------------------------------------\n", colors.green)
-    nm = PortScanner()
-    resp = nm.scan(hosts=target, arguments="-sn -PR")
-    return nm.all_hosts()
-
-#run a port scan on target using nmap
-def PortScan(target):
-    print_colored("\n---------------------------------------------------------", colors.green)
-    print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
-    print_colored("---------------------------------------------------------\n", colors.green)
-    nm = PortScanner()
-    if is_root():
-        resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T %d" % (args.speed))
-    else:
-        resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn -T %d" % (args.speed))
-    return nm
-
-#analyse and print scan results
-def AnalyseScanResults(nm,target):
-    HostArray = []
-    try:
-        nm[target]
-
-        try:
-            mac = nm[target]['addresses']['mac']
-        except:
-            mac = 'Unknown'
-
-        try:
-            vendor = nm[target]['vendor'][mac]
-        except:
-            vendor = 'Unknown'
-
-        try:
-            os = nm[target]['osmatch'][0]['name']
-        except:
-            os = 'Unknown'
-
-        try:
-            accuracy = nm[target]['osmatch'][0]['accuracy']
-        except:
-            accuracy = 'Unknown'
-
-        try:
-            ostype = nm[target]['osmatch'][0]['osclass'][0]['type']
-        except:
-            ostype = 'Unknown'
-
-        print_colored("MAC Address : %s\tVendor : %s" % (mac, vendor), colors.yellow)
-        print_colored("OS : %s\tAccuracy : %s\tType : %s\n" % (os, accuracy,ostype), colors.yellow)
-        if nm[target]['status']['reason'] == 'localhost-response' or nm[target]['status']['reason'] == 'user-set':
-            print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
-        if len(nm[target].all_protocols()) == 0:
-            print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
-        for proto in nm[target].all_protocols():
-            for port in nm[target][proto].keys():
-                                
-                try:
-                    if not len(nm[str(target)][proto][int(port)]['state']) == 0:
-                        state = nm[str(target)][proto][int(port)]['state']
-                    else:
-                        state = 'Unknown'
-                except:
-                    state = 'Unknown'
-                
-                try:
-                    if not len(nm[str(target)][proto][int(port)]['name']) == 0:
-                        service = nm[str(target)][proto][int(port)]['name']
-                    else:
-                        service = 'Unknown'
-                except:
-                    service = 'Unknown'
-
-                try:
-                    if not len(nm[str(target)][proto][int(port)]['product']) == 0:
-                        product = nm[str(target)][proto][int(port)]['product']
-                    else:
-                        product = 'Unknown'
-                    
-                except:
-                    product = 'Unknown'
-
-                try:
-                    if not len(nm[str(target)][proto][int(port)]['version']) == 0:
-                        version = nm[str(target)][proto][int(port)]['version']
-                    else:
-                        version = 'Unknown'
-                except:
-                    version = 'Unknown'
-
-                print(
-                    bcolors.cyan + "Port : " + bcolors.endc + str(port) + 
-                    bcolors.cyan + "\tState : " + bcolors.endc + str(state) +
-                    bcolors.cyan + "\tService : " + bcolors.endc + str(service) +
-                    bcolors.cyan + "\tProduct : " + bcolors.endc + str(product) +
-                    bcolors.cyan + "\tVersion : " + bcolors.endc + str(version)
-                )
-
-                if state == 'open':
-                    HostArray.insert(len(HostArray), [target, port, service, product, version])
-
-    except:
-        print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
-    return HostArray
-
 #ask the user if they want to scan ports
 def UserWantsPortScan():
     if DontAskForConfirmation:
@@ -199,6 +85,7 @@ def UserWantsPortScan():
                 return True
                 break
             elif wannaportscan == 'n' or wannaportscan == 'no':
+                output.WriteToFile("User refused to run a port scan on these hosts.")
                 return False
             else:
                 print("Please say Y or N!")
@@ -215,49 +102,33 @@ def UserWantsVulnerabilityDetection():
                 return True
                 break
             elif wannaportscan == 'n' or wannaportscan == 'no':
+                output.WriteToFile("User refused to do a version based vulnerability detection.")
                 return False
             else:
                 print("Please say Y or N!")
 
 #post scan stuff
-def PostScanStuff(hosts):
+def FurtherEnumuration(hosts):
     for host in hosts:
         print("\t\t" + host)
+        output.WriteToFile("\t\t" + host)
     if UserWantsPortScan():
         for host in hosts:
-            PortScanResults = PortScan(host)
+            output.WriteToFile("\n" + "-" * 50)
+            PortScanResults = PortScan(host, scanspeed)
             PortArray = AnalyseScanResults(PortScanResults,host)
             if len(PortArray) > 0:
                 if UserWantsVulnerabilityDetection():
                     SearchSploits(PortArray)
             else:
                 print("Skipping vulnerability detection for " + str(host))
+                output.WriteToFile("Skipped vulnerability detection for " + str(host))
+            output.WriteToFile("\n" + "-" * 50)
 
 #main function
 def main():
-    if args.scantype == 'ping':
-        results = TestPing(targetarg)
-        PostScanStuff(results)
-
-    elif args.scantype == 'arp':
-        if is_root():
-            results = TestArp(targetarg)
-        else:
-            #switch over to ping scan if user is not root
-            print_colored("Not running as root! Running ping scan instead...", colors.red) #Yell at the user for not running as root!
-            results = TestPing(targetarg)
-        PostScanStuff(results)
-
-    else:
-        #if specified scan type is invalid, decide which scan type to use depending on user privilege
-        if is_root():
-            print_colored("Unknown scan type: %s! Using arp scan instead..." % (args.scantype), colors.red)
-            results = TestArp(targetarg)
-            PostScanStuff(results)
-        else:
-            print_colored("Unknown scan type: %s! Using ping scan instead..." % (args.scantype), colors.red)
-            results = TestPing(targetarg)
-            PostScanStuff(results)
+    OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed)
+    FurtherEnumuration(OnlineHosts)
 
 #only run the script if its not imported as a module (directly interpreted with python3)
 if __name__ == '__main__':
@@ -265,3 +136,4 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print_colored("Ctrl+C pressed. Exiting.", colors.red)
+        output.WriteToFile("QUIT")

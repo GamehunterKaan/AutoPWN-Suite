@@ -3,6 +3,7 @@ from modules.nvdlib.nvdlib import searchCPE, searchCVE, getCVE
 from textwrap import wrap
 from os import get_terminal_size
 from requests.exceptions import JSONDecodeError
+from modules.outfile import output
 
 #generate keywords to search for from the information gathered from the target
 def GenerateKeywords(HostArray):
@@ -38,14 +39,17 @@ def GenerateKeywords(HostArray):
     return keywords
 
 def SearchSploits(HostArray):
-    print_colored("\n---------------------------------------------------------", colors.red)
-    print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]), colors.red)
-    print_colored("---------------------------------------------------------", colors.red)
+    print_colored("\n" + "-" * 64, colors.red)
+    print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]) + " :", colors.red)
+    print_colored("-" * 64 + "\n", colors.red)
+    output.WriteToFile("Possible vulnerabilities for " + str(HostArray[0][0]))
     keywords = GenerateKeywords(HostArray)
     if len(keywords) <= 0:
         print_colored("Insufficient information for " + str(HostArray[0][0]), colors.red)
+        output.WriteToFile("Insufficient information for " + str(HostArray[0][0]))
     else:
-        print("Searching vulnerability database for %s keyword(s)..." % (len(keywords)))
+        print("Searching vulnerability database for %s keyword(s)...\n" % (len(keywords)))
+        output.WriteToFile("Searching vulnerability database for %s keyword(s)..." % (len(keywords)))
         for keyword in keywords:
             #https://github.com/vehemont/nvdlib
             #search the NIST vulnerabilities database for the generated keywords
@@ -64,11 +68,14 @@ def SearchSploits(HostArray):
                 if len(TitleList) > 0:
                     ProductTitle = min(TitleList)
                     print_colored("\n\n┌─[ %s ]" % ProductTitle, colors.yellow)
+                    output.WriteToFile("\n\n┌─[ %s ]" % ProductTitle)
 
                     ApiResponseCVE = searchCVE(keyword = str(keyword))
                     
                     for CVE in ApiResponseCVE:
                         print("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
+                        output.WriteToFile("│\n├─────┤ " + str(CVE.id) + "\n│")
+
                         try:
                             description = str(CVE.cve.description.description_data[0].value)
                         except:
@@ -107,12 +114,22 @@ def SearchSploits(HostArray):
                         wrapped_description = wrap(description, termsize.columns - 50)
 
                         print("│\t\t" + bcolors.cyan + "Description : " + bcolors.endc)
-                        for wrapped_part in wrapped_description:
-                            print("│\t\t\t%s" % wrapped_part)
+                        output.WriteToFile("│\t\t" + "Description : ")
+                        for line in wrapped_description:
+                            print("│\t\t\t" + line)
+                            output.WriteToFile("│\t\t\t" + line)
                         print("│\t\t" + bcolors.cyan + "Severity : " + bcolors.endc + severity + " - " + score)
+                        output.WriteToFile("│\t\t" + "Severity : " + severity + " - " + score)
+                        
                         print("│\t\t" + bcolors.cyan + "Exploitability : " + bcolors.endc + exploitability)
+                        output.WriteToFile("│\t\t" + "Exploitability : " + exploitability)
+                        
                         print("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
+                        output.WriteToFile("│\t\t" + "Details : " + details)
+
             except JSONDecodeError:
                 print_colored("An error occurred while trying to fetch details for " + str(keyword), colors.red)
+                output.WriteToFile("An error occurred while trying to fetch details for " + str(keyword))
             except KeyboardInterrupt:
                 print_colored("Skipping vulnerability detection for keyword " + str(keyword), colors.red)
+                output.WriteToFile("Skipped vulnerability detection for keyword " + str(keyword))
