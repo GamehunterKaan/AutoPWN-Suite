@@ -170,9 +170,9 @@ def AnalyseScanResults(nm,target):
                     (
                         bcolors.cyan + "Port : " + bcolors.endc + "{0:10}" + 
                         bcolors.cyan + "State : " + bcolors.endc + "{1:10}" +
-                        bcolors.cyan + "Service : " + bcolors.endc + "{2:20}" +
+                        bcolors.cyan + "Service : " + bcolors.endc + "{2:15}" +
                         bcolors.cyan + "Product : " + bcolors.endc + "{3:20}" +
-                        bcolors.cyan + "Version : " + bcolors.endc + "{4:20}"
+                        bcolors.cyan + "Version : " + bcolors.endc + "{4:15}"
                     ).format(str(port), state, service, product, version)
                 )
 
