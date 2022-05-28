@@ -25,33 +25,11 @@ outputfile = args.output
 InitializeOutput(context=args.output)
 DontAskForConfirmation = args.yesplease
 
-def DetectPrivateIPAdress():
-    s = socket(AF_INET, SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    return s.getsockname()[0]
-
-def DetectNetworkRange(ip):
-    #split the IP address into 4 pieces and replace last part with 0/24
-    return str(ip.split('.')[0]) + '.' + str(ip.split('.')[1]) + '.' + ip.split('.')[2] + '.0/24'
-
-#use the 2 functions above if user doesn't specify an IP address and enabled automatic scan
-if args.target:
-    targetarg = args.target
-else:
-    if DontAskForConfirmation:
-        PrivateIPAdress = DetectPrivateIPAdress()
-        targetarg = DetectNetworkRange(PrivateIPAdress)
-    else:
-        print_colored("Please specify a target.", colors.cyan)
-        targetarg = input()
-
 scantype = args.scantype
 scanspeed = int(args.speed)
 
 #print a beautiful banner
 print_banner()
-
-output.OutputBanner(targetarg, scantype, scanspeed)
 
 def is_root():
     if getuid() == 0:
@@ -85,6 +63,28 @@ if args.evade:
         Evade = False
 else:
     Evade = False
+
+def DetectPrivateIPAdress():
+    s = socket(AF_INET, SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    return s.getsockname()[0]
+
+def DetectNetworkRange(ip):
+    #split the IP address into 4 pieces and replace last part with 0/24
+    return str(ip.split('.')[0]) + '.' + str(ip.split('.')[1]) + '.' + ip.split('.')[2] + '.0/24'
+
+#use the 2 functions above if user doesn't specify an IP address and enabled automatic scan
+if args.target:
+    targetarg = args.target
+else:
+    if DontAskForConfirmation:
+        PrivateIPAdress = DetectPrivateIPAdress()
+        targetarg = DetectNetworkRange(PrivateIPAdress)
+    else:
+        print_colored("Please specify a target.", colors.cyan)
+        targetarg = input()
+
+output.OutputBanner(targetarg, scantype, scanspeed)
 
 #ask the user if they want to scan ports
 def UserWantsPortScan():
