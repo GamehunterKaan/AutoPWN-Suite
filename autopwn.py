@@ -76,6 +76,9 @@ else:
     except FileNotFoundError:
         print_colored("No API key specified and no api.txt file found. Vulnerability detection is going to be slower!", colors.red)
         apiKey = None
+    except PermissionError:
+        print_colored("Permission denied while trying to read api.txt!", colors.red)
+        apiKey = None
 
 def DetectPrivateIPAdress():
     s = socket(AF_INET, SOCK_DGRAM)
