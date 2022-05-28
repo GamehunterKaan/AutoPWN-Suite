@@ -18,6 +18,7 @@ argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)", default="arp")
 argparser.add_argument("-s", "--speed", help="Scan speed. (0-5)", default=3)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
+argparser.add_argument("-e", "--evade", help="Evade the detection of the scanner. (Warning : Slower and slightly inaccurate!)", action="store_true")
 args = argparser.parse_args()
 
 outputfile = args.output
@@ -72,6 +73,12 @@ if not args.speed <= 5 or not args.speed >= 0:
     print_colored("Invalid speed specified : %d" % args.speed, colors.red)
     args.speed = 3
     print_colored("Using default speed : %d" % args.speed, colors.cyan) #Use default speed if user specified invalid speed value
+
+if args.evade:
+    print_colored("Evading the detection of the scanner is enabled. This will slow down the scan and will be slightly inaccurate!", colors.yellow)
+    print_colored("Changing the scan speed to 1, sorry but I will have to ignore if you manually specified it!", colors.yellow)
+    scanspeed = 1
+    Evade = True
 
 #ask the user if they want to scan ports
 def UserWantsPortScan():
@@ -136,4 +143,4 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print_colored("Ctrl+C pressed. Exiting.", colors.red)
-        output.WriteToFile("QUIT")
+        output.WriteToFile("Ctrl+C pressed. Exiting.")
