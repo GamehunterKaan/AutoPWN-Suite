@@ -17,7 +17,7 @@ def TestPing(target, scantype, evade):
     output.WriteToFile("\nHost discovery on " + str(target) + " : PING\n")
     nm = PortScanner()
     if evade:
-        resp = nm.scan(hosts=target, arguments="-sn -T 1 -f -g 53 --spoof-mac 0 --data-length 10")
+        resp = nm.scan(hosts=target, arguments="-sn -T 2 -f -g 53 --data-length 10")
     else:
         resp = nm.scan(hosts=target, arguments="-sn")
     return nm.all_hosts()
@@ -30,7 +30,7 @@ def TestArp(target, evade):
     output.WriteToFile("\nHost discovery on " + str(target) + " : ARP\n")
     nm = PortScanner()
     if evade:
-        resp = nm.scan(hosts=target, arguments="-sn -PR -T 1 -f -g 53 --spoof-mac 0 --data-length 10")
+        resp = nm.scan(hosts=target, arguments="-sn -PR -T 2 -f -g 53 --data-length 10")
     else:
         resp = nm.scan(hosts=target, arguments="-sn -PR")
     return nm.all_hosts()
@@ -70,7 +70,7 @@ def PortScan(target, scanspeed, evade):
     nm = PortScanner()
     if is_root():
         if evade:
-            resp = nm.scan(hosts=target, arguments="-sS -sV -O --host-timeout 60 -Pn -T 1 -f -g 53 --spoof-mac 0 --data-length 10")
+            resp = nm.scan(hosts=target, arguments="-sS -sV -O -Pn -T 2 -f -g 53 --data-length 10")
         else:
             resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T %d" % (scanspeed))
     else:
