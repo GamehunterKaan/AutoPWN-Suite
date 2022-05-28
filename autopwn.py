@@ -71,10 +71,11 @@ if args.api:
 else:
     try:
         with open("api.txt", "r") as f:
-            apiKey = f.readline()
+            apiKey = f.readline().strip("\n")
             print_colored("Using the API key from api.txt file.", colors.yellow)
     except FileNotFoundError:
         print_colored("No API key specified and no api.txt file found. Vulnerability detection is going to be slower!", colors.red)
+        print_colored("You can get your own NIST API key at https://nvd.nist.gov/developers/request-an-api-key", colors.yellow)
         apiKey = None
     except PermissionError:
         print_colored("Permission denied while trying to read api.txt!", colors.red)
@@ -126,11 +127,11 @@ def UserWantsVulnerabilityDetection():
     else:
         print_colored("\nWould you like to do a version based vulnerability detection? (Y/N)", colors.blue)
         while True:
-            wannaportscan = input().lower()
-            if wannaportscan == 'y' or wannaportscan == 'yes':
+            wannavulnscan = input().lower()
+            if wannavulnscan == 'y' or wannavulnscan == 'yes':
                 return True
                 break
-            elif wannaportscan == 'n' or wannaportscan == 'no':
+            elif wannavulnscan == 'n' or wannavulnscan == 'no':
                 output.WriteToFile("User refused to do a version based vulnerability detection.")
                 return False
             else:
@@ -148,7 +149,7 @@ def FurtherEnumuration(hosts):
             PortArray = AnalyseScanResults(PortScanResults,host)
             if len(PortArray) > 0:
                 if UserWantsVulnerabilityDetection():
-                    SearchSploits(PortArray)
+                    SearchSploits(PortArray, apiKey)
             else:
                 print("Skipping vulnerability detection for " + str(host))
                 output.WriteToFile("Skipped vulnerability detection for " + str(host))

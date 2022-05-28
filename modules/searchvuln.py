@@ -38,14 +38,14 @@ def GenerateKeywords(HostArray):
 
     return keywords
 
-def SearchSploits(HostArray):
+def SearchSploits(HostArray, apiKey):
     print_colored("\n" + "-" * 64, colors.red)
     print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]) + " :", colors.red)
     print_colored("-" * 64 + "\n", colors.red)
     output.WriteToFile("Possible vulnerabilities for " + str(HostArray[0][0]))
     keywords = GenerateKeywords(HostArray)
     if len(keywords) <= 0:
-        print_colored("Insufficient information for " + str(HostArray[0][0]), colors.red)
+        print_colored("Insufficient information for " + str(HostArray[0][0]), colors.yellow)
         output.WriteToFile("Insufficient information for " + str(HostArray[0][0]))
     else:
         print("Searching vulnerability database for %s keyword(s)...\n" % (len(keywords)))
@@ -55,7 +55,10 @@ def SearchSploits(HostArray):
             #search the NIST vulnerabilities database for the generated keywords
             print("Searching vulnerability database for keyword %s... CTRL-C to skip" % (keyword))
             try:
-                ApiResponseCPE = searchCPE(keyword = str(keyword))
+                if apiKey:
+                    ApiResponseCPE = searchCPE(keyword = str(keyword), key = str(apiKey))
+                else:
+                    ApiResponseCPE = searchCPE(keyword = str(keyword))
                 tempTitleList = []
                 TitleList = []
                 for CPE in ApiResponseCPE:
@@ -70,7 +73,10 @@ def SearchSploits(HostArray):
                     print_colored("\n\n┌─[ %s ]" % ProductTitle, colors.yellow)
                     output.WriteToFile("\n\n┌─[ %s ]" % ProductTitle)
 
-                    ApiResponseCVE = searchCVE(keyword = str(keyword))
+                    if apiKey:
+                        ApiResponseCVE = searchCVE(keyword = str(keyword), key = str(apiKey))
+                    else:
+                        ApiResponseCVE = searchCVE(keyword = str(keyword))
                     
                     for CVE in ApiResponseCVE:
                         print("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
