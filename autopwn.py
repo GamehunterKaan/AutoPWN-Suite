@@ -75,10 +75,16 @@ if not args.speed <= 5 or not args.speed >= 0:
     print_colored("Using default speed : %d" % args.speed, colors.cyan) #Use default speed if user specified invalid speed value
 
 if args.evade:
-    print_colored("Evading the detection of the scanner is enabled. This will slow down the scan and will be slightly inaccurate!", colors.yellow)
-    print_colored("Changing the scan speed to 1, sorry but I will have to ignore if you manually specified it!", colors.yellow)
-    scanspeed = 1
-    Evade = True
+    if is_root():
+        print_colored("Evading the detection of the scanner is enabled. This will slow down the scan and will make it slightly inaccurate!", colors.yellow)
+        print_colored("Changing the scan speed to 1, sorry but I will have to ignore if you manually specified it!", colors.yellow)
+        scanspeed = 1
+        Evade = True
+    else:
+        print_colored("Evasion mode requires root privileges! Switching back to normal mode...", colors.red)
+        Evade = False
+else:
+    Evade = False
 
 #ask the user if they want to scan ports
 def UserWantsPortScan():
@@ -122,7 +128,7 @@ def FurtherEnumuration(hosts):
     if UserWantsPortScan():
         for host in hosts:
             output.WriteToFile("\n" + "-" * 50)
-            PortScanResults = PortScan(host, scanspeed)
+            PortScanResults = PortScan(host, scanspeed, Evade)
             PortArray = AnalyseScanResults(PortScanResults,host)
             if len(PortArray) > 0:
                 if UserWantsVulnerabilityDetection():
@@ -134,7 +140,7 @@ def FurtherEnumuration(hosts):
 
 #main function
 def main():
-    OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed)
+    OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed, Evade)
     FurtherEnumuration(OnlineHosts)
 
 #only run the script if its not imported as a module (directly interpreted with python3)

@@ -10,38 +10,44 @@ def is_root():
         return False
 
 #do a ping scan using nmap
-def TestPing(target, scantype):
+def TestPing(target, scantype, evade):
     print_colored("\n" + "-" * 64, colors.green)
     print_colored("\tDoing host discovery on " + str(target) + "... (PING)", colors.green)
     print_colored("-" * 64 + "\n", colors.green)
     output.WriteToFile("\nHost discovery on " + str(target) + " : PING\n")
     nm = PortScanner()
-    resp = nm.scan(hosts=target, arguments="-sn")
+    if evade:
+        resp = nm.scan(hosts=target, arguments="-sn -T 1 -f -g 53 --spoof-mac 0 --data-length 10")
+    else:
+        resp = nm.scan(hosts=target, arguments="-sn")
     return nm.all_hosts()
 
 #do a arp scan using nmap
-def TestArp(target):
+def TestArp(target, evade):
     print_colored("\n" + "-" * 64, colors.green)
     print_colored("\tDoing host discovery on " + str(target) + "... (ARP)", colors.green)
     print_colored("-" * 64 + "\n", colors.green)
     output.WriteToFile("\nHost discovery on " + str(target) + " : ARP\n")
     nm = PortScanner()
-    resp = nm.scan(hosts=target, arguments="-sn -PR")
+    if evade:
+        resp = nm.scan(hosts=target, arguments="-sn -PR -T 1 -f -g 53 --spoof-mac 0 --data-length 10")
+    else:
+        resp = nm.scan(hosts=target, arguments="-sn -PR")
     return nm.all_hosts()
 
-def DiscoverHosts(target, scantype, scanspeed):
+def DiscoverHosts(target, scantype, scanspeed, evade):
     if scantype == 'ping':
         OnlineHosts = TestPing(target)
         return OnlineHosts
 
     elif scantype == 'arp':
         if is_root():
-            OnlineHosts = TestArp(target)
+            OnlineHosts = TestArp(target, evade)
         else:
             #switch over to ping scan if user is not root
             print_colored("Not running as root! Running ping scan instead...", colors.red) #Yell at the user for not running as root!
             output.WriteToFile("Switched over to ping scan because user is not root.")
-            OnlineHosts = TestPing(target)
+            OnlineHosts = TestPing(target, evade)
         return OnlineHosts
 
     else:
@@ -56,14 +62,17 @@ def DiscoverHosts(target, scantype, scanspeed):
             return OnlineHosts
 
 #run a port scan on target using nmap
-def PortScan(target, scanspeed):
+def PortScan(target, scanspeed, evade):
     print_colored("\n---------------------------------------------------------", colors.green)
     print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
     print_colored("---------------------------------------------------------\n", colors.green)
     output.WriteToFile("\nPortscan on " + str(target) + " : ")
     nm = PortScanner()
     if is_root():
-        resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T %d" % (scanspeed))
+        if evade:
+            resp = nm.scan(hosts=target, arguments="-sS -sV -O --host-timeout 60 -Pn -T 1 -f -g 53 --spoof-mac 0 --data-length 10")
+        else:
+            resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T %d" % (scanspeed))
     else:
         resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn -T %d" % (scanspeed))
     return nm
