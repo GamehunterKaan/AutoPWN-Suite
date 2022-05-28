@@ -10,7 +10,7 @@ def is_root():
         return False
 
 #do a ping scan using nmap
-def TestPing(target, scantype, evade):
+def TestPing(target, evade):
     print_colored("\n" + "-" * 64, colors.green)
     print_colored("\tDoing host discovery on " + str(target) + "... (PING)", colors.green)
     print_colored("-" * 64 + "\n", colors.green)
