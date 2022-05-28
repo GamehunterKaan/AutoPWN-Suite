@@ -14,8 +14,8 @@ __author__ = 'GamehunterKaan'
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
 argparser.add_argument("-o", "--output", help="Output file name. (Default : autopwn.log)", default="autopwn.log")
-argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.1 or 192.168.0.0/24)")
-argparser.add_argument("-hf", "--hostfile", help="File containing a list of hosts to scan. (Warning : Overwrites the target argument)")
+argparser.add_argument("-t", "--target", help="Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)")
+argparser.add_argument("-hf", "--hostfile", help="File containing a list of hosts to scan.")
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)", default="arp")
 argparser.add_argument("-s", "--speed", help="Scan speed. (0-5)", default=3)
 argparser.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)", default=None)
@@ -82,27 +82,51 @@ else:
         print_colored("Permission denied while trying to read api.txt!", colors.red)
         apiKey = None
 
-def DetectPrivateIPAdress():
-    s = socket(AF_INET, SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    return s.getsockname()[0]
-
-def DetectNetworkRange(ip):
-    #split the IP address into 4 pieces and replace last part with 0/24
-    return str(ip.split('.')[0]) + '.' + str(ip.split('.')[1]) + '.' + ip.split('.')[2] + '.0/24'
-
-#use the 2 functions above if user doesn't specify an IP address and enabled automatic scan
-if args.target:
-    targetarg = args.target
-else:
-    if DontAskForConfirmation:
-        PrivateIPAdress = DetectPrivateIPAdress()
-        targetarg = DetectNetworkRange(PrivateIPAdress)
+def GetTarget():
+    if args.target:
+        target = args.target
     else:
-        print_colored("Please specify a target.", colors.cyan)
-        targetarg = input()
+        if args.hostfile:
+            # read targets from host file and insert all of them into an array
+            try:
+                target = open(args.hostfile,'r').read().splitlines()
+            except FileNotFoundError:
+                print_colored("Host file not found!", colors.red)
+                s = socket(AF_INET, SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                PrivateIPAdress = s.getsockname()[0]
+                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+            except PermissionError:
+                print_colored("Permission denied while trying to read host file!", colors.red)
+                s = socket(AF_INET, SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                PrivateIPAdress = s.getsockname()[0]
+                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+            except OSError:
+                print_colored("OSError while trying to read host file!", colors.red)
+                s = socket(AF_INET, SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                PrivateIPAdress = s.getsockname()[0]
+                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+            except Exception:
+                print_colored("Unknown error while trying to read host file!", colors.red)
+                s = socket(AF_INET, SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                PrivateIPAdress = s.getsockname()[0]
+                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+        else:
+            if DontAskForConfirmation:
+                s = socket(AF_INET, SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                PrivateIPAdress = s.getsockname()[0]
+                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+            else:
+                target = input("Enter target range to scan : ")
+    return target
 
-output.OutputBanner(targetarg, scantype, scanspeed)
+targetarg = GetTarget()
+
+output.OutputBanner(targetarg, scantype, scanspeed, args.hostfile)
 
 #ask the user if they want to scan ports
 def UserWantsPortScan():

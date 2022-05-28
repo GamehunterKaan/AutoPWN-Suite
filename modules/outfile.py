@@ -5,14 +5,17 @@ def InitializeOutput(context):
     outfile = context
 
 class output:
-    def OutputBanner(target, scantype, speed):
+    def OutputBanner(target, scantype, speed, hostfile):
         filename = outfile
         file = open(filename, 'w')
         file.write("\n" + "-" * 50)
         file.write("\n" + "AutoPWN Suite")
         file.write("\n" + "Author: GamehunterKaan")
         file.write("\n" + "-" * 50)
-        file.write("\n" + "Target: " + target)
+        if hostfile:
+            file.write("\n" + "Targets list: " + hostfile)
+        else:
+            file.write("\n" + "Target: " + target)
         file.write("\n" + "Scan type: " + scantype)
         file.write("\n" + "Scan speed: " + str(speed))
         file.write("\n" + "-" * 50)

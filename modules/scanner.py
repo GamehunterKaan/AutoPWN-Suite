@@ -9,13 +9,16 @@ def is_root():
     else:
         return False
 
+# this function is for turning a list of hosts into a single string
+def listToString(s): 
+    str1 = " "
+    return (str1.join(s))
+
 #do a ping scan using nmap
 def TestPing(target, evade):
-    print_colored("\n" + "-" * 64, colors.green)
-    print_colored("\tDoing host discovery on " + str(target) + "... (PING)", colors.green)
-    print_colored("-" * 64 + "\n", colors.green)
-    output.WriteToFile("\nHost discovery on " + str(target) + " : PING\n")
     nm = PortScanner()
+    if type(target) is list:
+        target = listToString(target)
     if evade:
         resp = nm.scan(hosts=target, arguments="-sn -T 2 -f -g 53 --data-length 10")
     else:
@@ -24,11 +27,9 @@ def TestPing(target, evade):
 
 #do a arp scan using nmap
 def TestArp(target, evade):
-    print_colored("\n" + "-" * 64, colors.green)
-    print_colored("\tDoing host discovery on " + str(target) + "... (ARP)", colors.green)
-    print_colored("-" * 64 + "\n", colors.green)
-    output.WriteToFile("\nHost discovery on " + str(target) + " : ARP\n")
     nm = PortScanner()
+    if type(target) is list:
+        target = listToString(target)
     if evade:
         resp = nm.scan(hosts=target, arguments="-sn -PR -T 2 -f -g 53 --data-length 10")
     else:
@@ -36,30 +37,39 @@ def TestArp(target, evade):
     return nm.all_hosts()
 
 def DiscoverHosts(target, scantype, scanspeed, evade):
+    if scantype == "arp":
+        if not is_root():
+            print_colored("You must be root to do an arp scan!", colors.red)
+            scantype = "ping"
+    elif scantype == "ping":
+        pass
+    else:
+        if is_root():
+            print_colored("Unknown scan type: %s! Using arp scan instead..." % (scantype), colors.red)
+            scantype = "arp"
+        else:
+            print_colored("Unknown scan type: %s! Using ping scan instead..." % (scantype), colors.red)
+            scantype = "ping"
+
+    print_colored("\n" + "-" * 64, colors.green)
+    if type(target) is list:
+        print_colored("\tScanning %d hosts using %s scan..." % (len(target), scantype), colors.green)
+    else:
+        print_colored("\tScanning %s using %s scan..." % (target, scantype), colors.green)
+    print_colored("-" * 64 + "\n", colors.green)
+
+    if type(target) is list:
+        output.WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), scantype))
+    else:
+        output.WriteToFile("\nScanning %s using %s scan..." % (target, scantype))
+    
     if scantype == 'ping':
-        OnlineHosts = TestPing(target)
+        OnlineHosts = TestPing(target, evade)
         return OnlineHosts
 
     elif scantype == 'arp':
-        if is_root():
-            OnlineHosts = TestArp(target, evade)
-        else:
-            #switch over to ping scan if user is not root
-            print_colored("Not running as root! Running ping scan instead...", colors.red) #Yell at the user for not running as root!
-            output.WriteToFile("Switched over to ping scan because user is not root.")
-            OnlineHosts = TestPing(target, evade)
+        OnlineHosts = TestArp(target, evade)
         return OnlineHosts
-
-    else:
-        #if specified scan type is invalid, decide which scan type to use depending on user privilege
-        if is_root():
-            print_colored("Unknown scan type: %s! Using arp scan instead..." % (scantype), colors.red)
-            OnlineHosts = TestArp(target)
-            return OnlineHosts
-        else:
-            print_colored("Unknown scan type: %s! Using ping scan instead..." % (scantype), colors.red)
-            OnlineHosts = TestPing(target)
-            return OnlineHosts
 
 #run a port scan on target using nmap
 def PortScan(target, scanspeed, evade):
