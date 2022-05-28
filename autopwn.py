@@ -15,9 +15,10 @@ __author__ = 'GamehunterKaan'
 argparser = ArgumentParser(description="AutoPWN Suite")
 argparser.add_argument("-o", "--output", help="Output file name. (Default : autopwn.log)", default="autopwn.log")
 argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.1 or 192.168.0.0/24)")
+argparser.add_argument("-hf", "--hostfile", help="File containing a list of hosts to scan. (Warning : Overwrites the target argument)")
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)", default="arp")
 argparser.add_argument("-s", "--speed", help="Scan speed. (0-5)", default=3)
-argparser.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. You can also specify your api key in api.txt file. (Default : None)", default=None)
+argparser.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)", default=None)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 argparser.add_argument("-e", "--evade", help="Evade the detection of the scanner. (Warning : Slower and slightly inaccurate!)", action="store_true")
 args = argparser.parse_args()
@@ -75,7 +76,7 @@ else:
             print_colored("Using the API key from api.txt file.", colors.yellow)
     except FileNotFoundError:
         print_colored("No API key specified and no api.txt file found. Vulnerability detection is going to be slower!", colors.red)
-        print_colored("You can get your own NIST API key at https://nvd.nist.gov/developers/request-an-api-key", colors.yellow)
+        print_colored("You can get your own NIST API key from https://nvd.nist.gov/developers/request-an-api-key", colors.yellow)
         apiKey = None
     except PermissionError:
         print_colored("Permission denied while trying to read api.txt!", colors.red)
