@@ -12,8 +12,8 @@ def print_banner():
 
 """
 
-    print_colored("\nDeveloped by GamehunterKaan.", colors.bold)
+    print_colored("\nDeveloped by GamehunterKaan. (https://auto.pwnspot.com)", colors.bold)
     print_colored("\n" + "-" * 90, colors.bold)
     print_colored(banner, colors.blue)
     print_colored("-" * 90 + "\n", colors.bold)
-    print_colored("I am not responsible if you are doing something stupid with this tool!\n", colors.bold)
+    print_colored("I am not responsible if you are using this program for ne \n", colors.bold)
