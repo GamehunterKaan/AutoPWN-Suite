@@ -51,12 +51,12 @@ def DiscoverHosts(target, scantype, scanspeed, evade):
             print_colored("Unknown scan type: %s! Using ping scan instead..." % (scantype), colors.red)
             scantype = "ping"
 
-    print_colored("\n" + "-" * 64, colors.green)
+    print_colored("\n" + "-" * 60, colors.green)
     if type(target) is list:
         print_colored("\tScanning %d hosts using %s scan..." % (len(target), scantype), colors.green)
     else:
         print_colored("\tScanning %s using %s scan..." % (target, scantype), colors.green)
-    print_colored("-" * 64 + "\n", colors.green)
+    print_colored("-" * 60 + "\n", colors.green)
 
     if type(target) is list:
         output.WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), scantype))
@@ -73,9 +73,9 @@ def DiscoverHosts(target, scantype, scanspeed, evade):
 
 #run a port scan on target using nmap
 def PortScan(target, scanspeed, evade):
-    print_colored("\n---------------------------------------------------------", colors.green)
+    print_colored("\n" + "-" * 60, colors.green)
     print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
-    print_colored("---------------------------------------------------------\n", colors.green)
+    print_colored("-" * 60 + "\n", colors.green)
     output.WriteToFile("\nPortscan on " + str(target) + " : ")
     nm = PortScanner()
     if is_root():
@@ -167,14 +167,24 @@ def AnalyseScanResults(nm,target):
                     version = 'Unknown'
 
                 print(
-                    bcolors.cyan + "Port : " + bcolors.endc + str(port) + 
-                    bcolors.cyan + "\tState : " + bcolors.endc + str(state) +
-                    bcolors.cyan + "\tService : " + bcolors.endc + str(service) +
-                    bcolors.cyan + "\tProduct : " + bcolors.endc + str(product) +
-                    bcolors.cyan + "\tVersion : " + bcolors.endc + str(version)
+                    (
+                        bcolors.cyan + "Port : " + bcolors.endc + "{0:10}" + 
+                        bcolors.cyan + "State : " + bcolors.endc + "{1:10}" +
+                        bcolors.cyan + "Service : " + bcolors.endc + "{2:20}" +
+                        bcolors.cyan + "Product : " + bcolors.endc + "{3:20}" +
+                        bcolors.cyan + "Version : " + bcolors.endc + "{4:20}"
+                    ).format(str(port), state, service, product, version)
                 )
 
-                output.WriteToFile("Port : " + str(port) + "\tState : " + str(state) + "\tService : " + str(service) + "\tProduct : " + str(product) + "\tVersion : " + str(version))
+                output.WriteToFile(
+                    (
+                        "Port : " + "{0:10}" + 
+                        "State : " + "{1:10}" +
+                        "Service : " + "{2:20}" +
+                        "Product : " + "{3:20}" +
+                        "Version : " + "{4:20}"
+                    ).format(str(port), state, service, product, version)
+                )
 
                 if state == 'open':
                     HostArray.insert(len(HostArray), [target, port, service, product, version])
