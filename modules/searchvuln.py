@@ -53,7 +53,8 @@ def SearchSploits(HostArray, apiKey):
         for keyword in keywords:
             #https://github.com/vehemont/nvdlib
             #search the NIST vulnerabilities database for the generated keywords
-            print("Searching vulnerability database for keyword %s... CTRL-C to skip" % (keyword))
+            print(" " * 100, end="\r")
+            print("Searching vulnerability database for keyword %s... CTRL-C to skip" % (keyword), end="\r")
             try:
                 if apiKey:
                     ApiResponseCPE = searchCPE(keyword = str(keyword), key = str(apiKey))
@@ -68,6 +69,8 @@ def SearchSploits(HostArray, apiKey):
                     if title not in TitleList and not title == '':
                         TitleList.append(title)
                 
+                print(" " * 100, end="\r")
+
                 if len(TitleList) > 0:
                     ProductTitle = min(TitleList)
                     print_colored("\n\n┌─[ %s ]" % ProductTitle, colors.yellow)
