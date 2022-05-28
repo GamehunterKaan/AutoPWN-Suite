@@ -37,7 +37,7 @@ git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 ### Usage
 
 ```
-usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-st SCANTYPE] [-s SPEED] [-a API] [-y] [-e]
+usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-hf HOSTFILE] [-st SCANTYPE] [-s SPEED] [-a API] [-y] [-e]
 
 AutoPWN Suite
 
@@ -46,12 +46,14 @@ options:
   -o OUTPUT, --output OUTPUT
                         Output file name. (Default : autopwn.log)
   -t TARGET, --target TARGET
-                        Target range to scan. (192.168.0.1 or 192.168.0.0/24)
+                        Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)
+  -hf HOSTFILE, --hostfile HOSTFILE
+                        File containing a list of hosts to scan.
   -st SCANTYPE, --scantype SCANTYPE
                         Scan type. (Ping or ARP)
   -s SPEED, --speed SPEED
                         Scan speed. (0-5)
-  -a API, --api API     Specify API key for vulnerability detection for faster scanning. You can also specify your api key in api.txt file. (Default : None)
+  -a API, --api API     Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)
   -y, --yesplease       Don't ask for anything. (Full automatic mode)
   -e, --evade           Evade the detection of the scanner. (Warning : Slower and slightly inaccurate!)
 ```
