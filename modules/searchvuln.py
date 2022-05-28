@@ -40,7 +40,7 @@ def GenerateKeywords(HostArray):
 
 def SearchSploits(HostArray, apiKey):
     print_colored("\n" + "-" * 60, colors.red)
-    print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]) + " :", colors.red)
+    print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]), colors.red)
     print_colored("-" * 60 + "\n", colors.red)
     output.WriteToFile("Possible vulnerabilities for " + str(HostArray[0][0]))
     keywords = GenerateKeywords(HostArray)
