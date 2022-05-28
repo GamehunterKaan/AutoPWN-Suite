@@ -17,9 +17,13 @@ argparser.add_argument("-o", "--output", help="Output file name. (Default : auto
 argparser.add_argument("-t", "--target", help="Target range to scan. (192.168.0.1 or 192.168.0.0/24)")
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)", default="arp")
 argparser.add_argument("-s", "--speed", help="Scan speed. (0-5)", default=3)
+argparser.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. You can also specify your api key in api.txt file. (Default : None)", default=None)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 argparser.add_argument("-e", "--evade", help="Evade the detection of the scanner. (Warning : Slower and slightly inaccurate!)", action="store_true")
 args = argparser.parse_args()
+
+#print a beautiful banner
+print_banner()
 
 outputfile = args.output
 InitializeOutput(context=args.output)
@@ -27,9 +31,6 @@ DontAskForConfirmation = args.yesplease
 
 scantype = args.scantype
 scanspeed = int(args.speed)
-
-#print a beautiful banner
-print_banner()
 
 def is_root():
     if getuid() == 0:
@@ -63,6 +64,18 @@ if args.evade:
         Evade = False
 else:
     Evade = False
+
+if args.api:
+    print_colored("Using the specified API key for searching vulnerabilities.", colors.yellow)
+    apiKey = args.api
+else:
+    try:
+        with open("api.txt", "r") as f:
+            apiKey = f.readline()
+            print_colored("Using the API key from api.txt file.", colors.yellow)
+    except FileNotFoundError:
+        print_colored("No API key specified and no api.txt file found. Vulnerability detection is going to be slower!", colors.red)
+        apiKey = None
 
 def DetectPrivateIPAdress():
     s = socket(AF_INET, SOCK_DGRAM)
