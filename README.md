@@ -80,7 +80,7 @@ options:
 - [ ] Built in reverse shell handler that automatically stabilizes shell like [pwncat](https://github.com/calebstewart/pwncat).
 - [ ] Function to generate reverse shell commands based on IP and port.
 - [ ] GUI interface.
-- [ ] Meterpreter payload generator with common evasion techniques like encryption, obfuscation, signing, sandbox detection etc.
+- [ ] Meterpreter payload generator with common evasion techniques.
 - [ ] Fileless malware unique to AutoPWN Suite.
 
 
