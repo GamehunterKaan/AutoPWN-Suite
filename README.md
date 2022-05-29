@@ -14,11 +14,11 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of softwares running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of "keywords" to search [NIST vulnerability database](https://www.nist.gov/).
 
-### Sample output
+### Demo
 
 AutoPWN Suite has a very user friendly easy to read output.
 
-![Screenshot](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/autopwn.png)
+<a href="https://asciinema.org/a/497930" target="_blank"><img src="https://asciinema.org/a/497930.svg" /></a>
 
 ### Installation
 
