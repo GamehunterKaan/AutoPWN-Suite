@@ -65,6 +65,25 @@ options:
   -e, --evade           Evade the detection of the scanner. (Warning : Slower and slightly inaccurate!)
 ```
 
+### TODO
+
+- [x] Vulnerability detection based on version.
+- [x] Easy to read output.
+- [x] Functionality output results to a file.
+- [ ] Function to automatically download exploit related to vulnerability.
+- [ ] .deb package for Debian based systems like Kali Linux and Parrot Security.
+- [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
+- [ ] pypi package for easily installing with just `pip install autopwn-suite`.
+- [ ] Seperate script for checking local privilege escalation vulnerabilities.
+- [ ] Windows and OSX support.
+- [ ] Functionality to brute force common services like `ssh`, `vnc`, `ftp` etc.
+- [ ] Built in reverse shell handler that automatically stabilizes shell like [pwncat](https://github.com/calebstewart/pwncat).
+- [ ] Function to generate reverse shell commands based on IP and port.
+- [ ] GUI interface.
+- [ ] Meterpreter payload generator with common evasion techniques like encryption, obfuscation, signing, sandbox detection etc.
+- [ ] Fileless malware unique to AutoPWN Suite.
+
+
 ### Contributing to AutoPWN Suite
 
 I would be glad if you are willing to contribute this project. I am looking forward to merge your pull request unless its something that is not needed or just a personal preference. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/CONTRIBUTING.md)
@@ -77,4 +96,4 @@ You may not rent or lease, distribute, modify, sell or transfer the software to 
 
 ### Support or Contact
 
-Having trouble using this tool? You can reach me out on [discord](https://github.com/GamehunterKaan/GamehunterKaan/blob/main/README.md) or create an issue!
+Having trouble using this tool? You can reach me out on [discord](https://search.discordprofile.info/374953845438021635) or [create an issue!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new/choose)
