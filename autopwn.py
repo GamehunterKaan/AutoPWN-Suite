@@ -2,7 +2,6 @@
 from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
 from os import getuid
-from logging import exception
 from modules.color import print_colored, colors, bcolors
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
@@ -82,6 +81,13 @@ else:
         print_colored("Permission denied while trying to read api.txt!", colors.red)
         apiKey = None
 
+def DetectIPRange():
+    s = socket(AF_INET, SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    PrivateIPAdress = s.getsockname()[0]
+    target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+    return target
+
 def GetTarget():
     if args.target:
         target = args.target
@@ -92,34 +98,16 @@ def GetTarget():
                 target = open(args.hostfile,'r').read().splitlines()
             except FileNotFoundError:
                 print_colored("Host file not found!", colors.red)
-                s = socket(AF_INET, SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                PrivateIPAdress = s.getsockname()[0]
-                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+                target = DetectIPRange()
             except PermissionError:
                 print_colored("Permission denied while trying to read host file!", colors.red)
-                s = socket(AF_INET, SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                PrivateIPAdress = s.getsockname()[0]
-                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
-            except OSError:
-                print_colored("OSError while trying to read host file!", colors.red)
-                s = socket(AF_INET, SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                PrivateIPAdress = s.getsockname()[0]
-                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+                target = DetectIPRange()
             except Exception:
                 print_colored("Unknown error while trying to read host file!", colors.red)
-                s = socket(AF_INET, SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                PrivateIPAdress = s.getsockname()[0]
-                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+                target = DetectIPRange()
         else:
             if DontAskForConfirmation:
-                s = socket(AF_INET, SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                PrivateIPAdress = s.getsockname()[0]
-                target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
+                target = DetectIPRange()
             else:
                 target = input("Enter target range to scan : ")
     return target
