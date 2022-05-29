@@ -5,7 +5,7 @@ from os import getuid
 from modules.color import print_colored, colors, bcolors
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
-from modules.scanner import TestArp, TestPing, AnalyseScanResults, PortScan, DiscoverHosts
+from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts
 from modules.outfile import InitializeOutput, output
 
 __author__ = 'GamehunterKaan'
