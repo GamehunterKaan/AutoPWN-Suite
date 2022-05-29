@@ -16,7 +16,7 @@ argparser.add_argument("-o", "--output", help="Output file name. (Default : auto
 argparser.add_argument("-t", "--target", help="Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)")
 argparser.add_argument("-hf", "--hostfile", help="File containing a list of hosts to scan.")
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)", default="arp")
-argparser.add_argument("-s", "--speed", help="Scan speed. (0-5)", default=3)
+argparser.add_argument("-s", "--speed", help="Scan speed. (0-5) (Default : 3)", default=3)
 argparser.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)", default=None)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 argparser.add_argument("-e", "--evade", help="Evade the detection of the scanner. (Warning : Slower and slightly inaccurate!)", action="store_true")
