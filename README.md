@@ -18,7 +18,7 @@ AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the versio
 
 AutoPWN Suite has a very user friendly easy to read output.
 
-<a href="https://asciinema.org/a/497930" target="_blank"><img src="https://asciinema.org/a/497930.svg" /></a>
+[![asciicast](https://asciinema.org/a/497930.svg)](https://asciinema.org/a/497930)
 
 ### Installation
 
