@@ -82,6 +82,8 @@ options:
 - [ ] GUI interface.
 - [ ] Meterpreter payload generator with common evasion techniques.
 - [ ] Fileless malware unique to AutoPWN Suite.
+- [ ] Daemon mode
+- [ ] Option to email the results automatically
 
 
 ### Contributing to AutoPWN Suite
