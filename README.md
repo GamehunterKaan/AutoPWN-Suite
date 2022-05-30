@@ -82,8 +82,11 @@ options:
 - [ ] GUI interface.
 - [ ] Meterpreter payload generator with common evasion techniques.
 - [ ] Fileless malware unique to AutoPWN Suite.
-- [ ] Daemon mode
-- [ ] Option to email the results automatically
+- [ ] Daemon mode.
+- [ ] Option to email the results automatically.
+- [ ] Web application analysis.
+- [ ] Web application content discovery mode. (dirbusting)
+- [ ] Noisy mode. (Does nothing but creating a lot of noise)
 
 
 ### Contributing to AutoPWN Suite
