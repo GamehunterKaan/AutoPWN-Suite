@@ -69,11 +69,11 @@ options:
 
 - [x] Vulnerability detection based on version.
 - [x] Easy to read output.
-- [x] Functionality output results to a file.
+- [x] Function to output results to a file.
+- [x] pypi package for easily installing with just `pip install autopwn-suite`.
 - [ ] Function to automatically download exploit related to vulnerability.
 - [ ] .deb package for Debian based systems like Kali Linux and Parrot Security.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
-- [ ] pypi package for easily installing with just `pip install autopwn-suite`.
 - [ ] Seperate script for checking local privilege escalation vulnerabilities.
 - [ ] Windows and OSX support.
 - [ ] Functionality to brute force common services like `ssh`, `vnc`, `ftp` etc.
@@ -87,6 +87,7 @@ options:
 - [ ] Web application analysis.
 - [ ] Web application content discovery mode. (dirbusting)
 - [ ] Noisy mode. (Does nothing but creating a lot of noise)
+- [ ] Automatically install nmap if its not installed.
 
 
 ### Contributing to AutoPWN Suite
