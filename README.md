@@ -36,11 +36,20 @@ On Arch based distros (BlackArch/ArchAttack etc):
 sudo pacman -S nmap
 ```
 
-After installing nmap you can just clone the repo.
+You can install it using pip. (sudo recommended)
+
+```
+sudo pip install autopwn-suite
+```
+
+OR
+
+You can clone the repo.
 
 ```
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 ```
+
 ### Usage
 
 ```
