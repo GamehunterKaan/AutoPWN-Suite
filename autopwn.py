@@ -2,6 +2,7 @@
 from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
 from os import getuid
+from subprocess import check_call, CalledProcessError, DEVNULL
 from modules.color import print_colored, colors, bcolors
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
@@ -80,6 +81,29 @@ else:
     except PermissionError:
         print_colored("Permission denied while trying to read api.txt!", colors.red)
         apiKey = None
+
+def check_nmap():
+    # Check if nmap is installed
+    # If not, install it
+    try:
+        nmap_checker = check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
+    except FileNotFoundError:
+        print_colored("Nmap is not installed. Auto installing...", colors.yellow)
+        try:
+            debian_installer = check_call(["sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL)
+        except CalledProcessError:
+            try:
+                arch_instller = check_call(["sudo", "pacman", "-S", "nmap", "--noconfirm"], stderr=DEVNULL)
+            except CalledProcessError:
+                try:
+                    fedore_installer = check_call(["sudo", "dnf", "install", "nmap"], stderr=DEVNULL)
+                except CalledProcessError:
+                    try:
+                        yum_installer = check_call(["sudo", "yum", "install", "nmap"], stderr=DEVNULL)
+                    except CalledProcessError:
+                        print_colored("nmap installation failed. Please install nmap manually.", colors.red)
+                        exit(1)
+
 
 def DetectIPRange():
     s = socket(AF_INET, SOCK_DGRAM)
@@ -170,6 +194,7 @@ def FurtherEnumuration(hosts):
 
 #main function
 def main():
+    check_nmap()
     OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed, Evade)
     FurtherEnumuration(OnlineHosts)
 
