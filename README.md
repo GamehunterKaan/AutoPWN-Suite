@@ -22,20 +22,6 @@ AutoPWN Suite has a very user friendly easy to read output.
 
 ### Installation
 
-You will need [nmap](https://nmap.org) in order to use this tool.
-
-On Debian based distros (Kali/Parrot etc):
-
-```
-sudo apt install nmap
-```
-
-On Arch based distros (BlackArch/ArchAttack etc):
-
-```
-sudo pacman -S nmap
-```
-
 You can install it using pip. (sudo recommended)
 
 ```
