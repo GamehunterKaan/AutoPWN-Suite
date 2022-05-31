@@ -67,6 +67,7 @@ options:
 - [x] Function to output results to a file.
 - [x] pypi package for easily installing with just `pip install autopwn-suite`.
 - [x] Automatically install nmap if its not installed.
+- [x] Noise mode. (Does nothing but creating a lot of noise)
 - [ ] Function to automatically download exploit related to vulnerability.
 - [ ] .deb package for Debian based systems like Kali Linux and Parrot Security.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
@@ -82,8 +83,6 @@ options:
 - [ ] Option to email the results automatically.
 - [ ] Web application analysis.
 - [ ] Web application content discovery mode. (dirbusting)
-- [ ] Noisy mode. (Does nothing but creating a lot of noise)
-
 
 ### Contributing to AutoPWN Suite
 
