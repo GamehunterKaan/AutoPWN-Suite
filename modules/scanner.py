@@ -1,7 +1,10 @@
-from modules.nmap import PortScanner
+from modules.nmap import PortScanner, PortScannerAsync
 from modules.color import print_colored, colors, bcolors
 from modules.outfile import output
 from os import getuid
+from subprocess import Popen
+from time import sleep
+from multiprocessing import Process
 
 def is_root():
     if getuid() == 0:
@@ -15,77 +18,113 @@ def listToString(s):
     return (str1.join(s))
 
 #do a ping scan using nmap
-def TestPing(target, evade):
+def TestPing(target, mode):
     nm = PortScanner()
     if type(target) is list:
         target = listToString(target)
-    if evade:
+    if mode == "evade":
         resp = nm.scan(hosts=target, arguments="-sn -T 2 -f -g 53 --data-length 10")
     else:
         resp = nm.scan(hosts=target, arguments="-sn")
     return nm.all_hosts()
 
 #do a arp scan using nmap
-def TestArp(target, evade):
+def TestArp(target, mode):
     nm = PortScanner()
     if type(target) is list:
         target = listToString(target)
-    if evade:
+    if mode == "evade":
         resp = nm.scan(hosts=target, arguments="-sn -PR -T 2 -f -g 53 --data-length 10")
     else:
         resp = nm.scan(hosts=target, arguments="-sn -PR")
     return nm.all_hosts()
 
-def DiscoverHosts(target, scantype, scanspeed, evade):
-    if scantype == "arp":
-        if not is_root():
-            print_colored("You must be root to do an arp scan!", colors.red)
-            scantype = "ping"
-    elif scantype == "ping":
-        pass
-    else:
-        if is_root():
-            print_colored("Unknown scan type: %s! Using arp scan instead..." % (scantype), colors.red)
-            scantype = "arp"
-        else:
-            print_colored("Unknown scan type: %s! Using ping scan instead..." % (scantype), colors.red)
-            scantype = "ping"
-
-    print_colored("\n" + "-" * 60, colors.green)
-    if type(target) is list:
-        print_colored("\tScanning %d hosts using %s scan..." % (len(target), scantype), colors.green)
-    else:
-        print_colored("\tScanning %s using %s scan..." % (target, scantype), colors.green)
-    print_colored("-" * 60 + "\n", colors.green)
-
-    if type(target) is list:
-        output.WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), scantype))
-    else:
-        output.WriteToFile("\nScanning %s using %s scan..." % (target, scantype))
-    
-    if scantype == 'ping':
-        OnlineHosts = TestPing(target, evade)
-        return OnlineHosts
-
-    elif scantype == 'arp':
-        OnlineHosts = TestArp(target, evade)
-        return OnlineHosts
-
 #run a port scan on target using nmap
-def PortScan(target, scanspeed, evade):
+def PortScan(target, scanspeed, mode):
     print_colored("\n" + "-" * 60, colors.green)
     print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
     print_colored("-" * 60 + "\n", colors.green)
     output.WriteToFile("\nPortscan on " + str(target) + " : ")
     nm = PortScanner()
     if is_root():
-        if evade:
+        if mode == "evade":
             resp = nm.scan(hosts=target, arguments="-sS -sV -O -Pn -T 2 -f -g 53 --data-length 10")
         else:
             resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T %d" % (scanspeed))
     else:
         resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn -T %d" % (scanspeed))
     return nm
+
+def CreateNoise(target):
+    nm = PortScanner()
+    try:
+        if is_root():
+            while True:
+                resp = nm.scan(hosts=target, arguments="-A -T 5 -D RND:10")
+        else:
+            while True:
+                resp = nm.scan(hosts=target, arguments="-A -T 5")
+    except KeyboardInterrupt:
+        pass
+
+def DiscoverHosts(target, scantype, scanspeed, mode):
+    if mode == "noise":
+        print_colored("\n" + "-" * 60, colors.green)
+        print_colored("\tCreating noise...", colors.green)
+        print_colored("-" * 60 + "\n", colors.green)
+        output.WriteToFile("\nCreating noise...")
+        if scantype == "ping":
+            Uphosts = TestPing(target, mode)
+        elif scantype == "arp":
+            if is_root():
+                Uphosts = TestArp(target, mode)
+            else:
+                Uphosts = TestPing(target, mode)
+        for host in Uphosts:
+            print_colored("Started creating noise on %s..." % (host), colors.green)
+            P = Process(target=CreateNoise, args=(host,))
+            P.start()
+        while True:
+            try:
+                sleep(10)
+            except KeyboardInterrupt:
+                print_colored("\nStopping noise...", colors.red)
+                output.WriteToFile("\nStopped noise...")
+                exit(0)
+    else:
+        if scantype == "arp":
+            if not is_root():
+                print_colored("You must be root to do an arp scan!", colors.red)
+                scantype = "ping"
+        elif scantype == "ping":
+            pass
+        else:
+            if is_root():
+                print_colored("Unknown scan type: %s! Using arp scan instead..." % (scantype), colors.red)
+                scantype = "arp"
+            else:
+                print_colored("Unknown scan type: %s! Using ping scan instead..." % (scantype), colors.red)
+                scantype = "ping"
+
+        print_colored("\n" + "-" * 60, colors.green)
+        if type(target) is list:
+            print_colored("\tScanning %d hosts using %s scan..." % (len(target), scantype), colors.green)
+        else:
+            print_colored("\tScanning %s using %s scan..." % (target, scantype), colors.green)
+        print_colored("-" * 60 + "\n", colors.green)
+
+        if type(target) is list:
+            output.WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), scantype))
+        else:
+            output.WriteToFile("\nScanning %s using %s scan..." % (target, scantype))
+        
+        if scantype == "ping":
+            OnlineHosts = TestPing(target, mode)
+            return OnlineHosts
+
+        elif scantype == "arp":
+            OnlineHosts = TestArp(target, mode)
+            return OnlineHosts
 
 #analyse and print scan results
 def AnalyseScanResults(nm,target):

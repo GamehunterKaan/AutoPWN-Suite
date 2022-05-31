@@ -10,6 +10,7 @@ from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts
 from modules.outfile import InitializeOutput, output
 
 __author__ = 'GamehunterKaan'
+__version__ = '1.0.1'
 
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
@@ -20,8 +21,13 @@ argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)", def
 argparser.add_argument("-s", "--speed", help="Scan speed. (0-5) (Default : 3)", default=3)
 argparser.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)", default=None)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
-argparser.add_argument("-e", "--evade", help="Evade the detection of the scanner. (Warning : Slower and slightly inaccurate!)", action="store_true")
+argparser.add_argument("-m", "--mode", help="Scan mode. (Evade, Noise, Normal)", default="normal")
+argparser.add_argument("-v", "--version", help="Print version and exit.", action="store_true")
 args = argparser.parse_args()
+
+if args.version:
+    print("AutoPWN Suite v" + __version__)
+    exit(0)
 
 #print a beautiful banner
 print_banner()
@@ -53,18 +59,6 @@ if not args.speed <= 5 or not args.speed >= 0:
     print_colored("Invalid speed specified : %d" % args.speed, colors.red)
     args.speed = 3
     print_colored("Using default speed : %d" % args.speed, colors.cyan) #Use default speed if user specified invalid speed value
-
-if args.evade:
-    if is_root():
-        print_colored("Evading the detection of the scanner is enabled. This will slow down the scan and will make it slightly inaccurate!", colors.yellow)
-        print_colored("Changing the scan speed to 2, sorry but I will have to ignore if you manually specified it!", colors.yellow)
-        scanspeed = 2
-        Evade = True
-    else:
-        print_colored("Evasion mode requires root privileges! Switching back to normal mode...", colors.red)
-        Evade = False
-else:
-    Evade = False
 
 if args.api:
     print_colored("Using the specified API key for searching vulnerabilities.", colors.yellow)
@@ -138,6 +132,21 @@ def GetTarget():
 
 targetarg = GetTarget()
 
+if args.mode.lower() == "evade":
+    scanmode = "evade"
+    scanspeed = 2
+    print_colored("Evasion mode enabled!", colors.yellow)
+elif args.mode.lower() == "noise":
+    scanmode = "noise"
+    print_colored("Noise mode enabled!", colors.yellow)
+elif args.mode.lower() == "normal":
+    scanmode = "normal"
+    print_colored("Normal mode enabled!", colors.yellow)
+else:
+    print_colored("Invalid mode specified! %s" % (args.mode), colors.red)
+    print_colored("Using default mode : normal", colors.cyan)
+    scanmode = "normal"
+
 output.OutputBanner(targetarg, scantype, scanspeed, args.hostfile)
 
 #ask the user if they want to scan ports
@@ -182,7 +191,7 @@ def FurtherEnumuration(hosts):
     if UserWantsPortScan():
         for host in hosts:
             output.WriteToFile("\n" + "-" * 50)
-            PortScanResults = PortScan(host, scanspeed, Evade)
+            PortScanResults = PortScan(host, scanspeed, scanmode)
             PortArray = AnalyseScanResults(PortScanResults,host)
             if len(PortArray) > 0:
                 if UserWantsVulnerabilityDetection():
@@ -195,7 +204,7 @@ def FurtherEnumuration(hosts):
 #main function
 def main():
     check_nmap()
-    OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed, Evade)
+    OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed, scanmode)
     FurtherEnumuration(OnlineHosts)
 
 #only run the script if its not imported as a module (directly interpreted with python3)
