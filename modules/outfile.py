@@ -18,7 +18,7 @@ def OutputBanner(target, scantype, speed, hostfile):
     file.write("\n" + "Scan type: " + scantype)
     file.write("\n" + "Scan speed: " + str(speed))
     file.write("\n" + "-" * 50)
-    file.write("\n" + "Started at: " + str(datetime.now()))
+    file.write("\n" + "Started at: " + str(datetime.strftime("%b %d %Y %H:%M:%S")))
     file.write("\n" + "-" * 50)
     file.close()
 
