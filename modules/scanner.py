@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 @dataclass
 class PortInfo:
+    # gotta figure out how to use dataclasses
     port = 0
     protocol = ''
     state = ''
@@ -50,7 +51,7 @@ def TestArp(target, mode):
 #run a port scan on target using nmap
 def PortScan(target, scanspeed, mode):
     print_colored("\n" + "-" * 60, colors.green)
-    print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
+    print_colored("Running a portscan on host ".center(60) + str(target) + "...", colors.green)
     print_colored("-" * 60 + "\n", colors.green)
     WriteToFile("\nPortscan on " + str(target) + " : ")
     nm = PortScanner()
@@ -78,7 +79,7 @@ def CreateNoise(target):
 def DiscoverHosts(target, scantype, scanspeed, mode):
     if mode == "noise":
         print_colored("\n" + "-" * 60, colors.green)
-        print_colored("\tCreating noise...", colors.green)
+        print_colored("Creating noise...".center(60), colors.green)
         print_colored("-" * 60 + "\n", colors.green)
         WriteToFile("\nCreating noise...")
         if scantype == "ping":
@@ -116,9 +117,9 @@ def DiscoverHosts(target, scantype, scanspeed, mode):
 
         print_colored("\n" + "-" * 60, colors.green)
         if type(target) is list:
-            print_colored("\tScanning %d hosts using %s scan..." % (len(target), scantype), colors.green)
+            print_colored("Scanning %d hosts using %s scan...".center(60) % (len(target), scantype), colors.green)
         else:
-            print_colored("\tScanning %s using %s scan..." % (target, scantype), colors.green)
+            print_colored("Scanning %s using %s scan...".center(60) % (target, scantype), colors.green)
         print_colored("-" * 60 + "\n", colors.green)
 
         if type(target) is list:
