@@ -40,12 +40,12 @@ def GenerateKeywords(HostArray):
 
 def SearchSploits(HostArray, apiKey):
     print_colored("\n" + "-" * 60, colors.red)
-    print_colored("\tPossible vulnerabilities for " + str(HostArray[0][0]), colors.red)
+    print_colored(("Possible vulnerabilities for " + str(HostArray[0][0])).center(60), colors.red)
     print_colored("-" * 60 + "\n", colors.red)
-    WriteToFile("Possible vulnerabilities for " + str(HostArray[0][0]))
+    WriteToFile("\nPossible vulnerabilities for " + str(HostArray[0][0]))
     keywords = GenerateKeywords(HostArray)
     if len(keywords) <= 0:
-        print_colored("Insufficient information for " + str(HostArray[0][0]), colors.yellow)
+        print_colored(("Insufficient information for " + str(HostArray[0][0])).center(60), colors.yellow)
         WriteToFile("Insufficient information for " + str(HostArray[0][0]))
     else:
         print("Searching vulnerability database for %s keyword(s)...\n" % (len(keywords)))

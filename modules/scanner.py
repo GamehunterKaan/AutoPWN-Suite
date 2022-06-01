@@ -51,7 +51,7 @@ def TestArp(target, mode):
 #run a port scan on target using nmap
 def PortScan(target, scanspeed, mode):
     print_colored("\n" + "-" * 60, colors.green)
-    print_colored("Running a portscan on host ".center(60) + str(target) + "...", colors.green)
+    print_colored(("Running a portscan on host " + str(target) + "...").center(60), colors.green)
     print_colored("-" * 60 + "\n", colors.green)
     WriteToFile("\nPortscan on " + str(target) + " : ")
     nm = PortScanner()
@@ -117,15 +117,13 @@ def DiscoverHosts(target, scantype, scanspeed, mode):
 
         print_colored("\n" + "-" * 60, colors.green)
         if type(target) is list:
-            print_colored("Scanning %d hosts using %s scan...".center(60) % (len(target), scantype), colors.green)
-        else:
-            print_colored("Scanning %s using %s scan...".center(60) % (target, scantype), colors.green)
-        print_colored("-" * 60 + "\n", colors.green)
-
-        if type(target) is list:
+            print_colored(("Scanning " + str(len(target)) + " target(s) using " + scantype + " scan...").center(60), colors.green)
             WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), scantype))
         else:
+            print_colored(("Scanning " + target + " using " + scantype + " scan...").center(60), colors.green)
             WriteToFile("\nScanning %s using %s scan..." % (target, scantype))
+        
+        print_colored("-" * 60 + "\n", colors.green)
         
         if scantype == "ping":
             OnlineHosts = TestPing(target, mode)
