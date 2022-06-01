@@ -39,7 +39,7 @@ git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 ### Usage
 
 ```
-usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-hf HOSTFILE] [-st SCANTYPE] [-s SPEED] [-a API] [-y] [-e]
+usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-hf HOSTFILE] [-st SCANTYPE] [-s SPEED] [-a API] [-y] [-m MODE] [-v]
 
 AutoPWN Suite
 
@@ -54,10 +54,11 @@ options:
   -st SCANTYPE, --scantype SCANTYPE
                         Scan type. (Ping or ARP)
   -s SPEED, --speed SPEED
-                        Scan speed. (0-5)
+                        Scan speed. (0-5) (Default : 3)
   -a API, --api API     Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)
   -y, --yesplease       Don't ask for anything. (Full automatic mode)
-  -e, --evade           Evade the detection of the scanner. (Warning : Slower and slightly inaccurate!)
+  -m MODE, --mode MODE  Scan mode. (Evade, Noise, Normal)
+  -v, --version         Print version and exit.
 ```
 
 ### TODO
