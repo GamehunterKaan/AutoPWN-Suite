@@ -63,12 +63,6 @@ else:
 
 scanspeed = int(args.speed)
 
-def is_root():
-    if getuid() == 0:
-        return True #return True if the user is root
-    else:
-        return False
-
 if is_root() == False:
     print_colored("It's recommended to run this script as root since it's more silent and accurate.", colors.red)
 
