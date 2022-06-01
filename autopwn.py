@@ -141,7 +141,6 @@ elif args.mode.lower() == "noise":
     print_colored("Noise mode enabled!", colors.yellow)
 elif args.mode.lower() == "normal":
     scanmode = "normal"
-    print_colored("Normal mode enabled!", colors.yellow)
 else:
     print_colored("Invalid mode specified! %s" % (args.mode), colors.red)
     print_colored("Using default mode : normal", colors.cyan)
