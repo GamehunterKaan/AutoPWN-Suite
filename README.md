@@ -42,7 +42,8 @@ You can use Google Cloud Shell.
 
 ### Usage
 
-```
+```console
+$ python3 autopwn.py -h
 usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-hf HOSTFILE] [-st SCANTYPE] [-s SPEED] [-a API] [-y] [-m MODE] [-v]
 
 AutoPWN Suite
