@@ -35,6 +35,10 @@ You can clone the repo.
 ```
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 ```
+OR
+
+You can use Google Cloud Shell.
+[![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/GamehunterKaan/AutoPWN-Suite.git)
 
 ### Usage
 
