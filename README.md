@@ -84,6 +84,8 @@ options:
 - [ ] Option to email the results automatically.
 - [ ] Web application analysis.
 - [ ] Web application content discovery mode. (dirbusting)
+- [ ] Option to use as a module.
+- [ ] Config file argument to specify configurations in a seperate config file.
 
 ### Contributing to AutoPWN Suite
 
