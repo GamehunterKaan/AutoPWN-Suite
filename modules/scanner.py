@@ -1,10 +1,18 @@
-from modules.nmap import PortScanner, PortScannerAsync
+from modules.nmap import PortScanner
 from modules.color import print_colored, colors, bcolors
-from modules.outfile import output
+from modules.outfile import WriteToFile
 from os import getuid
-from subprocess import Popen
-from time import sleep
 from multiprocessing import Process
+from dataclasses import dataclass
+
+@dataclass
+class PortInfo:
+    port = 0
+    protocol = ''
+    state = ''
+    service = ''
+    product = ''
+    version = ''
 
 def is_root():
     if getuid() == 0:
@@ -44,7 +52,7 @@ def PortScan(target, scanspeed, mode):
     print_colored("\n" + "-" * 60, colors.green)
     print_colored("\tRunning a portscan on host " + str(target) + "...", colors.green)
     print_colored("-" * 60 + "\n", colors.green)
-    output.WriteToFile("\nPortscan on " + str(target) + " : ")
+    WriteToFile("\nPortscan on " + str(target) + " : ")
     nm = PortScanner()
     if is_root():
         if mode == "evade":
@@ -72,7 +80,7 @@ def DiscoverHosts(target, scantype, scanspeed, mode):
         print_colored("\n" + "-" * 60, colors.green)
         print_colored("\tCreating noise...", colors.green)
         print_colored("-" * 60 + "\n", colors.green)
-        output.WriteToFile("\nCreating noise...")
+        WriteToFile("\nCreating noise...")
         if scantype == "ping":
             Uphosts = TestPing(target, mode)
         elif scantype == "arp":
@@ -89,7 +97,7 @@ def DiscoverHosts(target, scantype, scanspeed, mode):
                 sleep(10)
             except KeyboardInterrupt:
                 print_colored("\nStopping noise...", colors.red)
-                output.WriteToFile("\nStopped noise...")
+                WriteToFile("\nStopped noise...")
                 exit(0)
     else:
         if scantype == "arp":
@@ -114,9 +122,9 @@ def DiscoverHosts(target, scantype, scanspeed, mode):
         print_colored("-" * 60 + "\n", colors.green)
 
         if type(target) is list:
-            output.WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), scantype))
+            WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), scantype))
         else:
-            output.WriteToFile("\nScanning %s using %s scan..." % (target, scantype))
+            WriteToFile("\nScanning %s using %s scan..." % (target, scantype))
         
         if scantype == "ping":
             OnlineHosts = TestPing(target, mode)
@@ -129,6 +137,7 @@ def DiscoverHosts(target, scantype, scanspeed, mode):
 #analyse and print scan results
 def AnalyseScanResults(nm,target):
     HostArray = []
+
     try:
         nm[target]
 
@@ -157,18 +166,45 @@ def AnalyseScanResults(nm,target):
         except:
             ostype = 'Unknown'
 
-        print_colored("MAC Address : %s\tVendor : %s" % (mac, vendor), colors.yellow)
-        print_colored("OS : %s\tAccuracy : %s\tType : %s\n" % (os, accuracy,ostype), colors.yellow)
+        print(
+            (
+                bcolors.yellow + "MAC Address : " + bcolors.endc + "{0:20}" +
+                bcolors.yellow + " Vendor : " + bcolors.endc + "{1:30}"
+            ).format(mac , vendor)
+        )
 
-        output.WriteToFile("MAC Address : %s\tVendor : %s" % (mac, vendor))
-        output.WriteToFile("OS : %s\tAccuracy : %s\tType : %s\n" % (os, accuracy,ostype))
+        WriteToFile(
+            (
+                "MAC Address : {0:20}" +
+                " Vendor : {1:30}\n"
+            ).format(mac, vendor)
+        )
+
+        print(
+            (
+                bcolors.yellow + "OS : " + bcolors.endc + "{0:20}" +
+                bcolors.yellow + " Accuracy : " + bcolors.endc + "{1:5}" +
+                bcolors.yellow + " Type : " + bcolors.endc + "{2:20}"
+            ).format(os , accuracy , ostype)
+        )
+
+        WriteToFile(
+            (
+                "OS : {0:20}" +
+                " Accuracy : {1:5}" +
+                " Type : {2:20}"
+            ).format(os , accuracy , ostype)
+        )
+
+        print("\n")
+        WriteToFile("\n")
 
         if nm[target]['status']['reason'] == 'localhost-response' or nm[target]['status']['reason'] == 'user-set':
             print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
-            output.WriteToFile('Target ' + str(target) + ' seems to be us.')
+            WriteToFile('Target ' + str(target) + ' seems to be us.')
         if len(nm[target].all_protocols()) == 0:
             print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
-            output.WriteToFile("Target " + str(target) + " seems to have no open ports.")
+            WriteToFile("Target " + str(target) + " seems to have no open ports.")
         for proto in nm[target].all_protocols():
             for port in nm[target][proto].keys():
                                 
@@ -208,27 +244,32 @@ def AnalyseScanResults(nm,target):
                 print(
                     (
                         bcolors.cyan + "Port : " + bcolors.endc + "{0:10}" + 
-                        bcolors.cyan + "State : " + bcolors.endc + "{1:10}" +
-                        bcolors.cyan + "Service : " + bcolors.endc + "{2:15}" +
-                        bcolors.cyan + "Product : " + bcolors.endc + "{3:20}" +
-                        bcolors.cyan + "Version : " + bcolors.endc + "{4:15}"
+                        bcolors.cyan + " State : " + bcolors.endc + "{1:10}" +
+                        bcolors.cyan + " Service : " + bcolors.endc + "{2:15}" +
+                        bcolors.cyan + " Product : " + bcolors.endc + "{3:20}" +
+                        bcolors.cyan + " Version : " + bcolors.endc + "{4:15}"
                     ).format(str(port), state, service, product, version)
                 )
 
-                output.WriteToFile(
+                WriteToFile(
                     (
-                        "Port : " + "{0:10}" + 
-                        "State : " + "{1:10}" +
-                        "Service : " + "{2:20}" +
-                        "Product : " + "{3:20}" +
-                        "Version : " + "{4:20}"
+                        "Port : {0:10}" + 
+                        " State : {1:10}" +
+                        " Service : {2:20}" +
+                        " Product : {3:20}" +
+                        " Version : {4:20}"
                     ).format(str(port), state, service, product, version)
                 )
 
                 if state == 'open':
                     HostArray.insert(len(HostArray), [target, port, service, product, version])
 
-    except:
-        print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
-        output.WriteToFile("Target " + str(target) + " seems to have no open ports.")
+    except KeyError:
+        print_colored("Target " + str(target) + " seems to be offline.", colors.red)
+        WriteToFile("Target " + str(target) + " seems to be offline.")
+    except Exception as e:
+        print_colored("An error occured while scanning " + str(target) + ".", colors.red)
+        WriteToFile("An error occured while scanning " + str(target) + ".")
+        print_colored(str(e), colors.red)
+        WriteToFile(str(e))
     return HostArray

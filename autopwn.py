@@ -7,7 +7,7 @@ from modules.color import print_colored, colors, bcolors
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
 from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts
-from modules.outfile import InitializeOutput, output
+from modules.outfile import InitializeOutput, WriteToFile, OutputBanner
 
 __author__ = 'GamehunterKaan'
 __version__ = '1.0.1'
@@ -147,7 +147,7 @@ else:
     print_colored("Using default mode : normal", colors.cyan)
     scanmode = "normal"
 
-output.OutputBanner(targetarg, scantype, scanspeed, args.hostfile)
+OutputBanner(targetarg, scantype, scanspeed, args.hostfile)
 
 #ask the user if they want to scan ports
 def UserWantsPortScan():
@@ -161,7 +161,7 @@ def UserWantsPortScan():
                 return True
                 break
             elif wannaportscan == 'n' or wannaportscan == 'no':
-                output.WriteToFile("User refused to run a port scan on these hosts.")
+                WriteToFile("User refused to run a port scan on these hosts.")
                 return False
             else:
                 print("Please say Y or N!")
@@ -178,7 +178,7 @@ def UserWantsVulnerabilityDetection():
                 return True
                 break
             elif wannavulnscan == 'n' or wannavulnscan == 'no':
-                output.WriteToFile("User refused to do a version based vulnerability detection.")
+                WriteToFile("User refused to do a version based vulnerability detection.")
                 return False
             else:
                 print("Please say Y or N!")
@@ -187,10 +187,10 @@ def UserWantsVulnerabilityDetection():
 def FurtherEnumuration(hosts):
     for host in hosts:
         print("\t\t" + host)
-        output.WriteToFile("\t\t" + host)
+        WriteToFile("\t\t" + host)
     if UserWantsPortScan():
         for host in hosts:
-            output.WriteToFile("\n" + "-" * 50)
+            WriteToFile("\n" + "-" * 50)
             PortScanResults = PortScan(host, scanspeed, scanmode)
             PortArray = AnalyseScanResults(PortScanResults,host)
             if len(PortArray) > 0:
@@ -198,8 +198,8 @@ def FurtherEnumuration(hosts):
                     SearchSploits(PortArray, apiKey)
             else:
                 print("Skipping vulnerability detection for " + str(host))
-                output.WriteToFile("Skipped vulnerability detection for " + str(host))
-            output.WriteToFile("\n" + "-" * 50)
+                WriteToFile("Skipped vulnerability detection for " + str(host))
+            WriteToFile("\n" + "-" * 50)
 
 #main function
 def main():
@@ -213,4 +213,4 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print_colored("Ctrl+C pressed. Exiting.", colors.red)
-        output.WriteToFile("Ctrl+C pressed. Exiting.")
+        WriteToFile("Ctrl+C pressed. Exiting.")
