@@ -101,20 +101,6 @@ def DiscoverHosts(target, scantype, scanspeed, mode):
                 WriteToFile("\nStopped noise...")
                 exit(0)
     else:
-        if scantype == "arp":
-            if not is_root():
-                print_colored("You must be root to do an arp scan!", colors.red)
-                scantype = "ping"
-        elif scantype == "ping":
-            pass
-        else:
-            if is_root():
-                print_colored("Unknown scan type: %s! Using arp scan instead..." % (scantype), colors.red)
-                scantype = "arp"
-            else:
-                print_colored("Unknown scan type: %s! Using ping scan instead..." % (scantype), colors.red)
-                scantype = "ping"
-
         print_colored("\n" + "-" * 60, colors.green)
         if type(target) is list:
             print_colored(("Scanning " + str(len(target)) + " target(s) using " + scantype + " scan...").center(60), colors.green)
