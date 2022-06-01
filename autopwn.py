@@ -10,7 +10,7 @@ from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts
 from modules.outfile import InitializeOutput, WriteToFile, OutputBanner
 
 __author__ = 'GamehunterKaan'
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
@@ -97,6 +97,7 @@ else:
 def check_nmap():
     # Check if nmap is installed
     # If not, install it
+    # also add a function to install nmap on windows
     try:
         nmap_checker = check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
     except FileNotFoundError:
