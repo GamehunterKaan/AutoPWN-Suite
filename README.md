@@ -86,6 +86,7 @@ options:
 - [ ] Web application content discovery mode. (dirbusting)
 - [ ] Option to use as a module.
 - [ ] Config file argument to specify configurations in a seperate config file.
+- [ ] Argument for passing custom nmap flags.
 
 ### Contributing to AutoPWN Suite
 
