@@ -37,6 +37,14 @@ git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 ```
 OR
 
+You can download debian (deb) package from [releases.](https://github.com/GamehunterKaan/AutoPWN-Suite/releases)
+
+```
+sudo apt-get install ./autopwn-suite_1.0.4.deb
+```
+
+OR
+
 You can use Google Cloud Shell.
 
 [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/GamehunterKaan/AutoPWN-Suite.git)
