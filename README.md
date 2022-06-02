@@ -83,8 +83,8 @@ options:
 - [x] pypi package for easily installing with just `pip install autopwn-suite`.
 - [x] Automatically install nmap if its not installed.
 - [x] Noise mode. (Does nothing but creating a lot of noise)
+- [x] `.deb` package for Debian based systems like Kali Linux and Parrot Security.
 - [ ] Function to automatically download exploit related to vulnerability.
-- [ ] .deb package for Debian based systems like Kali Linux and Parrot Security.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
 - [ ] Seperate script for checking local privilege escalation vulnerabilities.
 - [ ] Windows and OSX support.
