@@ -2,7 +2,6 @@ from modules.color import print_colored, colors, bcolors
 from modules.nvdlib.nvdlib import searchCPE, searchCVE, getCVE
 from textwrap import wrap
 from os import get_terminal_size
-from requests.exceptions import JSONDecodeError
 from modules.outfile import WriteToFile
 
 #generate keywords to search for from the information gathered from the target
@@ -136,9 +135,11 @@ def SearchSploits(HostArray, apiKey):
                         print("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
                         WriteToFile("│\t\t" + "Details : " + details)
 
-            except JSONDecodeError:
-                print_colored("An error occurred while trying to fetch details for " + str(keyword), colors.red)
-                WriteToFile("An error occurred while trying to fetch details for " + str(keyword))
             except KeyboardInterrupt:
                 print_colored("Skipping vulnerability detection for keyword " + str(keyword), colors.red)
                 WriteToFile("Skipped vulnerability detection for keyword " + str(keyword))
+            except Exception as e:
+                print_colored("An error occurred while trying to fetch details for " + str(keyword), colors.red)
+                print_colored("Error message : " + e, colors.red)
+                WriteToFile("An error occurred while trying to fetch details for " + str(keyword))
+                WriteToFile("Error message : " + e)
