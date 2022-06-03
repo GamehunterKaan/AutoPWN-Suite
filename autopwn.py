@@ -48,7 +48,7 @@ if args.scantype == "arp":
         scantype = "ping"
 elif args.scantype == "ping":
     pass
-elif args.scantype == "":
+elif args.scantype == "" or type(args.scantype) == None or args.scantype == None:
     if is_root():
         scantype = "arp"
     else:
@@ -208,7 +208,6 @@ def FurtherEnumuration(hosts):
         WriteToFile(host.center(60))
     if UserWantsPortScan():
         for host in hosts:
-            WriteToFile("\n" + "-" * 60)
             PortScanResults = PortScan(host, scanspeed, scanmode)
             PortArray = AnalyseScanResults(PortScanResults,host)
             if len(PortArray) > 0:
@@ -217,7 +216,6 @@ def FurtherEnumuration(hosts):
             else:
                 print("Skipping vulnerability detection for " + str(host))
                 WriteToFile("Skipped vulnerability detection for " + str(host))
-            WriteToFile("\n" + "-" * 60)
 
 #main function
 def main():

@@ -54,7 +54,11 @@ def PortScan(target, scanspeed, mode):
     print_colored("\n" + "-" * 60, colors.green)
     print_colored(("Running a portscan on host " + str(target) + "...").center(60), colors.green)
     print_colored("-" * 60 + "\n", colors.green)
-    WriteToFile("\nPortscan on " + str(target) + " : ")
+
+    WriteToFile("\n" + "-" * 60)
+    WriteToFile(("Portscan results for host " + str(target) + ".").center(60))
+    WriteToFile("-" * 60 + "\n")
+
     nm = PortScanner()
     if is_root():
         if mode == "evade":
@@ -103,15 +107,17 @@ def DiscoverHosts(target, scantype, scanspeed, mode):
                 exit(0)
     else:
         print_colored("\n" + "-" * 60, colors.green)
+        WriteToFile("\n" + "-" * 60)
         if type(target) is list:
             print_colored(("Scanning " + str(len(target)) + " target(s) using " + scantype + " scan...").center(60), colors.green)
             WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), scantype))
         else:
             print_colored(("Scanning " + target + " using " + scantype + " scan...").center(60), colors.green)
-            WriteToFile("\nScanning %s using %s scan..." % (target, scantype))
+            WriteToFile(("Scanning " + target + " using " + scantype + " scan...").center(60))
         
         print_colored("-" * 60 + "\n", colors.green)
-        
+        WriteToFile("-" * 60 + "\n")
+
         if scantype == "ping":
             OnlineHosts = TestPing(target, mode)
             return OnlineHosts
@@ -187,7 +193,7 @@ def AnalyseScanResults(nm,target):
 
         if nm[target]['status']['reason'] == 'localhost-response' or nm[target]['status']['reason'] == 'user-set':
             print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
-            WriteToFile('Target ' + str(target) + ' seems to be us.')
+            WriteToFile('Target ' + str(target) + ' seems to be us.\n')
         if len(nm[target].all_protocols()) == 0:
             print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
             WriteToFile("Target " + str(target) + " seems to have no open ports.")

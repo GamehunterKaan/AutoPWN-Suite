@@ -41,11 +41,15 @@ def SearchSploits(HostArray, apiKey):
     print_colored("\n" + "-" * 60, colors.red)
     print_colored(("Possible vulnerabilities for " + str(HostArray[0][0])).center(60), colors.red)
     print_colored("-" * 60 + "\n", colors.red)
-    WriteToFile("\nPossible vulnerabilities for " + str(HostArray[0][0]))
+
+    WriteToFile("\n" + "-" * 60)
+    WriteToFile(("Possible vulnerabilities for " + str(HostArray[0][0])).center(60))
+    WriteToFile("-" * 60 + "\n")
+
     keywords = GenerateKeywords(HostArray)
     if len(keywords) <= 0:
         print_colored(("Insufficient information for " + str(HostArray[0][0])).center(60), colors.yellow)
-        WriteToFile("Insufficient information for " + str(HostArray[0][0]))
+        WriteToFile(("Insufficient information for " + str(HostArray[0][0])).center(60))
     else:
         print("Searching vulnerability database for %s keyword(s)...\n" % (len(keywords)))
         WriteToFile("Searching vulnerability database for %s keyword(s)..." % (len(keywords)))
@@ -140,6 +144,6 @@ def SearchSploits(HostArray, apiKey):
                 WriteToFile("Skipped vulnerability detection for keyword " + str(keyword))
             except Exception as e:
                 print_colored("An error occurred while trying to fetch details for " + str(keyword), colors.red)
-                print_colored("Error message : " + e, colors.red)
+                print_colored("Error message : " + str(e), colors.red)
                 WriteToFile("An error occurred while trying to fetch details for " + str(keyword))
-                WriteToFile("Error message : " + e)
+                WriteToFile("Error message : " + str(e))
