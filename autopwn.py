@@ -208,9 +208,11 @@ def FurtherEnumuration(hosts):
     if len(hosts) == 0:
         print_colored("No hosts found!", colors.red)
         exit(0)
+    index = 0
     for host in hosts:
-        print(host.center(60))
-        WriteToFile(host.center(60))
+        print(("%s[%s%d%s]%s %s" % (bcolors.red, bcolors.endc, index, bcolors.red, bcolors.endc, host)).center(60))
+        WriteToFile(("[%d] %s" % (index, host)).center(60))
+        index += 1
     if not DontAskForConfirmation:
         print_colored("\nEnter the index number of the host you would like to enumurate further.", colors.yellow)
         print_colored("Enter 'all' to enumurate all hosts.", colors.yellow)
@@ -224,6 +226,9 @@ def FurtherEnumuration(hosts):
                 exit(0)
             elif host in hosts:
                 Targets = [host]
+                break
+            elif int(host) < len(hosts) and int(host) >= 0:
+                Targets = [hosts[int(host)]]
                 break
             else:
                 print_colored("Please enter a valid host number or 'all' or 'exit'", colors.red)
