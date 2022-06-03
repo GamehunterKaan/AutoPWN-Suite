@@ -91,6 +91,12 @@ Specifying a scan type.
 autopwn-suite -st ping
 ```
 
+Pass custom nmap flags to Port Scanner. (Must be used like below.)
+
+```console
+autopwn-suite -nf="-e eth0"
+```
+
 Specifying speed.
 
 ```console
