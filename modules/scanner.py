@@ -142,27 +142,27 @@ def AnalyseScanResults(nm,target):
 
         try:
             mac = nm[target]['addresses']['mac']
-        except:
+        except KeyError:
             mac = 'Unknown'
 
         try:
             vendor = nm[target]['vendor'][mac]
-        except:
+        except KeyError:
             vendor = 'Unknown'
 
         try:
             os = nm[target]['osmatch'][0]['name']
-        except:
+        except KeyError:
             os = 'Unknown'
 
         try:
             accuracy = nm[target]['osmatch'][0]['accuracy']
-        except:
+        except KeyError:
             accuracy = 'Unknown'
 
         try:
             ostype = nm[target]['osmatch'][0]['osclass'][0]['type']
-        except:
+        except KeyError:
             ostype = 'Unknown'
 
         print(
@@ -204,64 +204,51 @@ def AnalyseScanResults(nm,target):
         if len(nm[target].all_protocols()) == 0:
             print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
             WriteToFile("Target " + str(target) + " seems to have no open ports.")
-        for proto in nm[target].all_protocols():
-            for port in nm[target][proto].keys():
-                                
-                try:
-                    if not len(nm[str(target)][proto][int(port)]['state']) == 0:
-                        state = nm[str(target)][proto][int(port)]['state']
-                    else:
-                        state = 'Unknown'
-                except:
-                    state = 'Unknown'
-                
-                try:
-                    if not len(nm[str(target)][proto][int(port)]['name']) == 0:
-                        service = nm[str(target)][proto][int(port)]['name']
-                    else:
-                        service = 'Unknown'
-                except:
-                    service = 'Unknown'
+            return HostArray
+        for port in nm[target]['tcp'].keys():
+                            
+            if not len(nm[str(target)]['tcp'][int(port)]['state']) == 0:
+                state = nm[str(target)]['tcp'][int(port)]['state']
+            else:
+                state = 'Unknown'
+        
+            if not len(nm[str(target)]['tcp'][int(port)]['name']) == 0:
+                service = nm[str(target)]['tcp'][int(port)]['name']
+            else:
+                service = 'Unknown'
 
-                try:
-                    if not len(nm[str(target)][proto][int(port)]['product']) == 0:
-                        product = nm[str(target)][proto][int(port)]['product']
-                    else:
-                        product = 'Unknown'
-                    
-                except:
-                    product = 'Unknown'
+            if not len(nm[str(target)]['tcp'][int(port)]['product']) == 0:
+                product = nm[str(target)]['tcp'][int(port)]['product']
+            else:
+                product = 'Unknown'
 
-                try:
-                    if not len(nm[str(target)][proto][int(port)]['version']) == 0:
-                        version = nm[str(target)][proto][int(port)]['version']
-                    else:
-                        version = 'Unknown'
-                except:
-                    version = 'Unknown'
+            if not len(nm[str(target)]['tcp'][int(port)]['version']) == 0:
+                version = nm[str(target)]['tcp'][int(port)]['version']
+            else:
+                version = 'Unknown'
 
-                print(
-                    (
-                        bcolors.cyan + "Port : " + bcolors.endc + "{0:10}" + 
-                        bcolors.cyan + " State : " + bcolors.endc + "{1:10}" +
-                        bcolors.cyan + " Service : " + bcolors.endc + "{2:15}" +
-                        bcolors.cyan + " Product : " + bcolors.endc + "{3:20}" +
-                        bcolors.cyan + " Version : " + bcolors.endc + "{4:15}"
-                    ).format(str(port), state, service, product, version)
-                )
+            print(
+                (
+                    bcolors.cyan + "Port : " + bcolors.endc + "{0:10}" + 
+                    bcolors.cyan + " State : " + bcolors.endc + "{1:10}" +
+                    bcolors.cyan + " Service : " + bcolors.endc + "{2:15}" +
+                    bcolors.cyan + " Product : " + bcolors.endc + "{3:20}" +
+                    bcolors.cyan + " Version : " + bcolors.endc + "{4:15}"
+                ).format(str(port), state, service, product, version)
+            )
 
-                WriteToFile(
-                    (
-                        "Port : {0:10}" + 
-                        " State : {1:10}" +
-                        " Service : {2:20}" +
-                        " Product : {3:20}" +
-                        " Version : {4:20}"
-                    ).format(str(port), state, service, product, version)
-                )
+            WriteToFile(
+                (
+                    "Port : {0:10}" + 
+                    " State : {1:10}" +
+                    " Service : {2:20}" +
+                    " Product : {3:20}" +
+                    " Version : {4:20}"
+                ).format(str(port), state, service, product, version)
+            )
 
-                if state == 'open':
-                    HostArray.insert(len(HostArray), [target, port, service, product, version])
+            if state == 'open':
+                HostArray.insert(len(HostArray), [target, port, service, product, version])
 
     except KeyError:
         print_colored("Target " + str(target) + " seems to be offline.", colors.red)
