@@ -206,16 +206,35 @@ def FurtherEnumuration(hosts):
     for host in hosts:
         print(host.center(60))
         WriteToFile(host.center(60))
-    if UserWantsPortScan():
-        for host in hosts:
-            PortScanResults = PortScan(host, scanspeed, scanmode)
-            PortArray = AnalyseScanResults(PortScanResults,host)
-            if len(PortArray) > 0:
-                if UserWantsVulnerabilityDetection():
-                    SearchSploits(PortArray, apiKey)
+    if not DontAskForConfirmation:
+        print_colored("\nEnter the index number of the host you would like to enumurate further.", colors.yellow)
+        print_colored("Enter 'all' to enumurate all hosts.", colors.yellow)
+        print_colored("Enter 'exit' to exit.\n", colors.yellow)
+        while True:
+            host = input(bcolors.blue + "----> " + bcolors.endc)
+            if host == 'all':
+                Targets = hosts
+                break
+            elif host == 'exit':
+                exit(0)
+            elif host in hosts:
+                Targets = [host]
+                break
             else:
-                print("Skipping vulnerability detection for " + str(host))
-                WriteToFile("Skipped vulnerability detection for " + str(host))
+                print_colored("Please enter a valid host number or 'all' or 'exit'", colors.red)
+    if UserWantsPortScan():
+        if UserWantsVulnerabilityDetection():
+            for host in Targets:
+                PortScanResults = PortScan(host, scanspeed, scanmode)
+                PortArray = AnalyseScanResults(PortScanResults,host)
+                if len(PortArray) > 0:
+                    SearchSploits(PortArray, apiKey)
+        else:
+            for host in Targets:
+                PortScanResults = PortScan(host, scanspeed, scanmode)
+                PortArray = AnalyseScanResults(PortScanResults,host)
+    else:
+        exit(0)
 
 #main function
 def main():
