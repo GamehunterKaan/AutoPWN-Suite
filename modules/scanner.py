@@ -28,7 +28,7 @@ def listToString(s):
     return (str1.join(s))
 
 #do a ping scan using nmap
-def TestPing(target, mode):
+def TestPing(target, mode="normal"):
     nm = PortScanner()
     if type(target) is list:
         target = listToString(target)
@@ -39,7 +39,7 @@ def TestPing(target, mode):
     return nm.all_hosts()
 
 #do a arp scan using nmap
-def TestArp(target, mode):
+def TestArp(target, mode="normal"):
     nm = PortScanner()
     if type(target) is list:
         target = listToString(target)
@@ -50,7 +50,7 @@ def TestArp(target, mode):
     return nm.all_hosts()
 
 #run a port scan on target using nmap
-def PortScan(target, scanspeed, mode):
+def PortScan(target, scanspeed=5, mode="normal", customflags=""):
     print_colored("\n" + "-" * 60, colors.green)
     print_colored(("Running a portscan on host " + str(target) + "...").center(60), colors.green)
     print_colored("-" * 60 + "\n", colors.green)
@@ -60,13 +60,20 @@ def PortScan(target, scanspeed, mode):
     WriteToFile("-" * 60 + "\n")
 
     nm = PortScanner()
-    if is_root():
-        if mode == "evade":
-            resp = nm.scan(hosts=target, arguments="-sS -sV -O -Pn -T 2 -f -g 53 --data-length 10")
+
+    try:
+        if is_root():
+            if mode == "evade":
+                resp = nm.scan(hosts=target, arguments="-sS -sV -O -Pn -T 2 -f -g 53 --data-length 10 %s" % (customflags))
+            else:
+                resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T %d %s" % (scanspeed, customflags))
         else:
-            resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T %d" % (scanspeed))
-    else:
-        resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn -T %d" % (scanspeed))
+            resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn -T %d %s" % (scanspeed, customflags))
+    except Exception as e:
+        print_colored("Error: %s" % (e), colors.red)
+        WriteToFile("Error: %s" % (e))
+        exit(0)
+
     return nm
 
 def CreateNoise(target):
@@ -81,7 +88,7 @@ def CreateNoise(target):
     except KeyboardInterrupt:
         pass
 
-def DiscoverHosts(target, scantype, scanspeed, mode):
+def DiscoverHosts(target, scantype="arp", scanspeed=3, mode="normal", customflags=""):
     if mode == "noise":
         print_colored("\n" + "-" * 60, colors.green)
         print_colored("Creating noise...".center(60), colors.green)

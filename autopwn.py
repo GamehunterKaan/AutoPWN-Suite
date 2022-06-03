@@ -18,6 +18,7 @@ argparser.add_argument("-o", "--output", help="Output file name. (Default : auto
 argparser.add_argument("-t", "--target", help="Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)")
 argparser.add_argument("-hf", "--hostfile", help="File containing a list of hosts to scan.")
 argparser.add_argument("-st", "--scantype", help="Scan type. (Ping or ARP)")
+argparser.add_argument("-nf", "--nmapflags", help="Custom nmap flags to use for portscan. (Has to be specified like : -nf=\"-O\")", default="")
 argparser.add_argument("-s", "--speed", help="Scan speed. (0-5) (Default : 3)", default=3)
 argparser.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)", default=None)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
@@ -61,6 +62,7 @@ else:
         scantype = "ping"
         print_colored("Unknown scan type: %s! Using ping scan instead..." % (args.scantype), colors.red)
 
+nmapflags = args.nmapflags
 scanspeed = int(args.speed)
 
 if is_root() == False:
@@ -206,7 +208,7 @@ def FurtherEnumuration(hosts):
     for host in hosts:
         print(host.center(60))
         WriteToFile(host.center(60))
-    if not DontAskForConfirmation():
+    if not DontAskForConfirmation:
         print_colored("\nEnter the index number of the host you would like to enumurate further.", colors.yellow)
         print_colored("Enter 'all' to enumurate all hosts.", colors.yellow)
         print_colored("Enter 'exit' to exit.\n", colors.yellow)
@@ -222,16 +224,18 @@ def FurtherEnumuration(hosts):
                 break
             else:
                 print_colored("Please enter a valid host number or 'all' or 'exit'", colors.red)
+    else:
+        Targets = hosts
     if UserWantsPortScan():
         if UserWantsVulnerabilityDetection():
             for host in Targets:
-                PortScanResults = PortScan(host, scanspeed, scanmode)
+                PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
                 PortArray = AnalyseScanResults(PortScanResults,host)
                 if len(PortArray) > 0:
                     SearchSploits(PortArray, apiKey)
         else:
             for host in Targets:
-                PortScanResults = PortScan(host, scanspeed, scanmode)
+                PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
                 PortArray = AnalyseScanResults(PortScanResults,host)
     else:
         exit(0)
