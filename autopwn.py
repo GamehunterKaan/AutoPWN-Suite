@@ -205,6 +205,9 @@ def UserWantsVulnerabilityDetection():
 
 #post scan stuff
 def FurtherEnumuration(hosts):
+    if len(hosts) == 0:
+        print_colored("No hosts found!", colors.red)
+        exit(0)
     for host in hosts:
         print(host.center(60))
         WriteToFile(host.center(60))
