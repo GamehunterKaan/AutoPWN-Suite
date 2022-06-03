@@ -206,7 +206,7 @@ def FurtherEnumuration(hosts):
     for host in hosts:
         print(host.center(60))
         WriteToFile(host.center(60))
-    if not DontAskForConfirmation:
+    if not DontAskForConfirmation():
         print_colored("\nEnter the index number of the host you would like to enumurate further.", colors.yellow)
         print_colored("Enter 'all' to enumurate all hosts.", colors.yellow)
         print_colored("Enter 'exit' to exit.\n", colors.yellow)
