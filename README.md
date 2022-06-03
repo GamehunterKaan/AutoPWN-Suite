@@ -119,7 +119,7 @@ Help Menu
 
 ```console
 $ autopwn-suite -h
-usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-hf HOSTFILE] [-st SCANTYPE] [-s SPEED] [-a API] [-y] [-m MODE] [-v]
+usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-hf HOSTFILE] [-st SCANTYPE] [-nf NMAPFLAGS] [-s SPEED] [-a API] [-y] [-m MODE] [-v]
 
 AutoPWN Suite
 
@@ -133,6 +133,8 @@ options:
                         File containing a list of hosts to scan.
   -st SCANTYPE, --scantype SCANTYPE
                         Scan type. (Ping or ARP)
+  -nf NMAPFLAGS, --nmapflags NMAPFLAGS
+                        Custom nmap flags to use for portscan. (Has to be specified like : -nf="-O")
   -s SPEED, --speed SPEED
                         Scan speed. (0-5) (Default : 3)
   -a API, --api API     Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)
@@ -150,6 +152,7 @@ options:
 - [x] Automatically install nmap if its not installed.
 - [x] Noise mode. (Does nothing but creating a lot of noise)
 - [x] `.deb` package for Debian based systems like Kali Linux and Parrot Security.
+- [x] Argument for passing custom nmap flags.
 - [ ] Function to automatically download exploit related to vulnerability.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
 - [ ] Seperate script for checking local privilege escalation vulnerabilities.
@@ -166,7 +169,6 @@ options:
 - [ ] Web application content discovery mode. (dirbusting)
 - [ ] Option to use as a module.
 - [ ] Config file argument to specify configurations in a seperate config file.
-- [ ] Argument for passing custom nmap flags.
 
 ### Contributing to AutoPWN Suite
 
