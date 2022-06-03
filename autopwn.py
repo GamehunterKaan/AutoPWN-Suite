@@ -105,16 +105,16 @@ def check_nmap():
     except FileNotFoundError:
         print_colored("Nmap is not installed. Auto installing...", colors.yellow)
         try:
-            debian_installer = check_call(["sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL)
+            debian_installer = check_call(["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL)
         except CalledProcessError:
             try:
-                arch_instller = check_call(["sudo", "pacman", "-S", "nmap", "--noconfirm"], stderr=DEVNULL)
+                arch_instller = check_call(["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"], stderr=DEVNULL)
             except CalledProcessError:
                 try:
-                    fedore_installer = check_call(["sudo", "dnf", "install", "nmap"], stderr=DEVNULL)
+                    fedore_installer = check_call(["/usr/bin/sudo", "dnf", "install", "nmap"], stderr=DEVNULL)
                 except CalledProcessError:
                     try:
-                        yum_installer = check_call(["sudo", "yum", "install", "nmap"], stderr=DEVNULL)
+                        yum_installer = check_call(["/usr/bin/sudo", "yum", "install", "nmap"], stderr=DEVNULL)
                     except CalledProcessError:
                         print_colored("nmap installation failed. Please install nmap manually.", colors.red)
                         exit(1)
