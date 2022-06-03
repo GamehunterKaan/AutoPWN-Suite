@@ -10,7 +10,7 @@ from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts
 from modules.outfile import InitializeOutput, WriteToFile, OutputBanner
 
 __author__ = 'GamehunterKaan'
-__version__ = '1.0.4'
+__version__ = '1.0.5'
 
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
