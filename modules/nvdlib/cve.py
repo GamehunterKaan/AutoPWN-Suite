@@ -50,8 +50,9 @@ def getCVE(CVEID, cpe_dict=False, key=False, verbose=False):
                 raise LookupError(raw['message'])
 
         except JSONDecodeError:
-            print('Invalid CVE: ' + str(raw))
-            print('Attempted search for CVE ID : ' + CVEID)
+            raise LookupError("Invalid CVE: " + str(raw) +
+                            "\nPlease check your CVE ID syntax and try again."
+                            "\nAttempted CVE ID: " + CVEID)
 
         # NIST 6 second rate limit recommendation on requests without API key - https://nvd.nist.gov/developers
         # Get a key, its easy.

@@ -29,14 +29,15 @@ def __get(product, parameters, limit, key, verbose):
     raw = requests.get(link, params=parameters)
     
 
-    try: # Try to convert the request to JSON. If it is not JSON, then print the response and exit.
+    try: # Try to convert the request to JSON. If it is not JSON, then raise an exception.
         raw = raw.json() 
         if 'message' in raw:
             raise LookupError(raw['message'])
     except JSONDecodeError:
-        print('Invalid search criteria syntax: ' + str(raw))
-        print('Attempted search criteria: ' + str(parameters))
-    
+        raise LookupError("Invalid search criteria syntax: " + str(raw) +
+                          "\nPlease check your search criteria syntax and try again."
+                          "\nAttempted search criteria: " + str(parameters))
+
     time.sleep(delay) 
     totalResults = raw['totalResults']
 
