@@ -24,8 +24,6 @@ jobs:
       run: pip install requests
     - name: Set up nmap
       run: sudo apt-get update && sudo apt-get install nmap -y
-    - name: Import test
-      run: python -c "import autopwn"
     - name: Simple manual test
       run: python autopwn.py
     - name: Automatic test
@@ -34,8 +32,6 @@ jobs:
       run: python autopwn.py -y -m "evade"
     - name: Noise mod test
       run: python autopwn.py -y -m "noise"
-    - name: Import test (sudo)
-      run: sudo python -c "import autopwn"
     - name: Simple manual test (sudo)
       run: sudo python autopwn.py
     - name: Automatic test (sudo)
