@@ -57,4 +57,4 @@ jobs:
     - name: Noise mode test
       run: sudo python autopwn.py -y -m "noise" -nt 10 -t 127.0.0.1
     - name: Config file test
-      run: python autopwn.py -c example.conf
+      run: sudo python autopwn.py -c example.conf
