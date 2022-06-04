@@ -21,19 +21,15 @@ jobs:
       with:
         python-version: "3.10"
     - name: Install dependencies
-      run: pip install requests
-    - name: Set up nmap
-      run: sudo apt-get update && sudo apt-get install nmap -y
-    - name: Simple manual test
-      run: python autopwn.py
+      run: |
+        pip install requests
+        sudo apt-get update && sudo apt-get install nmap -y
     - name: Automatic test
       run: python autowpwn.py -y
     - name: Evade mode test
       run: python autopwn.py -y -m "evade"
     - name: Noise mod test
       run: python autopwn.py -y -m "noise"
-    - name: Simple manual test (sudo)
-      run: sudo python autopwn.py
     - name: Automatic test (sudo)
       run: sudo python autowpwn.py -y
     - name: Evade mode test (sudo)
