@@ -2,15 +2,19 @@ name: Tests
 
 on:
   push:
+    paths: '**.py'
     branches: [ "main" ]
   pull_request:
+    paths: '**.py'
     branches: [ "main" ]
+  release:
+    types: [published]
 
 permissions:
   contents: read
 
 jobs:
-  Test:
+  normal-tests:
 
     runs-on: ubuntu-latest
 
@@ -27,12 +31,28 @@ jobs:
     - name: Automatic test
       run: python autopwn.py -y -t 127.0.0.1
     - name: Evade mode test
-      run: python autopwn.py -y -m "evade" -t 127.0.0.1
+      run: python autopwn.py -y -m "evade" -t 127.0.0.1 -nf="--host-timeout 60"
     - name: Noise mod test
       run: python autopwn.py -y -m "noise" -nt 10 -t 127.0.0.1
-    - name: Automatic test (sudo)
+
+  superuser-tests:
+  
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        pip install requests
+        sudo apt-get update && sudo apt-get install nmap -y
+
+    - name: Automatic test
       run: sudo python autopwn.py -y -t 127.0.0.1
-    - name: Evade mode test (sudo)
-      run: sudo python autopwn.py -y -m "evade" -t 127.0.0.1
-    - name: Noise mod test (sudo)
+    - name: Evade mode test
+      run: sudo python autopwn.py -y -m "evade" -t 127.0.0.1 -nf="--host-timeout 60"
+    - name: Noise mod test
       run: sudo python autopwn.py -y -m "noise" -nt 10 -t 127.0.0.1
