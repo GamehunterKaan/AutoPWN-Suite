@@ -32,6 +32,8 @@ jobs:
       run: python autopwn.py -y -t 127.0.0.1
     - name: Noise mode test
       run: python autopwn.py -y -m "noise" -nt 10 -t 127.0.0.1
+    - name: Config file test
+      run: python autopwn.py -c example.conf
 
   superuser-tests:
   
@@ -54,3 +56,5 @@ jobs:
       run: sudo python autopwn.py -y -m "evade" -t 127.0.0.1 -nf="--host-timeout 60"
     - name: Noise mode test
       run: sudo python autopwn.py -y -m "noise" -nt 10 -t 127.0.0.1
+    - name: Config file test
+      run: python autopwn.py -c example.conf
