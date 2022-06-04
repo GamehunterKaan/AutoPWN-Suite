@@ -29,10 +29,10 @@ jobs:
     - name: Evade mode test
       run: python autopwn.py -y -m "evade"
     - name: Noise mod test
-      run: python autopwn.py -y -m "noise"
+      run: python autopwn.py -y -m "noise" -nt 10
     - name: Automatic test (sudo)
       run: sudo python autopwn.py -y
     - name: Evade mode test (sudo)
       run: sudo python autopwn.py -y -m "evade"
     - name: Noise mod test (sudo)
-      run: sudo python autopwn.py -y -m "noise"
+      run: sudo python autopwn.py -y -m "noise" -nt 10
