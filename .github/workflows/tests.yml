@@ -1,0 +1,44 @@
+name: Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  Test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Set up nmap
+      run: sudo apt-get update && sudo apt-get install nmap -y
+    - name: Import test
+      run: python -c "import autopwn"
+    - name: Simple manual test
+      run: python autopwn.py
+    - name: Automatic test
+      run: python autowpwn.py -y
+    - name: Evade mode test
+      run: python autopwn.py -y -m "evade"
+    - name: Noise mod test
+      run: python autopwn.py -y -m "noise"
+    - name: Import test (sudo)
+      run: sudo python -c "import autopwn"
+    - name: Simple manual test (sudo)
+      run: sudo python autopwn.py
+    - name: Automatic test (sudo)
+      run: sudo python autowpwn.py -y
+    - name: Evade mode test (sudo)
+      run: sudo python autopwn.py -y -m "evade"
+    - name: Noise mod test (sudo)
+      run: sudo python autopwn.py -y -m "noise"
