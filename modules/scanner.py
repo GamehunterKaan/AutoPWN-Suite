@@ -5,6 +5,7 @@ from os import getuid
 from multiprocessing import Process
 from dataclasses import dataclass
 from time import sleep
+from enum import Enum
 
 @dataclass
 class PortInfo:
@@ -15,6 +16,15 @@ class PortInfo:
     service = ''
     product = ''
     version = ''
+
+class ScanMode(Enum):
+    Normal = 0
+    Noise = 1
+    Evade = 2
+
+class ScanType(Enum):
+    Ping = 0
+    ARP = 1
 
 def is_root():
     if getuid() == 0:
@@ -28,29 +38,29 @@ def listToString(s):
     return (str1.join(s))
 
 #do a ping scan using nmap
-def TestPing(target, mode="normal"):
+def TestPing(target, mode=ScanMode.Normal):
     nm = PortScanner()
     if type(target) is list:
         target = listToString(target)
-    if mode == "evade" and is_root():
+    if mode == ScanMode.Evade and is_root():
         resp = nm.scan(hosts=target, arguments="-sn -T 2 -f -g 53 --data-length 10")
     else:
         resp = nm.scan(hosts=target, arguments="-sn")
     return nm.all_hosts()
 
 #do a arp scan using nmap
-def TestArp(target, mode="normal"):
+def TestArp(target, mode=ScanMode.Normal):
     nm = PortScanner()
     if type(target) is list:
         target = listToString(target)
-    if mode == "evade":
+    if mode == ScanMode.Evade:
         resp = nm.scan(hosts=target, arguments="-sn -PR -T 2 -f -g 53 --data-length 10")
     else:
         resp = nm.scan(hosts=target, arguments="-sn -PR")
     return nm.all_hosts()
 
 #run a port scan on target using nmap
-def PortScan(target, scanspeed=5, mode="normal", customflags=""):
+def PortScan(target, scanspeed=5, mode=ScanMode.Normal, customflags=""):
     print_colored("\n" + "-" * 60, colors.green)
     print_colored(("Running a portscan on host " + str(target) + "...").center(60), colors.green)
     print_colored("-" * 60 + "\n", colors.green)
@@ -63,7 +73,7 @@ def PortScan(target, scanspeed=5, mode="normal", customflags=""):
 
     try:
         if is_root():
-            if mode == "evade":
+            if mode == ScanMode.Evade:
                 resp = nm.scan(hosts=target, arguments="-sS -sV -O -Pn -T 2 -f -g 53 --data-length 10 %s" % (customflags))
             else:
                 resp = nm.scan(hosts=target, arguments="-sS -sV --host-timeout 60 -Pn -O -T %d %s" % (scanspeed, customflags))
@@ -88,50 +98,76 @@ def CreateNoise(target):
     except KeyboardInterrupt:
         pass
 
-def DiscoverHosts(target, scantype="arp", scanspeed=3, mode="normal", customflags=""):
-    if mode == "noise":
-        print_colored("\n" + "-" * 60, colors.green)
-        print_colored("Creating noise...".center(60), colors.green)
-        print_colored("-" * 60 + "\n", colors.green)
-        WriteToFile("\nCreating noise...")
-        if scantype == "ping":
-            Uphosts = TestPing(target, mode)
-        elif scantype == "arp":
-            if is_root():
-                Uphosts = TestArp(target, mode)
-            else:
-                Uphosts = TestPing(target, mode)
-        for host in Uphosts:
-            print_colored("Started creating noise on %s..." % (host), colors.green)
-            P = Process(target=CreateNoise, args=(host,))
-            P.start()
-        while True:
-            try:
-                sleep(10)
-            except KeyboardInterrupt:
-                print_colored("\nStopping noise...", colors.red)
-                WriteToFile("\nStopped noise...")
-                exit(0)
-    else:
-        print_colored("\n" + "-" * 60, colors.green)
-        WriteToFile("\n" + "-" * 60)
-        if type(target) is list:
-            print_colored(("Scanning " + str(len(target)) + " target(s) using " + scantype + " scan...").center(60), colors.green)
-            WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), scantype))
+def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
+    print_colored("\n" + "-" * 60, colors.green)
+    print_colored("Creating noise...".center(60), colors.green)
+    print_colored("-" * 60 + "\n", colors.green)
+    WriteToFile("\nCreating noise...")
+
+    if scantype == ScanType.Ping:
+        Uphosts = TestPing(target)
+    elif scantype == ScanType.ARP:
+        if is_root():
+            Uphosts = TestArp(target)
         else:
-            print_colored(("Scanning " + target + " using " + scantype + " scan...").center(60), colors.green)
-            WriteToFile(("Scanning " + target + " using " + scantype + " scan...").center(60))
-        
-        print_colored("-" * 60 + "\n", colors.green)
-        WriteToFile("-" * 60 + "\n")
+            Uphosts = TestPing(target)
+    
+    NoisyProcesses = []
 
-        if scantype == "ping":
-            OnlineHosts = TestPing(target, mode)
-            return OnlineHosts
+    for host in Uphosts:
+        print_colored("Started creating noise on %s..." % (host), colors.green)
+        P = Process(target=CreateNoise, args=(host,))
+        NoisyProcesses.append(P)
+        P.start()
 
-        elif scantype == "arp":
-            OnlineHosts = TestArp(target, mode)
-            return OnlineHosts
+    try:
+        if timeout:
+            while True:
+                print("|   " + str(timeout) + " seconds left!", end="     \r")
+                sleep(0.25)
+                print("/   " + str(timeout) + " seconds left!", end="     \r")
+                sleep(0.25)
+                print("-   " + str(timeout) + " seconds left!", end="     \r")
+                sleep(0.25)
+                print("\\   " + str(timeout) + " seconds left!", end="     \r")
+                sleep(0.25)
+                timeout -= 1
+                if timeout == 0:
+                    print("\nNoise scan complete!")
+                    for P in NoisyProcesses:
+                        P.terminate()
+                    exit(0)
+                    break
+        else:
+            while True:
+                sleep(1)
+    except KeyboardInterrupt:
+        print_colored("\nStopping noise...", colors.red)
+        WriteToFile("\nStopped noise...")
+        for P in NoisyProcesses:
+            P.terminate()
+        exit(0)
+
+def DiscoverHosts(target, scantype=ScanType.ARP, scanspeed=3, mode=ScanMode.Normal):
+    print_colored("\n" + "-" * 60, colors.green)
+    WriteToFile("\n" + "-" * 60)
+    if type(target) is list:
+        print_colored(("Scanning " + str(len(target)) + " target(s) using " + str(scantype.name) + " scan...").center(60), colors.green)
+        WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), str(scantype.name)))
+    else:
+        print_colored(("Scanning " + target + " using " + str(scantype.name) + " scan...").center(60), colors.green)
+        WriteToFile(("Scanning " + target + " using " + str(scantype.name) + " scan...").center(60))
+    
+    print_colored("-" * 60 + "\n", colors.green)
+    WriteToFile("-" * 60 + "\n")
+
+    if scantype == ScanType.Ping:
+        OnlineHosts = TestPing(target, mode)
+        return OnlineHosts
+
+    elif scantype == ScanType.ARP:
+        OnlineHosts = TestArp(target, mode)
+        return OnlineHosts
 
 #analyse and print scan results
 def AnalyseScanResults(nm, target=None):
