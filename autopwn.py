@@ -156,9 +156,13 @@ def GetTarget():
 targetarg = GetTarget()
 
 if args.mode.lower() == "evade":
-    scanmode = ScanMode.Evade
-    scanspeed = 2
-    print_colored("Evasion mode enabled!", colors.yellow)
+    if is_root():
+        scanmode = ScanMode.Evade
+        scanspeed = 2
+        print_colored("Evasion mode enabled!", colors.yellow)
+    else:
+        print_colored("You must be root to use evasion mode! Switching back to normal mode...", colors.red)
+        scanmode = ScanMode.Normal
 elif args.mode.lower() == "noise":
     scanmode = ScanMode.Noise
     print_colored("Noise mode enabled!", colors.yellow)
