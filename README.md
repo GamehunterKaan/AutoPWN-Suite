@@ -63,71 +63,11 @@ Automatic mode (This is the intended way of using AutoPWN Suite.)
 autopwn-suite -y
 ```
 
-Manual mode
-
-```console
-autopwn-suite
-```
-
-Specifying output file name. (Default : autopwn.log)
-
-```console
-autopwn-suite -o output.txt
-```
-
-Specifying target.
-
-```console
-autopwn-suite -t 192.168.0.1
-```
-
-Using a file as list of hosts.
-
-```console
-autopwn-suite -hf hosts.txt
-```
-
-Specifying a scan type.
-
-```console
-autopwn-suite -st ping
-```
-
-Pass custom nmap flags to Port Scanner. (Must be used like below.)
-
-```console
-autopwn-suite -nf="-e eth0"
-```
-
-Specifying speed.
-
-```console
-autopwn-suite -s 4
-```
-
-Specifying API key (If this argument is not specified, API key is going to be read from api.txt file)
-
-```console
-autopwn-suite -a
-```
-
-Specifying scan mode. (Evade, Noise, Normal)
-
-```console
-autopwn-suite -m noise
-```
-
-Print version and exit.
-
-```console
-autopwn-suite -v
-```
-
 Help Menu
 
 ```console
 $ autopwn-suite -h
-usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-hf HOSTFILE] [-st SCANTYPE] [-nf NMAPFLAGS] [-s SPEED] [-a API] [-y] [-m MODE] [-v]
+usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-hf HOSTFILE] [-st {arp,ping}] [-nf NMAPFLAGS] [-s {0,1,2,3,4,5}] [-a API] [-y] [-m {evade,noise,normal}] [-nt TIMEOUT] [-c CONFIG] [-v]
 
 AutoPWN Suite
 
@@ -139,15 +79,20 @@ options:
                         Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)
   -hf HOSTFILE, --hostfile HOSTFILE
                         File containing a list of hosts to scan.
-  -st SCANTYPE, --scantype SCANTYPE
-                        Scan type. (Ping or ARP)
+  -st {arp,ping}, --scantype {arp,ping}
+                        Scan type.
   -nf NMAPFLAGS, --nmapflags NMAPFLAGS
                         Custom nmap flags to use for portscan. (Has to be specified like : -nf="-O")
-  -s SPEED, --speed SPEED
-                        Scan speed. (0-5) (Default : 3)
-  -a API, --api API     Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)
+  -s {0,1,2,3,4,5}, --speed {0,1,2,3,4,5}
+                        Scan speed. (Default : 3)
+  -a API, --api API     Specify API key for vulnerability detection for faster scanning. (Default : None)
   -y, --yesplease       Don't ask for anything. (Full automatic mode)
-  -m MODE, --mode MODE  Scan mode. (Evade, Noise, Normal)
+  -m {evade,noise,normal}, --mode {evade,noise,normal}
+                        Scan mode.
+  -nt TIMEOUT, --noisetimeout TIMEOUT
+                        Noise mode timeout. (Default : None)
+  -c CONFIG, --config CONFIG
+                        Specify a config file to use. (Default : None)
   -v, --version         Print version and exit.
 ```
 
@@ -161,6 +106,7 @@ options:
 - [x] Noise mode. (Does nothing but creating a lot of noise)
 - [x] `.deb` package for Debian based systems like Kali Linux and Parrot Security.
 - [x] Argument for passing custom nmap flags.
+- [x] Config file argument to specify configurations in a seperate config file.
 - [ ] Function to automatically download exploit related to vulnerability.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
 - [ ] Seperate script for checking local privilege escalation vulnerabilities.
@@ -176,7 +122,6 @@ options:
 - [ ] Web application analysis.
 - [ ] Web application content discovery mode. (dirbusting)
 - [ ] Option to use as a module.
-- [ ] Config file argument to specify configurations in a seperate config file.
 
 ### Contributing to AutoPWN Suite
 
