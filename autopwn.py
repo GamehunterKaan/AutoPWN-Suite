@@ -3,10 +3,11 @@ from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
 from os import getuid
 from subprocess import check_call, CalledProcessError, DEVNULL
+from enum import Enum
 from modules.color import print_colored, colors, bcolors
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
-from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts
+from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts, ScanMode, ScanType, NoiseScan
 from modules.outfile import InitializeOutput, WriteToFile, OutputBanner
 
 __author__ = 'GamehunterKaan'
@@ -23,6 +24,7 @@ argparser.add_argument("-s", "--speed", help="Scan speed. (0-5) (Default : 3)", 
 argparser.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. You can also specify your API key in api.txt file. (Default : None)", default=None)
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true")
 argparser.add_argument("-m", "--mode", help="Scan mode. (Evade, Noise, Normal)", default="normal")
+argparser.add_argument("-nt", "--noisetimeout", help="Noise mode timeout. (Default : None)", default=None, type=int, required=False, metavar="TIMEOUT")
 argparser.add_argument("-v", "--version", help="Print version and exit.", action="store_true")
 args = argparser.parse_args()
 
@@ -46,20 +48,20 @@ def is_root():
 if args.scantype == "arp":
     if not is_root():
         print_colored("You must be root to do an arp scan!", colors.red)
-        scantype = "ping"
+        scantype = ScanType.Ping
 elif args.scantype == "ping":
     pass
 elif args.scantype == "" or type(args.scantype) == None or args.scantype == None:
     if is_root():
-        scantype = "arp"
+        scantype = ScanType.ARP
     else:
-        scantype = "ping"
+        scantype = ScanType.Ping
 else:
     if is_root():
-        scantype = "arp"
+        scantype = ScanType.ARP
         print_colored("Unknown scan type: %s! Using arp scan instead..." % (args.scantype), colors.red)
     else:
-        scantype = "ping"
+        scantype = ScanType.Ping
         print_colored("Unknown scan type: %s! Using ping scan instead..." % (args.scantype), colors.red)
 
 nmapflags = args.nmapflags
@@ -154,20 +156,20 @@ def GetTarget():
 targetarg = GetTarget()
 
 if args.mode.lower() == "evade":
-    scanmode = "evade"
+    scanmode = ScanMode.Evade
     scanspeed = 2
     print_colored("Evasion mode enabled!", colors.yellow)
 elif args.mode.lower() == "noise":
-    scanmode = "noise"
+    scanmode = ScanMode.Noise
     print_colored("Noise mode enabled!", colors.yellow)
 elif args.mode.lower() == "normal":
-    scanmode = "normal"
+    scanmode = ScanMode.Normal
 else:
     print_colored("Invalid mode specified! %s" % (args.mode), colors.red)
     print_colored("Using default mode : normal", colors.cyan)
-    scanmode = "normal"
+    scanmode = ScanMode.Normal
 
-OutputBanner(targetarg, scantype, scanspeed, args.hostfile)
+OutputBanner(targetarg, scantype, scanspeed, args.hostfile, scanmode)
 
 #ask the user if they want to scan ports
 def UserWantsPortScan():
@@ -251,6 +253,8 @@ def FurtherEnumuration(hosts):
 #main function
 def main():
     check_nmap()
+    if scanmode == ScanMode.Noise:
+        NoiseScan(targetarg, scantype, args.noisetimeout)
     OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed, scanmode)
     FurtherEnumuration(OnlineHosts)
 
