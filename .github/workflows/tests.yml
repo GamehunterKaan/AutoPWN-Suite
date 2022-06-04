@@ -25,13 +25,13 @@ jobs:
         pip install requests
         sudo apt-get update && sudo apt-get install nmap -y
     - name: Automatic test
-      run: python autowpwn.py -y
+      run: python autopwn.py -y
     - name: Evade mode test
       run: python autopwn.py -y -m "evade"
     - name: Noise mod test
       run: python autopwn.py -y -m "noise"
     - name: Automatic test (sudo)
-      run: sudo python autowpwn.py -y
+      run: sudo python autopwn.py -y
     - name: Evade mode test (sudo)
       run: sudo python autopwn.py -y -m "evade"
     - name: Noise mod test (sudo)
