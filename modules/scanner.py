@@ -32,7 +32,7 @@ def TestPing(target, mode="normal"):
     nm = PortScanner()
     if type(target) is list:
         target = listToString(target)
-    if mode == "evade":
+    if mode == "evade" and is_root():
         resp = nm.scan(hosts=target, arguments="-sn -T 2 -f -g 53 --data-length 10")
     else:
         resp = nm.scan(hosts=target, arguments="-sn")
