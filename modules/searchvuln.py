@@ -50,14 +50,17 @@ def SearchKeyword(keyword, apiKey=None):
             ApiResponseCPE = searchCPE(keyword=keyword, key=apiKey)
             ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
     except KeyboardInterrupt:
+        print(" " * 100, end="\r")
         print_colored("Skipping vulnerability detection for keyword " + keyword, colors.red)
         WriteToFile("Skipped vulnerability detection for keyword " + keyword)
         return '', []
     except LookupError:
+        print(" " * 100, end="\r")
         print_colored("NIST API returned an invalid response for keyword " + keyword, colors.red)
         WriteToFile("NIST API returned an invalid response for keyword " + keyword)
         return '', []
     except Exception as e:
+        print(" " * 100, end="\r")
         print_colored("Error: " + str(e), colors.red)
         WriteToFile("Error: " + str(e))
         return '', []
@@ -81,6 +84,7 @@ def SearchKeyword(keyword, apiKey=None):
     return CPETitle, ApiResponseCVE
 
 def SearchSploits(HostArray, apiKey=None):
+    ExploitsArray = []
     target = str(HostArray[0][0])
 
     print_colored("\n" + "-" * 60, colors.red)
@@ -106,15 +110,16 @@ def SearchSploits(HostArray, apiKey=None):
         #search the NIST vulnerabilities database for the generated keywords
         CPETitle, ApiResponseCVE = SearchKeyword(keyword, apiKey)
 
-        #if the keyword is found in the NVD database, print the title of the vulnerability
+        #if the keyword is found in the NVD database, print the title of the vulnerable software
         if CPETitle != '':
-            print("\n\n┌─" + bcolors.yellow + "[ " + CPETitle + " ]" + bcolors.endc)
-            WriteToFile("\n\n┌─[ %s ]" % CPETitle)
+            Title = CPETitle
         elif CPETitle == '' and len(ApiResponseCVE) != 0:
-            print("\n\n┌─" + bcolors.yellow + "[ " + keyword + " ]" + bcolors.endc)
-            WriteToFile("\n\n┌─[ %s ]" % keyword)
+            Title = keyword
         elif CPETitle == '' and len(ApiResponseCVE) == 0:
             continue
+
+        print("\n\n┌─" + bcolors.yellow + "[ " + Title + " ]" + bcolors.endc)
+        WriteToFile("\n\n┌─[ %s ]" % Title)
 
         for CVE in ApiResponseCVE:
             print("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
@@ -149,3 +154,10 @@ def SearchSploits(HostArray, apiKey=None):
             
             print("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
             WriteToFile("│\t\t" + "Details : " + details)
+
+            ExploitsArray.append([Title, CVE.id])
+
+        print(" " * 100, end="\r") #clear the line
+        print("└" + "─" * 59)
+
+    return ExploitsArray
