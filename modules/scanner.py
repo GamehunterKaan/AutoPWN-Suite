@@ -61,13 +61,13 @@ def TestArp(target, mode=ScanMode.Normal):
 
 #run a port scan on target using nmap
 def PortScan(target, scanspeed=5, mode=ScanMode.Normal, customflags=""):
-    print_colored("\n" + "-" * 60, colors.green)
+    print_colored("\n" + "─" * 60, colors.green)
     print_colored(("Running a portscan on host " + str(target) + "...").center(60), colors.green)
-    print_colored("-" * 60 + "\n", colors.green)
+    print_colored("─" * 60 + "\n", colors.green)
 
-    WriteToFile("\n" + "-" * 60)
+    WriteToFile("\n" + "─" * 60)
     WriteToFile(("Portscan results for host " + str(target) + ".").center(60))
-    WriteToFile("-" * 60 + "\n")
+    WriteToFile("─" * 60 + "\n")
 
     nm = PortScanner()
 
@@ -99,9 +99,9 @@ def CreateNoise(target):
         pass
 
 def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
-    print_colored("\n" + "-" * 60, colors.green)
+    print_colored("\n" + "─" * 60, colors.green)
     print_colored("Creating noise...".center(60), colors.green)
-    print_colored("-" * 60 + "\n", colors.green)
+    print_colored("─" * 60 + "\n", colors.green)
     WriteToFile("\nCreating noise...")
 
     if scantype == ScanType.Ping:
@@ -149,8 +149,8 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
         exit(0)
 
 def DiscoverHosts(target, scantype=ScanType.ARP, scanspeed=3, mode=ScanMode.Normal):
-    print_colored("\n" + "-" * 60, colors.green)
-    WriteToFile("\n" + "-" * 60)
+    print_colored("\n" + "─" * 60, colors.green)
+    WriteToFile("\n" + "─" * 60)
     if type(target) is list:
         print_colored(("Scanning " + str(len(target)) + " target(s) using " + str(scantype.name) + " scan...").center(60), colors.green)
         WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), str(scantype.name)))
@@ -158,8 +158,8 @@ def DiscoverHosts(target, scantype=ScanType.ARP, scanspeed=3, mode=ScanMode.Norm
         print_colored(("Scanning " + target + " using " + str(scantype.name) + " scan...").center(60), colors.green)
         WriteToFile(("Scanning " + target + " using " + str(scantype.name) + " scan...").center(60))
     
-    print_colored("-" * 60 + "\n", colors.green)
-    WriteToFile("-" * 60 + "\n")
+    print_colored("─" * 60 + "\n", colors.green)
+    WriteToFile("─" * 60 + "\n")
 
     if scantype == ScanType.Ping:
         OnlineHosts = TestPing(target, mode)
@@ -222,14 +222,14 @@ def AnalyseScanResults(nm, target=None):
         (
             bcolors.yellow + "MAC Address : " + bcolors.endc + "{0:20}" +
             bcolors.yellow + " Vendor : " + bcolors.endc + "{1:30}"
-        ).format(mac , vendor)
+        ).format(mac , vendor[:30])
     )
 
     WriteToFile(
         (
             "MAC Address : {0:20}" +
             " Vendor : {1:30}\n"
-        ).format(mac, vendor)
+        ).format(mac, vendor[:30])
     )
 
     print(
@@ -237,7 +237,7 @@ def AnalyseScanResults(nm, target=None):
             bcolors.yellow + "OS : " + bcolors.endc + "{0:20}" +
             bcolors.yellow + " Accuracy : " + bcolors.endc + "{1:5}" +
             bcolors.yellow + " Type : " + bcolors.endc + "{2:20}"
-        ).format(os , accuracy , ostype)
+        ).format(os[:20], accuracy , ostype[:20])
     )
 
     WriteToFile(
@@ -245,7 +245,7 @@ def AnalyseScanResults(nm, target=None):
             "OS : {0:20}" +
             " Accuracy : {1:5}" +
             " Type : {2:20}"
-        ).format(os , accuracy , ostype)
+        ).format(os[:20], accuracy , ostype[:20])
     )
 
     print("\n")
@@ -287,7 +287,7 @@ def AnalyseScanResults(nm, target=None):
                 bcolors.cyan + " Service : " + bcolors.endc + "{2:15}" +
                 bcolors.cyan + " Product : " + bcolors.endc + "{3:20}" +
                 bcolors.cyan + " Version : " + bcolors.endc + "{4:15}"
-            ).format(str(port), state, service, product, version)
+            ).format(str(port), state, service[:15], product[:20], version[:15])
         )
 
         WriteToFile(
@@ -297,7 +297,7 @@ def AnalyseScanResults(nm, target=None):
                 " Service : {2:20}" +
                 " Product : {3:20}" +
                 " Version : {4:20}"
-            ).format(str(port), state, service, product, version)
+            ).format(str(port), state, service[:15], product[:20], version[:15])
         )
 
         if state == 'open':
