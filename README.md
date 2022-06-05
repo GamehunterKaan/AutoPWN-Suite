@@ -107,7 +107,7 @@ options:
 - [x] `.deb` package for Debian based systems like Kali Linux and Parrot Security.
 - [x] Argument for passing custom nmap flags.
 - [x] Config file argument to specify configurations in a seperate config file.
-- [ ] Function to automatically download exploit related to vulnerability.
+- [x] Function to automatically download exploit related to vulnerability.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
 - [ ] Seperate script for checking local privilege escalation vulnerabilities.
 - [ ] Windows and OSX support.
