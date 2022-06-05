@@ -288,9 +288,9 @@ def FurtherEnumuration(hosts):
         for host in Targets:
             PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
             PortArray = AnalyseScanResults(PortScanResults,host)
-        if ScanVulns:
+        if ScanVulns and len(PortArray) > 0:
             ExploitsArray = SearchSploits(PortArray, apiKey)
-            if DownloadExploits:
+            if DownloadExploits and len(ExploitsArray) > 0:
                 GetExploitsFromArray(ExploitsArray, host)
     else:
         exit(0)
