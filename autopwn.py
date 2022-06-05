@@ -214,7 +214,7 @@ def UserConfirmation():
         return True, True, True
     print_colored("\nWould you like to run a port scan on these hosts? (Y/N)", colors.blue)
     while True:
-        wannaportscan = input(bcolors.blue + "----> " + bcolors.endc).lower()
+        wannaportscan = input(bcolors.blue + "────> " + bcolors.endc).lower()
         if wannaportscan == 'y' or wannaportscan == 'yes' or wannaportscan == "":
             ScanPorts = True
             break
@@ -225,7 +225,7 @@ def UserConfirmation():
             print("Please say Y or N!")
     print_colored("\nWould you like to do a version based vulnerability detection? (Y/N)", colors.blue)
     while True:
-        wannavulnscan = input(bcolors.blue + "----> " + bcolors.endc).lower()
+        wannavulnscan = input(bcolors.blue + "────> " + bcolors.endc).lower()
         if wannavulnscan == 'y' or wannavulnscan == 'yes' or wannavulnscan == "":
             ScanVulns = True
             break
@@ -237,7 +237,7 @@ def UserConfirmation():
 
     print_colored("\nWould you like to download exploit codes related with found vulnerabilities? (Y/N)", colors.blue)
     while True:
-        wannadownloadexploits = input(bcolors.blue + "----> " + bcolors.endc).lower()
+        wannadownloadexploits = input(bcolors.blue + "────> " + bcolors.endc).lower()
         if wannadownloadexploits == 'y' or wannadownloadexploits == 'yes' or wannadownloadexploits == "":
             DownloadExploits = True
             break
@@ -257,7 +257,7 @@ def FurtherEnumuration(hosts):
         exit(0)
     index = 0
     for host in hosts:
-        print(("%s[%s%d%s]%s %s" % (bcolors.red, bcolors.endc, index, bcolors.red, bcolors.endc, host)).center(60))
+        print((bcolors.red + "[" + bcolors.endc + str(index) + bcolors.red + "] " + bcolors.endc + host).center(60))
         WriteToFile(("[%d] %s" % (index, host)).center(60))
         index += 1
     if not DontAskForConfirmation:
@@ -265,7 +265,7 @@ def FurtherEnumuration(hosts):
         print_colored("Enter 'all' to enumurate all hosts.", colors.yellow)
         print_colored("Enter 'exit' to exit.\n", colors.yellow)
         while True:
-            host = input(bcolors.blue + "----> " + bcolors.endc)
+            host = input(bcolors.blue + "────> " + bcolors.endc)
             if host == 'all':
                 Targets = hosts
                 break
@@ -289,9 +289,9 @@ def FurtherEnumuration(hosts):
             PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
             PortArray = AnalyseScanResults(PortScanResults,host)
         if ScanVulns and len(PortArray) > 0:
-            ExploitsArray = SearchSploits(PortArray, apiKey)
-            if DownloadExploits and len(ExploitsArray) > 0:
-                GetExploitsFromArray(ExploitsArray, host)
+            VulnsArray = SearchSploits(PortArray, apiKey)
+            if DownloadExploits and len(VulnsArray) > 0:
+                GetExploitsFromArray(VulnsArray, host)
     else:
         exit(0)
 
