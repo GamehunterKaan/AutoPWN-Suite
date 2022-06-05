@@ -12,19 +12,34 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 ![GitHub Repo stars](https://img.shields.io/github/stars/GamehunterKaan/AutoPWN-Suite?style=social)
 ![Banner](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/banner.png)
 
+## Features
+- Fully automatic! (Use `-y` flag to enable)
+- Detect network IP range without any user input. 
+- Vulnerability detection based on version.
+- Get information about the vulnerability right from your terminal.
+- Automatically download exploit related with vulnerability.
+- Noise mode for creating a noise on the network.
+- Evasion mode for being sneaky.
+- Automatically decide which scan types to use based on privilege.
+- Easy to read output.
+- Function to output results to a file.
+- Argument for passing custom nmap flags.
+- Specify your arguments using a config file.
+
 ## How does it work?
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of softwares running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of "keywords" to search [NIST vulnerability database](https://www.nist.gov/).
 
 [Visit "PWN Spot!" for more information](https://pwnspot.com/posts/AutoPWN/)
 
-### Demo
+## Demo
 
 AutoPWN Suite has a very user friendly easy to read output.
 
 [![asciicast](https://asciinema.org/a/497930.svg)](https://asciinema.org/a/497930)
 
-### Installation
+
+## Installation
 
 You can install it using pip. (sudo recommended)
 
@@ -53,7 +68,7 @@ You can use Google Cloud Shell.
 
 [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/GamehunterKaan/AutoPWN-Suite.git)
 
-### Usage
+## Usage
 
 Running with root privileges (sudo) is always recommended.
 
@@ -96,22 +111,16 @@ options:
   -v, --version         Print version and exit.
 ```
 
-### TODO
+## TODO
 
-- [x] Vulnerability detection based on version.
-- [x] Easy to read output.
-- [x] Function to output results to a file.
-- [x] pypi package for easily installing with just `pip install autopwn-suite`.
-- [x] Automatically install nmap if its not installed.
-- [x] Noise mode. (Does nothing but creating a lot of noise)
-- [x] `.deb` package for Debian based systems like Kali Linux and Parrot Security.
-- [x] Argument for passing custom nmap flags.
-- [x] Config file argument to specify configurations in a seperate config file.
-- [x] Function to automatically download exploit related to vulnerability.
+Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
+
+- [x] 10 completed.
+- [ ] Print additional details about downloaded exploits.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
 - [ ] Seperate script for checking local privilege escalation vulnerabilities.
 - [ ] Windows and OSX support.
-- [ ] Functionality to brute force common services like `ssh`, `vnc`, `ftp` etc.
+- [ ] Function to brute force common services like `ssh`, `vnc`, `ftp` etc.
 - [ ] Built in reverse shell handler that automatically stabilizes shell like [pwncat](https://github.com/calebstewart/pwncat).
 - [ ] Function to generate reverse shell commands based on IP and port.
 - [ ] GUI interface.
@@ -123,16 +132,16 @@ options:
 - [ ] Web application content discovery mode. (dirbusting)
 - [ ] Option to use as a module.
 
-### Contributing to AutoPWN Suite
+## Contributing to AutoPWN Suite
 
 I would be glad if you are willing to contribute this project. I am looking forward to merge your pull request unless its something that is not needed or just a personal preference. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
 
 
-### Legal
+## Legal
 
 You may not rent or lease, distribute, modify, sell or transfer the software to a third party. AutoPWN Suite is free for distribution, and modification with the condition that credit is provided to the creator and not used for commercial use. You may not use software for illegal or nefarious purposes. No liability for consequential damages to the maximum extent permitted by all applicable laws.
 
 
-### Support or Contact
+## Support or Contact
 
 Having trouble using this tool? You can reach me out on [discord](https://search.discordprofile.info/374953845438021635), [create an issue](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new/choose) or [create a discussion!](https://github.com/GamehunterKaan/AutoPWN-Suite/discussions)
