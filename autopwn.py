@@ -10,6 +10,7 @@ from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
 from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts, ScanMode, ScanType, NoiseScan
 from modules.outfile import InitializeOutput, WriteToFile, OutputBanner
+from modules.getexploits import GetExploitsFromArray
 
 __author__ = 'GamehunterKaan'
 __version__ = '1.1.5'
@@ -208,38 +209,46 @@ print_colored("└" + "─" * 59, colors.bold)
 OutputBanner(targetarg, scantype, scanspeed, args.hostfile, scanmode)
 
 #ask the user if they want to scan ports
-def UserWantsPortScan():
+def UserConfirmation():
     if DontAskForConfirmation:
-        return True
-    else:
-        print_colored("\nWould you like to run a port scan on these hosts? (Y/N)", colors.blue)
-        while True:
-            wannaportscan = input().lower()
-            if wannaportscan == 'y' or wannaportscan == 'yes':
-                return True
-                break
-            elif wannaportscan == 'n' or wannaportscan == 'no':
-                WriteToFile("User refused to run a port scan on these hosts.")
-                return False
-            else:
-                print("Please say Y or N!")
+        return True, True, True
+    print_colored("\nWould you like to run a port scan on these hosts? (Y/N)", colors.blue)
+    while True:
+        wannaportscan = input(bcolors.blue + "----> " + bcolors.endc).lower()
+        if wannaportscan == 'y' or wannaportscan == 'yes' or wannaportscan == "":
+            ScanPorts = True
+            break
+        elif wannaportscan == 'n' or wannaportscan == 'no':
+            WriteToFile("User refused to run a port scan on these hosts.")
+            return False, False, False
+        else:
+            print("Please say Y or N!")
+    print_colored("\nWould you like to do a version based vulnerability detection? (Y/N)", colors.blue)
+    while True:
+        wannavulnscan = input(bcolors.blue + "----> " + bcolors.endc).lower()
+        if wannavulnscan == 'y' or wannavulnscan == 'yes' or wannavulnscan == "":
+            ScanVulns = True
+            break
+        elif wannavulnscan == 'n' or wannavulnscan == 'no':
+            WriteToFile("User refused to do a version based vulnerability detection.")
+            return True, False, False
+        else:
+            print("Please say Y or N!")
 
-#ask the user if they want to do a vulnerability check
-def UserWantsVulnerabilityDetection():
-    if DontAskForConfirmation:
-        return True
-    else:
-        print_colored("\nWould you like to do a version based vulnerability detection? (Y/N)", colors.blue)
-        while True:
-            wannavulnscan = input().lower()
-            if wannavulnscan == 'y' or wannavulnscan == 'yes':
-                return True
-                break
-            elif wannavulnscan == 'n' or wannavulnscan == 'no':
-                WriteToFile("User refused to do a version based vulnerability detection.")
-                return False
-            else:
-                print("Please say Y or N!")
+    print_colored("\nWould you like to download exploit codes related with found vulnerabilities? (Y/N)", colors.blue)
+    while True:
+        wannadownloadexploits = input(bcolors.blue + "----> " + bcolors.endc).lower()
+        if wannadownloadexploits == 'y' or wannadownloadexploits == 'yes' or wannadownloadexploits == "":
+            DownloadExploits = True
+            break
+        elif wannadownloadexploits == 'n' or wannadownloadexploits == 'no':
+            WriteToFile("User refused to do a version based vulnerability detection.")
+            return True, True, False
+        else:
+            print("Please say Y or N!")
+
+    return ScanPorts, ScanVulns, DownloadExploits
+
 
 #post scan stuff
 def FurtherEnumuration(hosts):
@@ -272,17 +281,17 @@ def FurtherEnumuration(hosts):
                 print_colored("Please enter a valid host number or 'all' or 'exit'", colors.red)
     else:
         Targets = hosts
-    if UserWantsPortScan():
-        if UserWantsVulnerabilityDetection():
-            for host in Targets:
-                PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
-                PortArray = AnalyseScanResults(PortScanResults,host)
-                if len(PortArray) > 0:
-                    SearchSploits(PortArray, apiKey)
-        else:
-            for host in Targets:
-                PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
-                PortArray = AnalyseScanResults(PortScanResults,host)
+
+    ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
+
+    if ScanPorts:
+        for host in Targets:
+            PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
+            PortArray = AnalyseScanResults(PortScanResults,host)
+        if ScanVulns:
+            ExploitsArray = SearchSploits(PortArray, apiKey)
+            if DownloadExploits:
+                GetExploitsFromArray(ExploitsArray, host)
     else:
         exit(0)
 
