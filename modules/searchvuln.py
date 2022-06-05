@@ -3,6 +3,12 @@ from modules.nvdlib.nvdlib import searchCPE, searchCVE, getCVE
 from textwrap import wrap
 from os import get_terminal_size
 from modules.outfile import WriteToFile
+from dataclasses import dataclass
+
+@dataclass
+class Vuln:
+    Software : str
+    CVEs : list
 
 #generate keywords to search for from the information gathered from the target
 def GenerateKeywords(HostArray):
@@ -84,16 +90,16 @@ def SearchKeyword(keyword, apiKey=None):
     return CPETitle, ApiResponseCVE
 
 def SearchSploits(HostArray, apiKey=None):
-    ExploitsArray = []
+    VulnsArray = []
     target = str(HostArray[0][0])
 
-    print_colored("\n" + "-" * 60, colors.red)
+    print_colored("\n" + "─" * 60, colors.red)
     print_colored(("Possible vulnerabilities for " + target).center(60), colors.red)
-    print_colored("-" * 60 + "\n", colors.red)
+    print_colored("─" * 60 + "\n", colors.red)
 
-    WriteToFile("\n" + "-" * 60)
+    WriteToFile("\n" + "─" * 60)
     WriteToFile(("Possible vulnerabilities for " + target).center(60))
-    WriteToFile("-" * 60 + "\n")
+    WriteToFile("─" * 60 + "\n")
 
     keywords = GenerateKeywords(HostArray)
 
@@ -117,6 +123,9 @@ def SearchSploits(HostArray, apiKey=None):
             Title = keyword
         elif CPETitle == '' and len(ApiResponseCVE) == 0:
             continue
+
+        # create a Vuln object
+        VulnObject = Vuln(Software=Title, CVEs=[])
 
         print("\n\n┌─" + bcolors.yellow + "[ " + Title + " ]" + bcolors.endc)
         WriteToFile("\n\n┌─[ %s ]" % Title)
@@ -155,9 +164,10 @@ def SearchSploits(HostArray, apiKey=None):
             print("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
             WriteToFile("│\t\t" + "Details : " + details)
 
-            ExploitsArray.append([Title, CVE.id])
+            VulnObject.CVEs.append(str(CVE.id))
 
+        VulnsArray.append(VulnObject)
         print(" " * 100, end="\r") #clear the line
         print("└" + "─" * 59)
 
-    return ExploitsArray
+    return VulnsArray
