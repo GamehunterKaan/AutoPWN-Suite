@@ -31,14 +31,12 @@ argparser.add_argument("-c", "--config", help="Specify a config file to use. (De
 argparser.add_argument("-v", "--version", help="Print version and exit.", action="store_true")
 args = argparser.parse_args()
 
-if args.version:
-    print("AutoPWN Suite v" + __version__)
-    exit(0)
+def is_root(): # this function is used everywhere, so it's better to put it here
+    return getuid() == 0
 
-#print a beautiful banner
-print_banner()
-
-if args.config:
+def InitArgsConf():
+    if not args.config:
+        return None
     try:
         config = ConfigParser()
         config.read(args.config)
@@ -72,49 +70,38 @@ if args.config:
         print_colored("Unknown error while trying to read config file! " + str(e), colors.red)
         exit(1)
 
-outputfile = args.output
-InitializeOutput(context=args.output)
-DontAskForConfirmation = args.yesplease
 
-def is_root():
-    if getuid() == 0:
-        return True #return True if the user is root
-    else:
-        return False
-
-if args.scantype == "arp":
-    if not is_root():
-        print_colored("You must be root to do an arp scan!", colors.red)
+def InitArgsScanType():
+    if args.scantype == "arp":
+        if not is_root():
+            print_colored("You must be root to do an arp scan!", colors.red)
+            scantype = ScanType.Ping
+        else:
+            scantype = ScanType.Arp
+    elif args.scantype == "ping":
         scantype = ScanType.Ping
+    elif args.scantype == "" or type(args.scantype) == None or args.scantype == None:
+        if is_root():
+            scantype = ScanType.ARP
+        else:
+            scantype = ScanType.Ping
+    return scantype
+
+def InitArgsAPI():
+    if args.api:
+        apiKey = args.api
     else:
-        scantype = ScanType.Arp
-elif args.scantype == "ping":
-    scantype = ScanType.Ping
-elif args.scantype == "" or type(args.scantype) == None or args.scantype == None:
-    if is_root():
-        scantype = ScanType.ARP
-    else:
-        scantype = ScanType.Ping
-
-nmapflags = args.nmapflags
-scanspeed = int(args.speed)
-
-if is_root() == False:
-    print_colored("It's recommended to run this script as root since it's more silent and accurate.", colors.red)
-
-if args.api:
-    apiKey = args.api
-else:
-    try:
-        with open("api.txt", "r") as f:
-            apiKey = f.readline().strip("\n")
-    except FileNotFoundError:
-        print_colored("No API key specified and no api.txt file found. Vulnerability detection is going to be slower!", colors.red)
-        print_colored("You can get your own NIST API key from https://nvd.nist.gov/developers/request-an-api-key", colors.yellow)
-        apiKey = None
-    except PermissionError:
-        print_colored("Permission denied while trying to read api.txt!", colors.red)
-        apiKey = None
+        try:
+            with open("api.txt", "r") as f:
+                apiKey = f.readline().strip("\n")
+        except FileNotFoundError:
+            print_colored("No API key specified and no api.txt file found. Vulnerability detection is going to be slower!", colors.red)
+            print_colored("You can get your own NIST API key from https://nvd.nist.gov/developers/request-an-api-key", colors.yellow)
+            apiKey = None
+        except PermissionError:
+            print_colored("Permission denied while trying to read api.txt!", colors.red)
+            apiKey = None
+    return apiKey
 
 def check_nmap():
     # Check if nmap is installed
@@ -147,7 +134,7 @@ def DetectIPRange():
     target = str(str(PrivateIPAdress.split('.')[0]) + '.' + str(PrivateIPAdress.split('.')[1]) + '.' + PrivateIPAdress.split('.')[2] + '.0/24')
     return target
 
-def GetTarget():
+def InitArgsTarget():
     if args.target:
         target = args.target
     else:
@@ -171,48 +158,49 @@ def GetTarget():
                 target = input("Enter target range to scan : ")
     return target
 
-targetarg = GetTarget()
-
-if args.mode == "evade":
-    if is_root():
-        scanmode = ScanMode.Evade
-        scanspeed = 2
-        print_colored("Evasion mode enabled!", colors.yellow)
-    else:
-        print_colored("You must be root to use evasion mode! Switching back to normal mode...", colors.red)
+def InitArgsMode():
+    if args.mode == "evade":
+        if is_root():
+            scanmode = ScanMode.Evade
+            scanspeed = 2
+            print_colored("Evasion mode enabled!", colors.yellow)
+        else:
+            print_colored("You must be root to use evasion mode! Switching back to normal mode...", colors.red)
+            scanmode = ScanMode.Normal
+    elif args.mode == "noise":
+        scanmode = ScanMode.Noise
+        print_colored("Noise mode enabled!", colors.yellow)
+    elif args.mode == "normal":
         scanmode = ScanMode.Normal
-elif args.mode == "noise":
-    scanmode = ScanMode.Noise
-    print_colored("Noise mode enabled!", colors.yellow)
-elif args.mode == "normal":
-    scanmode = ScanMode.Normal
+    
+    return scanmode
 
-# print everything inside args class to screen
-if args.config:
-    print_colored("\n┌─[ Config file " + args.config + " was used. ]", colors.bold)
-    print_colored("├─[ Scanning with the following parameters. ]", colors.bold)
-else:
-    print_colored("\n┌─[ Scanning with the following parameters. ]", colors.bold)
 
-print_colored("├" + "─" * 59, colors.bold)
-print_colored("│\tTarget : " + str(targetarg), colors.bold)
-print_colored("│\tScan type : " + str(scantype.name), colors.bold)
-print_colored("│\tScan mode : " + str(scanmode.name), colors.bold)
-print_colored("│\tScan speed : " + str(scanspeed), colors.bold)
-print_colored("│\tNmap flags : " + str(nmapflags), colors.bold)
-print_colored("│\tAPI key : " + str(apiKey), colors.bold)
-print_colored("│\tOutput file : " + str(outputfile), colors.bold)
-print_colored("│\tDont ask for confirmation : " + str(DontAskForConfirmation), colors.bold)
-print_colored("│\tHost file : " + str(args.hostfile), colors.bold)
-print_colored("└" + "─" * 59, colors.bold)
+def ParamPrint():
+    # print everything inside args class to screen
+    if args.config:
+        print_colored("\n┌─[ Config file " + args.config + " was used. ]", colors.bold)
+        print_colored("├─[ Scanning with the following parameters. ]", colors.bold)
+    else:
+        print_colored("\n┌─[ Scanning with the following parameters. ]", colors.bold)
 
-OutputBanner(targetarg, scantype, scanspeed, args.hostfile, scanmode)
+    print_colored("├" + "─" * 59, colors.bold)
+    print_colored("│\tTarget : " + str(targetarg), colors.bold)
+    print_colored("│\tScan type : " + str(scantype.name), colors.bold)
+    print_colored("│\tScan mode : " + str(scanmode.name), colors.bold)
+    print_colored("│\tScan speed : " + str(scanspeed), colors.bold)
+    print_colored("│\tNmap flags : " + str(nmapflags), colors.bold)
+    print_colored("│\tAPI key : " + str(apiKey), colors.bold)
+    print_colored("│\tOutput file : " + str(outputfile), colors.bold)
+    print_colored("│\tDont ask for confirmation : " + str(DontAskForConfirmation), colors.bold)
+    print_colored("│\tHost file : " + str(args.hostfile), colors.bold)
+    print_colored("└" + "─" * 59, colors.bold)
 
 #ask the user if they want to scan ports
 def UserConfirmation():
     if DontAskForConfirmation:
         return True, True, True
-    print_colored("\nWould you like to run a port scan on these hosts? (Y/N)", colors.blue)
+    print_colored("\nWould you like to run a port scan on these hosts? (Y/N)", colors.yellow)
     while True:
         wannaportscan = input(bcolors.blue + "────> " + bcolors.endc).lower()
         if wannaportscan == 'y' or wannaportscan == 'yes' or wannaportscan == "":
@@ -223,7 +211,7 @@ def UserConfirmation():
             return False, False, False
         else:
             print("Please say Y or N!")
-    print_colored("\nWould you like to do a version based vulnerability detection? (Y/N)", colors.blue)
+    print_colored("\nWould you like to do a version based vulnerability detection? (Y/N)", colors.yellow)
     while True:
         wannavulnscan = input(bcolors.blue + "────> " + bcolors.endc).lower()
         if wannavulnscan == 'y' or wannavulnscan == 'yes' or wannavulnscan == "":
@@ -235,7 +223,7 @@ def UserConfirmation():
         else:
             print("Please say Y or N!")
 
-    print_colored("\nWould you like to download exploit codes related with found vulnerabilities? (Y/N)", colors.blue)
+    print_colored("\nWould you like to download exploit codes related with found vulnerabilities? (Y/N)", colors.yellow)
     while True:
         wannadownloadexploits = input(bcolors.blue + "────> " + bcolors.endc).lower()
         if wannadownloadexploits == 'y' or wannadownloadexploits == 'yes' or wannadownloadexploits == "":
@@ -249,9 +237,7 @@ def UserConfirmation():
 
     return ScanPorts, ScanVulns, DownloadExploits
 
-
-#post scan stuff
-def FurtherEnumuration(hosts):
+def GetHost2Scan(hosts):
     if len(hosts) == 0:
         print_colored("No hosts found!", colors.red)
         exit(0)
@@ -260,28 +246,32 @@ def FurtherEnumuration(hosts):
         print((bcolors.red + "[" + bcolors.endc + str(index) + bcolors.red + "] " + bcolors.endc + host).center(60))
         WriteToFile(("[%d] %s" % (index, host)).center(60))
         index += 1
-    if not DontAskForConfirmation:
-        print_colored("\nEnter the index number of the host you would like to enumurate further.", colors.yellow)
-        print_colored("Enter 'all' to enumurate all hosts.", colors.yellow)
-        print_colored("Enter 'exit' to exit.\n", colors.yellow)
-        while True:
-            host = input(bcolors.blue + "────> " + bcolors.endc)
-            if host == 'all':
-                Targets = hosts
-                break
-            elif host == 'exit':
-                exit(0)
-            elif host in hosts:
-                Targets = [host]
-                break
-            elif int(host) < len(hosts) and int(host) >= 0:
-                Targets = [hosts[int(host)]]
-                break
-            else:
-                print_colored("Please enter a valid host number or 'all' or 'exit'", colors.red)
-    else:
-        Targets = hosts
+    if DontAskForConfirmation:
+        return hosts
+    print_colored("\nEnter the index number of the host you would like to enumurate further.", colors.yellow)
+    print_colored("Enter 'all' to enumurate all hosts.", colors.yellow)
+    print_colored("Enter 'exit' to exit.\n", colors.yellow)
+    while True:
+        host = input(bcolors.blue + "────> " + bcolors.endc)
+        if host == 'all':
+            Targets = hosts
+            break
+        elif host == 'exit':
+            exit(0)
+        elif host in hosts:
+            Targets = [host]
+            break
+        elif int(host) < len(hosts) and int(host) >= 0:
+            Targets = [hosts[int(host)]]
+            break
+        else:
+            print_colored("Please enter a valid host number or 'all' or 'exit'", colors.red)
 
+    return Targets
+
+#post scan stuff
+def FurtherEnumuration(hosts):
+    Targets = GetHost2Scan(hosts)
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
 
     if ScanPorts:
@@ -297,9 +287,37 @@ def FurtherEnumuration(hosts):
 
 #main function
 def main():
+    if args.version:
+        print("AutoPWN Suite v" + __version__)
+        exit(0)
+    if args.config:
+        InitArgsConf()
+    
+    global targetarg, scantype, scanmode, scanspeed, nmapflags, apiKey, outputfile, DontAskForConfirmation, hostfile, noisetimeout
+
+    outputfile = args.output
+    InitializeOutput(outputfile)
+    
+    print_banner()
+
+
+    DontAskForConfirmation = args.yesplease
+    targetarg = InitArgsTarget()
+    scantype = InitArgsScanType()
+    scanmode = InitArgsMode()
+    scanspeed = args.speed
+    nmapflags = args.nmapflags
+    apiKey = InitArgsAPI()
+    hostfile = args.hostfile
+    noisetimeout = args.noisetimeout
+
+    if is_root() == False:
+        print_colored("It's recommended to run this script as root since it's more silent and accurate.", colors.red)
+    OutputBanner(targetarg, scantype, scanspeed, hostfile, scanmode)
+    ParamPrint()
     check_nmap()
     if scanmode == ScanMode.Noise:
-        NoiseScan(targetarg, scantype, args.noisetimeout)
+        NoiseScan(targetarg, scantype, noisetimeout)
     OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed, scanmode)
     FurtherEnumuration(OnlineHosts)
 
@@ -308,5 +326,5 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        print_colored("Ctrl+C pressed. Exiting.", colors.red)
-        WriteToFile("Ctrl+C pressed. Exiting.")
+        print_colored("\nCtrl+C pressed. Exiting.", colors.red)
+        WriteToFile("\nCtrl+C pressed. Exiting.")
