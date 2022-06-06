@@ -27,10 +27,7 @@ class ScanType(Enum):
     ARP = 1
 
 def is_root():
-    if getuid() == 0:
-        return True #return True if the user is root
-    else:
-        return False
+    return getuid() == 0
 
 # this function is for turning a list of hosts into a single string
 def listToString(s): 
@@ -251,9 +248,15 @@ def AnalyseScanResults(nm, target=None):
     print("\n")
     WriteToFile("\n")
 
-    if nm[target]['status']['reason'] == 'localhost-response' or nm[target]['status']['reason'] == 'user-set':
-        print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
-        WriteToFile('Target ' + str(target) + ' seems to be us.\n')
+    reason = nm[target]['status']['reason']
+
+    if is_root():
+        if reason == 'localhost-response' or reason == 'user-set':
+            print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
+            WriteToFile('Target ' + str(target) + ' seems to be us.\n')
+    # we cant detect if the host is us or not, if we are not root
+    # we could get our ip address and compare them but i think it's not quite necessary
+
     if len(nm[target].all_protocols()) == 0:
         print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
         WriteToFile("Target " + str(target) + " seems to have no open ports.")
