@@ -110,6 +110,9 @@ options:
                         Specify a config file to use. (Default : None)
   -v, --version         Print version and exit.
 ```
+## Currently working on
+- Rewrite the nmap module from scratch
+- https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
 
 ## TODO
 
