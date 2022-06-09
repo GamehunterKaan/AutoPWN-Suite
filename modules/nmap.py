@@ -317,48 +317,6 @@ class PortScanner(object):
         nmap_err_keep_trace="",
         nmap_warn_keep_trace="",
     ):
-        """
-        Analyses NMAP xml scan ouput
-
-        May raise PortScannerError exception if nmap output was not xml
-
-        Test existance of the following key to know if something went wrong : ['nmap']['scaninfo']['error']
-        If not present, everything was ok.
-
-        :param nmap_xml_output: xml string to analyse
-        :returns: scan_result as dictionnary
-        """
-
-        # nmap xml output looks like :
-        # <host starttime="1267974521" endtime="1267974522">
-        #   <status state="up" reason="user-set"/>
-        #   <address addr="192.168.1.1" addrtype="ipv4" />
-        #   <hostnames><hostname name="neufbox" type="PTR" /></hostnames>
-        #   <ports>
-        #     <port protocol="tcp" portid="22">
-        #       <state state="filtered" reason="no-response" reason_ttl="0"/>
-        #       <service name="ssh" method="table" conf="3" />
-        #     </port>
-        #     <port protocol="tcp" portid="25">
-        #       <state state="filtered" reason="no-response" reason_ttl="0"/>
-        #       <service name="smtp" method="table" conf="3" />
-        #     </port>
-        #   </ports>
-        #   <hostscript>
-        #    <script id="nbstat" output="NetBIOS name: GROSTRUC, NetBIOS user: &lt;unknown&gt;, NetBIOS MAC: &lt;unknown&gt;&#xa;" />  # NOQA: E501
-        #    <script id="smb-os-discovery" output=" &#xa;  OS: Unix (Samba 3.6.3)&#xa;  Name: WORKGROUP\Unknown&#xa;  System time: 2013-06-23 15:37:40 UTC+2&#xa;" />  # NOQA: E501
-        #    <script id="smbv2-enabled" output="Server doesn&apos;t support SMBv2 protocol" />
-        #   </hostscript>
-        #   <times srtt="-1" rttvar="-1" to="1000000" />
-        # </host>
-
-        # <port protocol="tcp" portid="25">
-        #  <state state="open" reason="syn-ack" reason_ttl="0"/>
-        #   <service name="smtp" product="Exim smtpd" version="4.76" hostname="grostruc" method="probed" conf="10">
-        #     <cpe>cpe:/a:exim:exim:4.76</cpe>
-        #   </service>
-        #   <script id="smtp-commands" output="grostruc Hello localhost [127.0.0.1], SIZE 52428800, PIPELINING, HELP, &#xa; Commands supported: AUTH HELO EHLO MAIL RCPT DATA NOOP QUIT RSET HELP "/>  # NOQA: E501
-        # </port>
 
         if nmap_xml_output is not None:
             self._nmap_last_output = nmap_xml_output
