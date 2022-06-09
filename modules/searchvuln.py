@@ -106,7 +106,7 @@ def SearchSploits(HostArray, apiKey=None):
     if len(keywords) == 0:
         print_colored(("Insufficient information for " + target).center(60), colors.yellow)
         WriteToFile(("Insufficient information for " + target).center(60))
-        return
+        return []
 
     print("Searching vulnerability database for %s keyword(s)...\n" % (len(keywords)))
     WriteToFile("Searching vulnerability database for %s keyword(s)..." % (len(keywords)))
