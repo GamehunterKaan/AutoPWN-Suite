@@ -237,7 +237,7 @@ def UserConfirmation():
 
     return ScanPorts, ScanVulns, DownloadExploits
 
-def GetHost2Scan(hosts):
+def GetHostsToScan(hosts):
     if len(hosts) == 0:
         print_colored("No hosts found!", colors.red)
         exit(0)
@@ -261,6 +261,9 @@ def GetHost2Scan(hosts):
         elif host in hosts:
             Targets = [host]
             break
+        elif host == "":
+            Targets = hosts
+            break
         elif int(host) < len(hosts) and int(host) >= 0:
             Targets = [hosts[int(host)]]
             break
@@ -271,7 +274,7 @@ def GetHost2Scan(hosts):
 
 #post scan stuff
 def FurtherEnumuration(hosts):
-    Targets = GetHost2Scan(hosts)
+    Targets = GetHostsToScan(hosts)
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
 
     if ScanPorts:
@@ -297,9 +300,7 @@ def main():
 
     outputfile = args.output
     InitializeOutput(outputfile)
-    
     print_banner()
-
 
     DontAskForConfirmation = args.yesplease
     targetarg = InitArgsTarget()
