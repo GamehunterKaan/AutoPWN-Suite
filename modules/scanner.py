@@ -9,13 +9,56 @@ from enum import Enum
 
 @dataclass
 class PortInfo:
-    # gotta figure out how to use dataclasses
-    port = 0
-    protocol = ''
-    state = ''
-    service = ''
-    product = ''
-    version = ''
+    port : int
+    protocol : str
+    state : str
+    service : str
+    product : str
+    version : str
+
+@dataclass()
+class TargetInfo:
+    ip : str
+    mac : str = "Unknown"
+    vendor : str = "Unknown"
+    os : str = "Unknown"
+    os_accuracy : int = 0
+    os_type : str = "Unknown"
+
+    def colored(self):
+        return (
+            (
+                bcolors.yellow + "MAC Address : " + bcolors.endc + "{0:20}" +
+                bcolors.yellow + " Vendor : " + bcolors.endc + "{1:30}" + "\n" +
+                bcolors.yellow + "OS : " + bcolors.endc + "{2:20}" +
+                bcolors.yellow + " Accuracy : " + bcolors.endc + "{3:5}" +
+                bcolors.yellow + " Type : " + bcolors.endc + "{4:20}" + "\n"
+            ).format(
+                    str(self.mac),
+                    str(self.vendor),
+                    str(self.os[:20]),
+                    str(self.os_accuracy),
+                    str(self.os_type[:20])
+                )
+        )
+
+    def __str__(self):
+        return (
+            (
+                "MAC Address : {0:20}" +
+                " Vendor : {1:30}" + "\n" +
+                "OS : {2:20}" +
+                " Accuracy : {3:5}" +
+                " Type : {4:20}" + "\n"
+            ).format(
+                    str(self.mac),
+                    str(self.vendor),
+                    str(self.os[:20]),
+                    str(self.os_accuracy),
+                    str(self.os_type[:20])
+                )
+        )
+
 
 class ScanMode(Enum):
     Normal = 0
@@ -166,6 +209,45 @@ def DiscoverHosts(target, scantype=ScanType.ARP, scanspeed=3, mode=ScanMode.Norm
         OnlineHosts = TestArp(target, mode)
         return OnlineHosts
 
+def InitHostInfo(nm, target):
+    try:
+        mac = nm[target]['addresses']['mac']
+    except KeyError:
+        mac = 'Unknown'
+    except IndexError:
+        mac = 'Unknown'
+
+    try:
+        vendor = nm[target]['vendor'][0]
+    except KeyError:
+        vendor = 'Unknown'
+    except IndexError:
+        vendor = 'Unknown'
+
+    try:
+        os = nm[target]['osmatch'][0]['name']
+    except KeyError:
+        os = 'Unknown'
+    except IndexError:
+        os = 'Unknown'
+
+    try:
+        os_accuracy = nm[target]['osmatch'][0]['accuracy']
+    except KeyError:
+        os_accuracy = 'Unknown'
+    except IndexError:
+        os_accuracy = 'Unknown'
+
+    try:
+        os_type = nm[target]['osmatch'][0]['osclass'][0]['type']
+    except KeyError:
+        os_type = 'Unknown'
+    except IndexError:
+        os_type = 'Unknown'
+
+
+    return mac, vendor, os, os_accuracy, os_type
+
 #analyse and print scan results
 def AnalyseScanResults(nm, target=None):
     HostArray = []
@@ -180,73 +262,12 @@ def AnalyseScanResults(nm, target=None):
         WriteToFile("Target " + str(target) + " seems to be offline.")
         return []
 
-    try:
-        mac = nm[target]['addresses']['mac']
-    except KeyError:
-        mac = 'Unknown'
-    except IndexError:
-        mac = 'Unknown'
 
-    try:
-        vendor = nm[target]['vendor'][mac]
-    except KeyError:
-        vendor = 'Unknown'
-    except IndexError:
-        vendor = 'Unknown'
+    mac, vendor, os, os_accuracy, os_type = InitHostInfo(nm, target)
+    CurrentTargetInfo = TargetInfo(target, mac, vendor, os, os_accuracy, os_type)
 
-    try:
-        os = nm[target]['osmatch'][0]['name']
-    except KeyError:
-        os = 'Unknown'
-    except IndexError:
-        os = 'Unknown'
-
-    try:
-        accuracy = nm[target]['osmatch'][0]['accuracy']
-    except KeyError:
-        accuracy = 'Unknown'
-    except IndexError:
-        accuracy = 'Unknown'
-
-    try:
-        ostype = nm[target]['osmatch'][0]['osclass'][0]['type']
-    except KeyError:
-        ostype = 'Unknown'
-    except IndexError:
-        ostype = 'Unknown'
-
-    print(
-        (
-            bcolors.yellow + "MAC Address : " + bcolors.endc + "{0:20}" +
-            bcolors.yellow + " Vendor : " + bcolors.endc + "{1:30}"
-        ).format(mac , vendor[:30])
-    )
-
-    WriteToFile(
-        (
-            "MAC Address : {0:20}" +
-            " Vendor : {1:30}\n"
-        ).format(mac, vendor[:30])
-    )
-
-    print(
-        (
-            bcolors.yellow + "OS : " + bcolors.endc + "{0:20}" +
-            bcolors.yellow + " Accuracy : " + bcolors.endc + "{1:5}" +
-            bcolors.yellow + " Type : " + bcolors.endc + "{2:20}"
-        ).format(os[:20], accuracy , ostype[:20])
-    )
-
-    WriteToFile(
-        (
-            "OS : {0:20}" +
-            " Accuracy : {1:5}" +
-            " Type : {2:20}"
-        ).format(os[:20], accuracy , ostype[:20])
-    )
-
-    print("\n")
-    WriteToFile("\n")
+    print(CurrentTargetInfo.colored().center(60))
+    WriteToFile(str(CurrentTargetInfo).center(60) + "\n")
 
     reason = nm[target]['status']['reason']
 
