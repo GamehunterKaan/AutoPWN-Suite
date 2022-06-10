@@ -13,7 +13,7 @@ from modules.outfile import InitializeOutput, WriteToFile, OutputBanner
 from modules.getexploits import GetExploitsFromArray
 
 __author__ = 'GamehunterKaan'
-__version__ = '1.2.7'
+__version__ = '1.2.10'
 
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
