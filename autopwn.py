@@ -6,6 +6,7 @@ from subprocess import check_call, CalledProcessError, DEVNULL
 from enum import Enum
 from configparser import ConfigParser
 from modules.color import print_colored, colors, bcolors
+from modules.report import ReportType
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
 from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts, ScanMode, ScanType, NoiseScan
@@ -17,18 +18,31 @@ __version__ = '1.2.10'
 
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
-argparser.add_argument("-o", "--output", help="Output file name. (Default : autopwn.log)", default="autopwn.log", type=str, required=False)
-argparser.add_argument("-t", "--target", help="Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)", type=str, required=False, default=None,)
-argparser.add_argument("-hf", "--hostfile", help="File containing a list of hosts to scan.", type=str, required=False, default=None)
-argparser.add_argument("-st", "--scantype", help="Scan type.", type=str, required=False, default=None, choices=["arp", "ping"])
-argparser.add_argument("-nf", "--nmapflags", help="Custom nmap flags to use for portscan. (Has to be specified like : -nf=\"-O\")", default="", type=str, required=False)
-argparser.add_argument("-s", "--speed", help="Scan speed. (Default : 3)", default=3, type=int, required=False, choices=range(0,6))
-argparser.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. (Default : None)", default=None, type=str, required=False)
-argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true", required=False, default=False)
-argparser.add_argument("-m", "--mode", help="Scan mode.", default="normal", type=str, required=False, choices=["evade", "noise", "normal"])
-argparser.add_argument("-nt", "--noisetimeout", help="Noise mode timeout. (Default : None)", default=None, type=int, required=False, metavar="TIMEOUT")
-argparser.add_argument("-c", "--config", help="Specify a config file to use. (Default : None)", default=None, required=False, metavar="CONFIG", type=str)
 argparser.add_argument("-v", "--version", help="Print version and exit.", action="store_true")
+argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true", required=False, default=False)
+argparser.add_argument("-c", "--config", help="Specify a config file to use. (Default : None)", default=None, required=False, metavar="CONFIG", type=str)
+
+scanargs = argparser.add_argument_group('Scanning', 'Options for scanning :')
+scanargs.add_argument("-t", "--target", help="Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)", type=str, required=False, default=None,)
+scanargs.add_argument("-hf", "--hostfile", help="File containing a list of hosts to scan.", type=str, required=False, default=None)
+scanargs.add_argument("-st", "--scantype", help="Scan type.", type=str, required=False, default=None, choices=["arp", "ping"])
+scanargs.add_argument("-nf", "--nmapflags", help="Custom nmap flags to use for portscan. (Has to be specified like : -nf=\"-O\")", default="", type=str, required=False)
+scanargs.add_argument("-s", "--speed", help="Scan speed. (Default : 3)", default=3, type=int, required=False, choices=range(0,6))
+scanargs.add_argument("-a", "--api", help="Specify API key for vulnerability detection for faster scanning. (Default : None)", default=None, type=str, required=False)
+scanargs.add_argument("-m", "--mode", help="Scan mode.", default="normal", type=str, required=False, choices=["evade", "noise", "normal"])
+scanargs.add_argument("-nt", "--noisetimeout", help="Noise mode timeout. (Default : None)", default=None, type=int, required=False, metavar="TIMEOUT")
+
+reportargs = argparser.add_argument_group('Reporting', 'Options for reporting (WIP) :')
+reportargs.add_argument("-o", "--output", help="Output file name. (Default : autopwn.log)", default="autopwn.log", type=str, required=False)
+reportargs.add_argument("-rp", "--report", help="Report sending method.", type=str, required=False, default=None, choices=["email", "webhook"])
+reportargs.add_argument("-rpe", "--reportemail", help="Email address to use for sending report.", type=str, required=False, default=None, metavar="EMAIL")
+reportargs.add_argument("-rpep", "--reportemailpassword", help="Password of the email report is going to be sent from.", type=str, required=False, default=None, metavar="PASSWORD")
+reportargs.add_argument("-rpet", "--reportemailto", help="Email address to send report to.", type=str, required=False, default=None, metavar="EMAIL")
+reportargs.add_argument("-rpef", "--reportemailfrom", help="Email to send from.", type=str, required=False, default=None, metavar="EMAIL")
+reportargs.add_argument("-rpes", "--reportemailserver", help="Email server to use for sending report.", type=str, required=False, default=None, metavar="SERVER")
+reportargs.add_argument("-rpesp", "--reportemailserverport", help="Port of the email server.", type=int, required=False, default=None, metavar="PORT")
+reportargs.add_argument("-rpw", "--reportwebhook", help="Webhook to use for sending report.", type=str, required=False, default=None, metavar="WEBHOOK")
+
 args = argparser.parse_args()
 
 def is_root(): # this function is used everywhere, so it's better to put it here
@@ -40,8 +54,6 @@ def InitArgsConf():
     try:
         config = ConfigParser()
         config.read(args.config)
-        if config.has_option('AUTOPWN', 'output'):
-            args.output = config.get('AUTOPWN', 'output').lower()
         if config.has_option('AUTOPWN', 'target'):
             args.target = config.get('AUTOPWN', 'target').lower()
         if config.has_option('AUTOPWN', 'hostfile'):
@@ -60,6 +72,19 @@ def InitArgsConf():
             args.mode = config.get('AUTOPWN', 'mode').lower()
         if config.has_option('AUTOPWN', 'noisetimeout'):
             args.noisetimeout = config.get('AUTOPWN', 'noisetimeout').lower()
+        if config.has_option('REPORT', 'output'):
+            args.output = config.get('AUTOPWN', 'output').lower()
+        if config.has_option('REPORT', 'method'):
+            args.report = config.get('REPORT', 'method').lower()
+        if config.has_option('REPORT', 'email'):
+            args.reportemail = config.get('REPORT', 'email').lower()
+        if config.has_option('REPORT', 'email_password'):
+            args.reportemailpassword = config.get('REPORT', 'email_password').lower()
+        if config.has_option('REPORT', 'email_to'):
+            args.reportemailto = config.get('REPORT', 'email_to').lower()
+        if config.has_option('REPORT', 'webhook'):
+            args.reportwebhook = config.get('REPORT', 'webhook').lower()
+
     except FileNotFoundError:
         print_colored("Config file not found!", colors.red)
         exit(1)
@@ -175,6 +200,44 @@ def InitArgsMode():
     
     return scanmode
 
+def InitReport():
+    if not args.report:
+        return [None*7]
+
+    if args.report == "email":
+        ReportWebhook = None
+        if args.reportemail:
+            ReportMail = args.reportemail
+        else:
+            ReportMail = input("Enter your email address : ")
+        if args.reportemailpassword:
+            ReportMailPassword = args.reportemailpassword
+        else:
+            ReportMailPassword = getpass("Enter your email password : ")
+        if args.reportemailto:
+            ReportMailTo = args.reportemailto
+        else:
+            ReportMailTo = input("Enter the email address to send the report to : ")
+        if args.reportemailfrom:
+            ReportMailFrom = args.reportemailfrom
+        else:
+            ReportMailFrom = ReportMail
+        if args.reportemailserver:
+            ReportMailServer = args.reportemailserver
+        else:
+            ReportMailServer = "smtp.gmail.com"
+        if args.reportemailport:
+            ReportMailPort = args.reportemailport
+        else:
+            ReportMailPort = 587
+    elif args.report == "webhook":
+        ReportWebhook, ReportMail, ReportMailPassword, ReportMailTo, ReportMailFrom, ReportMailServer, ReportMailPort = None
+        if args.reportwebhook:
+            ReportWebhook = args.reportwebhook
+        else:
+            ReportWebhook = input("Enter your webhook URL : ")
+
+    return ReportMail, ReportMailPassword, ReportMailTo, ReportMailFrom, ReportMailServer, ReportMailPort, ReportWebhook
 
 def ParamPrint():
     # print everything inside args class to screen
@@ -311,6 +374,8 @@ def main():
     apiKey = InitArgsAPI()
     hostfile = args.hostfile
     noisetimeout = args.noisetimeout
+    reportmethod = args.report
+
 
     if is_root() == False:
         print_colored("It's recommended to run this script as root since it's more silent and accurate.", colors.red)
