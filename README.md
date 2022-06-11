@@ -113,6 +113,7 @@ options:
 ## Currently working on
 - Rewrite the nmap module from scratch
 - https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
+- Option to send results via email or webhook.
 
 ## TODO
 
@@ -131,7 +132,7 @@ Do you have a cool feature idea? [Create a feature request!](https://github.com/
 - [ ] Meterpreter payload generator with common evasion techniques.
 - [ ] Fileless malware unique to AutoPWN Suite.
 - [ ] Daemon mode.
-- [ ] Option to email the results automatically.
+- [ ] Option to send results via email or webhook.
 - [ ] Web application analysis.
 - [ ] Web application content discovery mode. (dirbusting)
 - [ ] Option to use as a module.
