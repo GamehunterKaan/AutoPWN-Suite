@@ -68,7 +68,10 @@ def InitArgsConf():
         if config.has_option('AUTOPWN', 'nmapflags'):
             args.nmapflags = config.get('AUTOPWN', 'nmapflags').lower()
         if config.has_option('AUTOPWN', 'speed'):
-            args.speed = config.get('AUTOPWN', 'speed').lower()
+            try:
+                args.speed = int(config.get('AUTOPWN', 'speed'))
+            except ValueError:
+                print_colored("[!] Invalid speed value in config file. (Default : 3)", colors.red)
         if config.has_option('AUTOPWN', 'apikey'):
             args.api = config.get('AUTOPWN', 'apikey').lower()
         if config.has_option('AUTOPWN', 'auto'):
@@ -87,6 +90,12 @@ def InitArgsConf():
             args.reportemailpassword = config.get('REPORT', 'email_password').lower()
         if config.has_option('REPORT', 'email_to'):
             args.reportemailto = config.get('REPORT', 'email_to').lower()
+        if config.has_option('REPORT', 'email_from'):
+            args.reportemailfrom = config.get('REPORT', 'email_from').lower()
+        if config.has_option('REPORT', 'email_server'):
+            args.reportemailserver = config.get('REPORT', 'email_server').lower()
+        if config.has_option('REPORT', 'email_port'):
+            args.reportemailserverport = config.get('REPORT', 'email_port').lower()
         if config.has_option('REPORT', 'webhook'):
             args.reportwebhook = config.get('REPORT', 'webhook').lower()
 
@@ -216,9 +225,9 @@ def InitReport():
     if args.report == "email":
         Method = ReportType.EMAIL
         if args.reportemail:
-            ReportMail = args.reportemail
+            ReportEmail = args.reportemail
         else:
-            ReportMail = input("Enter your email address : ")
+            ReportEmail = input("Enter your email address : ")
         if args.reportemailpassword:
             ReportMailPassword = args.reportemailpassword
         else:
@@ -230,7 +239,7 @@ def InitReport():
         if args.reportemailfrom:
             ReportMailFrom = args.reportemailfrom
         else:
-            ReportMailFrom = ReportMail
+            ReportMailFrom = ReportEmail
         if args.reportemailserver:
             ReportMailServer = args.reportemailserver
         else:
@@ -238,8 +247,8 @@ def InitReport():
             if ReportMailServer == "smtp.gmail.com":
                 print_colored("Google no longer supports sending mails via SMTP! Canceling report via email.", colors.red)
                 return ReportType.NONE, None
-        if args.reportemailport:
-            ReportMailPort = args.reportemailport
+        if args.reportemailserverport:
+            ReportMailPort = args.reportemailserverport
         else:
             while True:
                 ReportMailPort = input("Enter the email port to send the report from : ")
@@ -249,7 +258,7 @@ def InitReport():
                 except ValueError:
                     print_colored("Invalid port number!", colors.red)
 
-        EmailObj = ReportMail(ReportMail, ReportMailPassword, ReportMailTo, ReportMailFrom, ReportMailServer, int(ReportMailPort), args.output)
+        EmailObj = ReportMail(ReportEmail, ReportMailPassword, ReportMailTo, ReportMailFrom, ReportMailServer, int(ReportMailPort), args.output)
 
         return Method, EmailObj
 
