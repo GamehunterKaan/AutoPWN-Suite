@@ -96,7 +96,7 @@ options:
                         Specify a config file to use. (Default : None)
 
 Scanning:
-  Options for scanning :
+  Options for scanning
 
   -t TARGET, --target TARGET
                         Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)
@@ -115,7 +115,7 @@ Scanning:
                         Noise mode timeout. (Default : None)
 
 Reporting:
-  Options for reporting :
+  Options for reporting
 
   -o OUTPUT, --output OUTPUT
                         Output file name. (Default : autopwn.log)
