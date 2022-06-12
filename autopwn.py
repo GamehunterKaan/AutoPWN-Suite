@@ -37,7 +37,7 @@ scanargs.add_argument("-a", "--api", help="Specify API key for vulnerability det
 scanargs.add_argument("-m", "--mode", help="Scan mode.", default="normal", type=str, required=False, choices=["evade", "noise", "normal"])
 scanargs.add_argument("-nt", "--noisetimeout", help="Noise mode timeout. (Default : None)", default=None, type=int, required=False, metavar="TIMEOUT")
 
-reportargs = argparser.add_argument_group('Reporting', 'Options for reporting (WIP) :')
+reportargs = argparser.add_argument_group('Reporting', 'Options for reporting :')
 reportargs.add_argument("-o", "--output", help="Output file name. (Default : autopwn.log)", default="autopwn.log", type=str, required=False)
 reportargs.add_argument("-rp", "--report", help="Report sending method.", type=str, required=False, default=None, choices=["email", "webhook"])
 reportargs.add_argument("-rpe", "--reportemail", help="Email address to use for sending report.", type=str, required=False, default=None, metavar="EMAIL")
