@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-from argparse import ArgumentParser
-from socket import socket, AF_INET, SOCK_DGRAM
-from os import getuid
-from subprocess import check_call, CalledProcessError, DEVNULL
-from enum import Enum
-from configparser import ConfigParser
-from modules.color import print_colored, colors, bcolors
-from modules.report import ReportType
-from modules.banners import print_banner
-from modules.searchvuln import SearchSploits
-from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts, ScanMode, ScanType, NoiseScan
-from modules.outfile import InitializeOutput, WriteToFile, OutputBanner
-from modules.getexploits import GetExploitsFromArray
+try:
+    from argparse import ArgumentParser
+    from socket import socket, AF_INET, SOCK_DGRAM
+    from os import getuid
+    from subprocess import check_call, CalledProcessError, DEVNULL
+    from enum import Enum
+    from datetime import datetime
+    from configparser import ConfigParser
+    from modules.color import print_colored, colors, bcolors
+    from modules.report import InitializeReport, ReportType, ReportMail, ReportWebhook
+    from modules.banners import print_banner
+    from modules.searchvuln import SearchSploits
+    from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts, ScanMode, ScanType, NoiseScan
+    from modules.outfile import InitializeOutput, WriteToFile, OutputBanner
+    from modules.getexploits import GetExploitsFromArray
+except ImportError as e:
+    print("[!] ImportError: " + str(e))
+    exit(1)
 
 __author__ = 'GamehunterKaan'
 __version__ = '1.2.10'
@@ -180,7 +185,11 @@ def InitArgsTarget():
             if DontAskForConfirmation:
                 target = DetectIPRange()
             else:
-                target = input("Enter target range to scan : ")
+                try:
+                    target = input("Enter target range to scan : ")
+                except KeyboardInterrupt:
+                    print_colored("\nCtrl+C pressed. Exiting.", colors.red)
+                    exit(0)
     return target
 
 def InitArgsMode():
@@ -202,10 +211,10 @@ def InitArgsMode():
 
 def InitReport():
     if not args.report:
-        return [None*7]
+        return ReportType.NONE, None
 
     if args.report == "email":
-        ReportWebhook = None
+        Method = ReportType.EMAIL
         if args.reportemail:
             ReportMail = args.reportemail
         else:
@@ -225,19 +234,35 @@ def InitReport():
         if args.reportemailserver:
             ReportMailServer = args.reportemailserver
         else:
-            ReportMailServer = "smtp.gmail.com"
+            ReportMailServer = input("Enter the email server to send the report from : ")
+            if ReportMailServer == "smtp.gmail.com":
+                print_colored("Google no longer supports sending mails via SMTP! Canceling report via email.", colors.red)
+                return ReportType.NONE, None
         if args.reportemailport:
             ReportMailPort = args.reportemailport
         else:
-            ReportMailPort = 587
-    elif args.report == "webhook":
-        ReportWebhook, ReportMail, ReportMailPassword, ReportMailTo, ReportMailFrom, ReportMailServer, ReportMailPort = None
-        if args.reportwebhook:
-            ReportWebhook = args.reportwebhook
-        else:
-            ReportWebhook = input("Enter your webhook URL : ")
+            while True:
+                ReportMailPort = input("Enter the email port to send the report from : ")
+                try:
+                    ReportMailPorT = int(ReportMailPort)
+                    break
+                except ValueError:
+                    print_colored("Invalid port number!", colors.red)
 
-    return ReportMail, ReportMailPassword, ReportMailTo, ReportMailFrom, ReportMailServer, ReportMailPort, ReportWebhook
+        EmailObj = ReportMail(ReportMail, ReportMailPassword, ReportMailTo, ReportMailFrom, ReportMailServer, int(ReportMailPort), args.output)
+
+        return Method, EmailObj
+
+    elif args.report == "webhook":
+        Method = ReportType.WEBHOOK
+        if args.reportwebhook:
+            Webhook = args.reportwebhook
+        else:
+            Webhook = input("Enter your webhook URL : ")
+
+        WebhookObj = ReportWebhook(Webhook, args.output)
+        
+        return Method, WebhookObj
 
 def ParamPrint():
     # print everything inside args class to screen
@@ -257,6 +282,7 @@ def ParamPrint():
     print_colored("│\tOutput file : " + str(outputfile), colors.bold)
     print_colored("│\tDont ask for confirmation : " + str(DontAskForConfirmation), colors.bold)
     print_colored("│\tHost file : " + str(args.hostfile), colors.bold)
+    print_colored("│\tReporting method : " + str(args.report), colors.bold)
     print_colored("└" + "─" * 59, colors.bold)
 
 #ask the user if they want to scan ports
@@ -303,6 +329,7 @@ def UserConfirmation():
 def GetHostsToScan(hosts):
     if len(hosts) == 0:
         print_colored("No hosts found!", colors.red)
+        print(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
         exit(0)
     index = 0
     for host in hosts:
@@ -320,6 +347,7 @@ def GetHostsToScan(hosts):
             Targets = hosts
             break
         elif host == 'exit':
+            print(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
             exit(0)
         elif host in hosts:
             Targets = [host]
@@ -349,6 +377,7 @@ def FurtherEnumuration(hosts):
             if DownloadExploits and len(VulnsArray) > 0:
                 GetExploitsFromArray(VulnsArray, host)
     else:
+        print(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
         exit(0)
 
 #main function
@@ -374,7 +403,7 @@ def main():
     apiKey = InitArgsAPI()
     hostfile = args.hostfile
     noisetimeout = args.noisetimeout
-    reportmethod = args.report
+    ReportMethod, ReportObject = InitReport()
 
 
     if is_root() == False:
@@ -386,6 +415,8 @@ def main():
         NoiseScan(targetarg, scantype, noisetimeout)
     OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed, scanmode)
     FurtherEnumuration(OnlineHosts)
+    InitializeReport(ReportMethod, ReportObject)
+    print(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
 
 #only run the script if its not imported as a module (directly interpreted with python3)
 if __name__ == '__main__':
@@ -394,3 +425,4 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print_colored("\nCtrl+C pressed. Exiting.", colors.red)
         WriteToFile("\nCtrl+C pressed. Exiting.")
+        exit(0)
