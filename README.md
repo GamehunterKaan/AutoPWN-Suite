@@ -25,6 +25,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Function to output results to a file.
 - Argument for passing custom nmap flags.
 - Specify your arguments using a config file.
+- Send scan results via webhook or email.
 
 ## How does it work?
 
@@ -82,14 +83,21 @@ Help Menu
 
 ```console
 $ autopwn-suite -h
-usage: autopwn.py [-h] [-o OUTPUT] [-t TARGET] [-hf HOSTFILE] [-st {arp,ping}] [-nf NMAPFLAGS] [-s {0,1,2,3,4,5}] [-a API] [-y] [-m {evade,noise,normal}] [-nt TIMEOUT] [-c CONFIG] [-v]
+usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-t TARGET] [-hf HOSTFILE] [-st {arp,ping}] [-nf NMAPFLAGS] [-s {0,1,2,3,4,5}] [-a API] [-m {evade,noise,normal}]
+                  [-nt TIMEOUT] [-o OUTPUT] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK]
 
 AutoPWN Suite
 
 options:
   -h, --help            show this help message and exit
-  -o OUTPUT, --output OUTPUT
-                        Output file name. (Default : autopwn.log)
+  -v, --version         Print version and exit.
+  -y, --yesplease       Don't ask for anything. (Full automatic mode)
+  -c CONFIG, --config CONFIG
+                        Specify a config file to use. (Default : None)
+
+Scanning:
+  Options for scanning :
+
   -t TARGET, --target TARGET
                         Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)
   -hf HOSTFILE, --hostfile HOSTFILE
@@ -101,25 +109,42 @@ options:
   -s {0,1,2,3,4,5}, --speed {0,1,2,3,4,5}
                         Scan speed. (Default : 3)
   -a API, --api API     Specify API key for vulnerability detection for faster scanning. (Default : None)
-  -y, --yesplease       Don't ask for anything. (Full automatic mode)
   -m {evade,noise,normal}, --mode {evade,noise,normal}
                         Scan mode.
   -nt TIMEOUT, --noisetimeout TIMEOUT
                         Noise mode timeout. (Default : None)
-  -c CONFIG, --config CONFIG
-                        Specify a config file to use. (Default : None)
-  -v, --version         Print version and exit.
+
+Reporting:
+  Options for reporting :
+
+  -o OUTPUT, --output OUTPUT
+                        Output file name. (Default : autopwn.log)
+  -rp {email,webhook}, --report {email,webhook}
+                        Report sending method.
+  -rpe EMAIL, --reportemail EMAIL
+                        Email address to use for sending report.
+  -rpep PASSWORD, --reportemailpassword PASSWORD
+                        Password of the email report is going to be sent from.
+  -rpet EMAIL, --reportemailto EMAIL
+                        Email address to send report to.
+  -rpef EMAIL, --reportemailfrom EMAIL
+                        Email to send from.
+  -rpes SERVER, --reportemailserver SERVER
+                        Email server to use for sending report.
+  -rpesp PORT, --reportemailserverport PORT
+                        Port of the email server.
+  -rpw WEBHOOK, --reportwebhook WEBHOOK
+                        Webhook to use for sending report.
 ```
 ## Currently working on
 - Rewrite the nmap module from scratch
 - https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
-- Option to send results via email or webhook.
 
 ## TODO
 
 Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
 
-- [x] 11 completed.
+- [x] 12 completed.
 - [ ] https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
 - [ ] Support for smaller terminals.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
@@ -132,7 +157,6 @@ Do you have a cool feature idea? [Create a feature request!](https://github.com/
 - [ ] Meterpreter payload generator with common evasion techniques.
 - [ ] Fileless malware unique to AutoPWN Suite.
 - [ ] Daemon mode.
-- [ ] Option to send results via email or webhook.
 - [ ] Web application analysis.
 - [ ] Web application content discovery mode. (dirbusting)
 - [ ] Option to use as a module.
