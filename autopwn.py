@@ -27,7 +27,7 @@ argparser.add_argument("-v", "--version", help="Print version and exit.", action
 argparser.add_argument("-y", "--yesplease", help="Don't ask for anything. (Full automatic mode)",action="store_true", required=False, default=False)
 argparser.add_argument("-c", "--config", help="Specify a config file to use. (Default : None)", default=None, required=False, metavar="CONFIG", type=str)
 
-scanargs = argparser.add_argument_group('Scanning', 'Options for scanning :')
+scanargs = argparser.add_argument_group('Scanning', 'Options for scanning')
 scanargs.add_argument("-t", "--target", help="Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)", type=str, required=False, default=None,)
 scanargs.add_argument("-hf", "--hostfile", help="File containing a list of hosts to scan.", type=str, required=False, default=None)
 scanargs.add_argument("-st", "--scantype", help="Scan type.", type=str, required=False, default=None, choices=["arp", "ping"])
@@ -37,7 +37,7 @@ scanargs.add_argument("-a", "--api", help="Specify API key for vulnerability det
 scanargs.add_argument("-m", "--mode", help="Scan mode.", default="normal", type=str, required=False, choices=["evade", "noise", "normal"])
 scanargs.add_argument("-nt", "--noisetimeout", help="Noise mode timeout. (Default : None)", default=None, type=int, required=False, metavar="TIMEOUT")
 
-reportargs = argparser.add_argument_group('Reporting', 'Options for reporting :')
+reportargs = argparser.add_argument_group('Reporting', 'Options for reporting')
 reportargs.add_argument("-o", "--output", help="Output file name. (Default : autopwn.log)", default="autopwn.log", type=str, required=False)
 reportargs.add_argument("-rp", "--report", help="Report sending method.", type=str, required=False, default=None, choices=["email", "webhook"])
 reportargs.add_argument("-rpe", "--reportemail", help="Email address to use for sending report.", type=str, required=False, default=None, metavar="EMAIL")
