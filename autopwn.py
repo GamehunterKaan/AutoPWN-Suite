@@ -19,7 +19,7 @@ except ImportError as e:
     exit(1)
 
 __author__ = 'GamehunterKaan'
-__version__ = '1.2.10'
+__version__ = '1.3.0'
 
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
