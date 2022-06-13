@@ -174,3 +174,8 @@ You may not rent or lease, distribute, modify, sell or transfer the software to 
 ## Support or Contact
 
 Having trouble using this tool? You can reach me out on [discord](https://search.discordprofile.info/374953845438021635), [create an issue](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new/choose) or [create a discussion!](https://github.com/GamehunterKaan/AutoPWN-Suite/discussions)
+
+
+## Support & Hire Me!
+
+If you want to support my work and also get you job done you can hire me on [Fiverr](https://www.fiverr.com/kaangultekin)! I do various things such as website pentesting, python programming, malware hunting, PC optimization and mentoring.
