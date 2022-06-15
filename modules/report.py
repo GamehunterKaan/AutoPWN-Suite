@@ -1,6 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
-from modules.color import print_colored, colors, bcolors
+from modules.logger import info, error, warning, success, println, banner, print_colored, colors, bcolors
 
 class ReportType(Enum):
     """
