@@ -7,13 +7,12 @@ try:
     from enum import Enum
     from datetime import datetime
     from configparser import ConfigParser
-    from modules.color import print_colored, colors, bcolors
     from modules.report import InitializeReport, ReportType, ReportMail, ReportWebhook
     from modules.banners import print_banner
     from modules.searchvuln import SearchSploits
     from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts, ScanMode, ScanType, NoiseScan
-    from modules.outfile import InitializeOutput, WriteToFile, OutputBanner
     from modules.getexploits import GetExploitsFromArray
+    from modules.logger import info, error, warning, success, println, banner, InitializeLogger, print_colored, colors, bcolors
 except ImportError as e:
     print("[!] ImportError: " + str(e))
     exit(1)
@@ -71,7 +70,7 @@ def InitArgsConf():
             try:
                 args.speed = int(config.get('AUTOPWN', 'speed'))
             except ValueError:
-                print_colored("[!] Invalid speed value in config file. (Default : 3)", colors.red)
+                error("[!] Invalid speed value in config file. (Default : 3)")
         if config.has_option('AUTOPWN', 'apikey'):
             args.api = config.get('AUTOPWN', 'apikey').lower()
         if config.has_option('AUTOPWN', 'auto'):
@@ -100,20 +99,20 @@ def InitArgsConf():
             args.reportwebhook = config.get('REPORT', 'webhook').lower()
 
     except FileNotFoundError:
-        print_colored("Config file not found!", colors.red)
+        error("Config file not found!")
         exit(1)
     except PermissionError:
-        print_colored("Permission denied while trying to read config file!", colors.red)
+        error("Permission denied while trying to read config file!")
         exit(1)
     except Exception as e:
-        print_colored("Unknown error while trying to read config file! " + str(e), colors.red)
+        error("Unknown error while trying to read config file! " + str(e))
         exit(1)
 
 
 def InitArgsScanType():
     if args.scantype == "arp":
         if not is_root():
-            print_colored("You must be root to do an arp scan!", colors.red)
+            error("You must be root to do an arp scan!")
             scantype = ScanType.Ping
         else:
             scantype = ScanType.Arp
@@ -134,11 +133,11 @@ def InitArgsAPI():
             with open("api.txt", "r") as f:
                 apiKey = f.readline().strip("\n")
         except FileNotFoundError:
-            print_colored("No API key specified and no api.txt file found. Vulnerability detection is going to be slower!", colors.red)
-            print_colored("You can get your own NIST API key from https://nvd.nist.gov/developers/request-an-api-key", colors.yellow)
+            warning("No API key specified and no api.txt file found. Vulnerability detection is going to be slower!")
+            warning("You can get your own NIST API key from https://nvd.nist.gov/developers/request-an-api-key")
             apiKey = None
         except PermissionError:
-            print_colored("Permission denied while trying to read api.txt!", colors.red)
+            error("Permission denied while trying to read api.txt!")
             apiKey = None
     return apiKey
 
@@ -149,7 +148,7 @@ def check_nmap():
     try:
         nmap_checker = check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
     except FileNotFoundError:
-        print_colored("Nmap is not installed. Auto installing...", colors.yellow)
+        warning("Nmap is not installed. Auto installing...")
         try:
             debian_installer = check_call(["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL)
         except CalledProcessError:
@@ -162,7 +161,7 @@ def check_nmap():
                     try:
                         yum_installer = check_call(["/usr/bin/sudo", "yum", "install", "nmap"], stderr=DEVNULL)
                     except CalledProcessError:
-                        print_colored("nmap installation failed. Please install nmap manually.", colors.red)
+                        error("nmap installation failed. Please install nmap manually.")
                         exit(1)
 
 
@@ -182,13 +181,13 @@ def InitArgsTarget():
             try:
                 target = open(args.hostfile,'r').read().splitlines()
             except FileNotFoundError:
-                print_colored("Host file not found!", colors.red)
+                error("Host file not found!")
                 target = DetectIPRange()
             except PermissionError:
-                print_colored("Permission denied while trying to read host file!", colors.red)
+                error("Permission denied while trying to read host file!")
                 target = DetectIPRange()
             except Exception:
-                print_colored("Unknown error while trying to read host file!", colors.red)
+                error("Unknown error while trying to read host file!")
                 target = DetectIPRange()
         else:
             if DontAskForConfirmation:
@@ -197,7 +196,7 @@ def InitArgsTarget():
                 try:
                     target = input("Enter target range to scan : ")
                 except KeyboardInterrupt:
-                    print_colored("\nCtrl+C pressed. Exiting.", colors.red)
+                    error("\nCtrl+C pressed. Exiting.")
                     exit(0)
     return target
 
@@ -206,13 +205,13 @@ def InitArgsMode():
         if is_root():
             scanmode = ScanMode.Evade
             scanspeed = 2
-            print_colored("Evasion mode enabled!", colors.yellow)
+            info("Evasion mode enabled!")
         else:
-            print_colored("You must be root to use evasion mode! Switching back to normal mode...", colors.red)
+            error("You must be root to use evasion mode! Switching back to normal mode...")
             scanmode = ScanMode.Normal
     elif args.mode == "noise":
         scanmode = ScanMode.Noise
-        print_colored("Noise mode enabled!", colors.yellow)
+        warning("Noise mode enabled!")
     elif args.mode == "normal":
         scanmode = ScanMode.Normal
     
@@ -245,7 +244,7 @@ def InitReport():
         else:
             ReportMailServer = input("Enter the email server to send the report from : ")
             if ReportMailServer == "smtp.gmail.com":
-                print_colored("Google no longer supports sending mails via SMTP! Canceling report via email.", colors.red)
+                error("Google no longer supports sending mails via SMTP! Canceling report via email.")
                 return ReportType.NONE, None
         if args.reportemailserverport:
             ReportMailPort = args.reportemailserverport
@@ -256,7 +255,7 @@ def InitReport():
                     ReportMailPorT = int(ReportMailPort)
                     break
                 except ValueError:
-                    print_colored("Invalid port number!", colors.red)
+                    error("Invalid port number!")
 
         EmailObj = ReportMail(ReportEmail, ReportMailPassword, ReportMailTo, ReportMailFrom, ReportMailServer, int(ReportMailPort), args.output)
 
@@ -276,23 +275,23 @@ def InitReport():
 def ParamPrint():
     # print everything inside args class to screen
     if args.config:
-        print_colored("\n┌─[ Config file " + args.config + " was used. ]", colors.bold)
-        print_colored("├─[ Scanning with the following parameters. ]", colors.bold)
+        println("\n┌─[ Config file " + args.config + " was used. ]")
+        println("├─[ Scanning with the following parameters. ]")
     else:
-        print_colored("\n┌─[ Scanning with the following parameters. ]", colors.bold)
+        println("\n┌─[ Scanning with the following parameters. ]")
 
-    print_colored("├" + "─" * 59, colors.bold)
-    print_colored("│\tTarget : " + str(targetarg), colors.bold)
-    print_colored("│\tScan type : " + str(scantype.name), colors.bold)
-    print_colored("│\tScan mode : " + str(scanmode.name), colors.bold)
-    print_colored("│\tScan speed : " + str(scanspeed), colors.bold)
-    print_colored("│\tNmap flags : " + str(nmapflags), colors.bold)
-    print_colored("│\tAPI key : " + str(apiKey), colors.bold)
-    print_colored("│\tOutput file : " + str(outputfile), colors.bold)
-    print_colored("│\tDont ask for confirmation : " + str(DontAskForConfirmation), colors.bold)
-    print_colored("│\tHost file : " + str(args.hostfile), colors.bold)
-    print_colored("│\tReporting method : " + str(args.report), colors.bold)
-    print_colored("└" + "─" * 59, colors.bold)
+    println("├" + "─" * 59)
+    println("│\tTarget : " + str(targetarg))
+    println("│\tScan type : " + str(scantype.name))
+    println("│\tScan mode : " + str(scanmode.name))
+    println("│\tScan speed : " + str(scanspeed))
+    println("│\tNmap flags : " + str(nmapflags))
+    println("│\tAPI key : " + str(apiKey))
+    println("│\tOutput file : " + str(outputfile))
+    println("│\tDont ask for confirmation : " + str(DontAskForConfirmation))
+    println("│\tHost file : " + str(args.hostfile))
+    println("│\tReporting method : " + str(args.report))
+    println("└" + "─" * 59)
 
 #ask the user if they want to scan ports
 def UserConfirmation():
@@ -305,7 +304,6 @@ def UserConfirmation():
             ScanPorts = True
             break
         elif wannaportscan == 'n' or wannaportscan == 'no':
-            WriteToFile("User refused to run a port scan on these hosts.")
             return False, False, False
         else:
             print("Please say Y or N!")
@@ -316,7 +314,6 @@ def UserConfirmation():
             ScanVulns = True
             break
         elif wannavulnscan == 'n' or wannavulnscan == 'no':
-            WriteToFile("User refused to do a version based vulnerability detection.")
             return True, False, False
         else:
             print("Please say Y or N!")
@@ -328,7 +325,6 @@ def UserConfirmation():
             DownloadExploits = True
             break
         elif wannadownloadexploits == 'n' or wannadownloadexploits == 'no':
-            WriteToFile("User refused to do a version based vulnerability detection.")
             return True, True, False
         else:
             print("Please say Y or N!")
@@ -337,13 +333,12 @@ def UserConfirmation():
 
 def GetHostsToScan(hosts):
     if len(hosts) == 0:
-        print_colored("No hosts found!", colors.red)
-        print(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
+        error("No hosts found!")
+        println(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
         exit(0)
     index = 0
     for host in hosts:
-        print((bcolors.red + "[" + bcolors.endc + str(index) + bcolors.red + "] " + bcolors.endc + host).center(60))
-        WriteToFile(("[%d] %s" % (index, host)).center(60))
+        println((bcolors.red + "[" + bcolors.endc + str(index) + bcolors.red + "] " + bcolors.endc + host).center(60))
         index += 1
     if DontAskForConfirmation:
         return hosts
@@ -356,7 +351,7 @@ def GetHostsToScan(hosts):
             Targets = hosts
             break
         elif host == 'exit':
-            print(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
+            println(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
             exit(0)
         elif host in hosts:
             Targets = [host]
@@ -392,7 +387,7 @@ def FurtherEnumuration(hosts):
 #main function
 def main():
     if args.version:
-        print("AutoPWN Suite v" + __version__)
+        println("AutoPWN Suite v" + __version__)
         exit(0)
     if args.config:
         InitArgsConf()
@@ -400,7 +395,7 @@ def main():
     global targetarg, scantype, scanmode, scanspeed, nmapflags, apiKey, outputfile, DontAskForConfirmation, hostfile, noisetimeout
 
     outputfile = args.output
-    InitializeOutput(outputfile)
+    InitializeLogger(outputfile)
     print_banner()
 
     DontAskForConfirmation = args.yesplease
@@ -416,8 +411,7 @@ def main():
 
 
     if is_root() == False:
-        print_colored("It's recommended to run this script as root since it's more silent and accurate.", colors.red)
-    OutputBanner(targetarg, scantype, scanspeed, hostfile, scanmode)
+        error("It's recommended to run this script as root since it's more silent and accurate.")
     ParamPrint()
     check_nmap()
     if scanmode == ScanMode.Noise:
@@ -425,7 +419,7 @@ def main():
     OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed, scanmode)
     FurtherEnumuration(OnlineHosts)
     InitializeReport(ReportMethod, ReportObject)
-    print(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
+    println(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
 
 #only run the script if its not imported as a module (directly interpreted with python3)
 if __name__ == '__main__':
