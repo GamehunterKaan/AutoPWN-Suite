@@ -1,8 +1,7 @@
-from modules.color import print_colored, colors, bcolors
 from modules.nvdlib.nvdlib import searchCPE, searchCVE, getCVE
+from modules.logger import info, error, warning, success, println, banner, print_colored, colors, bcolors
 from textwrap import wrap
 from os import get_terminal_size
-from modules.outfile import WriteToFile
 from dataclasses import dataclass
 
 @dataclass
@@ -57,18 +56,15 @@ def SearchKeyword(keyword, apiKey=None):
             ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
     except KeyboardInterrupt:
         print(" " * 100, end="\r")
-        print_colored("Skipping vulnerability detection for keyword " + keyword, colors.red)
-        WriteToFile("Skipped vulnerability detection for keyword " + keyword)
+        error("Skipping vulnerability detection for keyword " + keyword)
         return '', []
     except LookupError:
         print(" " * 100, end="\r")
-        print_colored("NIST API returned an invalid response for keyword " + keyword, colors.red)
-        WriteToFile("NIST API returned an invalid response for keyword " + keyword)
+        error("NIST API returned an invalid response for keyword " + keyword)
         return '', []
     except Exception as e:
         print(" " * 100, end="\r")
-        print_colored("Error: " + str(e), colors.red)
-        WriteToFile("Error: " + str(e))
+        error("Error: " + str(e))
         return '', []
 
     tempTitleList = []
@@ -93,23 +89,15 @@ def SearchSploits(HostArray, apiKey=None):
     VulnsArray = []
     target = str(HostArray[0][0])
 
-    print_colored("\n" + "─" * 60, colors.red)
-    print_colored(("Possible vulnerabilities for " + target).center(60), colors.red)
-    print_colored("─" * 60 + "\n", colors.red)
-
-    WriteToFile("\n" + "─" * 60)
-    WriteToFile(("Possible vulnerabilities for " + target).center(60))
-    WriteToFile("─" * 60 + "\n")
+    banner("Possible vulnerabilities for " + target, colors.red)
 
     keywords = GenerateKeywords(HostArray)
 
     if len(keywords) == 0:
-        print_colored(("Insufficient information for " + target).center(60), colors.yellow)
-        WriteToFile(("Insufficient information for " + target).center(60))
+        error("Insufficient information for " + target)
         return []
 
-    print("Searching vulnerability database for %s keyword(s)...\n" % (len(keywords)))
-    WriteToFile("Searching vulnerability database for %s keyword(s)..." % (len(keywords)))
+    info("Searching vulnerability database for %s keyword(s)...\n" % (len(keywords)))
 
     for keyword in keywords:
         #https://github.com/vehemont/nvdlib
@@ -127,12 +115,10 @@ def SearchSploits(HostArray, apiKey=None):
         # create a Vuln object
         VulnObject = Vuln(Software=Title, CVEs=[])
 
-        print("\n\n┌─" + bcolors.yellow + "[ " + Title + " ]" + bcolors.endc)
-        WriteToFile("\n\n┌─[ %s ]" % Title)
+        println("\n\n┌─" + bcolors.yellow + "[ " + Title + " ]" + bcolors.endc)
 
         for CVE in ApiResponseCVE:
-            print("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
-            WriteToFile("│\n├─────┤ " + str(CVE.id) + "\n│")
+            println("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
 
             description = str(CVE.cve.description.description_data[0].value)
             severity = str(CVE.score[2])
@@ -150,24 +136,17 @@ def SearchSploits(HostArray, apiKey=None):
             termsize = get_terminal_size()
             wrapped_description = wrap(description, termsize.columns - 50)
 
-            print("│\t\t" + bcolors.cyan + "Description : " + bcolors.endc)
-            WriteToFile("│\t\t" + "Description : ")
+            println("│\t\t" + bcolors.cyan + "Description : " + bcolors.endc)
             for line in wrapped_description:
-                print("│\t\t\t" + line)
-                WriteToFile("│\t\t\t" + line)
-            print("│\t\t" + bcolors.cyan + "Severity : " + bcolors.endc + severity + " - " + score)
-            WriteToFile("│\t\t" + "Severity : " + severity + " - " + score)
-            
-            print("│\t\t" + bcolors.cyan + "Exploitability : " + bcolors.endc + exploitability)
-            WriteToFile("│\t\t" + "Exploitability : " + exploitability)
-            
-            print("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
-            WriteToFile("│\t\t" + "Details : " + details)
+                println("│\t\t\t" + line)
+            println("│\t\t" + bcolors.cyan + "Severity : " + bcolors.endc + severity + " - " + score)
+            println("│\t\t" + bcolors.cyan + "Exploitability : " + bcolors.endc + exploitability)
+            println("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
 
             VulnObject.CVEs.append(str(CVE.id))
 
         VulnsArray.append(VulnObject)
         print(" " * 100, end="\r") #clear the line
-        print("└" + "─" * 59)
+        println("└" + "─" * 59)
 
     return VulnsArray
