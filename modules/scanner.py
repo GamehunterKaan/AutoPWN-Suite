@@ -1,6 +1,5 @@
 from modules.nmap import PortScanner
-from modules.color import print_colored, colors, bcolors
-from modules.outfile import WriteToFile
+from modules.logger import info, error, warning, success, println, banner, print_colored, colors, bcolors
 from os import getuid
 from multiprocessing import Process
 from dataclasses import dataclass
@@ -101,13 +100,7 @@ def TestArp(target, mode=ScanMode.Normal):
 
 #run a port scan on target using nmap
 def PortScan(target, scanspeed=5, mode=ScanMode.Normal, customflags=""):
-    print_colored("\n" + "─" * 60, colors.green)
-    print_colored(("Running a portscan on host " + str(target) + "...").center(60), colors.green)
-    print_colored("─" * 60 + "\n", colors.green)
-
-    WriteToFile("\n" + "─" * 60)
-    WriteToFile(("Portscan results for host " + str(target) + ".").center(60))
-    WriteToFile("─" * 60 + "\n")
+    banner("Running a portscan on host " + str(target) + "...", colors.green)
 
     nm = PortScanner()
 
@@ -120,8 +113,7 @@ def PortScan(target, scanspeed=5, mode=ScanMode.Normal, customflags=""):
         else:
             resp = nm.scan(hosts=target, arguments="-sV --host-timeout 60 -Pn -T %d %s" % (scanspeed, customflags))
     except Exception as e:
-        print_colored("Error: %s" % (e), colors.red)
-        WriteToFile("Error: %s" % (e))
+        error("Error: %s" % (e))
         exit(0)
 
     return nm
@@ -139,10 +131,7 @@ def CreateNoise(target):
         pass
 
 def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
-    print_colored("\n" + "─" * 60, colors.green)
-    print_colored("Creating noise...".center(60), colors.green)
-    print_colored("─" * 60 + "\n", colors.green)
-    WriteToFile("\nCreating noise...")
+    banner("Creating noise...", colors.green)
 
     if scantype == ScanType.Ping:
         Uphosts = TestPing(target)
@@ -155,7 +144,7 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
     NoisyProcesses = []
 
     for host in Uphosts:
-        print_colored("Started creating noise on %s..." % (host), colors.green)
+        info("Started creating noise on %s..." % (host))
         P = Process(target=CreateNoise, args=(host,))
         NoisyProcesses.append(P)
         P.start()
@@ -173,7 +162,7 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
                 sleep(0.25)
                 timeout -= 1
                 if timeout == 0:
-                    print("\nNoise scan complete!")
+                    println("\nNoise scan complete!")
                     for P in NoisyProcesses:
                         P.terminate()
                     exit(0)
@@ -182,25 +171,17 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
             while True:
                 sleep(1)
     except KeyboardInterrupt:
-        print_colored("\nStopping noise...", colors.red)
-        WriteToFile("\nStopped noise...")
+        error("\nNoise scan interrupted!")
         for P in NoisyProcesses:
             P.terminate()
         exit(0)
 
 def DiscoverHosts(target, scantype=ScanType.ARP, scanspeed=3, mode=ScanMode.Normal):
-    print_colored("\n" + "─" * 60, colors.green)
-    WriteToFile("\n" + "─" * 60)
     if type(target) is list:
-        print_colored(("Scanning " + str(len(target)) + " target(s) using " + str(scantype.name) + " scan...").center(60), colors.green)
-        WriteToFile("\nScanning %d hosts using %s scan..." % (len(target), str(scantype.name)))
+        banner("Scanning " + str(len(target)) + " target(s) using " + str(scantype.name) + " scan...", colors.green)
     else:
-        print_colored(("Scanning " + target + " using " + str(scantype.name) + " scan...").center(60), colors.green)
-        WriteToFile(("Scanning " + target + " using " + str(scantype.name) + " scan...").center(60))
+        banner("Scanning " + target + " using " + str(scantype.name) + " scan...", colors.green)
     
-    print_colored("─" * 60 + "\n", colors.green)
-    WriteToFile("─" * 60 + "\n")
-
     if scantype == ScanType.Ping:
         OnlineHosts = TestPing(target, mode)
         return OnlineHosts
@@ -258,29 +239,25 @@ def AnalyseScanResults(nm, target=None):
     try:
         nm[target]
     except KeyError:
-        print_colored("Target " + str(target) + " seems to be offline.", colors.red)
-        WriteToFile("Target " + str(target) + " seems to be offline.")
+        error("Target " + str(target) + " seems to be offline.")
         return []
 
 
     mac, vendor, os, os_accuracy, os_type = InitHostInfo(nm, target)
     CurrentTargetInfo = TargetInfo(target, mac, vendor, os, os_accuracy, os_type)
 
-    print(CurrentTargetInfo.colored().center(60))
-    WriteToFile(str(CurrentTargetInfo).center(60) + "\n")
+    println(CurrentTargetInfo.colored().center(60))
 
     reason = nm[target]['status']['reason']
 
     if is_root():
         if reason == 'localhost-response' or reason == 'user-set':
-            print_colored('Target ' + str(target) + ' seems to be us.', colors.underline)
-            WriteToFile('Target ' + str(target) + ' seems to be us.\n')
+            info("Target " + str(target) + " seems to be us.")
     # we cant detect if the host is us or not, if we are not root
     # we could get our ip address and compare them but i think it's not quite necessary
 
     if len(nm[target].all_protocols()) == 0:
-        print_colored("Target " + str(target) + " seems to have no open ports.", colors.red)
-        WriteToFile("Target " + str(target) + " seems to have no open ports.")
+        error("Target " + str(target) + " seems to have no open ports.")
         return HostArray
     for port in nm[target]['tcp'].keys():
                         
@@ -304,23 +281,13 @@ def AnalyseScanResults(nm, target=None):
         else:
             version = 'Unknown'
 
-        print(
+        println(
             (
                 bcolors.cyan + "Port : " + bcolors.endc + "{0:10}" + 
                 bcolors.cyan + " State : " + bcolors.endc + "{1:10}" +
                 bcolors.cyan + " Service : " + bcolors.endc + "{2:15}" +
                 bcolors.cyan + " Product : " + bcolors.endc + "{3:20}" +
                 bcolors.cyan + " Version : " + bcolors.endc + "{4:15}"
-            ).format(str(port), state, service[:15], product[:20], version[:15])
-        )
-
-        WriteToFile(
-            (
-                "Port : {0:10}" + 
-                " State : {1:10}" +
-                " Service : {2:20}" +
-                " Product : {3:20}" +
-                " Version : {4:20}"
             ).format(str(port), state, service[:15], product[:20], version[:15])
         )
 
