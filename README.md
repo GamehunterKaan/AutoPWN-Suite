@@ -138,14 +138,12 @@ Reporting:
 ## Currently working on
 - Rewrite the nmap module from scratch
 - https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
-- https://github.com/GamehunterKaan/AutoPWN-Suite/issues/13
 
 ## TODO
 
 Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
 
 - [x] 12 completed.
-- [ ] https://github.com/GamehunterKaan/AutoPWN-Suite/issues/13
 - [ ] https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
 - [ ] Support for smaller terminals.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
