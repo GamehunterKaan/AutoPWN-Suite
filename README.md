@@ -59,7 +59,7 @@ OR
 You can download debian (deb) package from [releases.](https://github.com/GamehunterKaan/AutoPWN-Suite/releases)
 
 ```
-sudo apt-get install ./autopwn-suite_1.3.0.deb
+sudo apt-get install ./autopwn-suite_1.3.5.deb
 ```
 
 OR
