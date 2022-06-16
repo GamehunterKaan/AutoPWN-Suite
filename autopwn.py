@@ -196,7 +196,8 @@ def InitArgsTarget():
                 try:
                     target = input("Enter target range to scan : ")
                 except KeyboardInterrupt:
-                    error("\nCtrl+C pressed. Exiting.")
+                    print()
+                    error("Ctrl+C pressed. Exiting.")
                     exit(0)
     return target
 
@@ -426,6 +427,6 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        print_colored("\nCtrl+C pressed. Exiting.", colors.red)
-        WriteToFile("\nCtrl+C pressed. Exiting.")
+        print()
+        error("Ctrl+C pressed. Exiting.", colors.red)
         exit(0)
