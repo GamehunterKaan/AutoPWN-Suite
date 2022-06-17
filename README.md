@@ -138,6 +138,7 @@ Reporting:
 ## Currently working on
 - Rewrite the nmap module from scratch
 - https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
+- Web application analysis.
 
 ## TODO
 
