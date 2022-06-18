@@ -366,8 +366,8 @@ def FurtherEnumuration(hosts):
             PortArray = AnalyseScanResults(PortScanResults,host)
             if ScanVulns and len(PortArray) > 0:
                 VulnsArray = SearchSploits(PortArray, apiKey)
-            if DownloadExploits and len(VulnsArray) > 0:
-                GetExploitsFromArray(VulnsArray, host)
+                if DownloadExploits and len(VulnsArray) > 0:
+                    GetExploitsFromArray(VulnsArray, host)
 
         if ScanWeb:
             webvuln(host)
