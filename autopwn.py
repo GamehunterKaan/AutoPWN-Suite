@@ -370,7 +370,6 @@ def FurtherEnumuration(hosts):
                 GetExploitsFromArray(VulnsArray, host)
 
         if ScanWeb:
-            print("\nScanning for web vulnerabilities...")
             webvuln(host)
 
 #main function
