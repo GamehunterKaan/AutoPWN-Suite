@@ -15,6 +15,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Fully automatic! (Use `-y` flag to enable)
 - Detect network IP range without any user input. 
 - Vulnerability detection based on version.
+- Web app vulnerability testing. (Only LFI for now)
 - Get information about the vulnerability right from your terminal.
 - Automatically download exploit related with vulnerability.
 - Noise mode for creating a noise on the network.
@@ -136,15 +137,17 @@ Reporting:
                         Webhook to use for sending report.
 ```
 ## Currently working on
-- Rewrite the nmap module from scratch
 - https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
-- Web application analysis.
+- XSS tests.
 
 ## TODO
 
 Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
 
-- [x] 12 completed.
+- [x] 13 Completed.
+- [ ] XSS tests.
+- [ ] SQL Injection tests.
+- [ ] Web app dirbusting.
 - [ ] https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
 - [ ] Support for smaller terminals.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
@@ -157,8 +160,6 @@ Do you have a cool feature idea? [Create a feature request!](https://github.com/
 - [ ] Meterpreter payload generator with common evasion techniques.
 - [ ] Fileless malware unique to AutoPWN Suite.
 - [ ] Daemon mode.
-- [ ] Web application analysis.
-- [ ] Web application content discovery mode. (dirbusting)
 - [ ] Option to use as a module.
 
 ## Contributing to AutoPWN Suite
