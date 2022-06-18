@@ -12,6 +12,7 @@ try:
     from modules.searchvuln import SearchSploits
     from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts, ScanMode, ScanType, NoiseScan
     from modules.getexploits import GetExploitsFromArray
+    from modules.web.webvuln import webvuln
     from modules.logger import info, error, warning, success, println, banner, InitializeLogger, print_colored, colors, bcolors
 except ImportError as e:
     print("[!] ImportError: " + str(e))
@@ -294,43 +295,26 @@ def ParamPrint():
     println("│\tReporting method : " + str(args.report))
     println("└" + "─" * 59)
 
-#ask the user if they want to scan ports
+def Confirmation(message):
+    if DontAskForConfirmation:
+        return True
+    confirmation = input(message)
+    return confirmation.lower() != "n"
+
 def UserConfirmation():
     if DontAskForConfirmation:
         return True, True, True
-    print_colored("\nWould you like to run a port scan on these hosts? (Y/N)", colors.yellow)
-    while True:
-        wannaportscan = input(bcolors.blue + "────> " + bcolors.endc).lower()
-        if wannaportscan == 'y' or wannaportscan == 'yes' or wannaportscan == "":
-            ScanPorts = True
-            break
-        elif wannaportscan == 'n' or wannaportscan == 'no':
-            return False, False, False
-        else:
-            print("Please say Y or N!")
-    print_colored("\nWould you like to do a version based vulnerability detection? (Y/N)", colors.yellow)
-    while True:
-        wannavulnscan = input(bcolors.blue + "────> " + bcolors.endc).lower()
-        if wannavulnscan == 'y' or wannavulnscan == 'yes' or wannavulnscan == "":
-            ScanVulns = True
-            break
-        elif wannavulnscan == 'n' or wannavulnscan == 'no':
-            return True, False, False
-        else:
-            print("Please say Y or N!")
+    portscan = Confirmation("Do you want to scan ports? [Y/n] : ")
+    if portscan == False:
+        return False, False, False
+    vulnscan = Confirmation("Do you want to scan for vulnerabilities? [Y/n] : ")
+    if vulnscan == False:
+        return True, False, False
+    downloadexploits = Confirmation("Do you want to download exploits? [Y/n] : ")
+    return portscan, vulnscan, downloadexploits
 
-    print_colored("\nWould you like to download exploit codes related with found vulnerabilities? (Y/N)", colors.yellow)
-    while True:
-        wannadownloadexploits = input(bcolors.blue + "────> " + bcolors.endc).lower()
-        if wannadownloadexploits == 'y' or wannadownloadexploits == 'yes' or wannadownloadexploits == "":
-            DownloadExploits = True
-            break
-        elif wannadownloadexploits == 'n' or wannadownloadexploits == 'no':
-            return True, True, False
-        else:
-            print("Please say Y or N!")
-
-    return ScanPorts, ScanVulns, DownloadExploits
+def WebScan():
+    return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
 
 def GetHostsToScan(hosts):
     if len(hosts) == 0:
@@ -360,11 +344,13 @@ def GetHostsToScan(hosts):
         elif host == "":
             Targets = hosts
             break
-        elif int(host) < len(hosts) and int(host) >= 0:
-            Targets = [hosts[int(host)]]
-            break
         else:
-            print_colored("Please enter a valid host number or 'all' or 'exit'", colors.red)
+            try:
+                if int(host) < len(hosts) and int(host) >= 0:
+                    Targets = [hosts[int(host)]]
+                    break
+            except:
+                print_colored("Please enter a valid host number or 'all' or 'exit'", colors.red)
 
     return Targets
 
@@ -372,18 +358,20 @@ def GetHostsToScan(hosts):
 def FurtherEnumuration(hosts):
     Targets = GetHostsToScan(hosts)
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
+    ScanWeb = WebScan()
 
-    if ScanPorts:
-        for host in Targets:
+    for host in Targets:
+        if ScanPorts:
             PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
             PortArray = AnalyseScanResults(PortScanResults,host)
-        if ScanVulns and len(PortArray) > 0:
-            VulnsArray = SearchSploits(PortArray, apiKey)
+            if ScanVulns and len(PortArray) > 0:
+                VulnsArray = SearchSploits(PortArray, apiKey)
             if DownloadExploits and len(VulnsArray) > 0:
                 GetExploitsFromArray(VulnsArray, host)
-    else:
-        print(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
-        exit(0)
+
+        if ScanWeb:
+            print("\nScanning for web vulnerabilities...")
+            webvuln(host)
 
 #main function
 def main():
@@ -420,6 +408,7 @@ def main():
     OnlineHosts = DiscoverHosts(targetarg, scantype, scanspeed, scanmode)
     FurtherEnumuration(OnlineHosts)
     InitializeReport(ReportMethod, ReportObject)
+    print(" " * 200, end="\r")
     println(str(datetime.now().strftime("%b %d %Y %H:%M:%S")) + " - Scan completed.")
 
 #only run the script if its not imported as a module (directly interpreted with python3)
@@ -428,5 +417,5 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print()
-        error("Ctrl+C pressed. Exiting.", colors.red)
+        error("Ctrl+C pressed. Exiting.")
         exit(0)
