@@ -12,6 +12,7 @@ class bcolors:
     green = '\033[92m'
     yellow = '\033[93m'
     red = '\033[91m'
+    purple = '\033[38;5;93m'
     endc = '\033[0m'
     bold = '\033[1m'
     underline = '\033[4m'
@@ -22,6 +23,7 @@ class colors:
     green = 'green'
     yellow = 'yellow'
     red = 'red'
+    purple = 'purple'
     bold = 'bold'
     underline = 'underline'
     no_new_line = 'no_new_line'
@@ -75,6 +77,8 @@ def print_colored(text,color):
         print(bcolors.yellow + str(text) + bcolors.endc)
     elif color == 'red':
         print(bcolors.red + str(text) + bcolors.endc)
+    elif color == "purple":
+        print(bcolors.purple + str(text) + bcolors.endc)
     elif color == 'bold':
         print(bcolors.bold + str(text) + bcolors.endc)
     elif color == 'underline':
