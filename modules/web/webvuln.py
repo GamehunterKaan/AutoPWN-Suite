@@ -7,14 +7,17 @@ def get_url(target):
     """
     Get the target url
     """
-    request = get("http://" + target)
-    if request.status_code == 200:
-        return "http://" + target
-    
-    request = get("https://" + target)
-    if request.status_code == 200:
-        return "https://" + target
-
+    try:
+        request = get("http://" + target, timeout=10)
+        if request.status_code == 200:
+            return "http://" + target
+    except Exception as e:
+        try:
+            request = get("https://" + target, timeout=10)
+            if request.status_code == 200:
+                return "https://" + target
+        except Exception as e:
+            error("Could not get url for " + target)
     return None
 
 def webvuln(target):
@@ -22,6 +25,8 @@ def webvuln(target):
     Test for web vulnerabilities
     """
     target_url = get_url(target)
+    if target_url is None:
+        return
     #banner("got url " + target_url)
     banner("Testing web application on " + target + "...", colors.purple)
     # crawl the target_url
