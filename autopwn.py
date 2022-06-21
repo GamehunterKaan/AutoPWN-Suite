@@ -6,6 +6,7 @@ try:
     from subprocess import check_call, CalledProcessError, DEVNULL
     from enum import Enum
     from datetime import datetime
+    from platform import system as system_name
     from configparser import ConfigParser
     from modules.report import InitializeReport, ReportType, ReportMail, ReportWebhook
     from modules.banners import print_banner
@@ -19,7 +20,7 @@ except ImportError as e:
     exit(1)
 
 __author__ = 'GamehunterKaan'
-__version__ = '1.4.0'
+__version__ = '1.5.0'
 
 #parse command line arguments
 argparser = ArgumentParser(description="AutoPWN Suite")
@@ -142,29 +143,51 @@ def InitArgsAPI():
             apiKey = None
     return apiKey
 
+def install_nmap_linux():
+    try:
+        debian_installer = check_call(["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL)
+    except CalledProcessError:
+        try:
+            arch_installer = check_call(["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"], stderr=DEVNULL)
+        except CalledProcessError:
+            try:
+                fedora_installer = check_call(["/usr/bin/sudo", "dnf", "install", "nmap"], stderr=DEVNULL)
+            except CalledProcessError:
+                try:
+                    yum_installer = check_call(["/usr/bin/sudo", "yum", "install", "nmap"], stderr=DEVNULL)
+                except CalledProcessError:
+                    error("Couldn't install nmap! (Linux)")
+
+def install_nmap_windows():
+    # TODO: implement this
+    """shut up, pylint"""
+    try:
+        check_call(["powershell", "winget", "install", "nmap", "--silent"], stderr=DEVNULL)
+    except CalledProcessError:
+        error("Couldn't install nmap! (Windows)")
+
+def install_nmap_mac():
+    try:
+        check_call(["/usr/bin/sudo", "brew", "install", "nmap"], stderr=DEVNULL)
+    except CalledProcessError:
+        error("Couldn't install nmap! (Mac)")
+
 def check_nmap():
     # Check if nmap is installed
     # If not, install it
-    # TODO : Add a function to install nmap on windows
     try:
         nmap_checker = check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
     except FileNotFoundError:
         warning("Nmap is not installed. Auto installing...")
-        try:
-            debian_installer = check_call(["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL)
-        except CalledProcessError:
-            try:
-                arch_instller = check_call(["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"], stderr=DEVNULL)
-            except CalledProcessError:
-                try:
-                    fedore_installer = check_call(["/usr/bin/sudo", "dnf", "install", "nmap"], stderr=DEVNULL)
-                except CalledProcessError:
-                    try:
-                        yum_installer = check_call(["/usr/bin/sudo", "yum", "install", "nmap"], stderr=DEVNULL)
-                    except CalledProcessError:
-                        error("nmap installation failed. Please install nmap manually.")
-                        exit(1)
-
+        if platform.system() == "Linux":
+            install_nmap_linux()
+        elif system_name() == "Windows":
+            install_nmap_windows()
+        elif system_name() == "Darwin":
+            install_nmap_mac()
+        else:
+            error("Unknown OS! Auto installation not supported!")
+            exit(1)
 
 def DetectIPRange():
     s = socket(AF_INET, SOCK_DGRAM)
@@ -396,7 +419,6 @@ def main():
     hostfile = args.hostfile
     noisetimeout = args.noisetimeout
     ReportMethod, ReportObject = InitReport()
-
 
     if is_root() == False:
         error("It's recommended to run this script as root since it's more silent and accurate.")
