@@ -144,7 +144,7 @@ Reporting:
 
 Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
 
-- [x] 13 Completed.
+- [x] 14 Completed.
 - [ ] XSS tests.
 - [ ] SQL Injection tests.
 - [ ] Web app dirbusting.
@@ -152,7 +152,6 @@ Do you have a cool feature idea? [Create a feature request!](https://github.com/
 - [ ] Support for smaller terminals.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
 - [ ] Seperate script for checking local privilege escalation vulnerabilities.
-- [ ] Windows and OSX support.
 - [ ] Function to brute force common services like `ssh`, `vnc`, `ftp` etc.
 - [ ] Built in reverse shell handler that automatically stabilizes shell like [pwncat](https://github.com/calebstewart/pwncat).
 - [ ] Function to generate reverse shell commands based on IP and port.
