@@ -26,7 +26,7 @@ jobs:
         python-version: "3.10"
     - name: Install dependencies
       run: |
-        pip install requests
+        pip install -r requirements.txt
         sudo apt-get update && sudo apt-get install nmap -y
     - name: Automatic test
       run: python autopwn.py -y -t 127.0.0.1
@@ -47,7 +47,7 @@ jobs:
         python-version: "3.10"
     - name: Install dependencies
       run: |
-        pip install requests
+        pip install -r requirements.txt
         sudo apt-get update && sudo apt-get install nmap -y
 
     - name: Automatic test
