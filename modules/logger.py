@@ -1,3 +1,9 @@
+from platform import system as system_name
+
+if system_name() == "Windows":
+    from modules.colorama import init
+    init()
+
 def InitializeLogger(context):
     global outfile
     outfile = context
@@ -34,8 +40,13 @@ def WriteToFile(data):
     for colorcode in colors:
         data = data.replace(colorcode, "")
     filename = outfile
-    file = open(filename, 'a')
-    file.write("\n" + data)
+    if system_name() == "Windows":
+        data = data.encode("utf-8")
+        file = open(filename, 'ab')
+        file.write(b"\n" + bytes(data))
+    else:
+        file = open(filename, "a")
+        file.write("\n" + data)
     file.close()
 
 def info(msg):
