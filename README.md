@@ -22,11 +22,9 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Evasion mode for being sneaky.
 - Automatically decide which scan types to use based on privilege.
 - Easy to read output.
-- Function to output results to a file.
-- Argument for passing custom nmap flags.
 - Specify your arguments using a config file.
 - Send scan results via webhook or email.
-- Works on Linux and MacOS.
+- Works on Windows, MacOS and Linux.
 
 ## How does it work?
 
@@ -145,8 +143,7 @@ Reporting:
 
 Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
 
-- [x] 14 Completed.
-- [ ] Fix errors related to windows.
+- [x] 15 Completed.
 - [ ] XSS tests.
 - [ ] SQL Injection tests.
 - [ ] Web app dirbusting.
