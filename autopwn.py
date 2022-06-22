@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
-from os import getuid, get_terminal_size
-from _ctypes import windll
+from os import get_terminal_size
 from subprocess import check_call, CalledProcessError, DEVNULL
 from datetime import datetime
 from platform import system as system_name
@@ -10,7 +9,7 @@ from configparser import ConfigParser
 from rich.console import Console
 
 from modules.scanner import is_root
-from colors import bcolors
+from modules.colors import bcolors
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
 from modules.getexploits import GetExploitsFromArray
@@ -32,8 +31,8 @@ from modules.report import (
 )
 
 
-__author__ = 'GamehunterKaan'
-__version__ = '1.5.1'
+__author__ = "GamehunterKaan"
+__version__ = "1.5.1"
 
 log = Logger()
 console = Console()
@@ -60,10 +59,13 @@ argparser.add_argument(
     type=str
 )
 
-scanargs = argparser.add_argument_group('Scanning', 'Options for scanning')
+scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
 scanargs.add_argument(
     "-t", "--target",
-    help="Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)",
+    help=(
+            "Target range to scan. This argument overwrites the",
+            "hostfile argument. (192.168.0.1 or 192.168.0.0/24)"
+        ),
     type=str,
     required=False,
     default=None
@@ -85,7 +87,10 @@ scanargs.add_argument(
 )
 scanargs.add_argument(
     "-nf", "--nmapflags",
-    help="Custom nmap flags to use for portscan. (Has to be specified like : -nf=\"-O\")",
+    help=(
+            "Custom nmap flags to use for portscan.",
+            " (Has to be specified like : -nf=\"-O\")"
+        ),
     default="",
     type=str,
     required=False
@@ -100,7 +105,10 @@ scanargs.add_argument(
 )
 scanargs.add_argument(
     "-a", "--api",
-    help="Specify API key for vulnerability detection for faster scanning. (Default : None)",
+    help=(
+            "Specify API key for vulnerability detection ",
+            "for faster scanning. (Default : None)"
+        ),
     default=None,
     type=str,
     required=False
@@ -122,7 +130,7 @@ scanargs.add_argument(
     metavar="TIMEOUT"
 )
 
-reportargs = argparser.add_argument_group('Reporting', 'Options for reporting')
+reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
 reportargs.add_argument(
     "-o", "--output",
     help="Output file name. (Default : autopwn.log)",
@@ -208,54 +216,56 @@ def InitArgsConf():
         config = ConfigParser()
         config.read(args.config)
 
-        if config.has_option('AUTOPWN', 'target'):
-            args.target = config.get('AUTOPWN', 'target').lower()
-        if config.has_option('AUTOPWN', 'hostfile'):
-            args.hostfile = config.get('AUTOPWN', 'hostfile').lower()
-        if config.has_option('AUTOPWN', 'scantype'):
-            args.scantype = config.get('AUTOPWN', 'scantype').lower()
-        if config.has_option('AUTOPWN', 'nmapflags'):
-            args.nmapflags = config.get('AUTOPWN', 'nmapflags').lower()
-        if config.has_option('AUTOPWN', 'speed'):
+        if config.has_option("AUTOPWN", "target"):
+            args.target = config.get("AUTOPWN", "target").lower()
+        if config.has_option("AUTOPWN", "hostfile"):
+            args.hostfile = config.get("AUTOPWN", "hostfile").lower()
+        if config.has_option("AUTOPWN", "scantype"):
+            args.scantype = config.get("AUTOPWN", "scantype").lower()
+        if config.has_option("AUTOPWN", "nmapflags"):
+            args.nmapflags = config.get("AUTOPWN", "nmapflags").lower()
+        if config.has_option("AUTOPWN", "speed"):
             try:
-                args.speed = int(config.get('AUTOPWN', 'speed'))
+                args.speed = int(config.get("AUTOPWN", "speed"))
             except ValueError:
                 log.logger(
                     "error",
                     "[!] Invalid speed value in config file. (Default : 3)"
                 )
-        if config.has_option('AUTOPWN', 'apikey'):
-            args.api = config.get('AUTOPWN', 'apikey').lower()
-        if config.has_option('AUTOPWN', 'auto'):
+        if config.has_option("AUTOPWN", "apikey"):
+            args.api = config.get("AUTOPWN", "apikey").lower()
+        if config.has_option("AUTOPWN", "auto"):
             args.yesplease = True
-        if config.has_option('AUTOPWN', 'mode'):
-            args.mode = config.get('AUTOPWN', 'mode').lower()
-        if config.has_option('AUTOPWN', 'noisetimeout'):
-            args.noisetimeout = config.get('AUTOPWN', 'noisetimeout').lower()
-        if config.has_option('REPORT', 'output'):
-            args.output = config.get('AUTOPWN', 'output').lower()
-        if config.has_option('REPORT', 'method'):
-            args.report = config.get('REPORT', 'method').lower()
-        if config.has_option('REPORT', 'email'):
-            args.reportemail = config.get('REPORT', 'email').lower()
-        if config.has_option('REPORT', 'email_password'):
+        if config.has_option("AUTOPWN", "mode"):
+            args.mode = config.get("AUTOPWN", "mode").lower()
+        if config.has_option("AUTOPWN", "noisetimeout"):
+            args.noisetimeout = config.get(
+                    "AUTOPWN", "noisetimeout"
+                ).lower()
+        if config.has_option("REPORT", "output"):
+            args.output = config.get("AUTOPWN", "output").lower()
+        if config.has_option("REPORT", "method"):
+            args.report = config.get("REPORT", "method").lower()
+        if config.has_option("REPORT", "email"):
+            args.reportemail = config.get("REPORT", "email").lower()
+        if config.has_option("REPORT", "email_password"):
             args.reportemailpassword = config.get(
-                    'REPORT', 'email_password'
+                    "REPORT", "email_password"
                 ).lower()
-        if config.has_option('REPORT', 'email_to'):
-            args.reportemailto = config.get('REPORT', 'email_to').lower()
-        if config.has_option('REPORT', 'email_from'):
-            args.reportemailfrom = config.get('REPORT', 'email_from').lower()
-        if config.has_option('REPORT', 'email_server'):
+        if config.has_option("REPORT", "email_to"):
+            args.reportemailto = config.get("REPORT", "email_to").lower()
+        if config.has_option("REPORT", "email_from"):
+            args.reportemailfrom = config.get("REPORT", "email_from").lower()
+        if config.has_option("REPORT", "email_server"):
             args.reportemailserver = config.get(
-                    'REPORT', 'email_server'
+                    "REPORT", "email_server"
                 ).lower()
-        if config.has_option('REPORT', 'email_port'):
+        if config.has_option("REPORT", "email_port"):
             args.reportemailserverport = config.get(
-                    'REPORT', 'email_port'
+                    "REPORT", "email_port"
                 ).lower()
-        if config.has_option('REPORT', 'webhook'):
-            args.reportwebhook = config.get('REPORT', 'webhook').lower()
+        if config.has_option("REPORT", "webhook"):
+            args.reportwebhook = config.get("REPORT", "webhook").lower()
 
     except FileNotFoundError:
         raise SystemExit("Config file not found!")
@@ -419,9 +429,11 @@ def DetectIPRange():
         s = socket(AF_INET, SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         PrivateIPAdress = str(s.getsockname()[0]).split(".")
-        target = str(
-            f"{str(PrivateIPAdress[0])}.{str(PrivateIPAdress[1])}.{PrivateIPAdress[2]}.0/24"
-        )
+        target = (
+                f"{PrivateIPAdress[0]}.",
+                f"{PrivateIPAdress[1]}.",
+                f"{PrivateIPAdress[2]}.0/24"
+            )
     except ConnectionError:
         # include logger here
         log.logger("error", "Connection Error, aborting.")
@@ -498,22 +510,30 @@ def InitReport():
                 ReportEmail = args.reportemail
             else:
                 ReportEmail = input("Enter your email address : ")
+
             if args.reportemailpassword:
                 ReportMailPassword = args.reportemailpassword
             else:
                 ReportMailPassword = getpass("Enter your email password : ")
+
             if args.reportemailto:
                 ReportMailTo = args.reportemailto
             else:
-                ReportMailTo = input("Enter the email address to send the report to : ")
+                ReportMailTo = input(
+                        "Enter the email address to send the report to : "
+                    )
+
             if args.reportemailfrom:
                 ReportMailFrom = args.reportemailfrom
             else:
                 ReportMailFrom = ReportEmail
+
             if args.reportemailserver:
                 ReportMailServer = args.reportemailserver
             else:
-                ReportMailServer = input("Enter the email server to send the report from : ")
+                ReportMailServer = input(
+                        "Enter the email server to send the report from : "
+                    )
                 if ReportMailServer == "smtp.gmail.com":
                     log.logger(
                         "error",
@@ -521,18 +541,19 @@ def InitReport():
                         + "via SMTP! Canceling report via email."
                     )
                     return ReportType.NONE, None
+
             if args.reportemailserverport:
                 ReportMailPort = args.reportemailserverport
             else:
                 while True:
-                    ReportMailPort = input("Enter the email port to send the report from : ")
-                    try:
-                        int(ReportMailPort)
-                    except ValueError:
-                        log.logger("error", "Invalid port number!")
-                    else:
+                    ReportMailPort = input(
+                            "Enter the email port to send the report from : "
+                        )
+                    if  isinstance(ReportMailPort, int):
                         break
-                    continue
+
+                    log.logger("error", "Invalid port number!")
+
 
             EmailObj = ReportMail(
                     ReportEmail,
@@ -579,9 +600,9 @@ def ParamPrint(
     else:
         console.print("\n┌─[ Scanning with the following parameters. ]")
 
-    console.print("├" + "─" * term_width)
     console.print(
-        f"│\tTarget : {str(targetarg)}\n"
+        "├" + "─" * term_width
+        + f"\n│\tTarget : {str(targetarg)}\n"
         + f"│\tScan type : {str(scantype.name)}\n"
         + f"│\tScan mode : {str(scanmode.name)}\n"
         + f"│\tScan speed : {str(scanspeed)}\n"
@@ -591,8 +612,8 @@ def ParamPrint(
         + f"│\tDont ask for confirmation : {str(DontAskForConfirmation)}\n"
         + f"│\tHost file : {str(args.hostfile)}\n"
         + f"│\tReporting method : {str(args.report)}\n"
+        + "└" + "─" * term_width
     )
-    console.print("└" + "─" * term_width)
 
 
 def Confirmation(message, DontAskForConfirmation):
@@ -623,14 +644,16 @@ def UserConfirmation(DontAskForConfirmation):
 
 
 def WebScan():
-    return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
+    return Confirmation(
+        "Do you want to scan for web vulnerabilities? [Y/n] : "
+    )
 
 
 def GetHostsToScan(hosts, DontAskForConfirmation):
     if len(hosts) == 0:
         raise SystemExit(
             "No hosts found! {time} - Scan completed.".format(
-                time = "{str(datetime.now().strftime('%b %d %Y %H:%M:%S'))}"
+                time = {str(datetime.now().strftime("%b %d %Y %H:%M:%S"))}
             )
         )
 
@@ -663,19 +686,21 @@ def GetHostsToScan(hosts, DontAskForConfirmation):
                     break
                 case "exit":
                     raise SystemExit(
-                        f"{str(datetime.now().strftime('%b %d %Y %H:%M:%S'))} - Scan completed."
+                        "{time} - Scan completed.".format(
+                            time = datetime.now().strftime("%b %d %Y %H:%M:%S")
+                        )
                     )
                 case "":
                     break
                 case _:
                     try:
-                        if int(host) < len(hosts) and int(host) >= 0:
-                            Targets = [hosts[int(host)]]
+                        if (num := int(host)) < len(hosts) and int(host) >= 0:
+                            Targets = [hosts[num]]
                             break
                     except:
                         console.print(
-                            "[red]Please enter a valid host "
-                            +  "number or 'all' or 'exit'[/red]"
+                            "Please enter a valid host number or 'all' "
+                            + "or 'exit'", style="red"
                         )
 
     return Targets
@@ -759,7 +784,7 @@ def main():
     InitializeReport(ReportMethod, ReportObject)
     console.print(
         "{time} - Scan completed.".format(
-            time = str(datetime.now().strftime("%b %d %Y %H:%M:%S"))
+            time = datetime.now().strftime("%b %d %Y %H:%M:%S")
         )
     )
 
