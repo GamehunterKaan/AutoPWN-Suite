@@ -43,6 +43,3 @@ def random_user_agent() -> str:
             return user_agents[floor_:top_]
 
     yield choice(fetch_data())["user_agent"]
-
-
-print(next(random_user_agent()))
