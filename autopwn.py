@@ -2,7 +2,10 @@
 try:
     from argparse import ArgumentParser
     from socket import socket, AF_INET, SOCK_DGRAM
-    from os import getuid
+    try:
+        from os import getuid
+    except ImportError:
+        from ctypes import windll
     from subprocess import check_call, CalledProcessError, DEVNULL
     from enum import Enum
     from datetime import datetime
@@ -52,7 +55,10 @@ reportargs.add_argument("-rpw", "--reportwebhook", help="Webhook to use for send
 args = argparser.parse_args()
 
 def is_root(): # this function is used everywhere, so it's better to put it here
-    return getuid() == 0
+    try:
+        return getuid() == 0
+    except Exception as e:
+        return windll.shell32.IsUserAnAdmin() == 1
 
 def InitArgsConf():
     if not args.config:
