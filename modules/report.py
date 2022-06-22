@@ -1,6 +1,19 @@
+from smtplib import SMTP
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+from requests import post
 from enum import Enum
 from dataclasses import dataclass
-from modules.logger import info, error, warning, success, println, banner, print_colored, colors, bcolors
+from rich.console import Console
+
+from colors import bcolors
+from modules.logger import Logger, banner
+
+
+console = Console()
 
 class ReportType(Enum):
     """
@@ -9,6 +22,7 @@ class ReportType(Enum):
     NONE = 0
     EMAIL = 1
     WEBHOOK = 2
+
 
 @dataclass()
 class ReportMail():
@@ -23,6 +37,7 @@ class ReportMail():
     port : int
     attachment : str
 
+
 @dataclass()
 class ReportWebhook():
     """
@@ -30,6 +45,7 @@ class ReportWebhook():
     """
     url : str
     attachment : str
+
 
 def InitializeEmailReport(EmailObj):
     """
@@ -44,12 +60,27 @@ def InitializeEmailReport(EmailObj):
     attachment = EmailObj.attachment
 
     # Send email report
-    print(" " * 100, end="\r")
     print("Sending email report...", end="\r")
-    SendEmail(email, password, email_to, email_from, server, port, attachment)
+    SendEmail(
+        email,
+        password,
+        email_to,
+        email_from,
+        server,
+        port,
+        attachment
+    )
     print(" " * 100, end="\r")
 
-def SendEmail(email,password, email_to, email_from, server, port, attachment):
+def SendEmail(
+        email,
+        password,
+        email_to,
+        email_from,
+        server,
+        port,
+        attachment
+    ):
     """
     Send email report.
     """
@@ -57,13 +88,6 @@ def SendEmail(email,password, email_to, email_from, server, port, attachment):
     # Since google disabled sending emails via
     # smtp, i didn't have an opportunity to test
     # please create an issue if you test this
-
-    from smtplib import SMTP
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from email.mime.base import MIMEBase
-    from email import encoders
-
     msg = MIMEMultipart()
     msg['From'] = email_from
     msg['To'] = email_to
@@ -76,7 +100,10 @@ def SendEmail(email,password, email_to, email_from, server, port, attachment):
     part = MIMEBase('application', 'octet-stream')
     part.set_payload(open(attachment, 'rb').read())
     encoders.encode_base64(part)
-    part.add_header('Content-Disposition', 'attachment; filename="%s"' % attachment)
+    part.add_header(
+        'Content-Disposition',
+        f'attachment; filename="{attachment}"'
+    )
     msg.attach(part)
 
     mail = SMTP(server, port)
@@ -85,7 +112,7 @@ def SendEmail(email,password, email_to, email_from, server, port, attachment):
     text = msg.as_string()
     mail.sendmail(email, email_to, text)
     mail.quit()
-    print_colored("Email report sent successfully", colors.green)
+    console.print("Email report sent successfully", style="green")
 
 
 def InitializeWebhookReport(WebhookObj):
@@ -96,34 +123,35 @@ def InitializeWebhookReport(WebhookObj):
     attachment = WebhookObj.attachment
 
     # Send webhook report
-    print(" " * 100, end="\r")
     print("Sending webhook report...", end="\r")
     SendWebhook(url, attachment)
     print(" " * 100, end="\r")
+
 
 def SendWebhook(url, attachment):
     """
     Send webhook report.
     """
-    from requests import post
-
-    payload = {
-        "payload": open(attachment, 'rb')
-    }
+    with open(attachment, "rb") as file:
+        payload = {
+            "payload": file
+        }
 
     response = post(url, files=payload)
-    if response.status_code == 200:
-        print_colored("Webhook report sent successfully", colors.green)
-    else:
-        print_colored("Webhook report failed to send", colors.red)
+    try:
+        console.print("Webhook report sent successfully", style="green")
+    except ConnectionError:
+        console.print("Webhook report failed to send", style="red")
+
 
 def InitializeReport(Method, ReportObject):
     """
     Initialize report.
     """
-    if Method == ReportType.EMAIL:
-        InitializeEmailReport(ReportObject)
-    elif Method == ReportType.WEBHOOK:
-        InitializeWebhookReport(ReportObject)
-    elif Method == ReportType.NONE:
-        pass
+    match Method:
+        case ReportType.Email:
+            InitializeEmailReport(ReportObject)
+        case ReportType.WEBHOOK:
+            InitializeWebhookReport(ReportObject)
+        case ReportType.NONE:
+            pass
