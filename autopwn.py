@@ -9,6 +9,7 @@ from configparser import ConfigParser
 
 from rich.console import Console
 
+from modules.scanner import is_root
 from colors import bcolors
 from modules.banners import print_banner
 from modules.searchvuln import SearchSploits
@@ -197,13 +198,6 @@ reportargs.add_argument(
 )
 
 args = argparser.parse_args()
-
-
-def is_root(): # this function is used everywhere, so it's better to put it here
-    try:
-        return getuid() == 0
-    except (RuntimeError, NotImplementedError):
-        return windll.shell32.IsUserAnAdmin() == 1
 
 
 def InitArgsConf():
