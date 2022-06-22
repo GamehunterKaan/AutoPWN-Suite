@@ -1,6 +1,9 @@
 from modules.nmap import PortScanner
 from modules.logger import info, error, warning, success, println, banner, print_colored, colors, bcolors
-from os import getuid
+try:
+    from os import getuid
+except ImportError:
+    from ctypes import windll
 from multiprocessing import Process
 from dataclasses import dataclass
 from time import sleep
@@ -68,8 +71,11 @@ class ScanType(Enum):
     Ping = 0
     ARP = 1
 
-def is_root():
-    return getuid() == 0
+def is_root(): # this function is used everywhere, so it's better to put it here
+    try:
+        return getuid() == 0
+    except Exception as e:
+        return windll.shell32.IsUserAnAdmin() == 1
 
 # this function is for turning a list of hosts into a single string
 def listToString(s): 
