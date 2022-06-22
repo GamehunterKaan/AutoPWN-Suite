@@ -1,4 +1,9 @@
 from modules.logger import println, colors, warning, info
+from platform import system as system_name
+
+if system_name() == "Windows":
+    from modules.colorama import init
+    init()
 
 # https://patorjk.com/software/taag/
 def print_banner():
