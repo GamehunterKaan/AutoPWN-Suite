@@ -19,10 +19,10 @@ def random_user_agent() -> str:
         try:
             file = choice(
                     [
-                        "user_agents_1.jl",
-                        "user_agents_2.jl",
-                        "user_agents_3.jl",
-                        "user_agents_4.jl"
+                        "user_agents_1.json",
+                        "user_agents_2.json",
+                        "user_agents_3.json",
+                        "user_agents_4.json"
                     ]
                 )
             with open(
