@@ -1,4 +1,5 @@
 from requests import get
+
 from modules.logger import error, banner, colors
 from modules.web.crawler import crawl
 from modules.web.lfi import TestLFI
