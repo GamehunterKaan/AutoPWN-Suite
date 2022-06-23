@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 try:
+    import distro
     from argparse import ArgumentParser
+    from getpass import getpass
     from socket import socket, AF_INET, SOCK_DGRAM
     try:
         from os import getuid
@@ -9,7 +11,7 @@ try:
     from subprocess import check_call, CalledProcessError, DEVNULL
     from enum import Enum
     from datetime import datetime
-    from platform import system as system_name
+    from platform import system
     from configparser import ConfigParser
     from modules.report import InitializeReport, ReportType, ReportMail, ReportWebhook
     from modules.banners import print_banner
@@ -150,50 +152,122 @@ def InitArgsAPI():
     return apiKey
 
 def install_nmap_linux():
+    distro_ = distro.id().lower()
     try:
-        debian_installer = check_call(["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL)
+        if distro_ in ["ubuntu", "debian", "linuxmint", "raspbian"]:
+            check_call(
+                [
+                    "/usr/bin/sudo",
+                    "apt-get",
+                    "install",
+                    "nmap",
+                    "-y"
+                    ],
+                stderr=DEVNULL
+            )
+        elif distro_ in ["arch", "manjaro"]:
+            check_call(
+                    [
+                        "/usr/bin/sudo",
+                        "pacman",
+                        "-S",
+                        "nmap",
+                        "--noconfirm"
+                        ],
+                    stderr=DEVNULL
+            )
+        elif distro_ in ["fedora", "oracle"]:
+            check_call(
+                [
+                    "/usr/bin/sudo",
+                    "dnf",
+                    "install",
+                    "nmap"
+                    ],
+                stderr=DEVNULL
+            )
+        elif distro in ["rhel", "centos"]:
+            check_call(
+                [
+                    "/usr/bin/sudo",
+                    "yum",
+                    "install",
+                    "nmap"
+                    ],
+                stderr=DEVNULL
+            )
+        elif distro in ["sles", "opensuse"]:
+            check_call(
+                [
+                    "/usr/bin/sudo",
+                    "zypper",
+                    "install",
+                    "nmap"
+                    ],
+                stderr=DEVNULL
+            )
+        else:
+            raise CalledProcessError
+
     except CalledProcessError:
-        try:
-            arch_installer = check_call(["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"], stderr=DEVNULL)
-        except CalledProcessError:
-            try:
-                fedora_installer = check_call(["/usr/bin/sudo", "dnf", "install", "nmap"], stderr=DEVNULL)
-            except CalledProcessError:
-                try:
-                    yum_installer = check_call(["/usr/bin/sudo", "yum", "install", "nmap"], stderr=DEVNULL)
-                except CalledProcessError:
-                    error("Couldn't install nmap! (Linux)")
+        error("Couldn't install nmap! (Linux)")
+
 
 def install_nmap_windows():
     # TODO: implement this
     """shut up, pylint"""
     try:
-        check_call(["powershell", "winget", "install", "nmap", "--silent"], stderr=DEVNULL)
+        check_call(
+            [
+                "powershell",
+                "winget",
+                "install",
+                "nmap",
+                "--silent"
+                ],
+            stderr=DEVNULL
+        )
     except CalledProcessError:
         error("Couldn't install nmap! (Windows)")
 
+
 def install_nmap_mac():
     try:
-        check_call(["/usr/bin/sudo", "brew", "install", "nmap"], stderr=DEVNULL)
+        check_call(
+            [
+                "/usr/bin/sudo",
+                "brew",
+                "install",
+                "nmap"
+                ],
+            stderr=DEVNULL
+        )
     except CalledProcessError:
         error("Couldn't install nmap! (Mac)")
 
+
 def check_nmap():
-    # Check if nmap is installed
-    # If not, install it
+    # Check if nmap is installed if not, install it
     try:
-        nmap_checker = check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
+        check_call(
+                ["nmap", "-h"],
+                stdout=DEVNULL,
+                stderr=DEVNULL
+        )
     except FileNotFoundError:
         warning("Nmap is not installed. Auto installing...")
-        if platform.system() == "Linux":
+        platform_ = system().lower()
+        if  platform_ == "linux":
             install_nmap_linux()
-        elif system_name() == "Windows":
+        if platform_ == "windows":
             install_nmap_windows()
-        elif system_name() == "Darwin":
+        elif platform_ == "darwin":
             install_nmap_mac()
         else:
-            error("Unknown OS! Auto installation not supported!")
-            exit(1)
+            raise SystemExit(
+                "Unknown OS! Auto installation not supported!"
+            )
+
 
 def DetectIPRange():
     s = socket(AF_INET, SOCK_DGRAM)
@@ -245,7 +319,7 @@ def InitArgsMode():
         warning("Noise mode enabled!")
     elif args.mode == "normal":
         scanmode = ScanMode.Normal
-    
+
     return scanmode
 
 def InitReport():
@@ -300,7 +374,7 @@ def InitReport():
             Webhook = input("Enter your webhook URL : ")
 
         WebhookObj = ReportWebhook(Webhook, args.output)
-        
+
         return Method, WebhookObj
 
 def ParamPrint():
@@ -408,7 +482,7 @@ def main():
         exit(0)
     if args.config:
         InitArgsConf()
-    
+
     global targetarg, scantype, scanmode, scanspeed, nmapflags, apiKey, outputfile, DontAskForConfirmation, hostfile, noisetimeout
 
     outputfile = args.output
