@@ -23,8 +23,6 @@ class Vuln:
 def GenerateKeywords(HostArray):
     keywords = []
     for port in HostArray:
-        target = str(port[0])
-        targetport = str(port[1])
         service = str(port[2])
         product = str(port[3])
         version = str(port[4])
@@ -72,7 +70,7 @@ def SearchKeyword(keyword, apiKey=None):
     )
 
     try:
-        if apiKey == None:
+        if apiKey is None:
             ApiResponseCPE = searchCPE(keyword=keyword)
             ApiResponseCVE = searchCVE(keyword=keyword)
         else:
@@ -80,13 +78,10 @@ def SearchKeyword(keyword, apiKey=None):
             ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
 
     except KeyboardInterrupt:
-        print(" " * 100, end="\r")
         error(f"Skipping vulnerability detection for keyword {keyword}")
     except LookupError:
-        print(" " * 100, end="\r")
         error(f"NIST API returned an invalid response for keyword {keyword}")
     except Exception as e:
-        print(" " * 100, end="\r")
         error(f"Error: {e}")
     else:
         tempTitleList, TitleList = [], []
@@ -101,8 +96,6 @@ def SearchKeyword(keyword, apiKey=None):
             CPETitle = min(TitleList)
         else:
             CPETitle = ""
-
-        print(" " * 100, end="\r")
 
         return CPETitle, ApiResponseCVE
 
@@ -141,7 +134,7 @@ def SearchSploits(HostArray, apiKey=None):
         # create a Vuln object
         VulnObject = Vuln(Software=Title, CVEs=[])
 
-        println("\n\n┌─" + bcolors.yellow + "[ " + Title + " ]" + bcolors.endc)
+        println(f"\n\n┌─{bcolors.yellow}[{Title}]{bcolors.endc}")
 
         for CVE in ApiResponseCVE:
             println(

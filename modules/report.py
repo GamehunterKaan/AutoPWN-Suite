@@ -10,6 +10,7 @@ from enum import Enum
 
 from modules.logger import print_colored, colors
 
+
 class ReportType(Enum):
     """
     Enum for report types.
@@ -97,8 +98,7 @@ def SendEmail(
     part.set_payload(open(attachment, "rb").read())
     encoders.encode_base64(part)
     part.add_header(
-        "Content-Disposition",
-        f"attachment; filename='{attachment}'"
+        "Content-Disposition", f"attachment; filename='{attachment}'"
     )
     msg.attach(part)
 
@@ -129,9 +129,7 @@ def SendWebhook(url, attachment):
     Send webhook report.
     """
     with open(attachment, "rb") as file:
-        payload = {
-            "payload": file
-        }
+        payload = {"payload": file}
 
     try:
         post(url, files=payload)
