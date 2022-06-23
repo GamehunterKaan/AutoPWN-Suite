@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from smtplib import SMTP
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -5,20 +6,9 @@ from email.mime.base import MIMEBase
 from email import encoders
 
 from requests import post
-
 from enum import Enum
-from dataclasses import dataclass
-from modules.logger import (
-    info,
-    error,
-    warning,
-    success,
-    println,
-    banner,
-    print_colored,
-    colors,
-    bcolors
-)
+
+from modules.logger import print_colored, colors
 
 class ReportType(Enum):
     """

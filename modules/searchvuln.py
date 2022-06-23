@@ -1,18 +1,16 @@
-from modules.nvdlib.nvdlib import searchCPE, searchCVE, getCVE
-from modules.logger import (
-    info,
-    error,
-    warning,
-    success,
-    println,
-    banner,
-    print_colored,
-    colors,
-    bcolors
-)
 from textwrap import wrap
 from os import get_terminal_size
 from dataclasses import dataclass
+
+from modules.nvdlib.nvdlib import searchCPE, searchCVE
+from modules.logger import (
+    info,
+    error,
+    println,
+    banner,
+    colors,
+    bcolors
+)
 
 
 @dataclass

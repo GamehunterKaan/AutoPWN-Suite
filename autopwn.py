@@ -1,55 +1,40 @@
-#!/usr/bin/env python3
-try:
-    from argparse import ArgumentParser
-    from socket import socket, AF_INET, SOCK_DGRAM
-    from os import get_terminal_size
-    try:
-        from os import getuid
-    except ImportError:
-        from ctypes import windll
-    from subprocess import check_call, CalledProcessError, DEVNULL
-    from enum import Enum
-    from datetime import datetime
-    from platform import system as system_name
-    from configparser import ConfigParser
+from argparse import ArgumentParser
+from socket import socket, AF_INET, SOCK_DGRAM
+from os import get_terminal_size
+from subprocess import check_call, CalledProcessError, DEVNULL
+from datetime import datetime
 
-    from rich.console import Console
+from rich.console import Console
+from platform import system as system_name
+from configparser import ConfigParser
 
-    from modules.scanner import is_root
-    from modules.banners import print_banner
-    from modules.getexploits import GetExploitsFromArray
-    from modules.web.webvuln import webvuln
-
-    from modules.searchvuln import SearchSploits
-    from modules.report import (
-        InitializeReport,
-        ReportType,
-        ReportMail,
-        ReportWebhook
-    )
-    from modules.scanner import (
-        AnalyseScanResults,
-        PortScan,
-        DiscoverHosts,
-        ScanMode,
-        ScanType,
-        NoiseScan
-    )
-    from modules.logger import (
-        info,
-        error,
-        warning,
-        success,
-        println,
-        banner,
-        InitializeLogger,
-        print_colored,
-        colors,
-        bcolors
-    )
-
-except ImportError as e:
-    raise SystemExit(f"[!] ImportError: {e}")
+from modules.scanner import is_root
+from modules.banners import print_banner
+from modules.getexploits import GetExploitsFromArray
+from modules.web.webvuln import webvuln
+from modules.searchvuln import SearchSploits
+from modules.report import (
+    InitializeReport,
+    ReportType,
+    ReportMail,
+    ReportWebhook
+)
+from modules.scanner import (
+    AnalyseScanResults,
+    PortScan,
+    DiscoverHosts,
+    ScanMode,
+    ScanType,
+    NoiseScan
+)
+from modules.logger import (
+    info,
+    error,
+    warning,
+    println,
+    InitializeLogger,
+    bcolors
+)
 
 
 __author__ = "GamehunterKaan"
@@ -738,7 +723,7 @@ def main():
     if args.config:
         InitArgsConf()
 
-    global targetarg, scantype, scanmode, scanspeed, nmapflags, apiKey,
+    global targetarg, scantype, scanmode, scanspeed, nmapflags, apiKey
     global outputfile, DontAskForConfirmation, hostfile, noisetimeout
 
     outputfile = args.output

@@ -1,25 +1,25 @@
-from modules.nmap import PortScanner
-from modules.logger import (
-    info,
-    error,
-    warning,
-    success,
-    println,
-    banner,
-    print_colored,
-    colors,
-    bcolors
-)
-try:
-    from os import getuid
-except ImportError:
-    from ctypes import windll
 from multiprocessing import Process
 from dataclasses import dataclass
 from time import sleep
 from enum import Enum
 
+try:
+    from os import getuid
+except ImportError:
+    from ctypes import windll
+
 from rich.console import Console
+
+from modules.nmap import PortScanner
+from modules.logger import (
+    info,
+    error,
+    println,
+    banner,
+    colors,
+    bcolors
+)
+
 
 @dataclass
 class PortInfo:
