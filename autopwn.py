@@ -1,3 +1,4 @@
+import distro
 from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
 from os import get_terminal_size
@@ -5,7 +6,7 @@ from subprocess import check_call, CalledProcessError, DEVNULL
 from datetime import datetime
 
 from rich.console import Console
-from platform import system as system_name
+from platform import system
 from configparser import ConfigParser
 
 from modules.scanner import is_root
@@ -328,8 +329,9 @@ def InitArgsAPI():
 
 
 def install_nmap_linux():
-    try:
-        debian_installer = check_call(
+    distro = distro.id().lower()
+    if distro in ["ubuntu", "debian", "mint"]:
+        check_call(
                 [
                     "/usr/bin/sudo",
                     "apt-get",
@@ -338,43 +340,42 @@ def install_nmap_linux():
                     "-y"
                     ],
                 stderr=DEVNULL
-            )
-    except CalledProcessError:
+        )
+    elif distro in ["arch", "manjaro"]:
+        check_call(
+                [
+                    "/usr/bin/sudo",
+                    "pacman",
+                    "-S",
+                    "nmap",
+                    "--noconfirm"
+                    ],
+                stderr=DEVNULL
+        )
+    elif distro in ["fedora"]:
         try:
-            arch_installer = check_call(
-                    [
-                        "/usr/bin/sudo",
-                        "pacman",
-                        "-S",
-                        "nmap",
-                        "--noconfirm"
-                        ],
-                    stderr=DEVNULL
-                )
+            check_call(
+                [
+                    "/usr/bin/sudo",
+                    "dnf",
+                    "install",
+                    "nmap"
+                    ],
+                stderr=DEVNULL
+            )
         except CalledProcessError:
             try:
-                fedora_installer = check_call(
+                check_call(
                         [
                             "/usr/bin/sudo",
-                            "dnf",
+                            "yum",
                             "install",
                             "nmap"
                             ],
                         stderr=DEVNULL
-                    )
+                )
             except CalledProcessError:
-                try:
-                    yum_installer = check_call(
-                            [
-                                "/usr/bin/sudo",
-                                "yum",
-                                "install",
-                                "nmap"
-                                ],
-                            stderr=DEVNULL
-                        )
-                except CalledProcessError:
-                    error("Couldn't install nmap! (Linux)")
+                error("Couldn't install nmap! (Linux)")
 
 
 def install_nmap_windows():
