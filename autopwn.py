@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 try:
-    import distro
     from argparse import ArgumentParser
     from getpass import getpass
     from socket import socket, AF_INET, SOCK_DGRAM
@@ -12,6 +11,13 @@ try:
     from enum import Enum
     from datetime import datetime
     from platform import system
+    try:
+        import distro
+    except ImportError:
+        if system().lower() == "linux":    
+            raise
+        else:
+            pass
     from configparser import ConfigParser
     from modules.report import InitializeReport, ReportType, ReportMail, ReportWebhook
     from modules.banners import print_banner
