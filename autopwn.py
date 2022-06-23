@@ -3,11 +3,12 @@ from getpass import getpass
 from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
 from os import get_terminal_size
+from platform import system
 from subprocess import check_call, CalledProcessError, DEVNULL
 from datetime import datetime
 
+from colorama import init
 from rich.console import Console
-from platform import system
 from configparser import ConfigParser
 
 from modules.scanner import is_root
@@ -715,6 +716,8 @@ def FurtherEnumuration(hosts):
 
 #main function
 def main():
+    init()
+
     if args.version:
         console.print(f"AutoPWN Suite v{__version__}")
         raise SystemExit

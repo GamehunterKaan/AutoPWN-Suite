@@ -1,11 +1,6 @@
 from platform import system as system_name
 
 
-if system_name() == "Windows":
-    from modules.colorama import init
-    init()
-
-
 def InitializeLogger(context):
     global outfile
     outfile = context

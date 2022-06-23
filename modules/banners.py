@@ -1,12 +1,5 @@
-from platform import system as system_name
-
 from modules.logger import println, warning, info
 
-
-if system_name() == "Windows":
-    from colorama import init
-
-    init()
 
 # https://patorjk.com/software/taag/
 def print_banner():
