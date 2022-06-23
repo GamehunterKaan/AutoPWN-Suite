@@ -1,3 +1,4 @@
+import platform
 import distro
 from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
@@ -414,24 +415,24 @@ def install_nmap_mac():
 def check_nmap():
     # Check if nmap is installed if not, install it
     try:
-        nmap_checker = check_call(
+        check_call(
                 ["nmap", "-h"],
                 stdout=DEVNULL,
                 stderr=DEVNULL
-            )
+        )
     except FileNotFoundError:
         warning("Nmap is not installed. Auto installing...")
-        if platform.system() == "Linux":
+        platform_ = system().lower()
+        if  platform_ == "linux":
             install_nmap_linux()
+        if platform_ == "windows":
+            install_nmap_windows()
+        elif platform_ == "darwin":
+            install_nmap_mac()
         else:
-            if system_name() == "Windows":
-                install_nmap_windows()
-            elif system_name() == "Darwin":
-                install_nmap_mac()
-            else:
-                raise SystemExit(
-                    "Unknown OS! Auto installation not supported!"
-                )
+            raise SystemExit(
+                "Unknown OS! Auto installation not supported!"
+            )
 
 
 def DetectIPRange():
