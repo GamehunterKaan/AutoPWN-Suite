@@ -1,6 +1,5 @@
 from multiprocessing import Process
 from dataclasses import dataclass
-from time import sleep
 from enum import Enum
 
 try:
@@ -194,6 +193,8 @@ def CreateNoise(target):
 
 
 def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
+    console = Console()
+
     banner("Creating noise...", colors.green)
 
     if scantype == ScanType.ARP:
@@ -202,37 +203,26 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
     else:
         Uphosts = TestPing(target)
 
-    NoisyProcesses = []
-    for host in Uphosts:
-        info(
-            f"Started creating noise on {host}..."
-        )
-        P = Process(target=CreateNoise, args=(host,))
-        NoisyProcesses.append(P)
-        P.start()
+    with console.status("Creating noise ...", spinner="line"):
+        NoisyProcesses = []
+        for host in Uphosts:
+            info(
+                f"Started creating noise on {host}..."
+            )
+            P = Process(target=CreateNoise, args=(host,))
+            NoisyProcesses.append(P)
+            P.start()
 
-    try:
-        if timeout:
-            while True:
-                print("|   " + str(timeout) + " seconds left!", end="     \r")
-                sleep(0.25)
-                print("/   " + str(timeout) + " seconds left!", end="     \r")
-                sleep(0.25)
-                print("-   " + str(timeout) + " seconds left!", end="     \r")
-                sleep(0.25)
-                print("\\   " + str(timeout) + " seconds left!", end="     \r")
-                sleep(0.25)
-                timeout -= 1
-                if timeout == 0:
-                    println("\nNoise scan complete!")
-                    for P in NoisyProcesses:
-                        P.terminate()
-                    raise SystemExit
-    except KeyboardInterrupt:
-        error("\nNoise scan interrupted!")
-        for P in NoisyProcesses:
-            P.terminate()
-        raise SystemExit
+        try:
+            println("\nNoise scan complete!")
+            for P in NoisyProcesses:
+                P.terminate()
+            raise SystemExit
+        except KeyboardInterrupt:
+            error("\nNoise scan interrupted!")
+            for P in NoisyProcesses:
+                P.terminate()
+            raise SystemExit
 
 
 def DiscoverHosts(
