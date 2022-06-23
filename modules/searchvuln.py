@@ -2,7 +2,7 @@ from textwrap import wrap
 from os import get_terminal_size
 from dataclasses import dataclass
 
-from modules.nvdlib.nvdlib import searchCPE, searchCVE
+from nvdlib.nvdlib import searchCPE, searchCVE
 from modules.logger import (
     info,
     error,

@@ -9,7 +9,7 @@ except ImportError:
 
 from rich.console import Console
 
-from modules.nmap import PortScanner
+from nmap import PortScanner
 from modules.logger import (
     info,
     error,
