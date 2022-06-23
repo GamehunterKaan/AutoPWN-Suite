@@ -1,5 +1,5 @@
-import platform
 import distro
+from getpass import getpass
 from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
 from os import get_terminal_size
@@ -330,8 +330,8 @@ def InitArgsAPI():
 
 
 def install_nmap_linux():
-    distro = distro.id().lower()
-    if distro in ["ubuntu", "debian", "mint"]:
+    distro_ = distro.id().lower()
+    if distro_ in ["ubuntu", "debian", "mint"]:
         check_call(
                 [
                     "/usr/bin/sudo",
@@ -342,7 +342,7 @@ def install_nmap_linux():
                     ],
                 stderr=DEVNULL
         )
-    elif distro in ["arch", "manjaro"]:
+    elif distro_ in ["arch", "manjaro"]:
         check_call(
                 [
                     "/usr/bin/sudo",
@@ -353,7 +353,7 @@ def install_nmap_linux():
                     ],
                 stderr=DEVNULL
         )
-    elif distro in ["fedora"]:
+    elif distro_ in ["fedora"]:
         try:
             check_call(
                 [
@@ -458,9 +458,7 @@ def InitArgsTarget():
         if args.hostfile:
             # read targets from host file and insert all of them into an array
             try:
-                with open(
-                        args.hostfile, "r", encoding="utf-8"
-                    ) as target_file:
+                with open(args.hostfile, "r", encoding="utf-8") as target_file:
                     target = target_file.readlines()
             except FileNotFoundError:
                 error("Host file not found!")
@@ -490,7 +488,6 @@ def InitArgsMode():
     if args.mode == "evade":
         if is_root():
             scanmode = ScanMode.Evade
-            scanspeed = 2
             info("Evasion mode enabled!")
         else:
             error(
@@ -644,7 +641,7 @@ def GetHostsToScan(hosts):
     if len(hosts) == 0:
         raise SystemExit(
             "No hosts found! {time} - Scan completed.".format(
-                time = {str(datetime.now().strftime("%b %d %Y %H:%M:%S"))}
+                time = datetime.now().strftime("%b %d %Y %H:%M:%S")
             )
         )
 
@@ -652,7 +649,7 @@ def GetHostsToScan(hosts):
     for host in hosts:
         println(
             str(f"{bcolors.red}[{bcolors.endc}{index}"
-            + "{bcolors.red}]{bcolors.endc} {host}").center(60)
+            + f"{bcolors.red}]{bcolors.endc} {host}").center(60)
         )
         index += 1
 
@@ -702,13 +699,15 @@ def FurtherEnumuration(hosts):
     ScanWeb = WebScan()
 
     for host in Targets:
-        if ScanPorts:
-            PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
-            PortArray = AnalyseScanResults(PortScanResults,host)
-            if ScanVulns and len(PortArray) > 0:
-                VulnsArray = SearchSploits(PortArray, apiKey)
-                if DownloadExploits and len(VulnsArray) > 0:
-                    GetExploitsFromArray(VulnsArray, host)
+        if not ScanPorts:
+            break
+
+        PortScanResults = PortScan(host, scanspeed, scanmode, nmapflags)
+        PortArray = AnalyseScanResults(PortScanResults,host)
+        if ScanVulns and len(PortArray) > 0:
+            VulnsArray = SearchSploits(PortArray, apiKey)
+            if DownloadExploits and len(VulnsArray) > 0:
+                GetExploitsFromArray(VulnsArray, host)
 
         if ScanWeb:
             webvuln(host)
@@ -717,7 +716,7 @@ def FurtherEnumuration(hosts):
 #main function
 def main():
     if args.version:
-        console.print("AutoPWN Suite v" + __version__)
+        console.print(f"AutoPWN Suite v{__version__}")
         raise SystemExit
 
     print_banner()
