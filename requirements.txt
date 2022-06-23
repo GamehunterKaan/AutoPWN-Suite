@@ -1,2 +1,4 @@
 requests==2.27.1
 rich==12.4.4
+colorama
+python-nmap
