@@ -123,7 +123,9 @@ def SearchSploits(HostArray, apiKey=None):
         error(f"Insufficient information for {target}")
         return []
 
-    info(f"Searching vulnerability database for {len(keywords)} keyword(s)...\n")
+    info(
+        f"Searching vulnerability database for {len(keywords)} keyword(s)...\n"
+    )
 
     for keyword in keywords:
         #https://github.com/vehemont/nvdlib
@@ -144,7 +146,9 @@ def SearchSploits(HostArray, apiKey=None):
         println("\n\n┌─" + bcolors.yellow + "[ " + Title + " ]" + bcolors.endc)
 
         for CVE in ApiResponseCVE:
-            println("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
+            println(
+                f"│\n├─────┤ {bcolors.red}{CVE.id}{bcolors.endc}\n│"
+            )
 
             description = str(CVE.cve.description.description_data[0].value)
             severity = str(CVE.score[2])
@@ -157,7 +161,9 @@ def SearchSploits(HostArray, apiKey=None):
                 try:
                     exploitability = str(CVE.v2exploitability)
                 except AttributeError:
-                    exploitability = f"Could not fetch exploitability score for {CVE.id}"
+                    exploitability = (
+                           f"Could not fetch exploitability score for {CVE.id}"
+                        )
 
             termsize = get_terminal_size()
             wrapped_description = wrap(description, termsize.columns - 50)
@@ -166,8 +172,10 @@ def SearchSploits(HostArray, apiKey=None):
             for line in wrapped_description:
                 println(f"│\t\t\t{line}")
             println(
-                f"│\t\{bcolors.cyan}Severity : {bcolors.endc}{severity} - {score}"
-                + f"│\t\t{bcolors.cyan}Exploitability : {bcolors.endc} {exploitability}"
+                f"│\t\{bcolors.cyan}Severity : {bcolors.endc}{severity} "
+                + f"- {score}\n"
+                + f"│\t\t{bcolors.cyan}Exploitability : {bcolors.endc} "
+                + f"\n{exploitability}"
                 + f"│\t\t{bcolors.cyan}Details : {bcolors.endc} {details}"
             )
 

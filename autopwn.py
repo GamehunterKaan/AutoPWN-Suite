@@ -12,19 +12,45 @@ try:
     from datetime import datetime
     from platform import system as system_name
     from configparser import ConfigParser
-    from modules.report import InitializeReport, ReportType, ReportMail, ReportWebhook
-    from modules.banners import print_banner
-    from modules.searchvuln import SearchSploits
-    from modules.scanner import AnalyseScanResults, PortScan, DiscoverHosts, ScanMode, ScanType, NoiseScan
-    from modules.getexploits import GetExploitsFromArray
-    from modules.web.webvuln import webvuln
-    from modules.logger import info, error, warning, success, println, banner, InitializeLogger, print_colored, colors, bcolors
 
     from rich.console import Console
 
     from modules.scanner import is_root
+    from modules.banners import print_banner
+    from modules.getexploits import GetExploitsFromArray
+    from modules.web.webvuln import webvuln
+
+    from modules.searchvuln import SearchSploits
+    from modules.report import (
+        InitializeReport,
+        ReportType,
+        ReportMail,
+        ReportWebhook
+    )
+    from modules.scanner import (
+        AnalyseScanResults,
+        PortScan,
+        DiscoverHosts,
+        ScanMode,
+        ScanType,
+        NoiseScan
+    )
+    from modules.logger import (
+        info,
+        error,
+        warning,
+        success,
+        println,
+        banner,
+        InitializeLogger,
+        print_colored,
+        colors,
+        bcolors
+    )
+
 except ImportError as e:
     raise SystemExit(f"[!] ImportError: {e}")
+
 
 __author__ = "GamehunterKaan"
 __version__ = "1.5.1"
@@ -301,8 +327,14 @@ def InitArgsAPI():
             with open("api.txt", "r", encoding="utf-8") as f:
                 apiKey = f.readline().strip("\n")
         except FileNotFoundError:
-            warning("No API key specified and no api.txt file found. Vulnerability detection is going to be slower!")
-            warning("You can get your own NIST API key from https://nvd.nist.gov/developers/request-an-api-key")
+            warning(
+                "No API key specified and no api.txt file found. "
+                + "Vulnerability detection is going to be slower!"
+            )
+            warning(
+                "You can get your own NIST API key from "
+                + "https://nvd.nist.gov/developers/request-an-api-key"
+            )
 
         except PermissionError:
             error("Permission denied while trying to read api.txt!")
@@ -474,7 +506,10 @@ def InitArgsMode():
             scanspeed = 2
             info("Evasion mode enabled!")
         else:
-            error("You must be root to use evasion mode! Switching back to normal mode...")
+            error(
+                "You must be root to use evasion "
+                + "mode! Switching back to normal mode..."
+            )
     elif args.mode == "noise":
         scanmode = ScanMode.Noise
         warning("Noise mode enabled!")
@@ -518,7 +553,8 @@ def InitReport():
                 )
             if ReportMailServer == "smtp.gmail.com":
                 error(
-                    "Google no longer supports sending mails via SMTP! Canceling report via email."
+                    "Google no longer supports sending mails"
+                    + " via SMTP! Canceling report via email."
                 )
                 return ReportType.NONE, None
 
@@ -598,11 +634,15 @@ def UserConfirmation():
     if not portscan:
         return False, False, False
 
-    vulnscan = Confirmation("Do you want to scan for vulnerabilities? [Y/n] : ")
+    vulnscan = Confirmation(
+            "Do you want to scan for vulnerabilities? [Y/n] : "
+        )
     if not vulnscan:
         return True, False, False
 
-    downloadexploits = Confirmation("Do you want to download exploits? [Y/n] : ")
+    downloadexploits = Confirmation(
+            "Do you want to download exploits? [Y/n] : "
+        )
 
     return portscan, vulnscan, downloadexploits
 
@@ -623,7 +663,10 @@ def GetHostsToScan(hosts):
 
     index = 0
     for host in hosts:
-        println((bcolors.red + "[" + bcolors.endc + str(index) + bcolors.red + "] " + bcolors.endc + host).center(60))
+        println(
+            str(f"{bcolors.red}[{bcolors.endc}{index}"
+            + "{bcolors.red}]{bcolors.endc} {host}").center(60)
+        )
         index += 1
 
     if DontAskForConfirmation:
@@ -695,7 +738,8 @@ def main():
     if args.config:
         InitArgsConf()
 
-    global targetarg, scantype, scanmode, scanspeed, nmapflags, apiKey, outputfile, DontAskForConfirmation, hostfile, noisetimeout
+    global targetarg, scantype, scanmode, scanspeed, nmapflags, apiKey,
+    global outputfile, DontAskForConfirmation, hostfile, noisetimeout
 
     outputfile = args.output
     InitializeLogger(outputfile)

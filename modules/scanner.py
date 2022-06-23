@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from time import sleep
 from enum import Enum
 
-from rich.console import console
+from rich.console import Console
 
 @dataclass
 class PortInfo:
@@ -235,10 +235,16 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
         raise SystemExit
 
 
-def DiscoverHosts(target, scantype=ScanType.ARP, scanspeed=3, mode=ScanMode.Normal):
+def DiscoverHosts(
+        target,
+        scantype=ScanType.ARP,
+        scanspeed=3,
+        mode=ScanMode.Normal
+    ):
     if isinstance(target, list):
         banner(
-            f"Scanning {len(target)} target(s) using {scantype.name} scan...", colors.green
+            f"Scanning {len(target)} target(s) using {scantype.name} scan...",
+            colors.green
         )
     else:
         banner(
