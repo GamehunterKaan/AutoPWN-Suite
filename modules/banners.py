@@ -1,8 +1,11 @@
-from modules.logger import println, warning, info
 from platform import system as system_name
 
+from modules.logger import println, warning, info
+
+
 if system_name() == "Windows":
-    from modules.colorama import init
+    from colorama import init
+
     init()
 
 # https://patorjk.com/software/taag/
