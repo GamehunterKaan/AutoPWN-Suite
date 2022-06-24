@@ -457,18 +457,25 @@ def check_nmap():
             stderr=DEVNULL
         )
     except FileNotFoundError:
-        warning("Nmap is not installed. Auto installing...")
-        platform_ = system().lower()
-        if  platform_ == "linux":
-            install_nmap_linux()
-        if platform_ == "windows":
-            install_nmap_windows()
-        elif platform_ == "darwin":
-            install_nmap_mac()
-        else:
-            raise SystemExit(
-                "Unknown OS! Auto installation not supported!"
+        warning("Nmap is not installed.")
+        auto_install = input(
+                f"Install Nmap on your system ({distro.id()}: {platform})? "
             )
+        if auto_install in ["y", "Y"]:
+            platform_ = system().lower()
+            if  platform_ == "linux":
+                install_nmap_linux()
+            if platform_ == "windows":
+                install_nmap_windows()
+            elif platform_ == "darwin":
+                install_nmap_mac()
+            else:
+                raise SystemExit(
+                    "Unknown OS! Auto installation not supported!"
+                )
+        else:
+            error("Denied permission to install Nmap.")
+            raise SystemExit
 
 
 def DetectIPRange():
