@@ -76,6 +76,7 @@ class Logger:
         self.stream_to_console(exception_, message, stream_)
 
     def stream_to_console(
+            self,
             exception_: str,
             message: str,
             stream_: bool
