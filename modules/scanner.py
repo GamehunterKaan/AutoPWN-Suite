@@ -11,7 +11,7 @@ except ImportError:
 from rich.console import Console
 
 from modules.nmap import PortScanner
-from logger import Logger, banner
+from modules.logger import Logger, banner
 from colors import bcolors
 
 

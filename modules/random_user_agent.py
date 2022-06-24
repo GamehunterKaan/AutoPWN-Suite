@@ -3,7 +3,7 @@ from random import choice, randint
 from os.path import dirname
 from json import loads
 
-from logger import Logger
+from modules.logger import Logger
 
 
 def random_user_agent() -> str:

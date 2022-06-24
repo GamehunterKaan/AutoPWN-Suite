@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from rich.console import Console
 
 from modules.nvdlib.nvdlib import searchCPE, searchCVE
-from logger import Logger, banner
+from modules.logger import Logger, banner
 
 
 log = Logger()
