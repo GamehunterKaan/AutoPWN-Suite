@@ -635,7 +635,7 @@ def ParamPrint(term_width):
         console.print("\n┌─[ Scanning with the following parameters. ]")
 
     console.print(
-        "├" + "─" * term_width
+        "├" + "─" * (term_width-1)
         + f"\n│\tTarget : {str(targetarg)}\n"
         + f"│\tScan type : {str(scantype.name)}\n"
         + f"│\tScan mode : {str(scanmode.name)}\n"
@@ -646,7 +646,7 @@ def ParamPrint(term_width):
         + f"│\tDont ask for confirmation : {str(DontAskForConfirmation)}\n"
         + f"│\tHost file : {str(args.hostfile)}\n"
         + f"│\tReporting method : {str(args.report)}\n"
-        + "└" + "─" * term_width
+        + "└" + "─" * (term_width-1)
     )
 
 
