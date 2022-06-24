@@ -459,7 +459,7 @@ def check_nmap():
     except FileNotFoundError:
         log.logger("warning", "Nmap is not installed.")
         auto_install = input(
-                f"Install Nmap on your system ({distro.id()}: {platform})? "
+                f"Install Nmap on your system ({distro.id()}: {platform()})? "
             )
         if auto_install in ["y", "Y"]:
             platform_ = system().lower()
