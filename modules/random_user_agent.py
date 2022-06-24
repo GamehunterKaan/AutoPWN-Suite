@@ -3,6 +3,8 @@ from random import choice, randint
 from os.path import dirname
 from json import loads
 
+from logger import Logger
+
 
 def random_user_agent() -> str:
     """
@@ -10,7 +12,7 @@ def random_user_agent() -> str:
 
     ? Returns the randomly generated user agent or
     """
-
+    log = Logger()
     def fetch_data() -> list[str]:
         base_dir: str = dirname(__file__)
 
@@ -35,6 +37,7 @@ def random_user_agent() -> str:
 
                     user_agents.append(user_agent_)
         except FileNotFoundError:
+            log.logger("error", "User agent database not found.")
             raise SystemExit
         else:
             floor_: int = randint(1, 2500)
