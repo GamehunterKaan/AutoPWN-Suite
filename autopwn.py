@@ -1,4 +1,7 @@
+from dis import dis
 import distro
+from sys import platform as sys_platform
+from platform import platform, system
 from getpass import getpass
 from argparse import ArgumentParser
 from socket import socket, AF_INET, SOCK_DGRAM
@@ -7,7 +10,6 @@ from subprocess import check_call, CalledProcessError, DEVNULL
 from datetime import datetime
 
 from rich.console import Console
-from platform import system
 from configparser import ConfigParser
 
 from modules.scanner import is_root
@@ -331,65 +333,87 @@ def InitArgsAPI():
 
 def install_nmap_linux():
     distro_ = distro.id().lower()
-    try:
-        if distro_ in ["ubuntu", "debian", "linuxmint", "raspbian"]:
-            check_call(
-                [
-                    "/usr/bin/sudo",
-                    "apt-get",
-                    "install",
-                    "nmap",
-                    "-y"
-                    ],
-                stderr=DEVNULL
-            )
-        elif distro_ in ["arch", "manjaro"]:
-            check_call(
+    while True:
+        try:
+            if distro_ in ["ubuntu", "debian", "linuxmint", "raspbian"]:
+                check_call(
                     [
                         "/usr/bin/sudo",
-                        "pacman",
-                        "-S",
+                        "apt-get",
+                        "install",
                         "nmap",
-                        "--noconfirm"
+                        "-y"
                         ],
                     stderr=DEVNULL
-            )
-        elif distro_ in ["fedora", "oracle"]:
-            check_call(
-                [
-                    "/usr/bin/sudo",
-                    "dnf",
-                    "install",
-                    "nmap"
-                    ],
-                stderr=DEVNULL
-            )
-        elif distro in ["rhel", "centos"]:
-            check_call(
-                [
-                    "/usr/bin/sudo",
-                    "yum",
-                    "install",
-                    "nmap"
-                    ],
-                stderr=DEVNULL
-            )
-        elif distro in ["sles", "opensuse"]:
-            check_call(
-                [
-                    "/usr/bin/sudo",
-                    "zypper",
-                    "install",
-                    "nmap"
-                    ],
-                stderr=DEVNULL
-            )
-        else:
-            raise CalledProcessError
+                )
+            elif distro_ in ["arch", "manjaro"]:
+                check_call(
+                        [
+                            "/usr/bin/sudo",
+                            "pacman",
+                            "-S",
+                            "nmap",
+                            "--noconfirm"
+                            ],
+                        stderr=DEVNULL
+                )
+            elif distro_ in ["fedora", "oracle"]:
+                check_call(
+                    [
+                        "/usr/bin/sudo",
+                        "dnf",
+                        "install",
+                        "nmap"
+                        ],
+                    stderr=DEVNULL
+                )
+            elif distro in ["rhel", "centos"]:
+                check_call(
+                    [
+                        "/usr/bin/sudo",
+                        "yum",
+                        "install",
+                        "nmap"
+                        ],
+                    stderr=DEVNULL
+                )
+            elif distro in ["sles", "opensuse"]:
+                check_call(
+                    [
+                        "/usr/bin/sudo",
+                        "zypper",
+                        "install",
+                        "nmap"
+                        ],
+                    stderr=DEVNULL
+                )
+            else:
+                raise CalledProcessError
 
-    except CalledProcessError:
-        error("Couldn't install nmap! (Linux)")
-
+        except CalledProcessError:
+            _distro_ = input(
+                    "Cannot recognize the needed package manager for your "
+                    + f"system that seems to be running in: {distro_} and "
+                    + f"{sys_platform}, {platform()}, kindly select the "
+                    + "correct package manager below to proceed to the "
+                    + "installation, else, select, n.\n\t0 Abort installation\n"
+                    + "\t1 apt-get\n\t2 dnf\n\t3 yum\n\t4 pacman\n\t5 zypper."
+                    + "\nSelect option [0-5] >"
+                )
+            if _distro_ == 1:
+                distro_ = "ubuntu"
+            elif _distro_ == 2:
+                distro_ = "fedora"
+            elif _distro_ == 3:
+                distro_ = "centos"
+            elif _distro_ == 4:
+                distro_ = "arch"
+            elif _distro_ == 5:
+                distro_ = "opensuse"
+            else:
+                error("Couldn't install nmap! (Linux)")
+                break
+            continue
 
 def install_nmap_windows():
     # TODO: implement this
@@ -428,9 +452,9 @@ def check_nmap():
     # Check if nmap is installed if not, install it
     try:
         check_call(
-                ["nmap", "-h"],
-                stdout=DEVNULL,
-                stderr=DEVNULL
+            ["nmap", "-h"],
+            stdout=DEVNULL,
+            stderr=DEVNULL
         )
     except FileNotFoundError:
         warning("Nmap is not installed. Auto installing...")
