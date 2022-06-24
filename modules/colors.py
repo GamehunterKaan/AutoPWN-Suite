@@ -9,16 +9,3 @@ class bcolors:
     endc = "\033[0m"
     bold = "\033[1m"
     underline = "\033[4m"
-
-
-class colors:
-    blue = "blue"
-    cyan = "cyan"
-    green = "green"
-    yellow = "yellow"
-    red = "red"
-    purple = "purple"
-    bold = "bold"
-    underline = "underline"
-    no_new_line = "no_new_line"
-    endc = "endc"
