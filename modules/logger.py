@@ -20,7 +20,7 @@ class Logger:
     Custom logger
     """
 
-    def __init__(self, filename_: str) -> None:
+    def __init__(self) -> None:
         self.console = Console()
 
         logging.basicConfig(
@@ -36,7 +36,7 @@ class Logger:
                 "[*]"
             ]
         self.log: object = logging.getLogger("rich")
-        file_log: object = logging.FileHandler(filename=filename_)
+        file_log: object = logging.FileHandler(filename="output.log")
 
         file_log.setLevel(logging.INFO)
         file_log.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
