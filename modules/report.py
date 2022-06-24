@@ -6,9 +6,11 @@ from email.mime.base import MIMEBase
 from email import encoders
 
 from requests import post
+from rich.console import Console
 from enum import Enum
 
-from modules.logger import print_colored, colors
+
+console = Console()
 
 
 class ReportType(Enum):
@@ -56,7 +58,7 @@ def InitializeEmailReport(EmailObj):
     attachment = EmailObj.attachment
 
     # Send email report
-    print("Sending email report...", end="\r")
+    print("Sending email report...")
     SendEmail(
         email,
         password,
@@ -66,7 +68,6 @@ def InitializeEmailReport(EmailObj):
         port,
         attachment
     )
-    print(" " * 100, end="\r")
 
 
 def SendEmail(
@@ -108,7 +109,7 @@ def SendEmail(
     text = msg.as_string()
     mail.sendmail(email, email_to, text)
     mail.quit()
-    print_colored("Email report sent successfully", colors.green)
+    console.print("Email report sent successfully", style="green")
 
 
 def InitializeWebhookReport(WebhookObj):
@@ -119,9 +120,8 @@ def InitializeWebhookReport(WebhookObj):
     attachment = WebhookObj.attachment
 
     # Send webhook report
-    print("Sending webhook report...", end="\r")
+    print("Sending webhook report...")
     SendWebhook(url, attachment)
-    print(" " * 100, end="\r")
 
 
 def SendWebhook(url, attachment):
@@ -134,7 +134,7 @@ def SendWebhook(url, attachment):
     try:
         post(url, files=payload)
     except ConnectionError:
-        print_colored("Webhook report failed to send", colors.red)
+        console.print("Webhook report failed to send", style="red")
 
 
 def InitializeReport(Method, ReportObject):

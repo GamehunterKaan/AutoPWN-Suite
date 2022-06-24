@@ -1,16 +1,14 @@
 from textwrap import wrap
-from os import get_terminal_size
 from dataclasses import dataclass
 
+from rich.console import Console
+
 from modules.nvdlib.nvdlib import searchCPE, searchCVE
-from modules.logger import (
-    info,
-    error,
-    println,
-    banner,
-    colors,
-    bcolors
-)
+from modules.logger import Logger, banner
+
+
+log = Logger()
+console = Console()
 
 
 @dataclass
@@ -78,11 +76,16 @@ def SearchKeyword(keyword, apiKey=None):
             ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
 
     except KeyboardInterrupt:
-        error(f"Skipping vulnerability detection for keyword {keyword}")
+        log.logger(
+            "error", f"Skipping vulnerability detection for keyword {keyword}"
+        )
     except LookupError:
-        error(f"NIST API returned an invalid response for keyword {keyword}")
+        log.logger(
+            "error",
+            f"NIST API returned an invalid response for keybord {keyword}"
+        )
     except Exception as e:
-        error(f"Error: {e}")
+        log.logger("error", f"Error: {e}")
     else:
         tempTitleList, TitleList = [], []
         for CPE in ApiResponseCPE:
@@ -102,20 +105,21 @@ def SearchKeyword(keyword, apiKey=None):
     return "", []
 
 
-def SearchSploits(HostArray, apiKey=None):
+def SearchSploits(HostArray, term_width, term_cols, apiKey=None):
     VulnsArray = []
     target = str(HostArray[0][0])
 
-    banner(f"Possible vulnerabilities for {target}", colors.red)
+    banner(f"Possible vulnerabilities for {target}", "red", term_width)
 
     keywords = GenerateKeywords(HostArray)
 
     if len(keywords) == 0:
-        error(f"Insufficient information for {target}")
+        log.logger("error", f"Insufficient information for {target}")
         return []
 
-    info(
-        f"Searching vulnerability database for {len(keywords)} keyword(s)...\n"
+    log.logger(
+        "info",
+        f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
     )
 
     for keyword in keywords:
@@ -134,11 +138,11 @@ def SearchSploits(HostArray, apiKey=None):
         # create a Vuln object
         VulnObject = Vuln(Software=Title, CVEs=[])
 
-        println(f"\n\n┌─{bcolors.yellow}[{Title}]{bcolors.endc}")
+        console.print(f"┌─[yellow][{Title}][/yellow]")
 
         for CVE in ApiResponseCVE:
-            println(
-                f"│\n├─────┤ {bcolors.red}{CVE.id}{bcolors.endc}\n│"
+            console.print(
+                f"│\n├─────┤ [red]{CVE.id}[/red]\n│"
             )
 
             description = str(CVE.cve.description.description_data[0].value)
@@ -156,24 +160,19 @@ def SearchSploits(HostArray, apiKey=None):
                            f"Could not fetch exploitability score for {CVE.id}"
                         )
 
-            termsize = get_terminal_size()
-            wrapped_description = wrap(description, termsize.columns - 50)
-
-            println(f"│\t\t{bcolors.cyan}Description : {bcolors.endc}")
+            wrapped_description = wrap(description, term_cols-50)
+            console.print(f"│\t\t[cyan]Description : [/cyan]")
             for line in wrapped_description:
-                println(f"│\t\t\t{line}")
-            println(
-                f"│\t\{bcolors.cyan}Severity : {bcolors.endc}{severity} "
-                + f"- {score}\n"
-                + f"│\t\t{bcolors.cyan}Exploitability : {bcolors.endc} "
-                + f"\n{exploitability}"
-                + f"│\t\t{bcolors.cyan}Details : {bcolors.endc} {details}"
+                print(f"│\t\t\t{line}")
+            console.print(
+                f"│\t\[cyan]Severity: [/cyan]{severity} - {score}\n"
+                + f"│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
+                + f"│\t\t[cyan]Details: [/cyan] {details}"
             )
 
             VulnObject.CVEs.append(str(CVE.id))
 
         VulnsArray.append(VulnObject)
-        print(" " * 100, end="\r") #clear the line
-        println("└" + "─" * 59)
+        print("└" + "─"*term_width)
 
     return VulnsArray

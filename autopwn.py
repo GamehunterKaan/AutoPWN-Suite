@@ -1,4 +1,3 @@
-from dis import dis
 import distro
 from sys import platform as sys_platform
 from platform import platform, system
@@ -10,8 +9,11 @@ from subprocess import check_call, CalledProcessError, DEVNULL
 from datetime import datetime
 
 from rich.console import Console
+from rich.text import Text
 from configparser import ConfigParser
 
+from modules.logger import Logger
+from modules.colors import bcolors
 from modules.scanner import is_root
 from modules.banners import print_banner
 from modules.getexploits import GetExploitsFromArray
@@ -31,15 +33,6 @@ from modules.scanner import (
     ScanType,
     NoiseScan
 )
-from modules.logger import (
-    info,
-    error,
-    warning,
-    println,
-    InitializeLogger,
-    bcolors
-)
-
 
 __author__ = "GamehunterKaan"
 __version__ = "1.5.1"
@@ -214,6 +207,7 @@ reportargs.add_argument(
 
 args = argparser.parse_args()
 console = Console()
+log = Logger()
 
 
 def InitArgsConf():
@@ -240,7 +234,10 @@ def InitArgsConf():
             try:
                 args.speed = int(config.get("AUTOPWN", "speed"))
             except ValueError:
-                error("[!] Invalid speed value in config file. (Default : 3)")
+                log.logger(
+                    "error",
+                    "Invalid speed value in config file. (Default : 3)"
+                )
 
         if config.has_option("AUTOPWN", "apikey"):
             args.api = config.get("AUTOPWN", "apikey").lower()
@@ -288,11 +285,13 @@ def InitArgsConf():
             args.reportwebhook = config.get("REPORT", "webhook").lower()
 
     except FileNotFoundError:
-        raise SystemExit("Config file not found!")
+        log.logger("error", "Config file not found!")
+        raise SystemExit
     except PermissionError:
-        raise SystemExit(
-            "Permission denied while trying to read config file!"
+        log.logger(
+            "error", "Permission denied while trying to read config file!"
         )
+        raise SystemExit
 
 
 def InitArgsScanType():
@@ -316,17 +315,17 @@ def InitArgsAPI():
             with open("api.txt", "r", encoding="utf-8") as f:
                 apiKey = f.readline().strip("\n")
         except FileNotFoundError:
-            warning(
+            log.logger(
+                "warning",
                 "No API key specified and no api.txt file found. "
                 + "Vulnerability detection is going to be slower!"
-            )
-            warning(
-                "You can get your own NIST API key from "
+                + "You can get your own NIST API key from "
                 + "https://nvd.nist.gov/developers/request-an-api-key"
             )
-
         except PermissionError:
-            error("Permission denied while trying to read api.txt!")
+            log.logger(
+                "error", "Permission denied while trying to read api.txt!"
+            )
 
     return apiKey
 
@@ -411,9 +410,10 @@ def install_nmap_linux():
             elif _distro_ == 5:
                 distro_ = "opensuse"
             else:
-                error("Couldn't install nmap! (Linux)")
+                log.logger("error", "Couldn't install nmap (Linux)")
                 break
             continue
+
 
 def install_nmap_windows():
     # TODO: implement this
@@ -430,7 +430,7 @@ def install_nmap_windows():
             stderr=DEVNULL
         )
     except CalledProcessError:
-        error("Couldn't install nmap! (Windows)")
+        log.logger("error", "Couldn't install nmap! (Windows)")
 
 
 def install_nmap_mac():
@@ -445,7 +445,7 @@ def install_nmap_mac():
             stderr=DEVNULL
         )
     except CalledProcessError:
-        error("Couldn't install nmap! (Mac)")
+        log.logger("error", "Couldn't install nmap! (Mac)")
 
 
 def check_nmap():
@@ -457,9 +457,9 @@ def check_nmap():
             stderr=DEVNULL
         )
     except FileNotFoundError:
-        warning("Nmap is not installed.")
+        log.logger("warning", "Nmap is not installed.")
         auto_install = input(
-                f"Install Nmap on your system ({distro.id()}: {platform})? "
+                f"Install Nmap on your system ({distro.id()}: {platform()})? "
             )
         if auto_install in ["y", "Y"]:
             platform_ = system().lower()
@@ -474,7 +474,7 @@ def check_nmap():
                     "Unknown OS! Auto installation not supported!"
                 )
         else:
-            error("Denied permission to install Nmap.")
+            log.logger("error", "Denied permission to install Nmap.")
             raise SystemExit
 
 
@@ -504,11 +504,16 @@ def InitArgsTarget():
                 with open(args.hostfile, "r", encoding="utf-8") as target_file:
                     target = target_file.readlines()
             except FileNotFoundError:
-                error("Host file not found!")
+                log.logger("error", "Host file not found!")
             except PermissionError:
-                error("Permission denied while trying to read host file!")
+                log.logger(
+                    "error",
+                    "Permission denied while trying to read host file!"
+                )
             except Exception:
-                error("Unknown error while trying to read host file!")
+                log.logger(
+                    "error", "Unknown error while trying to read host file!"
+                )
             else:
                 return target
 
@@ -531,15 +536,16 @@ def InitArgsMode():
     if args.mode == "evade":
         if is_root():
             scanmode = ScanMode.Evade
-            info("Evasion mode enabled!")
+            log.logger("info", "Evasion mode enabled!")
         else:
-            error(
-                "You must be root to use evasion "
-                + "mode! Switching back to normal mode..."
+            log.logger(
+                "error",
+                "You must be root to use evasion mode!"
+                + " Switching back to normal mode ..."
             )
     elif args.mode == "noise":
         scanmode = ScanMode.Noise
-        warning("Noise mode enabled!")
+        log.logger("error", "Noise mode enabled!")
 
     return scanmode
 
@@ -579,9 +585,9 @@ def InitReport():
                     "Enter the email server to send the report from : "
                 )
             if ReportMailServer == "smtp.gmail.com":
-                error(
-                    "Google no longer supports sending mails"
-                    + " via SMTP! Canceling report via email."
+                log.logger(
+                    "error",
+                    "Google no longer supports sending mails via SMTP."
                 )
                 return ReportType.NONE, None
 
@@ -594,8 +600,7 @@ def InitReport():
                     )
                 if isinstance(ReportMailPort, int):
                     break
-
-                error("Invalid port number!")
+                log.logger("error", "Invalid port number!")
 
         EmailObj = ReportMail(
                 ReportEmail,
@@ -630,7 +635,7 @@ def ParamPrint(term_width):
         console.print("\n┌─[ Scanning with the following parameters. ]")
 
     console.print(
-        "├" + "─" * term_width
+        "├" + "─" * (term_width-1)
         + f"\n│\tTarget : {str(targetarg)}\n"
         + f"│\tScan type : {str(scantype.name)}\n"
         + f"│\tScan mode : {str(scanmode.name)}\n"
@@ -641,7 +646,7 @@ def ParamPrint(term_width):
         + f"│\tDont ask for confirmation : {str(DontAskForConfirmation)}\n"
         + f"│\tHost file : {str(args.hostfile)}\n"
         + f"│\tReporting method : {str(args.report)}\n"
-        + "└" + "─" * term_width
+        + "└" + "─" * (term_width-1)
     )
 
 
@@ -690,9 +695,8 @@ def GetHostsToScan(hosts):
 
     index = 0
     for host in hosts:
-        println(
-            str(f"{bcolors.red}[{bcolors.endc}{index}"
-            + f"{bcolors.red}]{bcolors.endc} {host}").center(60)
+        console.print(
+            Text(f"[red][[/red]{index}[red]][/red] {host}", justify="center")
         )
         index += 1
 
@@ -762,8 +766,6 @@ def main():
         console.print(f"AutoPWN Suite v{__version__}")
         raise SystemExit
 
-    print_banner()
-
     if args.config:
         InitArgsConf()
 
@@ -771,7 +773,6 @@ def main():
     global outputfile, DontAskForConfirmation, hostfile, noisetimeout
 
     outputfile = args.output
-    InitializeLogger(outputfile)
     print_banner()
 
     width_, _ = get_terminal_size()
@@ -787,9 +788,10 @@ def main():
     ReportMethod, ReportObject = InitReport()
 
     if not is_root():
-        error(
-            "It's recommended to run this script as "
-            + "root since it's more silent and accurate."
+        log.logger(
+            "error",
+            "It is recommended to run this script as root"
+            + "since it is more silent and accurate."
         )
 
     ParamPrint(width_)

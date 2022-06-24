@@ -1,3 +1,4 @@
+from distutils.log import Log
 from multiprocessing import Process
 from dataclasses import dataclass
 from enum import Enum
@@ -10,14 +11,11 @@ except ImportError:
 from rich.console import Console
 
 from modules.nmap import PortScanner
-from modules.logger import (
-    info,
-    error,
-    println,
-    banner,
-    colors,
-    bcolors
-)
+from modules.logger import Logger, banner
+from modules.colors import bcolors
+
+
+log = Logger()
 
 
 @dataclass
@@ -69,7 +67,7 @@ class ScanType(Enum):
     ARP = 1
 
 
-def is_root(): # this function is used everywhere, so it"s better to put it here
+def is_root(): # this function is used everywhere, so it's better to put it here
     try:
         return getuid() == 0
     except Exception as e:
@@ -80,6 +78,7 @@ def is_root(): # this function is used everywhere, so it"s better to put it here
 def listToString(s):
     str1 = " "
     return (str1.join(s))
+
 
 #do a ping scan using nmap
 def TestPing(target, mode=ScanMode.Normal):
@@ -114,11 +113,16 @@ def TestArp(target, mode=ScanMode.Normal):
 
 
 #run a port scan on target using nmap
-def PortScan(target, scanspeed=5, mode=ScanMode.Normal, customflags=""):
-    banner("Running a portscan on host " + str(target) + "...", colors.green)
+def PortScan(
+        target,
+        term_width,
+        scanspeed=5,
+        mode=ScanMode.Normal,
+        customflags=""
+    ):
+    banner(f"Running a portscan on host {target} ...", "green")
 
     nm = PortScanner()
-
     try:
         if is_root():
             if mode == ScanMode.Evade:
@@ -195,7 +199,7 @@ def CreateNoise(target):
 def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
     console = Console()
 
-    banner("Creating noise...", colors.green)
+    banner("Creating noise...", "green")
 
     if scantype == ScanType.ARP:
         if is_root():
@@ -206,20 +210,20 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
     with console.status("Creating noise ...", spinner="line"):
         NoisyProcesses = []
         for host in Uphosts:
-            info(
-                f"Started creating noise on {host}..."
+            log.logger(
+                "info", f"Started creating noise on {host}..."
             )
             P = Process(target=CreateNoise, args=(host,))
             NoisyProcesses.append(P)
             P.start()
 
         try:
-            println("\nNoise scan complete!")
+            print("Noise scan complete!")
             for P in NoisyProcesses:
                 P.terminate()
             raise SystemExit
         except KeyboardInterrupt:
-            error("\nNoise scan interrupted!")
+            log.logger("error", "Noise scan interrupted!")
             for P in NoisyProcesses:
                 P.terminate()
             raise SystemExit
@@ -234,11 +238,11 @@ def DiscoverHosts(
     if isinstance(target, list):
         banner(
             f"Scanning {len(target)} target(s) using {scantype.name} scan...",
-            colors.green
+            "green"
         )
     else:
         banner(
-            f"Scanning {target} using {scantype.name} scan...", colors.green
+            f"Scanning {target} using {scantype.name} scan...", "green"
         )
 
     if scantype == ScanType.Ping:
@@ -278,7 +282,7 @@ def InitHostInfo(nm, target):
     return mac, vendor, os, os_accuracy, os_type
 
 
-def AnalyseScanResults(nm, target=None):
+def AnalyseScanResults(nm, term_cols, target=None):
     """
     Analyse and print scan results.
     """
@@ -291,7 +295,7 @@ def AnalyseScanResults(nm, target=None):
     try:
         nm[target]
     except KeyError:
-        error(f"Target {target} seems to be offline.")
+        log.logger("error", f"Target {target} seems to be offline.")
         return []
 
     mac, vendor, os, os_accuracy, os_type = InitHostInfo(nm, target)
@@ -299,19 +303,19 @@ def AnalyseScanResults(nm, target=None):
             target, mac, vendor, os, os_accuracy, os_type
         )
 
-    println(CurrentTargetInfo.colored().center(60))
+    print(CurrentTargetInfo.colored().center(term_cols))
 
     reason = nm[target]["status"]["reason"]
 
     if is_root():
         if reason in ["localhost-response", "user-set"]:
-            info(f"Target {target} seems to be us.")
+            log.logger("info", f"Target {target} seems to be us.")
 
     # we cant detect if the host is us or not, if we are not root
     # we could get our ip address and compare them but i think it"s not quite necessary
 
     if len(nm[target].all_protocols()) == 0:
-        error(f"Target {target} seems to have no open ports.")
+        log.logger("error", f"Target {target} seems to have no open ports.")
         return HostArray
 
     for port in nm[target]["tcp"].keys():
