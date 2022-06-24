@@ -12,7 +12,7 @@ from rich.console import Console
 
 from modules.nmap import PortScanner
 from modules.logger import Logger, banner
-from colors import bcolors
+from modules.colors import bcolors
 
 
 log = Logger()
