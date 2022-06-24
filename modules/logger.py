@@ -24,8 +24,6 @@ class Logger:
     """
 
     def __init__(self) -> None:
-        self.console = Console()
-
         logging.basicConfig(
             format="%(message)s",
             level=logging.INFO,
@@ -78,7 +76,6 @@ class Logger:
         self.stream_to_console(exception_, message, stream_=stream_)
 
     def stream_to_console(
-            self,
             exception_: str,
             message: str,
             stream_: bool = True
@@ -89,12 +86,14 @@ class Logger:
         ? Returns none.
         """
 
+        console = Console()
+
         if stream_:
             if exception_ == "info":
-                self.console.print(f"[+] {message}", style="blue")
+                console.print(f"[+] {message}", style="blue")
             elif exception_ == "error":
-                self.console.print(f"[+] {message}", style="red")
+                console.print(f"[+] {message}", style="red")
             elif exception_ == "warning":
-                self.console.print(f"[+] {message}", style="red")
+                console.print(f"[+] {message}", style="red")
             elif exception_ == "success":
-                self.console.print(f"[+] {message}", style="green")
+                console.print(f"[+] {message}", style="green")
