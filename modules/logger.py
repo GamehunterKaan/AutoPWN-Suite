@@ -73,12 +73,12 @@ class Logger:
         elif exception_ == "success":
             self.log.info(f"[+] {message}")
 
-        self.stream_to_console(exception_, message, stream_=stream_)
+        self.stream_to_console(exception_, message, stream_)
 
     def stream_to_console(
             exception_: str,
             message: str,
-            stream_: bool = True
+            stream_: bool
         ) -> None:
         """
         * Steam the output to console.
