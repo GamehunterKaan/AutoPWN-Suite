@@ -13,13 +13,13 @@ def print_banner():
 │     \033[94m/ ___ |/ /_/ // /_ / /_/ // ____/ | |/ |/ // /|  /   ___/ // /_/ // // /_ /  __/\033[0m   │
 │    \033[94m/_/  |_|\__,_/ \__/ \____//_/      |__/|__//_/ |_/   /____/ \__,_//_/ \__/ \___/\033[0m    │
 │                                                                                        │"""
-    w, _ = get_terminal_size()
+    w, c = get_terminal_size()
 
     console.print(
         "Developed by GamehunterKaan. (https://auto.pwnspot.com)", style="blue"
     )
     print("\n┌" + "─"*w + "┐")
-    print(banner.center(w))
+    print(banner.center(c))
     print("└" + "─"*w + "┘\n")
     console.print(
         "I am not responsible if you are doing something"

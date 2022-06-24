@@ -766,8 +766,6 @@ def main():
         console.print(f"AutoPWN Suite v{__version__}")
         raise SystemExit
 
-    print_banner()
-
     if args.config:
         InitArgsConf()
 
