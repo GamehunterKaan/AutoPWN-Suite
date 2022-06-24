@@ -1,4 +1,3 @@
-from distutils.log import Log
 from multiprocessing import Process
 from dataclasses import dataclass
 from enum import Enum
@@ -8,9 +7,9 @@ try:
 except ImportError:
     from ctypes import windll
 
+from nmap import PortScanner
 from rich.console import Console
 
-from modules.nmap import PortScanner
 from modules.logger import Logger, banner
 from modules.colors import bcolors
 

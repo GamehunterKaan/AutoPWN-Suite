@@ -2,36 +2,39 @@ from requests import get
 
 from modules.logger import Logger, banner
 from modules.web.crawler import crawl
-from modules.web.lfi import test_lfi
+from modules.web.lfi import TestLFI
 
 
 log = Logger()
 
 
-def get_url(target):
-    """
-    Get the target url
-    """
-    try:
-        request = get("http://" + target, timeout=10)
-        if request.status_code == 200:
-            return "http://" + target
-    except Exception as e:
-        try:
-            request = get("https://" + target, timeout=10)
-            if request.status_code == 200:
-                return "https://" + target
-        except Exception as e:
-            log.logger("error", f"Could not get url for {target}")
-    return None
-
 def webvuln(target):
     """
     Test for web vulnerabilities
     """
+    test_lfi = TestLFI()
+
+    def get_url(target):
+        """
+        Get the target url
+        """
+
+        url_ = f"http://{target}"
+        for _ in range(3): # do 3 tries
+            try:
+                get(url_, timeout=10)
+            except ConnectionError:
+                continue
+            else:
+                return url_
+
+        return None
+
     target_url = get_url(target)
+
     if target_url is None:
         return
+
     #banner("got url " + target_url)
     banner(f"Testing web application on {target} ...", "purple")
     # crawl the target_url

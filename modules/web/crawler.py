@@ -1,24 +1,24 @@
 import requests
-from modules.web.bs4 import BeautifulSoup # https://pypi.org/project/beautifulsoup4/
+from bs4 import BeautifulSoup # https://pypi.org/project/beautifulsoup4/
 
 
 def crawl(target_url):
-    if not target_url.endswith('/'):
-        target_url += '/'
+    if not target_url.endswith("/"):
+        target_url += "/"
     urls = []
     reqs = requests.get(target_url)
-    soup = BeautifulSoup(reqs.text, 'html.parser')
+    soup = BeautifulSoup(reqs.text, "html.parser")
 
-    for link in soup.find_all('a'):
-        url = link.get('href')
-        if not url.startswith('http'):
-            if url.startswith('./'):
-                url = target_url + url.lstrip('./')
-            elif url.startswith('/'):
-                url = target_url + url.lstrip('/')
+    for link in soup.find_all("a"):
+        url = link.get("href")
+        if not url.startswith("http"):
+            if url.startswith("./"):
+                url = target_url + url.lstrip("./")
+            elif url.startswith("/"):
+                url = target_url + url.lstrip("/")
             elif "#" in url:
                 continue
-            elif url == '' or url == None:
+            elif url == "" or url == None:
                 continue
             else:
                 url = target_url + url
@@ -34,16 +34,16 @@ def crawl(target_url):
     if len(urls) < 10:
         for each_url in urls:
             reqs = requests.get(each_url)
-            soup = BeautifulSoup(reqs.text, 'html.parser')
-            for link in soup.find_all('a'):
-                url = link.get('href')
-                if url == '' or url == None:
+            soup = BeautifulSoup(reqs.text, "html.parser")
+            for link in soup.find_all("a"):
+                url = link.get("href")
+                if url == "" or url == None:
                     continue
-                elif not url.startswith('http'):
-                    if url.startswith('./'):
-                        url = each_url + url.lstrip('./')
-                    elif url.startswith('/'):
-                        url = each_url + url.lstrip('/')
+                elif not url.startswith("http"):
+                    if url.startswith("./"):
+                        url = each_url + url.lstrip("./")
+                    elif url.startswith("/"):
+                        url = each_url + url.lstrip("/")
                     elif "#" in url:
                         continue
                     else:
