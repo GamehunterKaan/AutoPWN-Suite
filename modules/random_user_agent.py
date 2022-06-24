@@ -19,16 +19,8 @@ def random_user_agent() -> str:
         user_agents: list[str] = []
 
         try:
-            file = choice(
-                    [
-                        "user_agents_1.json",
-                        "user_agents_2.json",
-                        "user_agents_3.json",
-                        "user_agents_4.json"
-                    ]
-                )
             with open(
-                    f"{base_dir}/user_agents/{file}",
+                    f"{base_dir}/user_agents/user_agents.json",
                     "r",
                     encoding="utf-8"
                 ) as data:
@@ -40,7 +32,7 @@ def random_user_agent() -> str:
             log.logger("error", "User agent database not found.")
             raise SystemExit
         else:
-            floor_: int = randint(1, 2500)
+            floor_: int = randint(1, 1100)
             top_: int = randint(floor_, floor_*2)
 
             return user_agents[floor_:top_]
