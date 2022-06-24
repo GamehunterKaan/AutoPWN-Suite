@@ -47,7 +47,6 @@ class Logger:
             self,
             exception_: str,
             message: str,
-            stream_: bool = True
         ) -> None:
         """
         * Log the proccesses with the passed message depending on the
@@ -72,29 +71,3 @@ class Logger:
             self.log.info(f"[*] {message}")
         elif exception_ == "success":
             self.log.info(f"[+] {message}")
-
-        self.stream_to_console(exception_, message, stream_)
-
-    def stream_to_console(
-            self,
-            exception_: str,
-            message: str,
-            stream_: bool
-        ) -> None:
-        """
-        * Steam the output to console.
-
-        ? Returns none.
-        """
-
-        console = Console()
-
-        if stream_:
-            if exception_ == "info":
-                console.print(f"[+] {message}", style="blue")
-            elif exception_ == "error":
-                console.print(f"[+] {message}", style="red")
-            elif exception_ == "warning":
-                console.print(f"[+] {message}", style="red")
-            elif exception_ == "success":
-                console.print(f"[+] {message}", style="green")
