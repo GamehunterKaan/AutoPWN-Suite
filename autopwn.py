@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.text import Text
 from configparser import ConfigParser
 
-from logging import Logger
+from modules.logger import Logger
 from modules.colors import bcolors
 from modules.scanner import is_root
 from modules.banners import print_banner
@@ -33,7 +33,6 @@ from modules.scanner import (
     ScanType,
     NoiseScan
 )
-
 
 __author__ = "GamehunterKaan"
 __version__ = "1.5.1"
