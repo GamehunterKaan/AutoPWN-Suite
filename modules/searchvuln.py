@@ -1,14 +1,16 @@
 from textwrap import wrap
+from os import get_terminal_size
 from dataclasses import dataclass
 
-from rich.console import Console
-
 from modules.nvdlib.nvdlib import searchCPE, searchCVE
-from modules.logger import Logger, banner
-
-
-log = Logger()
-console = Console()
+from modules.logger import (
+    info,
+    error,
+    println,
+    banner,
+    colors,
+    bcolors
+)
 
 
 @dataclass
@@ -76,16 +78,11 @@ def SearchKeyword(keyword, apiKey=None):
             ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
 
     except KeyboardInterrupt:
-        log.logger(
-            "error", f"Skipping vulnerability detection for keyword {keyword}"
-        )
+        error(f"Skipping vulnerability detection for keyword {keyword}")
     except LookupError:
-        log.logger(
-            "error",
-            f"NIST API returned an invalid response for keybord {keyword}"
-        )
+        error(f"NIST API returned an invalid response for keyword {keyword}")
     except Exception as e:
-        log.logger("error", f"Error: {e}")
+        error(f"Error: {e}")
     else:
         tempTitleList, TitleList = [], []
         for CPE in ApiResponseCPE:
@@ -105,21 +102,20 @@ def SearchKeyword(keyword, apiKey=None):
     return "", []
 
 
-def SearchSploits(HostArray, term_width, term_cols, apiKey=None):
+def SearchSploits(HostArray, apiKey=None):
     VulnsArray = []
     target = str(HostArray[0][0])
 
-    banner(f"Possible vulnerabilities for {target}", "red", term_width)
+    banner(f"Possible vulnerabilities for {target}", colors.red)
 
     keywords = GenerateKeywords(HostArray)
 
     if len(keywords) == 0:
-        log.logger("error", f"Insufficient information for {target}")
+        error(f"Insufficient information for {target}")
         return []
 
-    log.logger(
-        "info",
-        f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
+    info(
+        f"Searching vulnerability database for {len(keywords)} keyword(s)...\n"
     )
 
     for keyword in keywords:
@@ -138,11 +134,11 @@ def SearchSploits(HostArray, term_width, term_cols, apiKey=None):
         # create a Vuln object
         VulnObject = Vuln(Software=Title, CVEs=[])
 
-        console.print(f"┌─[yellow][{Title}][/yellow]")
+        println(f"\n\n┌─{bcolors.yellow}[{Title}]{bcolors.endc}")
 
         for CVE in ApiResponseCVE:
-            console.print(
-                f"│\n├─────┤ [red]{CVE.id}[/red]\n│"
+            println(
+                f"│\n├─────┤ {bcolors.red}{CVE.id}{bcolors.endc}\n│"
             )
 
             description = str(CVE.cve.description.description_data[0].value)
@@ -160,19 +156,24 @@ def SearchSploits(HostArray, term_width, term_cols, apiKey=None):
                            f"Could not fetch exploitability score for {CVE.id}"
                         )
 
-            wrapped_description = wrap(description, term_cols-50)
-            console.print(f"│\t\t[cyan]Description : [/cyan]")
+            termsize = get_terminal_size()
+            wrapped_description = wrap(description, termsize.columns - 50)
+
+            println(f"│\t\t{bcolors.cyan}Description : {bcolors.endc}")
             for line in wrapped_description:
-                print(f"│\t\t\t{line}")
-            console.print(
-                f"│\t\[cyan]Severity: [/cyan]{severity} - {score}\n"
-                + f"│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
-                + f"│\t\t[cyan]Details: [/cyan] {details}"
+                println(f"│\t\t\t{line}")
+            println(
+                f"│\t\{bcolors.cyan}Severity : {bcolors.endc}{severity} "
+                + f"- {score}\n"
+                + f"│\t\t{bcolors.cyan}Exploitability : {bcolors.endc} "
+                + f"\n{exploitability}"
+                + f"│\t\t{bcolors.cyan}Details : {bcolors.endc} {details}"
             )
 
             VulnObject.CVEs.append(str(CVE.id))
 
         VulnsArray.append(VulnObject)
-        print("└" + "─"*term_width)
+        print(" " * 100, end="\r") #clear the line
+        println("└" + "─" * 59)
 
     return VulnsArray
