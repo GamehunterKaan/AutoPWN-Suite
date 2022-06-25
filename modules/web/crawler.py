@@ -15,7 +15,7 @@ def crawl(target_url):
         )
     soup = BeautifulSoup(reqs.text, "html.parser")
 
-    urls = []
+    urls = set()
     for link in soup.find_all("a", href=True):
         url = link["href"]
 
@@ -30,14 +30,13 @@ def crawl(target_url):
                 url = f"{target_url}{url}"
 
             if url not in urls:
-                urls.append(url)
+                urls.add(url)
         else:
             if url.startswith(target_url):
                 if url not in urls:
-                    urls.append(url)
+                    urls.add(url)
 
     if len(urls) < 10:
-        secondary_urls = []
         for each_url in urls:
             reqs = get(each_url)
             soup = BeautifulSoup(reqs.text, "html.parser")
@@ -55,15 +54,11 @@ def crawl(target_url):
                     else:
                         url = f"{each_url}{url}"
 
-                    if url not in urls or url not in secondary_urls:
-                        secondary_urls.append(url)
+                    if url not in urls:
+                        urls.add(url)
                 else:
                     if url.startswith(each_url):
-                        if url not in urls or url not in secondary_urls:
-                            secondary_urls.append(url)
-
-    for each_url in secondary_urls:
-        if each_url not in urls:
-            urls.append(each_url)
+                        if url not in urls:
+                            urls.add(url)
 
     return urls
