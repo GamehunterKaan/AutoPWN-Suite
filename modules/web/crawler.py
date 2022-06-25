@@ -1,19 +1,27 @@
 from requests import get
 
 from bs4 import BeautifulSoup
+
 from modules.random_user_agent import random_user_agent
+from modules.logger import Logger
 
 
 def crawl(target_url):
+    log = Logger()
+
     if not target_url.endswith("/"):
         target_url += "/"
 
-    reqs = get(
-            target_url, headers={
-                    "User-Agent": next(random_user_agent())
-                }
-        )
-    soup = BeautifulSoup(reqs.text, "html.parser")
+    try:
+        reqs = get(
+                target_url, headers={
+                        "User-Agent": next(random_user_agent())
+                    }
+            )
+        soup = BeautifulSoup(reqs.text, "html.parser")
+    except ConnectionError:
+        log.logger("error", "Connection error was raised, aborting.")
+        raise SystemExit
 
     urls = set()
     for link in soup.find_all("a", href=True):
@@ -38,27 +46,34 @@ def crawl(target_url):
 
     if len(urls) < 10:
         for each_url in urls:
-            reqs = get(each_url)
-            soup = BeautifulSoup(reqs.text, "html.parser")
+            try:
+                reqs = get(each_url)
+                soup = BeautifulSoup(reqs.text, "html.parser")
+            except ConnectionError:
+                log.logger(
+                    "error",
+                    f"Connection error raised on: {each_url}, skipping ..."
+                )
+                continue
+            else:
+                for link in soup.find_all("a", href=True):
+                    url = link["href"]
+                    if url == "" or url is None or "#" in url:
+                        continue
 
-            for link in soup.find_all("a", href=True):
-                url = link["href"]
-                if url == "" or url is None or "#" in url:
-                    continue
+                    if not url.startswith("http"):
+                        if url.startswith("./"):
+                            url = f"{each_url}{url.lstrip('./')}"
+                        elif url.startswith("/"):
+                            url = f"{each_url}{url.lstrip('/')}"
+                        else:
+                            url = f"{each_url}{url}"
 
-                if not url.startswith("http"):
-                    if url.startswith("./"):
-                        url = f"{each_url}{url.lstrip('./')}"
-                    elif url.startswith("/"):
-                        url = f"{each_url}{url.lstrip('/')}"
-                    else:
-                        url = f"{each_url}{url}"
-
-                    if url not in urls:
-                        urls.add(url)
-                else:
-                    if url.startswith(each_url):
                         if url not in urls:
                             urls.add(url)
+                    else:
+                        if url.startswith(each_url):
+                            if url not in urls:
+                                urls.add(url)
 
     return urls
