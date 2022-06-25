@@ -184,15 +184,19 @@ def PortScan(
 
 def CreateNoise(target):
     nm = PortScanner()
-    try:
-        if is_root():
-            while True:
+    for _ in range(3):
+        try:
+            if is_root():
                 nm.scan(hosts=target, arguments="-A -T 5 -D RND:10")
-        else:
-            while True:
+            else:
                 nm.scan(hosts=target, arguments="-A -T 5")
-    except KeyboardInterrupt:
-        raise SystemExit("Ctr+C, aborting.")
+        except Exception:
+            continue
+        except KeyboardInterrupt:
+            raise SystemExit("Ctr+C, aborting.")
+        else:
+            break
+
 
 
 def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
