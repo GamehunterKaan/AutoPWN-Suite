@@ -85,12 +85,12 @@ def TestPing(target, mode=ScanMode.Normal):
     if isinstance(target, list):
         target = listToString(target)
     if mode == ScanMode.Evade and is_root():
-        resp = nm.scan(
+        nm.scan(
             hosts=target,
             arguments="-sn -T 2 -f -g 53 --data-length 10"
         )
     else:
-        resp = nm.scan(hosts=target, arguments="-sn")
+        nm.scan(hosts=target, arguments="-sn")
 
     return nm.all_hosts()
 
@@ -101,12 +101,12 @@ def TestArp(target, mode=ScanMode.Normal):
     if isinstance(target, list):
         target = listToString(target)
     if mode == ScanMode.Evade:
-        resp = nm.scan(
+        nm.scan(
             hosts=target,
             arguments="-sn -PR -T 2 -f -g 53 --data-length 10"
         )
     else:
-        resp = nm.scan(hosts=target, arguments="-sn -PR")
+        nm.scan(hosts=target, arguments="-sn -PR")
 
     return nm.all_hosts()
 
@@ -125,7 +125,7 @@ def PortScan(
     try:
         if is_root():
             if mode == ScanMode.Evade:
-                resp = nm.scan(
+                nm.scan(
                     hosts=target,
                     arguments=" ".join(
                         [
@@ -145,7 +145,7 @@ def PortScan(
                     )
                 )
             else:
-                resp = nm.scan(
+                nm.scan(
                     hosts=target,
                     arguments=" ".join(
                         [
@@ -162,7 +162,7 @@ def PortScan(
                     )
                 )
         else:
-            resp = nm.scan(
+            nm.scan(
                 hosts=target,
                 arguments=" ".join(
                     [
@@ -187,10 +187,10 @@ def CreateNoise(target):
     try:
         if is_root():
             while True:
-                resp = nm.scan(hosts=target, arguments="-A -T 5 -D RND:10")
+                nm.scan(hosts=target, arguments="-A -T 5 -D RND:10")
         else:
             while True:
-                resp = nm.scan(hosts=target, arguments="-A -T 5")
+                nm.scan(hosts=target, arguments="-A -T 5")
     except KeyboardInterrupt:
         raise SystemExit("Ctr+C, aborting.")
 
