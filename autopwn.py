@@ -638,16 +638,16 @@ def ParamPrint(term_width):
 
     console.print(
         "├" + "─" * (term_width-1)
-        + f"\n│\tTarget : {str(targetarg)}\n"
-        + f"│\tScan type : {str(scantype.name)}\n"
-        + f"│\tScan mode : {str(scanmode.name)}\n"
-        + f"│\tScan speed : {str(scanspeed)}\n"
-        + f"│\tNmap flags : {str(nmapflags)}\n"
-        + f"│\tAPI key : {str(apiKey)}\n"
-        + f"│\tOutput file : {str(outputfile)}"
-        + f"│\tDont ask for confirmation : {str(DontAskForConfirmation)}\n"
-        + f"│\tHost file : {str(args.hostfile)}\n"
-        + f"│\tReporting method : {str(args.report)}\n"
+        + f"\n│\tTarget : {targetarg}\n"
+        + f"│\tScan type : {scantype.name}\n"
+        + f"│\tScan mode : {scanmode.name}\n"
+        + f"│\tScan speed : {scanspeed}\n"
+        + f"│\tNmap flags : {nmapflags}\n"
+        + f"│\tAPI key : {apiKey}\n"
+        + f"│\tOutput file : {outputfile}\n"
+        + f"│\tDont ask for confirmation : {DontAskForConfirmation}\n"
+        + f"│\tHost file : {args.hostfile}\n"
+        + f"│\tReporting method : {args.report}\n"
         + "└" + "─" * (term_width-1)
     )
 
