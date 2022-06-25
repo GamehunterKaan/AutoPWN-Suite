@@ -312,7 +312,6 @@ def InitArgsAPI():
 
     else:
         apiKey = None
-
         try:
             with open("api.txt", "r", encoding="utf-8") as f:
                 apiKey = f.readline().strip("\n")
@@ -364,7 +363,8 @@ def install_nmap_linux():
                         "/usr/bin/sudo",
                         "dnf",
                         "install",
-                        "nmap"
+                        "nmap",
+                        "-y"
                         ],
                     stderr=DEVNULL
                 )
@@ -374,7 +374,8 @@ def install_nmap_linux():
                         "/usr/bin/sudo",
                         "yum",
                         "install",
-                        "nmap"
+                        "nmap",
+                        "-y"
                         ],
                     stderr=DEVNULL
                 )
@@ -384,7 +385,8 @@ def install_nmap_linux():
                         "/usr/bin/sudo",
                         "zypper",
                         "install",
-                        "nmap"
+                        "nmap",
+                        "--non-interactive"
                         ],
                     stderr=DEVNULL
                 )
