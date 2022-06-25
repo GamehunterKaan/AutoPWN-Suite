@@ -460,7 +460,7 @@ def check_nmap():
             stdout=DEVNULL,
             stderr=DEVNULL
         )
-    except FileNotFoundError:
+    except CalledProcessError:
         log.logger("warning", "Nmap is not installed.")
         auto_install = input(
                 f"Install Nmap on your system ({distro.id()}: {platform()})? "
