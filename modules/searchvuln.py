@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from rich.console import Console
 
-from nvdlib.nvdlib import searchCPE, searchCVE
+from nvdlib import searchCPE, searchCVE
 from modules.logger import Logger, banner
 
 

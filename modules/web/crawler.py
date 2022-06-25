@@ -1,5 +1,6 @@
 import requests
-from bs4 import BeautifulSoup # https://pypi.org/project/beautifulsoup4/
+
+from bs4 import BeautifulSoup
 
 
 def crawl(target_url):
