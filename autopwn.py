@@ -301,7 +301,7 @@ def InitArgsScanType():
 
     if args.scantype == "arp" or args.scantype == None:
         if is_root():
-            scantype = ScanType.Arp
+            scantype = ScanType.ARP
 
     return scantype
 
