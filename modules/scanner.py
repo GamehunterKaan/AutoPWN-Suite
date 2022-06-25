@@ -73,17 +73,11 @@ def is_root(): # this function is used everywhere, so it's better to put it here
         return windll.shell32.IsUserAnAdmin() == 1
 
 
-# this function is for turning a list of hosts into a single string
-def listToString(s):
-    str1 = " "
-    return (str1.join(s))
-
-
 #do a ping scan using nmap
 def TestPing(target, mode=ScanMode.Normal):
     nm = PortScanner()
     if isinstance(target, list):
-        target = listToString(target)
+        target = " ".join(target)
     if mode == ScanMode.Evade and is_root():
         nm.scan(
             hosts=target,
@@ -99,7 +93,7 @@ def TestPing(target, mode=ScanMode.Normal):
 def TestArp(target, mode=ScanMode.Normal):
     nm = PortScanner()
     if isinstance(target, list):
-        target = listToString(target)
+        target = " ".join(target)
     if mode == ScanMode.Evade:
         nm.scan(
             hosts=target,
@@ -114,7 +108,6 @@ def TestArp(target, mode=ScanMode.Normal):
 #run a port scan on target using nmap
 def PortScan(
         target,
-        term_width,
         scanspeed=5,
         mode=ScanMode.Normal,
         customflags=""
@@ -201,7 +194,7 @@ def CreateNoise(target):
             break
 
 
-def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
+def NoiseScan(target, scantype=ScanType.ARP):
     console = Console()
 
     banner("Creating noise...", "green")
@@ -233,7 +226,6 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
 def DiscoverHosts(
         target,
         scantype=ScanType.ARP,
-        scanspeed=3,
         mode=ScanMode.Normal
     ):
     if isinstance(target, list):
