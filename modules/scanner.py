@@ -317,25 +317,22 @@ def AnalyseScanResults(nm, term_cols, target=None):
         return HostArray
 
     for port in nm[target]["tcp"].keys():
+        state = "Unknown"
+        service = "Unknown"
+        product = "Unknown"
+        version = "Unknown"
+
         if not len(nm[str(target)]["tcp"][int(port)]["state"]) == 0:
             state = nm[str(target)]["tcp"][int(port)]["state"]
-        else:
-            state = "Unknown"
 
         if not len(nm[str(target)]["tcp"][int(port)]["name"]) == 0:
             service = nm[str(target)]["tcp"][int(port)]["name"]
-        else:
-            service = "Unknown"
 
         if not len(nm[str(target)]["tcp"][int(port)]["product"]) == 0:
             product = nm[str(target)]["tcp"][int(port)]["product"]
-        else:
-            product = "Unknown"
 
         if not len(nm[str(target)]["tcp"][int(port)]["version"]) == 0:
             version = nm[str(target)]["tcp"][int(port)]["version"]
-        else:
-            version = "Unknown"
 
         console.print(
             f"[cyan]Port: [/cyan] {port}\n"
