@@ -204,11 +204,10 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
 
     banner("Creating noise...", "green")
 
+    Uphosts = TestPing(target)
     if scantype == ScanType.ARP:
         if is_root():
             Uphosts = TestArp(target)
-    else:
-        Uphosts = TestPing(target)
 
     with console.status("Creating noise ...", spinner="line"):
         NoisyProcesses = []
@@ -224,7 +223,6 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
             print("Noise scan complete!")
             for P in NoisyProcesses:
                 P.terminate()
-            raise SystemExit
         except KeyboardInterrupt:
             log.logger("error", "Noise scan interrupted!")
             for P in NoisyProcesses:
@@ -245,15 +243,15 @@ def DiscoverHosts(
         )
     else:
         banner(
-            f"Scanning {target} using {scantype.name} scan...", "green"
+            f"Scanning {target} targets(s) using {scantype.name} scan...",
+            "green"
         )
 
-    if scantype == ScanType.Ping:
-        OnlineHosts = TestPing(target, mode)
-        return OnlineHosts
-    elif scantype == ScanType.ARP:
+    OnlineHosts = TestPing(target, mode)
+    if scantype == ScanType.ARP:
         OnlineHosts = TestArp(target, mode)
-        return OnlineHosts
+
+    return OnlineHosts
 
 
 def InitHostInfo(nm, target):
@@ -314,9 +312,8 @@ def AnalyseScanResults(nm, term_cols, target=None):
         if reason in ["localhost-response", "user-set"]:
             log.logger("info", f"Target {target} seems to be us.")
 
-    # we cant detect if the host is us or not, if we are not root
-    # we could get our ip address and compare them but i think it"s not quite necessary
-
+    # we cant detect if the host is us or not, if we are not root we could get
+    # our ip address and compare them but i think it"s not quite necessary
     if len(nm[target].all_protocols()) == 0:
         log.logger("error", f"Target {target} seems to have no open ports.")
         return HostArray
