@@ -5,13 +5,11 @@ from modules.web.crawler import crawl
 from modules.web.lfi import TestLFI
 
 
-log = Logger()
-
-
 def webvuln(target):
     """
     Test for web vulnerabilities
     """
+    log = Logger()
     test_lfi = TestLFI()
 
     def get_url(target):
@@ -35,17 +33,14 @@ def webvuln(target):
     if target_url is None:
         return
 
-    #banner("got url " + target_url)
     banner(f"Testing web application on {target} ...", "purple")
-    # crawl the target_url
     urls = crawl(target_url)
-    # test for lfi
     tested_urls = []
-    for url in urls:
+    for url in urls: # test for lfi
         if "?" in url:
-            print("Testing for LFI on " + url, end="\r")
-            tested_urls.append(url)
+            print(f"Testing for LFI on {url}", end="\r")
             test_lfi(url)
+            tested_urls.append(url)
 
     if len(tested_urls) == 0:
         log.logger("error", "No testable URLs found")
