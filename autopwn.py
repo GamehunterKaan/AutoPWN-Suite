@@ -36,6 +36,7 @@ from modules.scanner import (
     NoiseScan
 )
 
+
 __author__ = "GamehunterKaan"
 __version__ = "1.5.1"
 
@@ -600,7 +601,7 @@ def InitReport():
                 ReportMailPort = input(
                         "Enter the email port to send the report from : "
                     )
-                if isinstance(ReportMailPort, int):
+                if not isinstance(ReportMailPort, int):
                     break
                 log.logger("error", "Invalid port number!")
 

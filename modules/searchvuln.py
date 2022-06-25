@@ -49,12 +49,12 @@ def GenerateKeywords(HostArray):
         if version == "Unknown":
             version = ""
 
-        if product.lower() not in dontsearch and not product == "":
+        if product.lower() not in dontsearch and product != "":
             query1 = (f"{product} {version}").rstrip()
             templist.append(query1)
 
         for entry in templist:
-            if entry not in keywords and not entry == "":
+            if entry not in keywords and entry != "":
                 keywords.append(entry)
 
     return keywords
@@ -63,8 +63,8 @@ def GenerateKeywords(HostArray):
 def SearchKeyword(keyword, apiKey=None):
     #search for the keyword in the NVD database
     print(
-        "Searching vulnerability database for"
-        + f"keyword {keyword}... CTRL-C to skip", end="\r"
+        "Searching vulnerability database for keyword"
+        + f" {keyword}... CTRL-C to skip", end="\r"
     )
 
     try:
@@ -92,13 +92,12 @@ def SearchKeyword(keyword, apiKey=None):
             tempTitleList.append(CPE.title)
 
         for title in tempTitleList:
-            if title not in TitleList and not title == "":
+            if title not in TitleList and title != "":
                 TitleList.append(title)
 
+        CPETitle = ""
         if len(TitleList) != 0:
             CPETitle = min(TitleList)
-        else:
-            CPETitle = ""
 
         return CPETitle, ApiResponseCVE
 
@@ -128,12 +127,12 @@ def SearchSploits(HostArray, term_width, term_cols, apiKey=None):
         CPETitle, ApiResponseCVE = SearchKeyword(keyword, apiKey)
 
         #if the keyword is found in the NVD database, print the title of the vulnerable software
-        if CPETitle != "":
-            Title = CPETitle
+        if CPETitle == "" and len(ApiResponseCVE) == 0:
+            continue
         elif CPETitle == "" and len(ApiResponseCVE) != 0:
             Title = keyword
-        elif CPETitle == "" and len(ApiResponseCVE) == 0:
-            continue
+        elif CPETitle != "":
+            Title = CPETitle
 
         # create a Vuln object
         VulnObject = Vuln(Software=Title, CVEs=[])
