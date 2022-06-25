@@ -697,9 +697,8 @@ def GetHostsToScan(hosts):
 
     index = 0
     for host in hosts:
-        console.print(
-            Text(f"[red][[/red]{index}[red]][/red] {host}", justify="center")
-        )
+        msg = Text.assemble(("[", "red"), index, ("]", "red"), host, justify="center")
+        console.print(msg)
         index += 1
 
     if DontAskForConfirmation:
