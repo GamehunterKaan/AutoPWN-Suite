@@ -1,13 +1,19 @@
 import requests
 
 from bs4 import BeautifulSoup
+from modules.random_user_agent import random_user_agent
 
 
 def crawl(target_url):
     if not target_url.endswith("/"):
         target_url += "/"
+
     urls = []
-    reqs = requests.get(target_url)
+    reqs = requests.get(
+            target_url, headers={
+                    "User-Agent": next(random_user_agent())
+                }
+        )
     soup = BeautifulSoup(reqs.text, "html.parser")
 
     for link in soup.find_all("a"):
