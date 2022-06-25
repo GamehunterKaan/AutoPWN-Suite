@@ -160,7 +160,7 @@ def SearchSploits(HostArray, term_width, term_cols, apiKey=None):
                         )
 
             wrapped_description = wrap(description, term_cols-50)
-            console.print(f"│\t\t[cyan]Description : [/cyan]")
+            console.print(f"│\t\t[cyan]Description: [/cyan]")
             for line in wrapped_description:
                 print(f"│\t\t\t{line}")
             console.print(
@@ -172,6 +172,6 @@ def SearchSploits(HostArray, term_width, term_cols, apiKey=None):
             VulnObject.CVEs.append(str(CVE.id))
 
         VulnsArray.append(VulnObject)
-        print("└" + "─"*term_width)
+        print("└" + "─" * (term_width-1))
 
     return VulnsArray

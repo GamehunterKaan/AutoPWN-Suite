@@ -19,7 +19,6 @@ def print_banner():
     """
     width, _ = get_terminal_size()
 
-
     panel = Panel(
         Align(
             Text(
@@ -32,7 +31,7 @@ def print_banner():
         width=width, height=8
     )
     console.print(
-        "[blue]Developed by GamehunterKaan. (https://auto.pwnspot.com)[/blue]"
+        "Developed by GamehunterKaan. (https://auto.pwnspot.com)", style="blue"
     )
     console.print(panel)
     console.print(

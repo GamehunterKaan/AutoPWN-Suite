@@ -708,9 +708,9 @@ def GetHostsToScan(hosts):
 
     console.print(
         "\n[yellow]Enter the index number of the "
-        + "host you would like to enumurate further."
-        + "Enter 'all' to enumurate all hosts."
-        + "Enter 'exit' to exit [/yellow]"
+        + "host you would like to enumurate further. "
+        + "Enter 'all' to enumurate all hosts. "
+        + "Enter 'exit' to exit [/yellow] ", end=" "
     )
 
     while True:
