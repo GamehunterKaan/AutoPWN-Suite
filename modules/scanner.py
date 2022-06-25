@@ -209,25 +209,23 @@ def NoiseScan(target, scantype=ScanType.ARP, timeout=None):
         if is_root():
             Uphosts = TestArp(target)
 
-    with console.status("Creating noise ...", spinner="line"):
-        NoisyProcesses = []
-        for host in Uphosts:
-            log.logger(
-                "info", f"Started creating noise on {host}..."
-            )
-            P = Process(target=CreateNoise, args=(host,))
-            NoisyProcesses.append(P)
-            P.start()
+    try:
+        with console.status("Creating noise ...", spinner="line"):
+            NoisyProcesses = []
+            for host in Uphosts:
+                log.logger(
+                    "info", f"Started creating noise on {host}..."
+                )
+                P = Process(target=CreateNoise, args=(host,))
+                NoisyProcesses.append(P)
+                P.start()
 
-        try:
-            print("Noise scan complete!")
-            for P in NoisyProcesses:
-                P.terminate()
-        except KeyboardInterrupt:
-            log.logger("error", "Noise scan interrupted!")
-            for P in NoisyProcesses:
-                P.terminate()
-            raise SystemExit
+        print("Noise scan complete!")
+        for P in NoisyProcesses:
+            P.terminate()
+    except KeyboardInterrupt:
+        log.logger("error", "Noise scan interrupted!")
+        raise SystemExit
 
 
 def DiscoverHosts(
