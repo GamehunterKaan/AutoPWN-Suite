@@ -3,3 +3,4 @@ rich
 colorama
 python-nmap
 nvdlib
+bs4
