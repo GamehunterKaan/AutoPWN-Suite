@@ -230,7 +230,7 @@ def DiscoverHosts(
         )
     else:
         banner(
-            f"Scanning {target} targets(s) using {scantype.name} scan...",
+            f"Scanning {target} using {scantype.name} scan...",
             "green"
         )
 
