@@ -23,7 +23,7 @@ class Logger:
     Custom logger
     """
 
-    def __init__(self) -> None:
+    def __init__(self, filename: str = None) -> None:
         logging.basicConfig(
             format="%(message)s",
             level=logging.INFO,
@@ -37,7 +37,10 @@ class Logger:
                 "[*]"
             ]
         self.log: object = logging.getLogger("rich")
+
         file_log: object = logging.FileHandler(filename="output.log")
+        if filename is not None:
+            file_log: object = logging.FileHandler(filename="autopwn.log")
 
         file_log.setLevel(logging.INFO)
         file_log.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
