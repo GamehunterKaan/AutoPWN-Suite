@@ -1,4 +1,8 @@
-import distro
+try:
+    import distro
+except ImportError:
+    pass
+
 from sys import platform as sys_platform
 from platform import platform, system
 from getpass import getpass
