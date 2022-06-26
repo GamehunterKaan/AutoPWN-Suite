@@ -303,7 +303,7 @@ def InitArgsConf():
 
 def InitArgsScanType():
     scantype = ScanType.Ping
-    if args.scantype == "arp":
+    if args.scantype == "arp" or args.scantype is None or args.scantype == "":
         if is_root():
             scantype = ScanType.ARP
 
