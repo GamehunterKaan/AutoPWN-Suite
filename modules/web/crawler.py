@@ -12,16 +12,27 @@ def crawl(target_url):
     if not target_url.endswith("/"):
         target_url += "/"
 
-    try:
-        reqs = get(
-                target_url, headers={
-                        "User-Agent": next(random_user_agent())
-                    }
-            )
-        soup = BeautifulSoup(reqs.text, "html.parser")
-    except ConnectionError:
-        log.logger("error", "Connection error was raised, aborting.")
-        raise SystemExit
+    for tries in range(3):
+        try:
+            reqs = get(
+                    target_url, headers={
+                            "User-Agent": next(random_user_agent())
+                        }
+                )
+            soup = BeautifulSoup(reqs.text, "html.parser")
+        except ConnectionError:
+            if tries < 3:
+                log.logger(
+                    "error",
+                    f"Connection error raised, retrying again: {tries}."
+                )
+                continue
+            else:
+                log.logger(
+                    "error",
+                    f"Connection error raised, reached a maximum of 3 tries."
+                )
+                raise SystemExit
 
     urls = set()
     for link in soup.find_all("a", href=True):
