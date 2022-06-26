@@ -12,9 +12,9 @@ def banner(msg, color):
 
     term_width, _ = get_terminal_size()
 
-    console.print("-"*term_width, style=color)
+    console.print("─"*term_width, style=color)
     console.print(Text(msg, justify="center"), style=color)
-    console.print("-"*term_width, style=color)
+    console.print("─"*term_width, style=color)
     log.logger("info", msg)
 
 
