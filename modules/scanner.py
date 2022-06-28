@@ -2,11 +2,6 @@ from multiprocessing import Process
 from dataclasses import dataclass
 from enum import Enum
 
-try:
-    from os import getuid
-except ImportError:
-    from ctypes import windll
-
 from nmap import PortScanner
 from rich.console import Console
 
@@ -61,13 +56,6 @@ class ScanMode(Enum):
 class ScanType(Enum):
     Ping = 0
     ARP = 1
-
-
-def is_root(): # this function is used everywhere, so it's better to put it here
-    try:
-        return getuid() == 0
-    except Exception as e:
-        return windll.shell32.IsUserAnAdmin() == 1
 
 
 #do a ping scan using nmap
