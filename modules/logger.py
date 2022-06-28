@@ -69,8 +69,8 @@ class Logger:
         if exception_ == "info":
             self.log.info(f"[+] {message}")
         elif exception_ == "error":
-            self.log.warning(f"[-] {message}")
+            self.log.error(f"[-] {message}")
         elif exception_ == "warning":
-            self.log.info(f"[*] {message}")
+            self.log.warning(f"[*] {message}")
         elif exception_ == "success":
             self.log.info(f"[+] {message}")
