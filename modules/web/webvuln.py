@@ -10,7 +10,7 @@ def webvuln(target, log):
     Test for web vulnerabilities
     """
 
-    test_lfi = TestLFI()
+    test_lfi = TestLFI(log)
 
     def get_url(target):
         """
@@ -34,7 +34,7 @@ def webvuln(target, log):
         return
 
     banner(f"Testing web application on {target} ...", "purple")
-    urls = crawl(target_url)
+    urls = crawl(target_url, log)
     tested_urls = []
     for url in urls: # test for lfi
         if "?" in url:
