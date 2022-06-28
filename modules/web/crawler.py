@@ -3,12 +3,9 @@ from requests import get
 from bs4 import BeautifulSoup
 
 from modules.random_user_agent import random_user_agent
-from modules.logger import Logger
 
 
-def crawl(target_url):
-    log = Logger()
-
+def crawl(target_url, log):
     if not target_url.endswith("/"):
         target_url += "/"
 

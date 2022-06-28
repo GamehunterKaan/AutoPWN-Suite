@@ -1,15 +1,15 @@
 from requests import get
 
-from modules.logger import Logger, banner
+from modules.logger import banner
 from modules.web.crawler import crawl
 from modules.web.lfi import TestLFI
 
 
-def webvuln(target):
+def webvuln(target, log):
     """
     Test for web vulnerabilities
     """
-    log = Logger()
+
     test_lfi = TestLFI()
 
     def get_url(target):

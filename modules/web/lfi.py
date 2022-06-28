@@ -1,12 +1,9 @@
 from requests import get
 
-from modules.logger import Logger
-
 
 class TestLFI:
-    def __init__(self):
-        self.log = Logger()
-
+    def __init__(self, log):
+        self.log = log
         self.lfi_tests = [
             r"../../../../../etc/passwd",
             r"/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2"

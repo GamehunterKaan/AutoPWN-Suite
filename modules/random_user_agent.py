@@ -3,16 +3,14 @@ from random import choice, randint
 from os.path import dirname
 from json import loads
 
-from modules.logger import Logger
 
-
-def random_user_agent() -> str:
+def random_user_agent(log) -> str:
     """
     * Generate random user agent for headers.
 
     ? Returns the randomly generated user agent or
     """
-    log = Logger()
+
     def fetch_data() -> list[str]:
         base_dir: str = dirname(__file__)
 

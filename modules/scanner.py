@@ -10,11 +10,8 @@ except ImportError:
 from nmap import PortScanner
 from rich.console import Console
 
-from modules.logger import Logger, banner
+from modules.logger import banner
 from modules.colors import bcolors
-
-
-log = Logger()
 
 
 @dataclass
@@ -189,7 +186,7 @@ def CreateNoise(target):
             break
 
 
-def NoiseScan(target, scantype=ScanType.ARP):
+def NoiseScan(target, log, scantype=ScanType.ARP):
     console = Console()
 
     banner("Creating noise...", "green")
@@ -270,7 +267,7 @@ def InitHostInfo(nm, target):
     return mac, vendor, os, os_accuracy, os_type
 
 
-def AnalyseScanResults(nm, term_cols, target=None):
+def AnalyseScanResults(nm, log, term_cols, target=None):
     """
     Analyse and print scan results.
     """

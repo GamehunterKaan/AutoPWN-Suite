@@ -4,11 +4,7 @@ from dataclasses import dataclass
 from rich.console import Console
 
 from nvdlib import searchCPE, searchCVE
-from modules.logger import Logger, banner
-
-
-log = Logger()
-console = Console()
+from modules.logger import banner
 
 
 @dataclass
@@ -60,7 +56,7 @@ def GenerateKeywords(HostArray):
     return keywords
 
 
-def SearchKeyword(keyword, apiKey=None):
+def SearchKeyword(keyword, log, apiKey=None):
     #search for the keyword in the NVD database
     print(
         "Searching vulnerability database for keyword"
@@ -104,7 +100,7 @@ def SearchKeyword(keyword, apiKey=None):
     return "", []
 
 
-def SearchSploits(HostArray, term_width, term_cols, apiKey=None):
+def SearchSploits(HostArray, term_width, term_cols, log, console, apiKey=None):
     VulnsArray = []
     target = str(HostArray[0][0])
 
