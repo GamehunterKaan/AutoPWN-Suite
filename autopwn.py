@@ -160,7 +160,7 @@ def InitArgsAPI():
 def install_nmap_linux():
     distro_ = distro.id().lower()
     try:
-        if distro_ in ["ubuntu", "debian", "linuxmint", "raspbian"]:
+        if distro_ in ["ubuntu", "debian", "linuxmint", "raspbian", "kali", "parrot"]:
             check_call(
                 [
                     "/usr/bin/sudo",
