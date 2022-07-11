@@ -11,6 +11,8 @@ def crawl(target_url):
 
     for link in soup.find_all('a'):
         url = link.get('href')
+        if url == "" or url == None:
+            continue
         if not url.startswith('http'):
             if url.startswith('./'):
                 url = target_url + url.lstrip('./')
