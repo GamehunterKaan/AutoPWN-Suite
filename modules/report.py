@@ -1,16 +1,13 @@
 from dataclasses import dataclass
-from smtplib import SMTP
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
+from enum import Enum
+from os import remove
+from smtplib import SMTP
 
 from requests import post
-from rich.console import Console
-from enum import Enum
-
-
-console = Console()
 
 
 class ReportType(Enum):
@@ -33,19 +30,9 @@ class ReportMail():
     email_from : str
     server : str
     port : int
-    attachment : str
 
 
-@dataclass()
-class ReportWebhook():
-    """
-    Report webhook.
-    """
-    url : str
-    attachment : str
-
-
-def InitializeEmailReport(EmailObj):
+def InitializeEmailReport(EmailObj, log, console) -> None:
     """
     Initialize email report.
     """
@@ -55,10 +42,14 @@ def InitializeEmailReport(EmailObj):
     email_from = EmailObj.email_from
     server = EmailObj.server
     port = EmailObj.port
-    attachment = EmailObj.attachment
 
-    # Send email report
-    print("Sending email report...")
+    console.save_html("tmp_report.html")
+
+    log.logger(
+        "success",
+        "Sending email report..."
+    )
+
     SendEmail(
         email,
         password,
@@ -66,8 +57,10 @@ def InitializeEmailReport(EmailObj):
         email_from,
         server,
         port,
-        attachment
+        log
     )
+
+    remove("tmp_report.html")
 
 
 def SendEmail(
@@ -77,8 +70,8 @@ def SendEmail(
         email_from,
         server,
         port,
-        attachment
-    ):
+        log
+    ) -> None:
     """
     Send email report.
     """
@@ -94,13 +87,8 @@ def SendEmail(
     body = "AutoPWN Report"
     msg.attach(MIMEText(body, "plain"))
 
-    attachment = attachment
-    part = MIMEBase("application", "octet-stream")
-    part.set_payload(open(attachment, "rb").read())
-    encoders.encode_base64(part)
-    part.add_header(
-        "Content-Disposition", f"attachment; filename='{attachment}'"
-    )
+    html = open("tmp_report.html", "rb").read()
+    part = MIMEText(html, "text/html")
     msg.attach(part)
 
     mail = SMTP(server, port)
@@ -109,41 +97,60 @@ def SendEmail(
     text = msg.as_string()
     mail.sendmail(email, email_to, text)
     mail.quit()
-    console.print("Email report sent successfully", style="green")
+    log.logger(
+        "success",
+        "Email report sent successfully."
+    )
 
 
-def InitializeWebhookReport(WebhookObj):
+def InitializeWebhookReport(Webhook, log, console) -> None:
     """
     Initialize webhook report.
     """
-    url = WebhookObj.url
-    attachment = WebhookObj.attachment
-
     # Send webhook report
-    print("Sending webhook report...")
-    SendWebhook(url, attachment)
+    log.logger(
+        "info",
+        "Sending webhook report..."
+    )
+    console.save_text("report.log")
+    SendWebhook(Webhook, log)
+    remove("report.log")
 
 
-def SendWebhook(url, attachment):
+def SendWebhook(url, log) -> None:
     """
     Send webhook report.
     """
-    with open(attachment, "rb") as file:
-        payload = {"payload": file}
+    file = open("report.log", "r") # read of closed file
+    payload = {"payload": file}
 
     try:
-        post(url, files=payload)
-    except ConnectionError:
-        console.print("Webhook report failed to send", style="red")
+        req = post(url, files=payload)
+        file.close()
+        if req.status_code == 200:
+            log.logger(
+                "success",
+                "Webhook report sent succesfully."
+            )
+        else:
+            log.logger(
+                "error",
+                "Webhook report failed to send."
+            )
+            print(req.text)
+    except Exception as e:
+        log.logger("error", e)
+        log.logger(
+            "error",
+            "Webhook report failed to send."
+        )
 
 
-def InitializeReport(Method, ReportObject):
+def InitializeReport(Method, ReportObject, log, console) -> None:
     """
     Initialize report.
     """
     if Method == ReportType.EMAIL:
-        InitializeEmailReport(ReportObject)
+        InitializeEmailReport(ReportObject, log, console)
     elif Method == ReportType.WEBHOOK:
-        InitializeWebhookReport(ReportObject)
-    elif Method == ReportType.NONE:
-        pass
+        InitializeWebhookReport(ReportObject, log, console)
