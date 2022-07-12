@@ -1,14 +1,13 @@
-from random import choice, randint
-
-from os.path import dirname
 from json import loads
+from os.path import dirname
+from random import choice, randint
 
 
 def random_user_agent(log) -> str:
     """
     * Generate random user agent for headers.
 
-    ? Returns the randomly generated user agent or
+    ? Returns the randomly generated user agent
     """
 
     def fetch_data() -> list[str]:
@@ -30,8 +29,8 @@ def random_user_agent(log) -> str:
             log.logger("error", "User agent database not found.")
             raise SystemExit
         else:
-            floor_: int = randint(1, 1100)
-            top_: int = randint(floor_, floor_*2)
+            floor_: int = randint(1, 450)
+            top_: int = randint(floor_+1, floor_*2)
 
             return user_agents[floor_:top_]
 
