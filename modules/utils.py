@@ -1,42 +1,257 @@
 try:
-    import distro
-    from os import getuid
     from ctypes import windll
+    from os import getuid
+
+    import distro
 except ImportError:
     pass
 
-from socket import socket, AF_INET, SOCK_DGRAM
-from subprocess import check_call, DEVNULL, CalledProcessError
-from sys import platform as sys_platform
-from platform import platform, system
+from argparse import ArgumentParser
 from configparser import ConfigParser
+from datetime import datetime
+from enum import Enum
+from os import get_terminal_size
+from platform import platform, system
+from socket import AF_INET, SOCK_DGRAM, socket
+from subprocess import DEVNULL, CalledProcessError, check_call
+from sys import platform as sys_platform
+
+from requests import get
+from rich.align import Align
+from rich.text import Text
+
+from modules.report import ReportType
 
 
-def is_root(): # this function is used everywhere, so it's better to put it here
+class ScanMode(Enum):
+    Normal = 0
+    Noise = 1
+    Evade = 2
+
+
+class ScanType(Enum):
+    Ping = 0
+    ARP = 1
+
+
+def cli():
+    argparser = ArgumentParser(
+        description="AutoPWN Suite | A project for scanning " + 
+        "vulnerabilities and exploiting systems automatically."
+    )
+    argparser.add_argument(
+        "-v", "--version",
+        help="Print version and exit.",
+        action="store_true"
+    )
+    argparser.add_argument(
+        "-y", "--yesplease",
+        help="Don't ask for anything. (Full automatic mode)",
+        action="store_true",
+        required=False,
+        default=False
+    )
+    argparser.add_argument(
+        "-c", "--config",
+        help="Specify a config file to use. (Default : None)",
+        default=None,
+        required=False,
+        metavar="CONFIG",
+        type=str
+    )
+
+    scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
+    scanargs.add_argument(
+        "-t", "--target",
+        help=(
+                "Target range to scan. This argument overwrites the" +
+                " hostfile argument. (192.168.0.1 or 192.168.0.0/24)"
+            ),
+        type=str,
+        required=False,
+        default=None
+    )
+    scanargs.add_argument(
+        "-hf", "--hostfile",
+        help="File containing a list of hosts to scan.",
+        type=str,
+        required=False,
+        default=None
+    )
+    scanargs.add_argument(
+        "-st", "--scantype",
+        help="Scan type.",
+        type=str,
+        required=False,
+        default=None,
+        choices=["arp", "ping"]
+    )
+    scanargs.add_argument(
+        "-nf", "--nmapflags",
+        help=(
+                "Custom nmap flags to use for portscan." +
+                " (Has to be specified like : -nf=\"-O\")"
+            ),
+        default="",
+        type=str,
+        required=False
+    )
+    scanargs.add_argument(
+        "-s", "--speed",
+        help="Scan speed. (Default : 3)",
+        default=3,
+        type=int,
+        required=False,
+        choices=range(0,6)
+    )
+    scanargs.add_argument(
+        "-a", "--api",
+        help=(
+                "Specify API key for vulnerability detection " +
+                "for faster scanning. (Default : None)"
+            ),
+        default=None,
+        type=str,
+        required=False
+    )
+    scanargs.add_argument(
+        "-m", "--mode",
+        help="Scan mode.",
+        default="normal",
+        type=str,
+        required=False,
+        choices=["evade", "noise", "normal"]
+    )
+    scanargs.add_argument(
+        "-nt", "--noisetimeout",
+        help="Noise mode timeout. (Default : None)",
+        default=None,
+        type=int,
+        required=False,
+        metavar="TIMEOUT"
+    )
+
+    reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
+    reportargs.add_argument(
+        "-o", "--output",
+        help="Output file name. (Default : autopwn.log)",
+        default="autopwn",
+        type=str,
+        required=False
+    )
+    reportargs.add_argument(
+        "-ot", "--outputtype",
+        help="Output file type. (Default : html)",
+        default="html",
+        type=str,
+        required=False,
+        choices=["html", "txt", "svg"]
+    )
+    reportargs.add_argument(
+        "-rp", "--report",
+        help="Report sending method.",
+        type=str,
+        required=False,
+        default=None,
+        choices=["email", "webhook"]
+    )
+    reportargs.add_argument(
+        "-rpe",
+        "--reportemail",
+        help="Email address to use for sending report.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="EMAIL"
+    )
+    reportargs.add_argument(
+        "-rpep",
+        "--reportemailpassword",
+        help="Password of the email report is going to be sent from.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="PASSWORD"
+    )
+    reportargs.add_argument(
+        "-rpet", "--reportemailto",
+        help="Email address to send report to.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="EMAIL"
+    )
+    reportargs.add_argument(
+        "-rpef", "--reportemailfrom",
+        help="Email to send from.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="EMAIL"
+    )
+    reportargs.add_argument(
+        "-rpes", "--reportemailserver",
+        help="Email server to use for sending report.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="SERVER"
+    )
+    reportargs.add_argument(
+        "-rpesp", "--reportemailserverport",
+        help="Port of the email server.",
+        type=int,
+        required=False,
+        default=None,
+        metavar="PORT"
+    )
+    reportargs.add_argument(
+        "-rpw", "--reportwebhook",
+        help="Webhook to use for sending report.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="WEBHOOK"
+    )
+
+    return argparser.parse_args()
+
+
+def is_root() -> bool: # this function is used everywhere, so it's better to put it here
     try:
         return getuid() == 0
     except Exception as e:
         return windll.shell32.IsUserAnAdmin() == 1
 
 
-def DetectIPRange():
-    try:
-        s = socket(AF_INET, SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        PrivateIPAdress = str(s.getsockname()[0]).split(".")
-        target = (
-                f"{PrivateIPAdress[0]}.",
-                f"{PrivateIPAdress[1]}.",
-                f"{PrivateIPAdress[2]}.0/24"
-            )
-    except ConnectionError:
-        raise SystemExit
+def GetIpAdress() -> str:
+    s = socket(AF_INET, SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    PrivateIPAdress = str(s.getsockname()[0])
+    return PrivateIPAdress
+
+
+def DetectIPRange() -> str:
+    PrivateIPAdress = GetIpAdress().split(".")
+    target = (
+            f"{PrivateIPAdress[0]}." +
+            f"{PrivateIPAdress[1]}." +
+            f"{PrivateIPAdress[2]}.0/24"
+        )
+    return target
+
+
+def InitAutomation(args) -> bool:
+    if args.yesplease:
+        global DontAskForConfirmation
+        DontAskForConfirmation = True
+        return True
     else:
-        return target
+        DontAskForConfirmation = False
+        return False
 
 
-
-def InitArgsAPI(args, log):
+def InitArgsAPI(args, log) -> str:
     if args.api:
         apiKey = args.api
 
@@ -49,7 +264,7 @@ def InitArgsAPI(args, log):
             log.logger(
                 "warning",
                 "No API key specified and no api.txt file found. "
-                + "Vulnerability detection is going to be slower!"
+                + "Vulnerability detection is going to be slower! "
                 + "You can get your own NIST API key from "
                 + "https://nvd.nist.gov/developers/request-an-api-key"
             )
@@ -61,13 +276,253 @@ def InitArgsAPI(args, log):
     return apiKey
 
 
-def InitArgsScanType(args, ScanType):
+def InitArgsScanType(args, log):
     scantype = ScanType.Ping
-    if args.scantype == "arp" or args.scantype is None or args.scantype == "":
+    if args.scantype == "arp":
+        if is_root():
+            scantype = ScanType.ARP
+        else:
+            log.logger(
+                "warning", "You need to be root in order to run arp scan.\n" +
+                            "Changed scan mode to Ping Scan."
+            )
+    elif args.scantype is None or args.scantype == "":
         if is_root():
             scantype = ScanType.ARP
 
     return scantype
+
+
+def InitArgsTarget(args, log):
+    if args.target:
+        target = args.target
+    else:
+        if args.hostfile:
+            # read targets from host file and insert all of them into an array
+            try:
+                with open(args.hostfile, "r", encoding="utf-8") as target_file:
+                    target = target_file.readlines()
+            except FileNotFoundError:
+                log.logger("error", "Host file not found!")
+            except PermissionError:
+                log.logger(
+                    "error",
+                    "Permission denied while trying to read host file!"
+                )
+            except Exception:
+                log.logger(
+                    "error", "Unknown error while trying to read host file!"
+                )
+            else:
+                return target
+
+            target = DetectIPRange()
+        else:
+            if DontAskForConfirmation:
+                try:
+                    target = DetectIPRange()
+                except Exception as e:
+                    log.logger(
+                        "error", 
+                        e
+                    )
+                    target = input("Enter target range to scan : ")
+            else:
+                try:
+                    target = input("Enter target range to scan : ")
+                except KeyboardInterrupt:
+                    raise SystemExit("Ctrl+C pressed. Exiting.")
+
+    return target
+
+
+def InitArgsMode(args, log):
+    scanmode = ScanMode.Normal
+
+    if args.mode == "evade":
+        if is_root():
+            scanmode = ScanMode.Evade
+            log.logger("info", "Evasion mode enabled!")
+        else:
+            log.logger(
+                "error",
+                "You must be root to use evasion mode!"
+                + " Switching back to normal mode ..."
+            )
+    elif args.mode == "noise":
+        scanmode = ScanMode.Noise
+        log.logger("error", "Noise mode enabled!")
+
+    return scanmode
+
+
+def InitReport(args, log):
+    if not args.report:
+        return ReportType.NONE, None
+
+    if args.report == "email":
+        Method = ReportType.EMAIL
+        if args.reportemail:
+            ReportEmail = args.reportemail
+        else:
+            ReportEmail = input("Enter your email address : ")
+
+        if args.reportemailpassword:
+            ReportMailPassword = args.reportemailpassword
+        else:
+            ReportMailPassword = getpass("Enter your email password : ")
+
+        if args.reportemailto:
+            ReportMailTo = args.reportemailto
+        else:
+            ReportMailTo = input(
+                    "Enter the email address to send the report to : "
+                )
+
+        if args.reportemailfrom:
+            ReportMailFrom = args.reportemailfrom
+        else:
+            ReportMailFrom = ReportEmail
+
+        if args.reportemailserver:
+            ReportMailServer = args.reportemailserver
+        else:
+            ReportMailServer = input(
+                    "Enter the email server to send the report from : "
+                )
+            if ReportMailServer == "smtp.gmail.com":
+                log.logger(
+                    "error",
+                    "Google no longer supports sending mails via SMTP."
+                )
+                return ReportType.NONE, None
+
+        if args.reportemailserverport:
+            ReportMailPort = args.reportemailserverport
+        else:
+            while True:
+                ReportMailPort = input(
+                        "Enter the email port to send the report from : "
+                    )
+                if not isinstance(ReportMailPort, int):
+                    break
+                log.logger("error", "Invalid port number!")
+
+        EmailObj = ReportMail(
+                ReportEmail,
+                ReportMailPassword,
+                ReportMailTo,
+                ReportMailFrom,
+                ReportMailServer,
+                int(ReportMailPort),
+            )
+
+        return Method, EmailObj
+
+    elif args.report == "webhook":
+        Method = ReportType.WEBHOOK
+        if args.reportwebhook:
+            Webhook = args.reportwebhook
+        else:
+            Webhook = input("Enter your webhook URL : ")
+
+        return Method, Webhook
+
+
+def Confirmation(message) -> bool:
+    if DontAskForConfirmation:
+        return True
+
+    confirmation = input(message)
+    return confirmation.lower() != "n"
+
+
+def UserConfirmation():
+    if DontAskForConfirmation:
+        return True, True, True
+
+    portscan = Confirmation("Do you want to scan ports? [Y/n] : ")
+    if not portscan:
+        return False, False, False
+
+    vulnscan = Confirmation(
+            "Do you want to scan for vulnerabilities? [Y/n] : "
+        )
+    if not vulnscan:
+        return True, False, False
+
+    downloadexploits = Confirmation(
+            "Do you want to download exploits? [Y/n] : "
+        )
+
+    return portscan, vulnscan, downloadexploits
+
+
+def WebScan() -> bool:
+    return Confirmation(
+        "Do you want to scan for web vulnerabilities? [Y/n] : "
+    )
+
+
+def GetHostsToScan(hosts, console):
+    if len(hosts) == 0:
+        raise SystemExit(
+            "No hosts found! {time} - Scan completed.".format(
+                time = datetime.now().strftime("%b %d %Y %H:%M:%S")
+            )
+        )
+
+    index = 0
+    for host in hosts:
+        if not len(host) % 2 == 0:
+            host += " "
+
+        msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
+
+        console.print(
+            msg,
+            justify="center"
+        )
+
+        index += 1
+
+    if DontAskForConfirmation:
+        return hosts
+
+    console.print(
+        "\n[yellow]Enter the index number of the "
+        + "host you would like to enumurate further.\n"
+        + "Enter 'all' to enumurate all hosts.\n"
+        + "Enter 'exit' to exit [/yellow]"
+    )
+
+    while True:
+        host = input(f"────> ")
+        Targets = hosts
+
+        if host in hosts:
+            Targets = [host]
+        else:
+            if host == "all" or host == "":
+                break
+            elif host == "exit":
+                raise SystemExit(
+                    "{time} - Scan completed.".format(
+                        time = datetime.now().strftime("%b %d %Y %H:%M:%S")
+                    )
+                )
+            else:
+                try:
+                    if int(host) < len(hosts) and int(host) >= 0:
+                        Targets = [hosts[int(host)]]
+                        break
+                except:
+                    console.print(
+                        "Please enter a valid host number or 'all' "
+                        + "or 'exit'", style="red"
+                    )
+
+    return Targets
 
 
 def InitArgsConf(args, log):
@@ -114,6 +569,9 @@ def InitArgsConf(args, log):
         if config.has_option("REPORT", "output"):
             args.output = config.get("AUTOPWN", "output").lower()
 
+        if config.has_option("REPORT", "outputtype"):
+            args.outputtype = config.get("REPORT", "outputtype").lower()
+
         if config.has_option("REPORT", "method"):
             args.report = config.get("REPORT", "method").lower()
 
@@ -142,7 +600,7 @@ def InitArgsConf(args, log):
                 ).lower()
 
         if config.has_option("REPORT", "webhook"):
-            args.reportwebhook = config.get("REPORT", "webhook").lower()
+            args.reportwebhook = config.get("REPORT", "webhook")
 
     except FileNotFoundError:
         log.logger("error", "Config file not found!")
@@ -158,7 +616,7 @@ def install_nmap_linux(log):
     distro_ = distro.id().lower()
     while True:
         try:
-            if distro_ in ["ubuntu", "debian", "linuxmint", "raspbian"]:
+            if distro_ in ["ubuntu", "debian", "linuxmint", "raspbian", "kali", "parrot"]:
                 check_call(
                     [
                         "/usr/bin/sudo",
@@ -243,8 +701,6 @@ def install_nmap_linux(log):
 
 
 def install_nmap_windows(log):
-    # TODO: implement this
-    """shut up, pylint"""
     try:
         check_call(
             [
@@ -276,7 +732,6 @@ def install_nmap_mac(log):
 
 
 def check_nmap(log):
-    # Check if nmap is installed if not, install it
     try:
         check_call(
             ["nmap", "-h"],
@@ -319,16 +774,16 @@ def ParamPrint(
     ):
     # print everything inside args class to screen
     if args.config:
-        console.print(f"\n┌─[ Config file {args.config} was used. ]")
-        console.print("├─[ Scanning with the following parameters. ]")
+        console.print(f"\n┌─[ Config file {args.config} was used ]")
+        console.print("├─[ Scanning with the following parameters ]")
     else:
-        console.print("\n┌─[ Scanning with the following parameters. ]")
+        console.print("\n┌─[ Scanning with the following parameters ]")
 
     console.print(
         "├" + "─" * (term_width-1)
         + f"\n│\tTarget : {targetarg}\n"
-        + f"│\tScan type : {scantype_name}\n"
-        + f"│\tScan mode : {scanmode_name}\n"
+        + f"│\tScan type : {scantype_name.name}\n"
+        + f"│\tScan mode : {scanmode_name.name}\n"
         + f"│\tScan speed : {scanspeed}\n"
         + f"│\tNmap flags : {nmapflags}\n"
         + f"│\tAPI key : {apiKey}\n"
@@ -338,3 +793,26 @@ def ParamPrint(
         + f"│\tReporting method : {args.report}\n"
         + "└" + "─" * (term_width-1)
     )
+
+
+def CheckConnection() -> bool:
+    print("Checking for internet connection...", end="\r")
+    try:
+        get("https://google.com")
+    except Exception as e:
+        return False
+    else:
+        return True
+
+
+def SaveOutput(console, out_type, report, output_file):
+    if out_type == "html":
+        if not output_file.endswith(".html"):
+            output_file += ".html"
+        console.save_html(output_file)
+    elif out_type == "svg":
+        if not output_file.endswith(".svg"):
+            output_file += ".svg"
+        console.save_svg(output_file)
+    elif out_type == "txt":
+        console.save_text(output_file)
