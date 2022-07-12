@@ -1,22 +1,15 @@
-from multiprocessing import Process
 from dataclasses import dataclass
 from enum import Enum
+from multiprocessing import Process
+from os import get_terminal_size
+from time import sleep
 
 from nmap import PortScanner
-from rich.console import Console
+from rich import box
+from rich.table import Table
 
 from modules.logger import banner
-from modules.colors import bcolors
-
-
-@dataclass
-class PortInfo:
-    port : int
-    protocol : str
-    state : str
-    service : str
-    product : str
-    version : str
+from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
 
 
 @dataclass()
@@ -28,16 +21,18 @@ class TargetInfo:
     os_accuracy : int = 0
     os_type : str = "Unknown"
 
-    def colored(self):
+    def colored(self) -> str:
+
         return (
-            f"{bcolors.yellow}MAC Address : {bcolors.endc} {self.mac}\n"
-            + f"{bcolors.yellow}Vendor : {bcolors.endc} {self.vendor}\n"
-            + f"{bcolors.yellow}OS : {bcolors.endc} {self.os}\n"
-            + f"{bcolors.yellow}Accuracy : {bcolors.endc} {self.os_accuracy}"
-            + f"{bcolors.yellow}Type : {bcolors.endc} {self.os_type[:20]}\n"
+            f"[yellow]MAC Address :[/yellow] {self.mac}\n"
+            + f"[yellow]Vendor :[/yellow] {self.vendor}\n"
+            + f"[yellow]OS :[/yellow] {self.os}\n"
+            + f"[yellow]Accuracy :[/yellow] {self.os_accuracy}\n"
+            + f"[yellow]Type :[/yellow] {self.os_type[:20]}\n"
         )
 
-    def __str__(self):
+
+    def __str__(self) -> str:
         return (
             f"MAC Address : {self.mac}"
             + f" Vendor : {self.vendor}\n"
@@ -47,19 +42,8 @@ class TargetInfo:
         )
 
 
-class ScanMode(Enum):
-    Normal = 0
-    Noise = 1
-    Evade = 2
-
-
-class ScanType(Enum):
-    Ping = 0
-    ARP = 1
-
-
 #do a ping scan using nmap
-def TestPing(target, mode=ScanMode.Normal):
+def TestPing(target, mode=ScanMode.Normal) -> list:
     nm = PortScanner()
     if isinstance(target, list):
         target = " ".join(target)
@@ -75,7 +59,7 @@ def TestPing(target, mode=ScanMode.Normal):
 
 
 #do a arp scan using nmap
-def TestArp(target, mode=ScanMode.Normal):
+def TestArp(target, mode=ScanMode.Normal) -> list:
     nm = PortScanner()
     if isinstance(target, list):
         target = " ".join(target)
@@ -93,11 +77,17 @@ def TestArp(target, mode=ScanMode.Normal):
 #run a port scan on target using nmap
 def PortScan(
         target,
+        console,
+        log,
         scanspeed=5,
         mode=ScanMode.Normal,
-        customflags=""
+        customflags="",
     ):
-    banner(f"Running a portscan on host {target} ...", "green")
+
+    log.logger(
+        "info",
+        f"Scanning {target} for open ports ..."
+    )
 
     nm = PortScanner()
     try:
@@ -174,10 +164,8 @@ def CreateNoise(target):
             break
 
 
-def NoiseScan(target, log, scantype=ScanType.ARP):
-    console = Console()
-
-    banner("Creating noise...", "green")
+def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) -> None:
+    banner("Creating noise...", "green", console)
 
     Uphosts = TestPing(target)
     if scantype == ScanType.ARP:
@@ -194,10 +182,16 @@ def NoiseScan(target, log, scantype=ScanType.ARP):
                 P = Process(target=CreateNoise, args=(host,))
                 NoisyProcesses.append(P)
                 P.start()
+                if noisetimeout:
+                    sleep(noisetimeout)
+                else:
+                    while True:
+                        sleep(1)
 
         print("Noise scan complete!")
         for P in NoisyProcesses:
             P.terminate()
+        raise SystemExit
     except KeyboardInterrupt:
         log.logger("error", "Noise scan interrupted!")
         raise SystemExit
@@ -205,18 +199,21 @@ def NoiseScan(target, log, scantype=ScanType.ARP):
 
 def DiscoverHosts(
         target,
+        console,
         scantype=ScanType.ARP,
         mode=ScanMode.Normal
-    ):
+    ) -> list:
     if isinstance(target, list):
         banner(
-            f"Scanning {len(target)} target(s) using {scantype.name} scan...",
-            "green"
+            f"Scanning {len(target)} target(s) using {scantype.name} scan ...",
+            "green",
+            console
         )
     else:
         banner(
-            f"Scanning {target} using {scantype.name} scan...",
-            "green"
+            f"Scanning {target} using {scantype.name} scan ...",
+            "green",
+            console
         )
 
     OnlineHosts = TestPing(target, mode)
@@ -252,15 +249,43 @@ def InitHostInfo(nm, target):
     except (KeyError, IndexError):
         os_type = "Unknown"
 
-    return mac, vendor, os, os_accuracy, os_type
+    return TargetInfo(
+        ip=target,
+        mac=mac,
+        vendor=vendor,
+        os=os,
+        os_accuracy=os_accuracy,
+        os_type=os_type,
+    )
 
 
-def AnalyseScanResults(nm, log, term_cols, target=None):
+def InitPortInfo(nm, target, port):
+    state = "Unknown"
+    service = "Unknown"
+    product = "Unknown"
+    version = "Unknown"
+
+    if not len(nm[str(target)]["tcp"][int(port)]["state"]) == 0:
+        state = nm[str(target)]["tcp"][int(port)]["state"]
+
+    if not len(nm[str(target)]["tcp"][int(port)]["name"]) == 0:
+        service = nm[str(target)]["tcp"][int(port)]["name"]
+
+    if not len(nm[str(target)]["tcp"][int(port)]["product"]) == 0:
+        product = nm[str(target)]["tcp"][int(port)]["product"]
+
+    if not len(nm[str(target)]["tcp"][int(port)]["version"]) == 0:
+        version = nm[str(target)]["tcp"][int(port)]["version"]
+
+    return state, service, product, version
+
+
+def AnalyseScanResults(nm, log, console, target=None) -> list:
     """
     Analyse and print scan results.
     """
-
-    console = Console()
+    term_width, _ = get_terminal_size()
+    print(" " * term_width)
     HostArray = []
     if target is None:
         target = nm.all_hosts()[0]
@@ -271,54 +296,40 @@ def AnalyseScanResults(nm, log, term_cols, target=None):
         log.logger("error", f"Target {target} seems to be offline.")
         return []
 
-    mac, vendor, os, os_accuracy, os_type = InitHostInfo(nm, target)
-    CurrentTargetInfo = TargetInfo(
-            target, mac, vendor, os, os_accuracy, os_type
-        )
+    CurrentTargetInfo = InitHostInfo(nm, target)
 
-    print(CurrentTargetInfo.colored().center(term_cols))
-
-    reason = nm[target]["status"]["reason"]
+    if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
+       console.print(CurrentTargetInfo.colored(), justify="center")
 
     if is_root():
-        if reason in ["localhost-response", "user-set"]:
+        if nm[target]["status"]["reason"] in ["localhost-response", "user-set"]:
             log.logger("info", f"Target {target} seems to be us.")
+    elif GetIpAdress() == target:
+        log.logger("info", f"Target {target} seems to be us.")
 
-    # we cant detect if the host is us or not, if we are not root we could get
-    # our ip address and compare them but i think it"s not quite necessary
-    if len(nm[target].all_protocols()) == 0:
+    if len(nm[target].all_tcp()) == 0:
         log.logger("error", f"Target {target} seems to have no open ports.")
         return HostArray
 
+    banner(f"Portscan results for {target}", "green", console)
+
+    table = Table(box=box.MINIMAL)
+
+    table.add_column("Port", style="cyan")
+    table.add_column("State", style="white")
+    table.add_column("Service", style="blue")
+    table.add_column("Product", style="red")
+    table.add_column("Version", style="purple")
+
     for port in nm[target]["tcp"].keys():
-        state = "Unknown"
-        service = "Unknown"
-        product = "Unknown"
-        version = "Unknown"
-
-        if not len(nm[str(target)]["tcp"][int(port)]["state"]) == 0:
-            state = nm[str(target)]["tcp"][int(port)]["state"]
-
-        if not len(nm[str(target)]["tcp"][int(port)]["name"]) == 0:
-            service = nm[str(target)]["tcp"][int(port)]["name"]
-
-        if not len(nm[str(target)]["tcp"][int(port)]["product"]) == 0:
-            product = nm[str(target)]["tcp"][int(port)]["product"]
-
-        if not len(nm[str(target)]["tcp"][int(port)]["version"]) == 0:
-            version = nm[str(target)]["tcp"][int(port)]["version"]
-
-        console.print(
-            f"[cyan]Port: [/cyan] {port}\n"
-            + f"[cyan]State: [/cyan] {state}\n"
-            + f"[cyan]Service: [/cyan] {service[:15]}\n"
-            + f"[cyan]Product: [/cyan] {product[:20]}\n"
-            + f"[cyan]Version: [/cyan] {version[:15]}"
-        )
+        state, service, product, version = InitPortInfo(nm, target, port)
+        table.add_row(str(port), state, service, product, version)
 
         if state == "open":
             HostArray.insert(
                 len(HostArray), [target, port, service, product, version]
             )
+
+    console.print(table, justify="center")
 
     return HostArray
