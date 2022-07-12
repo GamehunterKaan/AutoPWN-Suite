@@ -1,10 +1,11 @@
-from textwrap import wrap
 from dataclasses import dataclass
-
-from rich.console import Console
+from os import get_terminal_size
+from textwrap import wrap
 
 from nvdlib import searchCPE, searchCVE
+
 from modules.logger import banner
+from modules.utils import CheckConnection
 
 
 @dataclass
@@ -14,7 +15,7 @@ class Vuln:
 
 
 #generate keywords to search for from the information gathered from the target
-def GenerateKeywords(HostArray):
+def GenerateKeywords(HostArray) -> list:
     keywords = []
     for port in HostArray:
         service = str(port[2])
@@ -46,8 +47,8 @@ def GenerateKeywords(HostArray):
             version = ""
 
         if product.lower() not in dontsearch and product != "":
-            query1 = (f"{product} {version}").rstrip()
-            templist.append(query1)
+            query = (f"{product} {version}").rstrip()
+            templist.append(query)
 
         for entry in templist:
             if entry not in keywords and entry != "":
@@ -57,7 +58,8 @@ def GenerateKeywords(HostArray):
 
 
 def SearchKeyword(keyword, log, apiKey=None):
-    #search for the keyword in the NVD database
+    term_width, _ = get_terminal_size()
+    print(" " * term_width, end="\r") # we have to clear screen here
     print(
         "Searching vulnerability database for keyword"
         + f" {keyword}... CTRL-C to skip", end="\r"
@@ -100,11 +102,17 @@ def SearchKeyword(keyword, log, apiKey=None):
     return "", []
 
 
-def SearchSploits(HostArray, term_width, term_cols, log, console, apiKey=None):
+def SearchSploits(HostArray, log, console, apiKey=None) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
+    term_width, _ = get_terminal_size()
 
-    banner(f"Possible vulnerabilities for {target}", "red", term_width)
+    if not CheckConnection():
+        log.logger(
+            "error", 
+            "Connection error was raised. Skipping vulnerability detection."
+        )
+        return []
 
     keywords = GenerateKeywords(HostArray)
 
@@ -117,12 +125,11 @@ def SearchSploits(HostArray, term_width, term_cols, log, console, apiKey=None):
         f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
     )
 
-    for keyword in keywords:
-        #https://github.com/vehemont/nvdlib
-        #search the NIST vulnerabilities database for the generated keywords
-        CPETitle, ApiResponseCVE = SearchKeyword(keyword, apiKey)
+    printed_banner = False
 
-        #if the keyword is found in the NVD database, print the title of the vulnerable software
+    for keyword in keywords:
+        CPETitle, ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+
         if CPETitle == "" and len(ApiResponseCVE) == 0:
             continue
         elif CPETitle == "" and len(ApiResponseCVE) != 0:
@@ -130,10 +137,14 @@ def SearchSploits(HostArray, term_width, term_cols, log, console, apiKey=None):
         elif CPETitle != "":
             Title = CPETitle
 
-        # create a Vuln object
+        if not printed_banner:
+            banner(f"Possible vulnerabilities for {target}", "red", console)
+            printed_banner = True
+
         VulnObject = Vuln(Software=Title, CVEs=[])
 
-        console.print(f"┌─[yellow][{Title}][/yellow]")
+        print(" " * term_width, end="\r") # we have to clear screen here
+        console.print(f"┌─ [yellow][{Title}][/yellow]")
 
         for CVE in ApiResponseCVE:
             console.print(
@@ -155,12 +166,12 @@ def SearchSploits(HostArray, term_width, term_cols, log, console, apiKey=None):
                            f"Could not fetch exploitability score for {CVE.id}"
                         )
 
-            wrapped_description = wrap(description, term_cols-50)
+            wrapped_description = wrap(description, term_width-50)
             console.print(f"│\t\t[cyan]Description: [/cyan]")
             for line in wrapped_description:
-                print(f"│\t\t\t{line}")
+                console.print(f"│\t\t\t{line}")
             console.print(
-                f"│\t\[cyan]Severity: [/cyan]{severity} - {score}\n"
+                f"│\t\t[cyan]Severity: [/cyan]{severity} - {score}\n"
                 + f"│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
                 + f"│\t\t[cyan]Details: [/cyan] {details}"
             )
@@ -168,6 +179,7 @@ def SearchSploits(HostArray, term_width, term_cols, log, console, apiKey=None):
             VulnObject.CVEs.append(str(CVE.id))
 
         VulnsArray.append(VulnObject)
-        print("└" + "─" * (term_width-1))
+        console.print("└" + "─" * (term_width-1))
 
+    print(" " * term_width, end="\r") # we have to clear screen here
     return VulnsArray
