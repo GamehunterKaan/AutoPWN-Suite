@@ -1,21 +1,18 @@
 from os import get_terminal_size
 
-from rich.console import Console
+from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
-from rich.align import Align
 
 
 # https://patorjk.com/software/taag/
-def print_banner():
-    console = Console()
-
+def print_banner(console) -> None:
     banner = """\
     ___           __          ____  _       __ _   __   _____         _  __
         /   |  __  __ / /_ ____   / __ \| |     / // | / /  / ___/ __  __ (_)/ /_ ___
        / /| | / / / // __// __ \ / /_/ /| | /| / //  |/ /   \__ \ / / / // // __// _ \\
       / ___ |/ /_/ // /_ / /_/ // ____/ | |/ |/ // /|  /   ___/ // /_/ // // /_ /  __/
-     /_/  |_|\__,_/ \__/ \____//_/      |__/|__//_/ |_/   /____/ \__,_//_/ \__/ \___/
+     /_/  |_|\____/ \__/ \____//_/      |__/|__//_/ |_/   /____/ \____//_/ \__/ \___/
     """
     width, _ = get_terminal_size()
 
@@ -28,13 +25,6 @@ def print_banner():
             ),
             vertical="middle", align="center"
         ),
-        width=width, height=8
-    )
-    console.print(
-        "Developed by GamehunterKaan. (https://auto.pwnspot.com)", style="blue"
+        width=width, height=8, subtitle="by GamehunterKaan (https://auto.pwnspot.com)"
     )
     console.print(panel)
-    console.print(
-        "I am not responsible if you are doing something"
-        + " illegal using this program!", style="red"
-    )
