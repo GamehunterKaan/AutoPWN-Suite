@@ -11,6 +11,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 ![GitHub Repo stars](https://img.shields.io/github/stars/GamehunterKaan/AutoPWN-Suite?style=social)
 ![Banner](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/banner.png)
 
+
 ## Features
 - Fully automatic! (Use `-y` flag to enable)
 - Detect network IP range without any user input. 
@@ -26,11 +27,13 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Send scan results via webhook or email.
 - Works on Windows, MacOS and Linux.
 
+
 ## How does it work?
 
-AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of softwares running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of "keywords" to search [NIST vulnerability database](https://www.nist.gov/).
+AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of softwares running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of "keywords" to search [NIST vulnerability database.](https://www.nist.gov/)
 
-[Visit "PWN Spot!" for more information](https://pwnspot.com/posts/AutoPWN/)
+[Visit "PWN Spot!" for more information.](https://pwnspot.com/posts/AutoPWN/)
+
 
 ## Demo
 
@@ -59,7 +62,7 @@ OR
 You can download debian (deb) package from [releases.](https://github.com/GamehunterKaan/AutoPWN-Suite/releases)
 
 ```
-sudo apt-get install ./autopwn-suite_1.5.0.deb
+sudo apt-get install ./autopwn-suite_2.0.0.deb
 ```
 
 OR
@@ -68,24 +71,28 @@ You can use Google Cloud Shell.
 
 [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/GamehunterKaan/AutoPWN-Suite.git)
 
+
 ## Usage
 
 Running with root privileges (sudo) is always recommended.
 
-Automatic mode (This is the intended way of using AutoPWN Suite.)
+Automatic mode (This is the intended way of using AutoPWN Suite)
 
 ```console
 autopwn-suite -y
 ```
 
+
 Help Menu
 
 ```console
 $ autopwn-suite -h
-usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-t TARGET] [-hf HOSTFILE] [-st {arp,ping}] [-nf NMAPFLAGS] [-s {0,1,2,3,4,5}] [-a API] [-m {evade,noise,normal}]
-                  [-nt TIMEOUT] [-o OUTPUT] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK]
 
-AutoPWN Suite
+usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-t TARGET] [-hf HOSTFILE] [-st {arp,ping}] [-nf NMAPFLAGS] [-s {0,1,2,3,4,5}] [-a API] [-m {evade,noise,normal}]
+                  [-nt TIMEOUT] [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER]
+                  [-rpesp PORT] [-rpw WEBHOOK]
+
+AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.
 
 options:
   -h, --help            show this help message and exit
@@ -118,6 +125,8 @@ Reporting:
 
   -o OUTPUT, --output OUTPUT
                         Output file name. (Default : autopwn.log)
+  -ot {html,txt,svg}, --outputtype {html,txt,svg}
+                        Output file type. (Default : html)
   -rp {email,webhook}, --report {email,webhook}
                         Report sending method.
   -rpe EMAIL, --reportemail EMAIL
@@ -135,9 +144,12 @@ Reporting:
   -rpw WEBHOOK, --reportwebhook WEBHOOK
                         Webhook to use for sending report.
 ```
+
+
 ## Currently working on
-- https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
 - XSS tests.
+- SQL Injection tests.
+
 
 ## TODO
 
@@ -147,18 +159,13 @@ Do you have a cool feature idea? [Create a feature request!](https://github.com/
 - [ ] XSS tests.
 - [ ] SQL Injection tests.
 - [ ] Web app dirbusting.
-- [ ] https://github.com/GamehunterKaan/AutoPWN-Suite/issues/9
 - [ ] Support for smaller terminals.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
-- [ ] Seperate script for checking local privilege escalation vulnerabilities.
 - [ ] Function to brute force common services like `ssh`, `vnc`, `ftp` etc.
-- [ ] Built in reverse shell handler that automatically stabilizes shell like [pwncat](https://github.com/calebstewart/pwncat).
-- [ ] Function to generate reverse shell commands based on IP and port.
 - [ ] GUI interface.
-- [ ] Meterpreter payload generator with common evasion techniques.
-- [ ] Fileless malware unique to AutoPWN Suite.
 - [ ] Daemon mode.
 - [ ] Option to use as a module.
+
 
 ## Contributing to AutoPWN Suite
 
@@ -177,4 +184,4 @@ Having trouble using this tool? You can reach me out on [discord](https://search
 
 ## Support & Hire Me!
 
-If you want to support my work and also get your job done you can hire me on [Fiverr](https://www.fiverr.com/kaangultekin)! I do various things such as website pentesting, python programming, malware hunting, PC optimization and mentoring.
+If you want to support my work and also get your job done you can hire me on [Fiverr](https://www.fiverr.com/kaangultekin)! I do various things such as website pentesting, python programming, cleaning malware, PC optimization, file recovery and mentoring.
