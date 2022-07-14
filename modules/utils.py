@@ -522,15 +522,15 @@ def GetHostsToScan(hosts, console):
                     )
                 )
             else:
-                try:
-                    if int(host) < len(hosts) and int(host) >= 0:
-                        Targets = [hosts[int(host)]]
-                        break
-                except:
+                if int(host) < len(hosts) and int(host) >= 0:
+                    Targets = [hosts[int(host)]]
+                    break
+                else:
                     console.print(
-                        "Please enter a valid host number or 'all' "
-                        + "or 'exit'", style="red"
-                    )
+                    "Please enter a valid host number or 'all' "
+                    + "or 'exit'", style="red"
+                )
+                
 
     return Targets
 
