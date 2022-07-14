@@ -1,14 +1,15 @@
 import logging
-from os import get_terminal_size
 
 from rich.logging import RichHandler
 from rich.text import Text
+
+from modules.utils import get_terminal_width
 
 
 def banner(msg, color, console) -> None:
     log = Logger()
 
-    term_width, _ = get_terminal_size()
+    term_width = get_terminal_width()
 
     console.print("─"*term_width, style=color)
     console.print(Text(msg), justify="center", style=color)
