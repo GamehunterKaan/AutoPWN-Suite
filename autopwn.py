@@ -64,13 +64,15 @@ def StartScanning(
 
 
 def main() -> None:
-
     __author__ = "GamehunterKaan"
     __version__ = "2.0.0"
 
     args = cli()
-    console = Console(record=True)
-    log = Logger()
+    if args.no_color:
+        console = Console(record=True, color_system=None)
+    else:
+        console = Console(record=True, color_system="truecolor")
+    log = Logger(console)
 
     if args.version:
         print(f"AutoPWN Suite v{__version__}")
