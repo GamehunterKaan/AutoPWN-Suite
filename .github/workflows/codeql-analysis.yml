@@ -14,11 +14,11 @@ name: "CodeQL"
 on:
   push:
     paths: '**.py'
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
   pull_request:
     paths: '**.py'
     # The branches below must be a subset of the branches above
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
 
 jobs:
   analyze:
