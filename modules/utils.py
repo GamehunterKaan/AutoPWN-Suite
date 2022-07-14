@@ -600,17 +600,17 @@ def InitArgsConf(args, log):
             args.report_email_from = config.get("REPORT", "email_from").lower()
 
         if config.has_option("REPORT", "email_server"):
-            args.report_email_server  = config.get(
+            args.report_email_server = config.get(
                     "REPORT", "email_server"
                 ).lower()
 
         if config.has_option("REPORT", "email_port"):
-            args.report_email_server_port  = config.get(
+            args.report_email_server_port = config.get(
                     "REPORT", "email_port"
                 ).lower()
 
         if config.has_option("REPORT", "webhook"):
-            args.report_webhook  = config.get("REPORT", "webhook")
+            args.report_webhook = config.get("REPORT", "webhook")
 
     except FileNotFoundError:
         log.logger("error", "Config file not found!")
@@ -765,7 +765,7 @@ def check_nmap(log):
                 ).lower() != "n"
         if auto_install:
             platform_ = system().lower()
-            if  platform_ == "linux":
+            if platform_ == "linux":
                 install_nmap_linux(log)
             if platform_ == "windows":
                 install_nmap_windows(log)
