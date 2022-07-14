@@ -12,8 +12,8 @@ from modules.searchvuln import SearchSploits
 from modules.utils import (GetHostsToScan, InitArgsAPI, InitArgsConf,
                            InitArgsMode, InitArgsScanType, InitArgsTarget,
                            InitAutomation, InitReport, ParamPrint, SaveOutput,
-                           ScanMode, ScanType, UserConfirmation, WebScan,
-                           check_nmap, cli, is_root, get_terminal_width)
+                           ScanMode, UserConfirmation, WebScan, check_nmap,
+                           cli, get_terminal_width, is_root)
 from modules.web.webvuln import webvuln
 
 
