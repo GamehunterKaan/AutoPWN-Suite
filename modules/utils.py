@@ -622,7 +622,8 @@ def install_nmap_linux(log):
     distro_ = distro.id().lower()
     while True:
         try:
-            if distro_ in ["ubuntu", "debian", "linuxmint", "raspbian", "kali", "parrot"]:
+            if distro_ in ["ubuntu", "debian", "linuxmint",
+                           "raspbian", "kali", "parrot"]:
                 check_call(
                     [
                         "/usr/bin/sudo",
@@ -746,10 +747,13 @@ def check_nmap(log):
         )
     except CalledProcessError:
         log.logger("warning", "Nmap is not installed.")
-        auto_install = input(
-                f"Install Nmap on your system ({distro.id()}: {platform()})? "
-            )
-        if auto_install in ["y", "Y"]:
+        if DontAskForConfirmation:
+            auto_install = True
+        else:
+            auto_install = input(
+                    f"Install Nmap on your system ({distro.id()}: {platform()})? "
+                ).lower() != "n"
+        if auto_install:
             platform_ = system().lower()
             if  platform_ == "linux":
                 install_nmap_linux()
