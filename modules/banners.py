@@ -5,8 +5,6 @@ from rich.text import Text
 from modules.utils import get_terminal_width
 
 
-
-
 # https://patorjk.com/software/taag/
 def print_banner(console) -> None:
     width = get_terminal_width()
