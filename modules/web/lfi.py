@@ -1,5 +1,4 @@
-from os import get_terminal_size
-
+from modules.utils import get_terminal_width
 from requests import get
 
 
@@ -61,7 +60,7 @@ class TestLFI:
         ]
 
     def exploit_lfi(self, base_url, url_params, console) -> None:
-        term_width, _ = get_terminal_size()
+        term_width = get_terminal_width()
         for param in url_params:
             for test in self.lfi_tests:
                 # create a new url with the test as the value of the url_params
@@ -76,23 +75,22 @@ class TestLFI:
                     )
                     continue
                 else:
-                    # if the response is 200, the test was successful
                     if (
                         response.text.find(
-                                "root:x:0:0:root:/root:/bin/bash"
+                                "root:x:0:0:root:/root"
                             ) != -1
                         ):
                         print(" " * term_width, end="\r")
-                        console.print(f"LFI on : {test_url}")
+                        console.print(
+                            f"[red][[/red][green]+[/green][red]][/red]"
+                            + f" [white]LFI :[/white] {test_url}"
+                        )
                         break
 
     def test_lfi(self, url, console) -> None:
         """
         Test for LFI
         """
-        # split the url into the base url and the parameters
         base_url, params = url.split("?")[0], url.split("?")[1]
-        # get the parameters from the url
         params_dict = params.split("&")
-        # exploit the lfi
         self.exploit_lfi(base_url, params_dict, console)
