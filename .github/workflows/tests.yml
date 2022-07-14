@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  tests:
+  Tests:
 
     runs-on: ${{ matrix.os }}
     strategy:
@@ -32,12 +32,15 @@ jobs:
       uses: KnicKnic/os-specific-run@v1.0.4
       with:
         linux: |
-          sudo apt-get update && sudo apt-get install nmap -y
+          sudo apt-get update
+          sudo apt-get install nmap -y
         macos: |
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           brew install nmap
         windows: |
           powershell Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
           choco install nmap -y
+          chcp 65001
+          set PYTHONIOENCODING=utf-8
     - name: Automatic test
       run: python autopwn.py -y -t 127.0.0.1 --no-color
