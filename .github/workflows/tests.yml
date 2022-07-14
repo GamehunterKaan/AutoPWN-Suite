@@ -20,8 +20,6 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-    - name: OS specific run
-      uses: KnicKnic/os-specific-run@v1.0.4
     - uses: actions/checkout@v3
     - name: Set up Python 3.10
       uses: actions/setup-python@v3
@@ -30,12 +28,15 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-      linux: |
-        sudo apt-get update && sudo apt-get install nmap -y
-      macos: |
-        bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        brew install nmap
-      windows: |
-        powershell winget install nmap --silent
+    - name: OS specific run
+      uses: KnicKnic/os-specific-run@v1.0.4
+      with:
+        linux: |
+          sudo apt-get update && sudo apt-get install nmap -y
+        macos: |
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          brew install nmap
+        windows: |
+          powershell winget install nmap --silent
     - name: Automatic test
       run: python autopwn.py -y -t 127.0.0.1
