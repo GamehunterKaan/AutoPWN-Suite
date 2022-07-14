@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from os import get_terminal_size
 from textwrap import wrap
 
 from nvdlib import searchCPE, searchCVE
 
 from modules.logger import banner
-from modules.utils import CheckConnection
+from modules.utils import CheckConnection, get_terminal_width
 
 
 @dataclass
@@ -58,7 +57,7 @@ def GenerateKeywords(HostArray) -> list:
 
 
 def SearchKeyword(keyword, log, apiKey=None):
-    term_width, _ = get_terminal_size()
+    term_width = get_terminal_width()
     print(" " * term_width, end="\r") # we have to clear screen here
     print(
         "Searching vulnerability database for keyword"
@@ -105,7 +104,7 @@ def SearchKeyword(keyword, log, apiKey=None):
 def SearchSploits(HostArray, log, console, apiKey=None) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
-    term_width, _ = get_terminal_size()
+    term_width = get_terminal_width()
 
     if not CheckConnection():
         log.logger(
