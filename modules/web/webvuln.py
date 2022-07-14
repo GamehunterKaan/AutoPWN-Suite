@@ -48,7 +48,7 @@ def webvuln(target, log, console) -> None:
 
     if len(testable_urls) == 0:
         log.logger(
-            "error",
+            "warning",
             "No testable urls found for current host."
         )
         return
