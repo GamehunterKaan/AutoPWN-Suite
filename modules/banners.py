@@ -40,7 +40,4 @@ ___           __          ____  _       __ _   __   _____         _  __
         ),
         width=width, height=height, subtitle="by GamehunterKaan (https://auto.pwnspot.com)"
     )
-    try:
-        console.print(panel)
-    except UnicodeEncodeError:
-        console.print("Banner failed to print due to UnicodeEncodeError.")
+    console.print(panel)
