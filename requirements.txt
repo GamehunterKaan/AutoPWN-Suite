@@ -3,3 +3,4 @@ rich
 python-nmap
 nvdlib
 bs4
+distro
