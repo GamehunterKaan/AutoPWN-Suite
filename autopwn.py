@@ -13,18 +13,31 @@ from modules.utils import (GetHostsToScan, InitArgsAPI, InitArgsConf,
                            InitArgsMode, InitArgsScanType, InitArgsTarget,
                            InitAutomation, InitReport, ParamPrint, SaveOutput,
                            ScanMode, UserConfirmation, WebScan, check_nmap,
-                           cli, get_terminal_width, is_root)
+                           cli)
 from modules.web.webvuln import webvuln
 
 
-def FurtherEnumuration(
+def StartScanning(
         args,
-        hosts,
-        console,
-        log,
+        targetarg,
+        scantype,
         scanmode,
-        apiKey
+        apiKey,
+        console,
+        log
     ) -> None:
+
+    check_nmap(log)
+
+    if scanmode == ScanMode.Noise:
+        NoiseScan(
+            targetarg, log, console, scantype, args.noise_timeout
+        )
+
+    hosts = DiscoverHosts(
+        targetarg, console, scantype, scanmode
+    )
+
     Targets = GetHostsToScan(hosts, console)
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
     ScanWeb = WebScan()
@@ -43,8 +56,13 @@ def FurtherEnumuration(
         if ScanWeb:
             webvuln(host, log, console)
 
+    console.print(
+        "{time} - Scan completed.".format(
+            time = datetime.now().strftime("%b %d %Y %H:%M:%S")
+        )
+    )
 
-#main function
+
 def main() -> None:
 
     __author__ = "GamehunterKaan"
@@ -58,25 +76,17 @@ def main() -> None:
         print(f"AutoPWN Suite v{__version__}")
         raise SystemExit
 
+    print_banner(console)
+    
     if args.config:
         InitArgsConf(args, log)
 
-    print_banner(console)
-
-    term_width = get_terminal_width()
-    DontAskForConfirmation = InitAutomation(args)
+    InitAutomation(args)
     targetarg = InitArgsTarget(args, log)
     scantype = InitArgsScanType(args, log)
     scanmode = InitArgsMode(args, log)
     apiKey = InitArgsAPI(args, log)
     ReportMethod, ReportObject = InitReport(args, log)
-
-    if not is_root():
-        log.logger(
-            "warning",
-            "It is recommended to run this script as root"
-            + " since it is more silent and accurate."
-        )
 
     ParamPrint(
         args,
@@ -84,35 +94,20 @@ def main() -> None:
         scantype,
         scanmode,
         apiKey,
-        console
-    )
-
-    check_nmap(log)
-
-    if scanmode == ScanMode.Noise:
-        NoiseScan(
-            targetarg, log, console, scantype, args.noise_timeout
-        )
-
-    OnlineHosts = DiscoverHosts(
-        targetarg, console, scantype, scanmode
-    )
-
-    FurtherEnumuration(
-        args,
-        OnlineHosts,
         console,
-        log,
+        log
+    )
+
+    StartScanning(
+        args,
+        targetarg,
+        scantype,
         scanmode,
         apiKey,
+        console,
+        log
     )
 
-    print(" " * term_width, end="\r")
-    console.print(
-        "{time} - Scan completed.".format(
-            time = datetime.now().strftime("%b %d %Y %H:%M:%S")
-        )
-    )
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
