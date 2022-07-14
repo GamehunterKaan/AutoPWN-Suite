@@ -16,10 +16,9 @@ from subprocess import DEVNULL, CalledProcessError, check_call
 from sys import platform as sys_platform
 
 from requests import get
-from rich.align import Align
 from rich.text import Text
 
-from modules.report import ReportType
+from modules.report import ReportMail, ReportType
 
 
 class ScanMode(Enum):
@@ -31,6 +30,7 @@ class ScanMode(Enum):
 class ScanType(Enum):
     Ping = 0
     ARP = 1
+
 
 
 def cli():
@@ -357,7 +357,7 @@ def InitArgsMode(args, log):
             )
     elif args.mode == "noise":
         scanmode = ScanMode.Noise
-        log.logger("error", "Noise mode enabled!")
+        log.logger("info", "Noise mode enabled!")
 
     return scanmode
 
@@ -376,7 +376,7 @@ def InitReport(args, log):
         if args.reportemailpassword:
             ReportMailPassword = args.reportemailpassword
         else:
-            ReportMailPassword = getpass("Enter your email password : ")
+            ReportMailPassword = input("Enter your email password : ")
 
         if args.reportemailto:
             ReportMailTo = args.reportemailto
@@ -398,7 +398,7 @@ def InitReport(args, log):
                 )
             if ReportMailServer == "smtp.gmail.com":
                 log.logger(
-                    "error",
+                    "warning",
                     "Google no longer supports sending mails via SMTP."
                 )
                 return ReportType.NONE, None
@@ -711,7 +711,7 @@ def install_nmap_windows(log):
     try:
         check_call(
             [
-                "powershell",
+                "C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\powershell.exe",
                 "winget",
                 "install",
                 "nmap",
@@ -719,8 +719,14 @@ def install_nmap_windows(log):
                 ],
             stderr=DEVNULL
         )
+        log.logger(
+            "warning",
+            "Nmap is installed but shell restart is required."
+        )
+        raise SystemExit
     except CalledProcessError:
         log.logger("error", "Couldn't install nmap! (Windows)")
+        raise SystemExit
 
 
 def install_nmap_mac(log):
@@ -745,7 +751,7 @@ def check_nmap(log):
             stdout=DEVNULL,
             stderr=DEVNULL
         )
-    except CalledProcessError:
+    except (CalledProcessError, FileNotFoundError):
         log.logger("warning", "Nmap is not installed.")
         if DontAskForConfirmation:
             auto_install = True
@@ -756,11 +762,11 @@ def check_nmap(log):
         if auto_install:
             platform_ = system().lower()
             if  platform_ == "linux":
-                install_nmap_linux()
+                install_nmap_linux(log)
             if platform_ == "windows":
-                install_nmap_windows()
+                install_nmap_windows(log)
             elif platform_ == "darwin":
-                install_nmap_mac()
+                install_nmap_mac(log)
             else:
                 raise SystemExit(
                     "Unknown OS! Auto installation not supported!"
