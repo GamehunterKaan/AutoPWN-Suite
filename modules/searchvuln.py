@@ -32,7 +32,8 @@ def GenerateKeywords(HostArray) -> list:
                 "smtp",
                 "smb",
                 "smbv2",
-                "linux telnetd"
+                "linux telnetd",
+                "Microsoft Windows RPC"
             ]
 
         #if any of these equal to "Unknown" set them to empty string
@@ -74,7 +75,7 @@ def SearchKeyword(keyword, log, apiKey=None):
 
     except KeyboardInterrupt:
         log.logger(
-            "error", f"Skipping vulnerability detection for keyword {keyword}"
+            "warning", f"Skipping vulnerability detection for keyword {keyword}"
         )
     except LookupError:
         log.logger(
@@ -116,7 +117,7 @@ def SearchSploits(HostArray, log, console, apiKey=None) -> list:
     keywords = GenerateKeywords(HostArray)
 
     if len(keywords) == 0:
-        log.logger("error", f"Insufficient information for {target}")
+        log.logger("warning", f"Insufficient information for {target}")
         return []
 
     log.logger(
