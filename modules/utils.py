@@ -57,6 +57,13 @@ def cli():
         metavar="CONFIG",
         type=str
     )
+    argparser.add_argument(
+        "-nc", "--no-color",
+        help="Disable colors.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
 
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument(
