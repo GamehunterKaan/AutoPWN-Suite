@@ -43,10 +43,7 @@ def InitializeEmailReport(EmailObj, log, console) -> None:
 
     console.save_html("tmp_report.html")
 
-    log.logger(
-        "success",
-        "Sending email report..."
-    )
+    log.logger("info","Sending email report...")
 
     SendEmail(
         email,
@@ -95,10 +92,7 @@ def SendEmail(
     text = msg.as_string()
     mail.sendmail(email, email_to, text)
     mail.quit()
-    log.logger(
-        "success",
-        "Email report sent successfully."
-    )
+    log.logger("success","Email report sent successfully.")
 
 
 def InitializeWebhookReport(Webhook, log, console) -> None:
@@ -106,10 +100,7 @@ def InitializeWebhookReport(Webhook, log, console) -> None:
     Initialize webhook report.
     """
     # Send webhook report
-    log.logger(
-        "info",
-        "Sending webhook report..."
-    )
+    log.logger("info","Sending webhook report...")
     console.save_text("report.log")
     SendWebhook(Webhook, log)
     remove("report.log")
@@ -126,22 +117,13 @@ def SendWebhook(url, log) -> None:
         req = post(url, files=payload)
         file.close()
         if req.status_code == 200:
-            log.logger(
-                "success",
-                "Webhook report sent succesfully."
-            )
+            log.logger("success","Webhook report sent succesfully.")
         else:
-            log.logger(
-                "error",
-                "Webhook report failed to send."
-            )
+            log.logger("error","Webhook report failed to send.")
             print(req.text)
     except Exception as e:
         log.logger("error", e)
-        log.logger(
-            "error",
-            "Webhook report failed to send."
-        )
+        log.logger("error","Webhook report failed to send.")
 
 
 def InitializeReport(Method, ReportObject, log, console) -> None:
