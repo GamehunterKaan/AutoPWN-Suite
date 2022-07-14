@@ -858,7 +858,7 @@ def get_terminal_width() -> int:
     try:
         width, _ = get_terminal_size()
     except OSError:
-        width = 200
+        width = 80
 
     if system().lower() == "windows":
         width -= 1
