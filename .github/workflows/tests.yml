@@ -37,6 +37,7 @@ jobs:
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           brew install nmap
         windows: |
-          powershell winget install nmap --silent
+          powershell Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+          choco install nmap -y
     - name: Automatic test
       run: python autopwn.py -y -t 127.0.0.1
