@@ -8,8 +8,7 @@ from rich import box
 from rich.table import Table
 
 from modules.logger import banner
-from modules.utils import (GetIpAdress, ScanMode, ScanType, get_terminal_width,
-                           is_root)
+from modules.utils import GetIpAdress, ScanMode, ScanType, clear_line, is_root
 
 
 @dataclass()
@@ -285,8 +284,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     """
     Analyse and print scan results.
     """
-    term_width = get_terminal_width()
-    print(" " * term_width)
+    clear_line()
     HostArray = []
     if target is None:
         target = nm.all_hosts()[0]
@@ -311,7 +309,8 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
 
     banner(f"Portscan results for {target}", "green", console)
 
-    if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
+    if (not CurrentTargetInfo.mac == "Unknown" 
+        and not CurrentTargetInfo.os == "Unknown"):
        console.print(CurrentTargetInfo.colored(), justify="center")
 
     table = Table(box=box.MINIMAL)
