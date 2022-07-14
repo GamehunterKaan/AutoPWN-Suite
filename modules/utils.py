@@ -247,14 +247,12 @@ def DetectIPRange() -> str:
     return target
 
 
-def InitAutomation(args) -> bool:
+def InitAutomation(args) -> None:
+    global DontAskForConfirmation
     if args.yes_please:
-        global DontAskForConfirmation
         DontAskForConfirmation = True
-        return True
     else:
         DontAskForConfirmation = False
-        return False
 
 
 def InitArgsAPI(args, log) -> str:
@@ -781,9 +779,17 @@ def ParamPrint(
         scantype_name,
         scanmode_name,
         apiKey,
-        console
+        console,
+        log
     ):
-    
+
+    if not is_root():
+        log.logger(
+            "warning",
+            "It is recommended to run this script as root"
+            + " since it is more silent and accurate."
+        )
+
     term_width = get_terminal_width()
 
     msg = (
@@ -856,3 +862,8 @@ def get_terminal_width() -> int:
         width -= 1
 
     return width
+
+
+def clear_line() -> None:
+    term_width = get_terminal_width()
+    print(" " * term_width, end="\r")
