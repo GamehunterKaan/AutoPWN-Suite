@@ -294,7 +294,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     try:
         nm[target]
     except KeyError:
-        log.logger("error", f"Target {target} seems to be offline.")
+        log.logger("warning", f"Target {target} seems to be offline.")
         return []
 
     CurrentTargetInfo = InitHostInfo(nm, target)
@@ -306,7 +306,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
         log.logger("info", f"Target {target} seems to be us.")
 
     if len(nm[target].all_tcp()) == 0:
-        log.logger("error", f"Target {target} seems to have no open ports.")
+        log.logger("warning", f"Target {target} seems to have no open ports.")
         return HostArray
 
     banner(f"Portscan results for {target}", "green", console)
