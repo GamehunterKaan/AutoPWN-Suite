@@ -1,5 +1,4 @@
 from datetime import datetime
-from os import get_terminal_size
 
 from rich.console import Console
 
@@ -14,17 +13,16 @@ from modules.utils import (GetHostsToScan, InitArgsAPI, InitArgsConf,
                            InitArgsMode, InitArgsScanType, InitArgsTarget,
                            InitAutomation, InitReport, ParamPrint, SaveOutput,
                            ScanMode, ScanType, UserConfirmation, WebScan,
-                           check_nmap, cli, is_root)
+                           check_nmap, cli, is_root, get_terminal_width)
 from modules.web.webvuln import webvuln
 
 
 def FurtherEnumuration(
+        args,
         hosts,
         console,
         log,
-        scanspeed,
         scanmode,
-        nmapflags,
         apiKey
     ) -> None:
     Targets = GetHostsToScan(hosts, console)
@@ -33,7 +31,9 @@ def FurtherEnumuration(
 
     for host in Targets:
         if ScanPorts:
-            PortScanResults = PortScan(host, console, log, scanspeed, scanmode, nmapflags)
+            PortScanResults = PortScan(host, console, log, args.speed,
+                                       args.host_timeout, scanmode,
+                                       args.nmap_flags)
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
             if ScanVulns and len(PortArray) > 0:
                 VulnsArray = SearchSploits(PortArray, log, console, apiKey)
@@ -63,17 +63,12 @@ def main() -> None:
 
     print_banner(console)
 
-    term_width, _ = get_terminal_size()
-    outputfile = args.output
+    term_width = get_terminal_width()
     DontAskForConfirmation = InitAutomation(args)
     targetarg = InitArgsTarget(args, log)
     scantype = InitArgsScanType(args, log)
     scanmode = InitArgsMode(args, log)
-    scanspeed = args.speed
-    nmapflags = args.nmapflags
     apiKey = InitArgsAPI(args, log)
-    hostfile = args.hostfile
-    noisetimeout = args.noisetimeout
     ReportMethod, ReportObject = InitReport(args, log)
 
     if not is_root():
@@ -88,20 +83,15 @@ def main() -> None:
         targetarg,
         scantype,
         scanmode,
-        scanspeed,
-        nmapflags,
         apiKey,
-        outputfile,
-        DontAskForConfirmation,
-        console,
-        term_width
+        console
     )
 
     check_nmap(log)
 
     if scanmode == ScanMode.Noise:
         NoiseScan(
-            targetarg, log, console, scantype, noisetimeout
+            targetarg, log, console, scantype, args.noise_timeout
         )
 
     OnlineHosts = DiscoverHosts(
@@ -109,12 +99,11 @@ def main() -> None:
     )
 
     FurtherEnumuration(
+        args,
         OnlineHosts,
         console,
         log,
-        scanspeed,
         scanmode,
-        nmapflags,
         apiKey,
     )
 
@@ -126,7 +115,7 @@ def main() -> None:
     )
 
     InitializeReport(ReportMethod, ReportObject, log, console)
-    SaveOutput(console, args.outputtype, args.report, outputfile)
+    SaveOutput(console, args.output_type, args.report, args.output)
 
 
 if __name__ == "__main__":
