@@ -530,7 +530,6 @@ def GetHostsToScan(hosts, console):
                     "Please enter a valid host number or 'all' "
                     + "or 'exit'", style="red"
                 )
-                
 
     return Targets
 
