@@ -64,24 +64,14 @@ def SearchKeyword(keyword, log, apiKey=None):
     )
 
     try:
-        if apiKey is None:
-            ApiResponseCPE = searchCPE(keyword=keyword)
-            ApiResponseCVE = searchCVE(keyword=keyword)
-        else:
-            ApiResponseCPE = searchCPE(keyword=keyword, key=apiKey)
-            ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
-
+        ApiResponseCPE = searchCPE(keyword=keyword, key=apiKey)
+        ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
     except KeyboardInterrupt:
         log.logger(
             "warning", f"Skipping vulnerability detection for keyword {keyword}"
         )
-    except LookupError:
-        log.logger(
-            "error",
-            f"NIST API returned an invalid response for keybord {keyword}"
-        )
     except Exception as e:
-        log.logger("error", f"Error: {e}")
+        log.logger("error", e)
     else:
         tempTitleList, TitleList = [], []
         for CPE in ApiResponseCPE:
@@ -107,7 +97,7 @@ def SearchSploits(HostArray, log, console, apiKey=None) -> list:
 
     if not CheckConnection():
         log.logger(
-            "error", 
+            "error",
             "Connection error was raised. Skipping vulnerability detection."
         )
         return []
