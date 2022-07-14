@@ -4,7 +4,7 @@ from textwrap import wrap
 from nvdlib import searchCPE, searchCVE
 
 from modules.logger import banner
-from modules.utils import CheckConnection, get_terminal_width
+from modules.utils import CheckConnection, clear_line, get_terminal_width
 
 
 @dataclass
@@ -33,10 +33,9 @@ def GenerateKeywords(HostArray) -> list:
                 "smb",
                 "smbv2",
                 "linux telnetd",
-                "Microsoft Windows RPC"
+                "microsoft windows rpc"
             ]
 
-        #if any of these equal to "Unknown" set them to empty string
         if service == "Unknown":
             service = ""
 
@@ -58,8 +57,7 @@ def GenerateKeywords(HostArray) -> list:
 
 
 def SearchKeyword(keyword, log, apiKey=None):
-    term_width = get_terminal_width()
-    print(" " * term_width, end="\r") # we have to clear screen here
+    clear_line()
     print(
         "Searching vulnerability database for keyword"
         + f" {keyword}... CTRL-C to skip", end="\r"
@@ -143,7 +141,7 @@ def SearchSploits(HostArray, log, console, apiKey=None) -> list:
 
         VulnObject = Vuln(Software=Title, CVEs=[])
 
-        print(" " * term_width, end="\r") # we have to clear screen here
+        clear_line()
         console.print(f"┌─ [yellow][{Title}][/yellow]")
 
         for CVE in ApiResponseCVE:
@@ -181,5 +179,5 @@ def SearchSploits(HostArray, log, console, apiKey=None) -> list:
         VulnsArray.append(VulnObject)
         console.print("└" + "─" * (term_width-1))
 
-    print(" " * term_width, end="\r") # we have to clear screen here
+    clear_line()
     return VulnsArray
