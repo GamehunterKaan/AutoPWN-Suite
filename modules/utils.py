@@ -32,7 +32,6 @@ class ScanType(Enum):
     ARP = 1
 
 
-
 def cli():
     argparser = ArgumentParser(
         description="AutoPWN Suite | A project for scanning " + 
@@ -856,7 +855,10 @@ def SaveOutput(console, out_type, report, output_file):
 
 
 def get_terminal_width() -> int:
-    width, _ = get_terminal_size()
+    try:
+        width, _ = get_terminal_size()
+    except OSError:
+        width = 200
 
     if system().lower() == "windows":
         width -= 1
