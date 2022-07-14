@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
 from multiprocessing import Process
-from os import get_terminal_size
 from time import sleep
 
 from nmap import PortScanner
@@ -9,7 +8,8 @@ from rich import box
 from rich.table import Table
 
 from modules.logger import banner
-from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
+from modules.utils import (GetIpAdress, ScanMode, ScanType, get_terminal_width,
+                           is_root)
 
 
 @dataclass()
@@ -80,6 +80,7 @@ def PortScan(
         console,
         log,
         scanspeed=5,
+        host_timeout=240,
         mode=ScanMode.Normal,
         customflags="",
     ):
@@ -120,7 +121,7 @@ def PortScan(
                             "-sS",
                             "-sV",
                             "--host-timeout",
-                            "60",
+                            str(host_timeout),
                             "-Pn",
                             "-O",
                             "-T",
@@ -136,7 +137,7 @@ def PortScan(
                     [
                         "-sV",
                         "--host-timeout",
-                        "60",
+                        str(host_timeout),
                         "-Pn",
                         "-T",
                         str(scanspeed),
@@ -284,7 +285,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     """
     Analyse and print scan results.
     """
-    term_width, _ = get_terminal_size()
+    term_width = get_terminal_width()
     print(" " * term_width)
     HostArray = []
     if target is None:
@@ -298,9 +299,6 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
 
     CurrentTargetInfo = InitHostInfo(nm, target)
 
-    if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
-       console.print(CurrentTargetInfo.colored(), justify="center")
-
     if is_root():
         if nm[target]["status"]["reason"] in ["localhost-response", "user-set"]:
             log.logger("info", f"Target {target} seems to be us.")
@@ -312,6 +310,9 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
         return HostArray
 
     banner(f"Portscan results for {target}", "green", console)
+
+    if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
+       console.print(CurrentTargetInfo.colored(), justify="center")
 
     table = Table(box=box.MINIMAL)
 
