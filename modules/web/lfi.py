@@ -1,4 +1,4 @@
-from modules.utils import get_terminal_width
+from modules.utils import clear_line
 from requests import get
 
 
@@ -60,7 +60,6 @@ class TestLFI:
         ]
 
     def exploit_lfi(self, base_url, url_params, console) -> None:
-        term_width = get_terminal_width()
         for param in url_params:
             for test in self.lfi_tests:
                 # create a new url with the test as the value of the url_params
@@ -80,7 +79,7 @@ class TestLFI:
                                 "root:x:0:0:root:/root"
                             ) != -1
                         ):
-                        print(" " * term_width, end="\r")
+                        clear_line()
                         console.print(
                             f"[red][[/red][green]+[/green][red]][/red]"
                             + f" [white]LFI :[/white] {test_url}"
