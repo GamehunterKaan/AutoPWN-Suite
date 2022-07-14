@@ -7,8 +7,6 @@ from modules.utils import get_terminal_width
 
 
 def banner(msg, color, console) -> None:
-    log = Logger()
-
     term_width = get_terminal_width()
 
     console.print("─"*term_width, style=color)
@@ -16,17 +14,17 @@ def banner(msg, color, console) -> None:
     console.print("─"*term_width, style=color)
 
 
-class Logger:
+class Logger():
     """
     Custom logger
     """
 
-    def __init__(self) -> None:
+    def __init__(self, console) -> None:
         logging.basicConfig(
             format="%(message)s",
             level=logging.INFO,
             datefmt="[%X]",
-            handlers=[RichHandler()]
+            handlers=[RichHandler(console=console)],
         )
 
         RichHandler.KEYWORDS = [
