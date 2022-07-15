@@ -16,7 +16,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Fully automatic! (Use `-y` flag to enable)
 - Detect network IP range without any user input. 
 - Vulnerability detection based on version.
-- Web app vulnerability testing. (Only LFI for now)
+- Web app vulnerability testing. (LFI, XSS, SQLI)
 - Get information about the vulnerability right from your terminal.
 - Automatically download exploit related with vulnerability.
 - Noise mode for creating a noise on the network.
@@ -88,78 +88,79 @@ Help Menu
 ```console
 $ autopwn-suite -h
 
-usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-t TARGET] [-hf HOSTFILE] [-st {arp,ping}] [-nf NMAPFLAGS] [-s {0,1,2,3,4,5}] [-a API] [-m {evade,noise,normal}]
-                  [-nt TIMEOUT] [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER]
-                  [-rpesp PORT] [-rpw WEBHOOK]
+usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-a API] [-m {evade,noise,normal}] [-nt TIMEOUT]
+                  [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK]
 
 AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.
 
 options:
   -h, --help            show this help message and exit
   -v, --version         Print version and exit.
-  -y, --yesplease       Don't ask for anything. (Full automatic mode)
+  -y, --yes-please      Don't ask for anything. (Full automatic mode)
   -c CONFIG, --config CONFIG
                         Specify a config file to use. (Default : None)
+  -nc, --no-color       Disable colors.
 
 Scanning:
   Options for scanning
 
   -t TARGET, --target TARGET
                         Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)
-  -hf HOSTFILE, --hostfile HOSTFILE
+  -hf HOST_FILE, --host-file HOST_FILE
                         File containing a list of hosts to scan.
-  -st {arp,ping}, --scantype {arp,ping}
+  -sd, --skip-discovery
+                        Skips the host discovery phase.
+  -st {arp,ping}, --scan-type {arp,ping}
                         Scan type.
-  -nf NMAPFLAGS, --nmapflags NMAPFLAGS
+  -nf NMAP_FLAGS, --nmap-flags NMAP_FLAGS
                         Custom nmap flags to use for portscan. (Has to be specified like : -nf="-O")
   -s {0,1,2,3,4,5}, --speed {0,1,2,3,4,5}
                         Scan speed. (Default : 3)
+  -ht HOST_TIMEOUT, --host-timeout HOST_TIMEOUT
+                        Timeout for every host. (Default :240)
   -a API, --api API     Specify API key for vulnerability detection for faster scanning. (Default : None)
   -m {evade,noise,normal}, --mode {evade,noise,normal}
                         Scan mode.
-  -nt TIMEOUT, --noisetimeout TIMEOUT
-                        Noise mode timeout. (Default : None)
+  -nt TIMEOUT, --noise-timeout TIMEOUT
+                        Noise mode timeout.
 
 Reporting:
   Options for reporting
 
   -o OUTPUT, --output OUTPUT
                         Output file name. (Default : autopwn.log)
-  -ot {html,txt,svg}, --outputtype {html,txt,svg}
+  -ot {html,txt,svg}, --output-type {html,txt,svg}
                         Output file type. (Default : html)
   -rp {email,webhook}, --report {email,webhook}
                         Report sending method.
-  -rpe EMAIL, --reportemail EMAIL
+  -rpe EMAIL, --report-email EMAIL
                         Email address to use for sending report.
-  -rpep PASSWORD, --reportemailpassword PASSWORD
+  -rpep PASSWORD, --report-email-password PASSWORD
                         Password of the email report is going to be sent from.
-  -rpet EMAIL, --reportemailto EMAIL
+  -rpet EMAIL, --report-email-to EMAIL
                         Email address to send report to.
-  -rpef EMAIL, --reportemailfrom EMAIL
+  -rpef EMAIL, --report-email-from EMAIL
                         Email to send from.
-  -rpes SERVER, --reportemailserver SERVER
+  -rpes SERVER, --report-email-server SERVER
                         Email server to use for sending report.
-  -rpesp PORT, --reportemailserverport PORT
+  -rpesp PORT, --report-email-server-port PORT
                         Port of the email server.
-  -rpw WEBHOOK, --reportwebhook WEBHOOK
+  -rpw WEBHOOK, --report-webhook WEBHOOK
                         Webhook to use for sending report.
 ```
 
 
 ## Currently working on
-- XSS tests.
-- SQL Injection tests.
+- Option to use as a module.
+- Web app dirbusting.
 
 
 ## TODO
 
 Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
 
-- [x] 15 Completed.
-- [ ] XSS tests.
-- [ ] SQL Injection tests.
+- [x] 20 Completed.
 - [ ] Web app dirbusting.
-- [ ] Support for smaller terminals.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
 - [ ] Function to brute force common services like `ssh`, `vnc`, `ftp` etc.
 - [ ] GUI interface.
