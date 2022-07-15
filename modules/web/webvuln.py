@@ -1,6 +1,8 @@
 from modules.logger import banner
 from modules.web.crawler import crawl
 from modules.web.lfi import TestLFI
+from modules.web.sqli import TestSQLI
+from modules.web.xss import TestXSS
 from requests import get
 
 
@@ -10,6 +12,8 @@ def webvuln(target, log, console) -> None:
     """
 
     LFI = TestLFI(log, console)
+    SQLI = TestSQLI(log, console)
+    XSS = TestXSS(log, console)
 
     def get_url(target):
         """
@@ -56,6 +60,7 @@ def webvuln(target, log, console) -> None:
     banner(f"Testing web application on {target} ...", "purple", console)
 
     for url in testable_urls:
-        print(f"Testing for LFI on {url}", end="\r")
-        LFI.test_lfi(url, console)
+        LFI.test_lfi(url)
+        SQLI.test_sqli(url)
+        XSS.test_xss(url)
         tested_urls.append(url)
