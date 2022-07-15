@@ -72,7 +72,6 @@ class TestLFI:
                     test_url = f"{main_url}={test}"
                 else:
                     continue
-
                 
                 try:
                     response = get(test_url)
