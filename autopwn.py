@@ -111,7 +111,6 @@ def main() -> None:
         log
     )
 
-
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
 
