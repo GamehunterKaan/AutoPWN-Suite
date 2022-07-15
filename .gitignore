@@ -2,8 +2,10 @@ api.txt
 lapi.txt
 hosts.txt
 autopwn.log
+autopwn.html
+autopwn.svg
 .vscode/
 exploits/
 __pycache__/
 modules/__pycache__
-modules/nvdlib/__pycache__
+modules/web/__pycache__

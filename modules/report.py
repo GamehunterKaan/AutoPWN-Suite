@@ -1,6 +1,12 @@
-from enum import Enum
 from dataclasses import dataclass
-from modules.logger import info, error, warning, success, println, banner, print_colored, colors, bcolors
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from enum import Enum
+from os import remove
+from smtplib import SMTP
+
+from requests import post
+
 
 class ReportType(Enum):
     """
@@ -9,6 +15,7 @@ class ReportType(Enum):
     NONE = 0
     EMAIL = 1
     WEBHOOK = 2
+
 
 @dataclass()
 class ReportMail():
@@ -21,17 +28,9 @@ class ReportMail():
     email_from : str
     server : str
     port : int
-    attachment : str
 
-@dataclass()
-class ReportWebhook():
-    """
-    Report webhook.
-    """
-    url : str
-    attachment : str
 
-def InitializeEmailReport(EmailObj):
+def InitializeEmailReport(EmailObj, log, console) -> None:
     """
     Initialize email report.
     """
@@ -41,15 +40,33 @@ def InitializeEmailReport(EmailObj):
     email_from = EmailObj.email_from
     server = EmailObj.server
     port = EmailObj.port
-    attachment = EmailObj.attachment
 
-    # Send email report
-    print(" " * 100, end="\r")
-    print("Sending email report...", end="\r")
-    SendEmail(email, password, email_to, email_from, server, port, attachment)
-    print(" " * 100, end="\r")
+    console.save_html("tmp_report.html")
 
-def SendEmail(email,password, email_to, email_from, server, port, attachment):
+    log.logger("info","Sending email report...")
+
+    SendEmail(
+        email,
+        password,
+        email_to,
+        email_from,
+        server,
+        port,
+        log
+    )
+
+    remove("tmp_report.html")
+
+
+def SendEmail(
+        email,
+        password,
+        email_to,
+        email_from,
+        server,
+        port,
+        log
+    ) -> None:
     """
     Send email report.
     """
@@ -57,26 +74,16 @@ def SendEmail(email,password, email_to, email_from, server, port, attachment):
     # Since google disabled sending emails via
     # smtp, i didn't have an opportunity to test
     # please create an issue if you test this
-
-    from smtplib import SMTP
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from email.mime.base import MIMEBase
-    from email import encoders
-
     msg = MIMEMultipart()
-    msg['From'] = email_from
-    msg['To'] = email_to
-    msg['Subject'] = "AutoPWN Report"
+    msg["From"] = email_from
+    msg["To"] = email_to
+    msg["Subject"] = "AutoPWN Report"
 
     body = "AutoPWN Report"
-    msg.attach(MIMEText(body, 'plain'))
+    msg.attach(MIMEText(body, "plain"))
 
-    attachment = attachment
-    part = MIMEBase('application', 'octet-stream')
-    part.set_payload(open(attachment, 'rb').read())
-    encoders.encode_base64(part)
-    part.add_header('Content-Disposition', 'attachment; filename="%s"' % attachment)
+    html = open("tmp_report.html", "rb").read()
+    part = MIMEText(html, "text/html")
     msg.attach(part)
 
     mail = SMTP(server, port)
@@ -85,45 +92,45 @@ def SendEmail(email,password, email_to, email_from, server, port, attachment):
     text = msg.as_string()
     mail.sendmail(email, email_to, text)
     mail.quit()
-    print_colored("Email report sent successfully", colors.green)
+    log.logger("success","Email report sent successfully.")
 
 
-def InitializeWebhookReport(WebhookObj):
+def InitializeWebhookReport(Webhook, log, console) -> None:
     """
     Initialize webhook report.
     """
-    url = WebhookObj.url
-    attachment = WebhookObj.attachment
-
     # Send webhook report
-    print(" " * 100, end="\r")
-    print("Sending webhook report...", end="\r")
-    SendWebhook(url, attachment)
-    print(" " * 100, end="\r")
+    log.logger("info","Sending webhook report...")
+    console.save_text("report.log")
+    SendWebhook(Webhook, log)
+    remove("report.log")
 
-def SendWebhook(url, attachment):
+
+def SendWebhook(url, log) -> None:
     """
     Send webhook report.
     """
-    from requests import post
+    file = open("report.log", "r") # read of closed file
+    payload = {"payload": file}
 
-    payload = {
-        "payload": open(attachment, 'rb')
-    }
+    try:
+        req = post(url, files=payload)
+        file.close()
+        if req.status_code == 200:
+            log.logger("success","Webhook report sent succesfully.")
+        else:
+            log.logger("error","Webhook report failed to send.")
+            print(req.text)
+    except Exception as e:
+        log.logger("error", e)
+        log.logger("error","Webhook report failed to send.")
 
-    response = post(url, files=payload)
-    if response.status_code == 200:
-        print_colored("Webhook report sent successfully", colors.green)
-    else:
-        print_colored("Webhook report failed to send", colors.red)
 
-def InitializeReport(Method, ReportObject):
+def InitializeReport(Method, ReportObject, log, console) -> None:
     """
     Initialize report.
     """
     if Method == ReportType.EMAIL:
-        InitializeEmailReport(ReportObject)
+        InitializeEmailReport(ReportObject, log, console)
     elif Method == ReportType.WEBHOOK:
-        InitializeWebhookReport(ReportObject)
-    elif Method == ReportType.NONE:
-        pass
+        InitializeWebhookReport(ReportObject, log, console)

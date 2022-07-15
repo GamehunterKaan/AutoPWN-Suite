@@ -1,124 +1,143 @@
-from modules.nvdlib.nvdlib import searchCPE, searchCVE, getCVE
-from modules.logger import info, error, warning, success, println, banner, print_colored, colors, bcolors
-from textwrap import wrap
-from os import get_terminal_size
 from dataclasses import dataclass
+from textwrap import wrap
+
+from nvdlib import searchCPE, searchCVE
+
+from modules.logger import banner
+from modules.utils import CheckConnection, clear_line, get_terminal_width
+
 
 @dataclass
 class Vuln:
     Software : str
     CVEs : list
 
+
 #generate keywords to search for from the information gathered from the target
-def GenerateKeywords(HostArray):
+def GenerateKeywords(HostArray) -> list:
     keywords = []
     for port in HostArray:
-        target = str(port[0])
-        targetport = str(port[1])
         service = str(port[2])
         product = str(port[3])
         version = str(port[4])
         templist = []
         #dont search if keyword is equal to any of these
-        dontsearch = ['ssh', 'vnc', 'http', 'https', 'ftp', 'sftp', 'smtp', 'smb', 'smbv2', 'linux telnetd']
+        dontsearch = [
+                "ssh",
+                "vnc",
+                "http",
+                "https",
+                "ftp",
+                "sftp",
+                "smtp",
+                "smb",
+                "smbv2",
+                "linux telnetd",
+                "microsoft windows rpc"
+            ]
 
-        #if any of these equal to 'Unknown' set them to empty string
-        if service == 'Unknown':
-            service = ''
-        
-        if product == 'Unknown':
-            product = ''
-        
-        if version == 'Unknown':
-            version = ''
+        if service == "Unknown":
+            service = ""
 
-        if product.lower() not in dontsearch and not product == '':
-            query1 = (product + ' ' + version).rstrip()
-            templist.append(query1)
+        if product == "Unknown":
+            product = ""
+
+        if version == "Unknown":
+            version = ""
+
+        if product.lower() not in dontsearch and product != "":
+            query = (f"{product} {version}").rstrip()
+            templist.append(query)
 
         for entry in templist:
-            if entry not in keywords and not entry == '':
+            if entry not in keywords and entry != "":
                 keywords.append(entry)
 
     return keywords
 
-def SearchKeyword(keyword, apiKey=None):
-    #search for the keyword in the NVD database
-    print(" " * 100, end="\r")
-    print("Searching vulnerability database for keyword %s... CTRL-C to skip" % (keyword), end="\r")
+
+def SearchKeyword(keyword, log, apiKey=None):
+    clear_line()
+    print(
+        "Searching vulnerability database for keyword"
+        + f" {keyword}... CTRL-C to skip", end="\r"
+    )
 
     try:
-        if apiKey == None:
-            ApiResponseCPE = searchCPE(keyword=keyword)
-            ApiResponseCVE = searchCVE(keyword=keyword)
-        else:
-            ApiResponseCPE = searchCPE(keyword=keyword, key=apiKey)
-            ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
+        ApiResponseCPE = searchCPE(keyword=keyword, key=apiKey)
+        ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
     except KeyboardInterrupt:
-        print(" " * 100, end="\r")
-        error("Skipping vulnerability detection for keyword " + keyword)
-        return '', []
-    except LookupError:
-        print(" " * 100, end="\r")
-        error("NIST API returned an invalid response for keyword " + keyword)
-        return '', []
+        log.logger(
+            "warning", f"Skipping vulnerability detection for keyword {keyword}"
+        )
     except Exception as e:
-        print(" " * 100, end="\r")
-        error("Error: " + str(e))
-        return '', []
-
-    tempTitleList = []
-    TitleList = []
-    for CPE in ApiResponseCPE:
-        tempTitleList.append(CPE.title)
-
-    for title in tempTitleList:
-        if title not in TitleList and not title == '':
-            TitleList.append(title)
-
-    if len(TitleList) != 0:
-        CPETitle = min(TitleList)
+        log.logger("error", e)
     else:
-        CPETitle = ''
-    
-    print(" " * 100, end="\r")
+        tempTitleList, TitleList = [], []
+        for CPE in ApiResponseCPE:
+            tempTitleList.append(CPE.title)
 
-    return CPETitle, ApiResponseCVE
+        for title in tempTitleList:
+            if title not in TitleList and title != "":
+                TitleList.append(title)
 
-def SearchSploits(HostArray, apiKey=None):
+        CPETitle = ""
+        if len(TitleList) != 0:
+            CPETitle = min(TitleList)
+
+        return CPETitle, ApiResponseCVE
+
+    return "", []
+
+
+def SearchSploits(HostArray, log, console, apiKey=None) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
+    term_width = get_terminal_width()
 
-    banner("Possible vulnerabilities for " + target, colors.red)
+    if not CheckConnection():
+        log.logger(
+            "error",
+            "Connection error was raised. Skipping vulnerability detection."
+        )
+        return []
 
     keywords = GenerateKeywords(HostArray)
 
     if len(keywords) == 0:
-        error("Insufficient information for " + target)
+        log.logger("warning", f"Insufficient information for {target}")
         return []
 
-    info("Searching vulnerability database for %s keyword(s)...\n" % (len(keywords)))
+    log.logger(
+        "info",
+        f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
+    )
+
+    printed_banner = False
 
     for keyword in keywords:
-        #https://github.com/vehemont/nvdlib
-        #search the NIST vulnerabilities database for the generated keywords
-        CPETitle, ApiResponseCVE = SearchKeyword(keyword, apiKey)
+        CPETitle, ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
 
-        #if the keyword is found in the NVD database, print the title of the vulnerable software
-        if CPETitle != '':
-            Title = CPETitle
-        elif CPETitle == '' and len(ApiResponseCVE) != 0:
-            Title = keyword
-        elif CPETitle == '' and len(ApiResponseCVE) == 0:
+        if CPETitle == "" and len(ApiResponseCVE) == 0:
             continue
+        elif CPETitle == "" and len(ApiResponseCVE) != 0:
+            Title = keyword
+        elif CPETitle != "":
+            Title = CPETitle
 
-        # create a Vuln object
+        if not printed_banner:
+            banner(f"Possible vulnerabilities for {target}", "red", console)
+            printed_banner = True
+
         VulnObject = Vuln(Software=Title, CVEs=[])
 
-        println("\n\n┌─" + bcolors.yellow + "[ " + Title + " ]" + bcolors.endc)
+        clear_line()
+        console.print(f"┌─ [yellow][{Title}][/yellow]")
 
         for CVE in ApiResponseCVE:
-            println("│\n├─────┤ " + bcolors.red + str(CVE.id) + bcolors.endc + "\n│")
+            console.print(
+                f"│\n├─────┤ [red]{CVE.id}[/red]\n│"
+            )
 
             description = str(CVE.cve.description.description_data[0].value)
             severity = str(CVE.score[2])
@@ -131,22 +150,24 @@ def SearchSploits(HostArray, apiKey=None):
                 try:
                     exploitability = str(CVE.v2exploitability)
                 except AttributeError:
-                    exploitability = "Could not fetch exploitability score for " + str(CVE.id)
+                    exploitability = (
+                           f"Could not fetch exploitability score for {CVE.id}"
+                        )
 
-            termsize = get_terminal_size()
-            wrapped_description = wrap(description, termsize.columns - 50)
-
-            println("│\t\t" + bcolors.cyan + "Description : " + bcolors.endc)
+            wrapped_description = wrap(description, term_width-50)
+            console.print(f"│\t\t[cyan]Description: [/cyan]")
             for line in wrapped_description:
-                println("│\t\t\t" + line)
-            println("│\t\t" + bcolors.cyan + "Severity : " + bcolors.endc + severity + " - " + score)
-            println("│\t\t" + bcolors.cyan + "Exploitability : " + bcolors.endc + exploitability)
-            println("│\t\t" + bcolors.cyan + "Details : " + bcolors.endc + details)
+                console.print(f"│\t\t\t{line}")
+            console.print(
+                f"│\t\t[cyan]Severity: [/cyan]{severity} - {score}\n"
+                + f"│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
+                + f"│\t\t[cyan]Details: [/cyan] {details}"
+            )
 
             VulnObject.CVEs.append(str(CVE.id))
 
         VulnsArray.append(VulnObject)
-        print(" " * 100, end="\r") #clear the line
-        println("└" + "─" * 59)
+        console.print("└" + "─" * (term_width-1))
 
+    clear_line()
     return VulnsArray

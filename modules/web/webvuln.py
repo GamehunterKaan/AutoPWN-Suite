@@ -1,43 +1,58 @@
-from requests import get
-from modules.logger import error, banner, colors
+from modules.logger import banner
 from modules.web.crawler import crawl
-from modules.web.lfi import test_lfi
+from modules.web.lfi import TestLFI
+from modules.web.sqli import TestSQLI
+from modules.web.xss import TestXSS
+from requests import get
 
-def get_url(target):
-    """
-    Get the target url
-    """
-    try:
-        request = get("http://" + target, timeout=10)
-        if request.status_code == 200:
-            return "http://" + target
-    except Exception as e:
-        try:
-            request = get("https://" + target, timeout=10)
-            if request.status_code == 200:
-                return "https://" + target
-        except Exception as e:
-            error("Could not get url for " + target)
-    return None
 
-def webvuln(target):
+def webvuln(target, log, console) -> None:
     """
     Test for web vulnerabilities
     """
+
+    LFI = TestLFI(log, console)
+    SQLI = TestSQLI(log, console)
+    XSS = TestXSS(log, console)
+
+    def get_url(target):
+        """
+        Get the target url
+        """
+
+        url_ = [f"http://{target}", f"https://{target}"]
+        for url in url_:
+            for _ in range(3): # do 3 tries
+                try:
+                    get(url, timeout=10)
+                except Exception as e:
+                    continue
+                else:
+                    return url
+
+        return None
+
     target_url = get_url(target)
+
     if target_url is None:
         return
-    #banner("got url " + target_url)
-    banner("Testing web application on " + target + "...", colors.purple)
-    # crawl the target_url
-    urls = crawl(target_url)
-    # test for lfi
-    tested_urls = []
+
+    urls = crawl(target_url, log)
+    tested_urls, testable_urls = [], []
     for url in urls:
         if "?" in url:
-            print("Testing for LFI on " + url, end="\r")
-            tested_urls.append(url)
-            test_lfi(url)
-    
-    if len(tested_urls) == 0:
-        error("No testable URLs found")
+            testable_urls.append(url)
+
+    log.logger("info", f"Found {len(testable_urls)} testable urls.")
+
+    if len(testable_urls) == 0:
+        log.logger("warning","No testable urls found for current host.")
+        return
+
+    banner(f"Testing web application on {target} ...", "purple", console)
+
+    for url in testable_urls:
+        LFI.test_lfi(url)
+        SQLI.test_sqli(url)
+        XSS.test_xss(url)
+        tested_urls.append(url)

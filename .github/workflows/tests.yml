@@ -2,11 +2,9 @@ name: Tests
 
 on:
   push:
-    paths: '**.py'
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
   pull_request:
-    paths: '**.py'
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
   release:
     types: [published]
 
@@ -14,9 +12,12 @@ permissions:
   contents: read
 
 jobs:
-  normal-tests:
+  Tests:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
 
     steps:
     - uses: actions/checkout@v3
@@ -27,34 +28,14 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-        sudo apt-get update && sudo apt-get install nmap -y
-    - name: Automatic test
-      run: python autopwn.py -y -t 127.0.0.1
-    - name: Noise mode test
-      run: python autopwn.py -y -m "noise" -nt 10 -t 127.0.0.1
-    - name: Config file test
-      run: python autopwn.py -c example.conf
-
-  superuser-tests:
-  
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v3
+    - name: OS specific run
+      uses: KnicKnic/os-specific-run@v1.0.4
       with:
-        python-version: "3.10"
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-        sudo apt-get update && sudo apt-get install nmap -y
-
+        linux: |
+          sudo apt-get update
+          sudo apt-get install nmap -y
+        macos: |
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          brew install nmap
     - name: Automatic test
-      run: sudo python autopwn.py -y -t 127.0.0.1
-    - name: Evade mode test
-      run: sudo python autopwn.py -y -m "evade" -t 127.0.0.1 -nf="--host-timeout 60"
-    - name: Noise mode test
-      run: sudo python autopwn.py -y -m "noise" -nt 10 -t 127.0.0.1
-    - name: Config file test
-      run: sudo python autopwn.py -c example.conf
+      run: python autopwn.py -y -t 127.0.0.1 --no-color

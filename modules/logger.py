@@ -1,98 +1,66 @@
-from platform import system as system_name
+import logging
 
-if system_name() == "Windows":
-    from modules.colorama import init
-    init()
+from rich.logging import RichHandler
+from rich.text import Text
 
-def InitializeLogger(context):
-    global outfile
-    outfile = context
-    file = open(outfile, 'w')
-    file.close()
+from modules.utils import get_terminal_width
 
-# https://stackoverflow.com/a/287944
-class bcolors:
-    header = '\033[95m'
-    blue = '\033[94m'
-    cyan = '\033[96m'
-    green = '\033[92m'
-    yellow = '\033[93m'
-    red = '\033[91m'
-    purple = '\033[38;5;93m'
-    endc = '\033[0m'
-    bold = '\033[1m'
-    underline = '\033[4m'
 
-class colors:
-    blue = 'blue'
-    cyan = 'cyan'
-    green = 'green'
-    yellow = 'yellow'
-    red = 'red'
-    purple = 'purple'
-    bold = 'bold'
-    underline = 'underline'
-    no_new_line = 'no_new_line'
-    endc = 'endc'
+def banner(msg, color, console) -> None:
+    term_width = get_terminal_width()
 
-def WriteToFile(data):
-    colors = [bcolors.blue, bcolors.red, bcolors.yellow, bcolors.green, bcolors.cyan, bcolors.endc, bcolors.bold, bcolors.underline]
-    for colorcode in colors:
-        data = data.replace(colorcode, "")
-    filename = outfile
-    if system_name() == "Windows":
-        data = data.encode("utf-8")
-        file = open(filename, 'ab')
-        file.write(b"\n" + bytes(data))
-    else:
-        file = open(filename, "a")
-        file.write("\n" + data)
-    file.close()
+    console.print("─"*term_width, style=color)
+    console.print(Text(msg), justify="center", style=color)
+    console.print("─"*term_width, style=color)
 
-def info(msg):
-    print(bcolors.blue + "[+] " + bcolors.endc + str(msg))
-    WriteToFile("[+] " + msg)
 
-def error(msg):
-    print(bcolors.red + "[-] " + bcolors.endc + str(msg))
-    WriteToFile("[-] " + msg)
+class Logger():
+    """
+    Custom logger
+    """
 
-def warning(msg):
-    print(bcolors.yellow + "[*] " + bcolors.endc + str(msg))
-    WriteToFile("[*] " + msg)
+    def __init__(self, console) -> None:
+        logging.basicConfig(
+            format="%(message)s",
+            level=logging.INFO,
+            datefmt="[%X]",
+            handlers=[RichHandler(console=console)],
+        )
 
-def success(msg):
-    print(bcolors.green + "[+] " + bcolors.endc + str(msg))
-    WriteToFile("[+] " + msg)
+        RichHandler.KEYWORDS = [
+                "[+]",
+                "[-]",
+                "[*]"
+            ]
 
-def println(msg):
-    print(msg)
-    WriteToFile(msg)
+        self.log: object = logging.getLogger("rich")
 
-def banner(msg, color):
-    print_colored("\n" + "─" * 60, color)
-    print_colored(str(msg).center(60), color)
-    print_colored("─" * 60 + "\n", color)
-    WriteToFile("\n" + "─" * 60)
-    WriteToFile((msg).center(60))
-    WriteToFile("─" * 60 + "\n")
 
-def print_colored(text,color):
-    if color == 'blue':
-        print(bcolors.blue + str(text) + bcolors.endc)
-    elif color == 'cyan':
-        print(bcolors.cyan + str(text) + bcolors.endc)
-    elif color == 'green':
-        print(bcolors.green + str(text) + bcolors.endc)
-    elif color == 'yellow':
-        print(bcolors.yellow + str(text) + bcolors.endc)
-    elif color == 'red':
-        print(bcolors.red + str(text) + bcolors.endc)
-    elif color == "purple":
-        print(bcolors.purple + str(text) + bcolors.endc)
-    elif color == 'bold':
-        print(bcolors.bold + str(text) + bcolors.endc)
-    elif color == 'underline':
-        print(bcolors.underline + str(text) + bcolors.endc)
-    elif color == 'no_new_line':
-        print(str(text), end='')
+    def logger(
+            self,
+            exception_: str,
+            message: str,
+        ) -> None:
+        """
+        * Log the proccesses with the passed message depending on the
+        * exception_ variable
+
+        @args
+            exception_: str, determines what type of log level to use
+                (1.) info
+                (2.) error
+                (3.) warning
+                (4.) success
+            message: str, message to be logged.
+
+        ? Returns none.
+        """
+
+        if exception_ == "info":
+            self.log.info(f"[+] {message}")
+        elif exception_ == "error":
+            self.log.error(f"[-] {message}")
+        elif exception_ == "warning":
+            self.log.warning(f"[*] {message}")
+        elif exception_ == "success":
+            self.log.info(f"[+] {message}")
