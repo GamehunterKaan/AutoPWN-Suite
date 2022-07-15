@@ -37,6 +37,8 @@ def StartScanning(
     if not args.skip_discovery:
         hosts = DiscoverHosts(targetarg, console, scantype, scanmode)
         Targets = GetHostsToScan(hosts, console)
+    else:
+        Targets = [targetarg]
 
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
     ScanWeb = WebScan()
