@@ -760,7 +760,7 @@ def check_nmap(log):
             auto_install = True
         else:
             auto_install = input(
-                    f"Install Nmap on your system ({distro.id()}: {platform()})? "
+                    f"Install Nmap on your system ({distro.id()})? "
                 ).lower() != "n"
         if auto_install:
             platform_ = system().lower()
