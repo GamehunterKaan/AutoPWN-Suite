@@ -8,6 +8,7 @@ class TestXSS:
     def __init__(self, log, console) -> None:
         self.log = log
         self.console = console
+        self.tested_urls = []
         self.xss_test = [
             r"<script>alert('PAYLOAD')</script>",
             r"\\\";alert('PAYLOAD');//",
@@ -39,11 +40,17 @@ class TestXSS:
     def exploit_xss(self, base_url, url_params) -> None:
         for param in url_params:
             for test in self.xss_test:
-                param_no_value = param.rsplit("=",1)
+                param_no_value = param.split("=")[0]
                 payload_length = randint(5, 15)
                 payload_text = ''.join(choices(ascii_letters, k = payload_length))
                 payload = test.replace("PAYLOAD", payload_text)
-                test_url = f"{base_url}?{param_no_value}={payload}"
+                main_url = f"{base_url}?{param_no_value}"
+
+                if not main_url in self.tested_urls:
+                    self.tested_urls.append(main_url)
+                    test_url = f"{main_url}={payload}"
+                else:
+                    continue
 
                 try:
                     response = get(test_url)
