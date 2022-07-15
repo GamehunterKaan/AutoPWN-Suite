@@ -5,7 +5,7 @@ class TestSQLI:
     def __init__(self, log, console) -> None:
         self.log = log
         self.console = console
-        self.sqli_test = "'"
+        self.sqli_test = "'1"
         self.sql_dbms_errors = [
             "sql syntax",
             "valid mysql result",
@@ -22,7 +22,8 @@ class TestSQLI:
 
     def exploit_sqli(self, base_url, url_params) -> None:
         for param in url_params:
-            test_url = f"{base_url}?{param}={self.sqli_test}"
+            param_no_value = param.rsplit("=",1)
+            test_url = f"{base_url}?{param_no_value}={self.sqli_test}"
 
             try:
                 response = get(test_url)

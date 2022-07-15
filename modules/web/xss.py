@@ -39,10 +39,11 @@ class TestXSS:
     def exploit_xss(self, base_url, url_params) -> None:
         for param in url_params:
             for test in self.xss_test:
+                param_no_value = param.rsplit("=",1)
                 payload_length = randint(5, 15)
                 payload_text = ''.join(choices(ascii_letters, k = payload_length))
                 payload = test.replace("PAYLOAD", payload_text)
-                test_url = f"{base_url}?{param}={payload}"
+                test_url = f"{base_url}?{param_no_value}={payload}"
 
                 try:
                     response = get(test_url)

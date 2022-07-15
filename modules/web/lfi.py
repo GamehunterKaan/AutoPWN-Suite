@@ -62,9 +62,8 @@ class TestLFI:
     def exploit_lfi(self, base_url, url_params) -> None:
         for param in url_params:
             for test in self.lfi_tests:
-                # create a new url with the test as the value of the url_params
-                test_url = f"{base_url}?{param}={test}"
-                # send a request to the new url
+                param_no_value = param.rsplit("=",1)
+                test_url = f"{base_url}?{param_no_value}={test}"
                 try:
                     response = get(test_url)
                 except ConnectionError:
