@@ -37,24 +37,17 @@ def webvuln(target, log, console) -> None:
     if target_url is None:
         return
 
-
     urls = crawl(target_url, log)
     tested_urls = []
     testable_urls = []
-    for url in urls: # test for lfi
+    for url in urls:
         if "?" in url:
             testable_urls.append(url)
 
-    log.logger(
-        "info", 
-        f"Found {len(testable_urls)} testable urls."
-    )
+    log.logger("info", f"Found {len(testable_urls)} testable urls.")
 
     if len(testable_urls) == 0:
-        log.logger(
-            "warning",
-            "No testable urls found for current host."
-        )
+        log.logger("warning","No testable urls found for current host.")
         return
 
     banner(f"Testing web application on {target} ...", "purple", console)
