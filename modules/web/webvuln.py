@@ -38,8 +38,7 @@ def webvuln(target, log, console) -> None:
         return
 
     urls = crawl(target_url, log)
-    tested_urls = []
-    testable_urls = []
+    tested_urls, testable_urls = [], []
     for url in urls:
         if "?" in url:
             testable_urls.append(url)
