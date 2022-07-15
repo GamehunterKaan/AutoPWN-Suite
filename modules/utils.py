@@ -637,6 +637,7 @@ def install_nmap_linux(log):
                         ],
                     stderr=DEVNULL
                 )
+                break
             elif distro_ in ["arch", "manjaro"]:
                 check_call(
                         [
@@ -648,6 +649,7 @@ def install_nmap_linux(log):
                             ],
                         stderr=DEVNULL
                 )
+                break
             elif distro_ in ["fedora", "oracle"]:
                 check_call(
                     [
@@ -659,6 +661,7 @@ def install_nmap_linux(log):
                         ],
                     stderr=DEVNULL
                 )
+                break
             elif distro in ["rhel", "centos"]:
                 check_call(
                     [
@@ -670,6 +673,7 @@ def install_nmap_linux(log):
                         ],
                     stderr=DEVNULL
                 )
+                break
             elif distro in ["sles", "opensuse"]:
                 check_call(
                     [
@@ -681,6 +685,7 @@ def install_nmap_linux(log):
                         ],
                     stderr=DEVNULL
                 )
+                break
             else:
                 raise CalledProcessError
 
@@ -766,7 +771,7 @@ def check_nmap(log):
             platform_ = system().lower()
             if platform_ == "linux":
                 install_nmap_linux(log)
-            if platform_ == "windows":
+            elif platform_ == "windows":
                 install_nmap_windows(log)
             elif platform_ == "darwin":
                 install_nmap_mac(log)
