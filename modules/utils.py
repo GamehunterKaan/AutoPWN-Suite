@@ -84,6 +84,13 @@ def cli():
         default=None
     )
     scanargs.add_argument(
+        "-sd", "--skip-discovery",
+        help="Skips the host discovery phase.",
+        required=False,
+        default=False,
+        action="store_true"
+    )
+    scanargs.add_argument(
         "-st", "--scan-type",
         help="Scan type.",
         type=str,
@@ -810,6 +817,9 @@ def ParamPrint(
         + f"│\tAPI Key : {type(apiKey) == str}\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
+
+    if args.skip_discovery:
+        msg += f"│\tSkip discovery: True\n"
 
     if args.host_file:
         msg += f"│\tHostfile: {args.host_file}\n"
