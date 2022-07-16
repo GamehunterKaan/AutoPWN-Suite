@@ -852,11 +852,12 @@ def ParamPrint(
     console.print(msg)
 
 
-def CheckConnection() -> bool:
-    print("Checking for internet connection...", end="\r")
+def CheckConnection(log) -> bool:
     try:
         get("https://google.com")
     except Exception as e:
+        log.logger("error", "Connection failed.")
+        log.logger("error", e)
         return False
     else:
         return True
