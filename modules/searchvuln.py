@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from textwrap import wrap
 
-from nvdlib import searchCPE, searchCVE
-
 from modules.logger import banner
+from modules.nvdlib.cpe import searchCPE
+from modules.nvdlib.cve import searchCVE
 from modules.utils import CheckConnection, clear_line, get_terminal_width
 
 
