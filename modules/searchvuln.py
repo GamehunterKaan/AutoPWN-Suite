@@ -17,7 +17,6 @@ class Vuln:
 def GenerateKeywords(HostArray) -> list:
     keywords = []
     for port in HostArray:
-        service = str(port[2])
         product = str(port[3])
         version = str(port[4])
         templist = []
@@ -35,9 +34,6 @@ def GenerateKeywords(HostArray) -> list:
                 "linux telnetd",
                 "microsoft windows rpc"
             ]
-
-        if service == "Unknown":
-            service = ""
 
         if product == "Unknown":
             product = ""
@@ -95,11 +91,7 @@ def SearchSploits(HostArray, log, console, apiKey=None) -> list:
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
 
-    if not CheckConnection():
-        log.logger(
-            "error",
-            "Connection error was raised. Skipping vulnerability detection."
-        )
+    if not CheckConnection(log):
         return []
 
     keywords = GenerateKeywords(HostArray)
