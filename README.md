@@ -64,7 +64,7 @@ OR
 You can download debian (deb) package from [releases.](https://github.com/GamehunterKaan/AutoPWN-Suite/releases)
 
 ```
-sudo pip install requests rich python-nmap nvdlib bs4 distro
+sudo pip install requests rich python-nmap bs4 distro
 sudo apt-get install ./autopwn-suite_2.0.0.deb
 ```
 
