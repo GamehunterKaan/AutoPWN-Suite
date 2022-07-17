@@ -1,5 +1,7 @@
 from modules.logger import banner
+from modules.random_user_agent import random_user_agent
 from modules.web.crawler import crawl
+from modules.web.dirbust import dirbust
 from modules.web.lfi import TestLFI
 from modules.web.sqli import TestSQLI
 from modules.web.xss import TestXSS
@@ -19,18 +21,18 @@ def webvuln(target, log, console) -> None:
         """
         Get the target url
         """
-
-        url_ = [f"http://{target}", f"https://{target}"]
+        headers = {
+            "User-Agent" : next(random_user_agent(log))
+        }
+        url_ = [f"http://{target}/", f"https://{target}/"]
         for url in url_:
-            for _ in range(3):
-                try:
-                    get(url, timeout=10)
-                except Exception as e:
-                    continue
-                else:
-                    return url
+            try:
+                get(url, headers=headers, timeout=10)
+            except Exception as e:
+                return None
+            else:
+                return url
 
-        return None
 
     target_url = get_url(target)
 
@@ -49,6 +51,8 @@ def webvuln(target, log, console) -> None:
         return
 
     banner(f"Testing web application on {target} ...", "purple", console)
+
+    dirbust(target_url, console, log)
 
     for url in testable_urls:
         LFI.test_lfi(url)
