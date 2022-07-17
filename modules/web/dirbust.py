@@ -1,7 +1,7 @@
 from os.path import dirname
 
-from requests import get
 from modules.random_user_agent import random_user_agent
+from requests import get
 
 
 def dirbust(target_url, console, log) -> None:
