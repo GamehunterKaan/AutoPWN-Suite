@@ -58,7 +58,7 @@ def SearchKeyword(keyword : str, log, apiKey=None) -> list:
     )
 
     try:
-        ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
+        ApiResponseCVE = searchCVE(keyword=keyword, apiKey=apiKey)
     except KeyboardInterrupt:
         log.logger(
             "warning", f"Skipping vulnerability detection for keyword {keyword}"
@@ -120,7 +120,7 @@ def SearchSploits(HostArray : list, log, console, apiKey=None) -> list:
                 + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
             )
 
-        VulnObject = VulnerableSoftware(keyword, CVEs)        
+        VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)        
         VulnsArray.append(VulnObject)
         console.print("└" + "─" * (term_width-1))
 
