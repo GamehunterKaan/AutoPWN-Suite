@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from textwrap import wrap
-from turtle import title
 
 from modules.logger import banner
 from modules.nist_search import searchCVE
@@ -10,7 +9,7 @@ from modules.utils import CheckConnection, clear_line, get_terminal_width
 @dataclass
 class VulnerableSoftware:
     title : str
-    CVEs = list
+    CVEs : list
 
 
 def GenerateKeywords(HostArray : list) -> list:
@@ -30,7 +29,8 @@ def GenerateKeywords(HostArray : list) -> list:
                 "smb",
                 "smbv2",
                 "linux telnetd",
-                "microsoft windows rpc"
+                "microsoft windows rpc",
+                "metasploitable root shell"
             ]
 
         if product == "Unknown":
@@ -58,7 +58,7 @@ def SearchKeyword(keyword : str, log, apiKey=None) -> list:
     )
 
     try:
-        ApiResponseCVE = searchCVE(keyword=keyword, apiKey=apiKey)
+        ApiResponseCVE = searchCVE(keyword, log, apiKey)
     except KeyboardInterrupt:
         log.logger(
             "warning", f"Skipping vulnerability detection for keyword {keyword}"
@@ -91,17 +91,18 @@ def SearchSploits(HostArray : list, log, console, apiKey=None) -> list:
     )
 
     printed_banner = False
-
     for keyword in keywords:
         ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
 
+        if len(ApiResponseCVE) == 0:
+            continue
 
         if not printed_banner:
             banner(f"Possible vulnerabilities for {target}", "red", console)
             printed_banner = True
 
         clear_line()
-        console.print(f"┌─ [yellow][{keyword}][/yellow]")
+        console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
         CVEs = []
         for CVE in ApiResponseCVE:
