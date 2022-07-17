@@ -29,46 +29,38 @@ def FindVars(vuln : dict) -> tuple:
     CVE_ID = vuln["cve"]["CVE_data_meta"]["ID"]
     description = vuln["cve"]["description"]["description_data"][0]["value"]
 
+    exploitability = 0.0
+    severity_score = 0.0
+    severity = "UNKNOWN"
+
     if "baseMetricV3" in vuln["impact"].keys():
         if "exploitabilityScore" in vuln["impact"]["baseMetricV3"]:
             exploitability = vuln["impact"]["baseMetricV3"]["exploitabilityScore"]
         elif "cvssV3" in vuln["impact"]["baseMetricV3"]:
             exploitability = vuln["impact"]["baseMetricV3"]["cvssV3"]["exploitabilityScore"]
-        else:
-            exploitability = 0.0
+
         if "cvssV3" in vuln["impact"]["baseMetricV3"]:
             if "baseSeverity" in vuln["impact"]["baseMetricV3"]["cvssV3"]:
                 severity = vuln["impact"]["baseMetricV3"]["cvssV3"]["baseSeverity"]
-            else:
-                severity = "UNKNOWN"
+
             if "baseScore" in vuln["impact"]["baseMetricV3"]["cvssV3"]:
                 severity_score = vuln["impact"]["baseMetricV3"]["cvssV3"]["baseScore"]
-            else:
-                severity_score = 0.0
-        else:
-            severity = "UNKNOWN"
-            severity_score = 0.0
+
     elif "baseMetricV2" in vuln["impact"].keys():
         if "exploitabilityScore" in vuln["impact"]["baseMetricV2"].keys():
             exploitability = vuln["impact"]["baseMetricV2"]["exploitabilityScore"]
         elif "cvssV2" in vuln["impact"]["baseMetricV2"]:
             exploitability = vuln["impact"]["baseMetricV2"]["cvssV2"]["exploitabilityScore"]
-        else:
-            exploitability = 0.0
+
         if "cvssV2" in vuln["impact"]["baseMetricV2"]:
             if "baseSeverity" in vuln["impact"]["baseMetricV2"]["cvssV2"]:
                 severity = vuln["impact"]["baseMetricV2"]["cvssV2"]["baseSeverity"]
             elif "severity" in vuln["impact"]["baseMetricV2"].keys():
                 severity = vuln["impact"]["baseMetricV2"]["severity"]
-            else:
-                severity = "UNKNOWN"
+
             if "baseScore" in vuln["impact"]["baseMetricV2"]["cvssV2"]:
                 severity_score = vuln["impact"]["baseMetricV2"]["cvssV2"]["baseScore"]
-            else:
-                severity_score = 0.0
-        else:
-            severity = "UNKNOWN"
-            severity_score = 0.0
+
 
     details_url = vuln["cve"]["references"]["reference_data"][0]["url"]
 
@@ -101,6 +93,9 @@ def searchCVE(keyword : str, log, apiKey=None) -> list[Vulnerability]:
             break
 
     Vulnerabilities = []
+    if not "result" in data:
+        return []
+
     for vuln in data["result"]["CVE_Items"]:
         title = keyword
         CVE_ID, description, severity, severity_score, details_url, exploitability = FindVars(vuln)
