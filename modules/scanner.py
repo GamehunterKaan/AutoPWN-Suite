@@ -82,7 +82,7 @@ def PortScan(
         host_timeout=240,
         mode=ScanMode.Normal,
         customflags="",
-    ):
+    ) -> PortScanner:
 
     log.logger(
         "info",
