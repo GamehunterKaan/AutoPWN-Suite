@@ -22,7 +22,7 @@ def webvuln(target, log, console) -> None:
 
         url_ = [f"http://{target}", f"https://{target}"]
         for url in url_:
-            for _ in range(3): # do 3 tries
+            for _ in range(3):
                 try:
                     get(url, timeout=10)
                 except Exception as e:
@@ -46,7 +46,6 @@ def webvuln(target, log, console) -> None:
     log.logger("info", f"Found {len(testable_urls)} testable urls.")
 
     if len(testable_urls) == 0:
-        log.logger("warning","No testable urls found for current host.")
         return
 
     banner(f"Testing web application on {target} ...", "purple", console)
