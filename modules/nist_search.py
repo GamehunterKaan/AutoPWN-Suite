@@ -1,5 +1,8 @@
-from requests import get
 from dataclasses import dataclass
+from time import sleep
+
+from requests import get
+
 
 @dataclass
 class Vulnerability:
@@ -72,21 +75,30 @@ def FindVars(vuln : dict) -> tuple:
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
 
-def searchCVE(keyword : str, apiKey=None) -> list[Vulnerability]:
+def searchCVE(keyword : str, log, apiKey=None) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/1.0?"
     if apiKey:
+        sleep_time = 0.6
         paramaters = {"keyword": keyword, "apiKey": apiKey}
     else:
+        sleep_time = 6
         paramaters = {"keyword": keyword}
 
     for tries in range(3):
         try:
-            data = get(url, params=paramaters).json()
+            sleep(sleep_time)
+            request = get(url, params=paramaters)
+            data = request.json()
         except Exception as e:
-            if tries < 3:
-                continue
-            else:
-                return []
+            if request.status_code == 403:
+                log.logger(
+                    "error",
+                    "Requests are being rate limited by NIST API," 
+                    + " please get a NIST API key to prevent this."
+                )
+                sleep(sleep_time)
+        else:
+            break
 
     Vulnerabilities = []
     for vuln in data["result"]["CVE_Items"]:
