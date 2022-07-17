@@ -1,6 +1,7 @@
 from os.path import dirname
 
 from requests import get
+from modules.random_user_agent import random_user_agent
 
 
 def dirbust(target_url, console, log) -> None:
@@ -23,8 +24,12 @@ def dirbust(target_url, console, log) -> None:
         if test_url in found_dirs:
             continue
 
+        headers = {
+            "User-Agent" : next(random_user_agent(log))
+        }
+
         try:
-            req = get(test_url)
+            req = get(test_url, headers=headers)
         except Exception as e:
             log.logger("error", e)
         else:
