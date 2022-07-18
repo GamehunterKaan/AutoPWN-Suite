@@ -48,7 +48,7 @@ def GenerateKeywords(HostArray : list) -> list:
         version = str(port[4])
 
         keyword = GenerateKeyword(product, version)
-        if not keyword == "":
+        if not keyword == "" and not keyword in keywords:
             keywords.append(keyword)
 
     return keywords
