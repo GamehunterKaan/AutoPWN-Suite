@@ -68,10 +68,10 @@ class AutoScanner:
     
     def CreateScanArgs(
             self, 
-            host_timeout : int | None,
-            scan_speed : int | None,
+            host_timeout,
+            scan_speed,
             os_scan : bool,
-            nmap_args : str | list | None,
+            nmap_args,
         ) -> str:
 
         scan_args = ["-sV"]
@@ -107,7 +107,7 @@ class AutoScanner:
             port_key : JSON,
             apiKey : str =None,
             debug : bool = False
-        ) -> JSON | None:
+        ) -> JSON:
         product = port_key["product"]
         version = port_key["version"]
         log = fake_logger()
@@ -132,13 +132,13 @@ class AutoScanner:
 
     def scan(
             self,
-            target : str | list,
+            target,
             host_timeout : int = None,
             scan_speed : int = None,
             apiKey : str = None,
             os_scan : bool = False,
             scan_vulns : bool = True,
-            nmap_args : str | list = None,
+            nmap_args=None,
             debug : bool = False
         ) -> JSON:
         if type(target) == str:
