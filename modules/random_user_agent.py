@@ -17,7 +17,7 @@ def random_user_agent(log) -> str:
 
         try:
             with open(
-                    f"{base_dir}/user_agents/user_agents.json",
+                    f"{base_dir}/data/user_agents.json",
                     "r",
                     encoding="utf-8"
                 ) as data:

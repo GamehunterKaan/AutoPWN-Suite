@@ -2,57 +2,59 @@ from dataclasses import dataclass
 from textwrap import wrap
 
 from modules.logger import banner
-from modules.nvdlib.cpe import searchCPE
-from modules.nvdlib.cve import searchCVE
+from modules.nist_search import searchCVE
 from modules.utils import CheckConnection, clear_line, get_terminal_width
 
 
 @dataclass
-class Vuln:
-    Software : str
+class VulnerableSoftware:
+    title : str
     CVEs : list
 
 
-#generate keywords to search for from the information gathered from the target
-def GenerateKeywords(HostArray) -> list:
+def GenerateKeyword(product : str, version : str) -> str:
+    if product == "Unknown":
+            product = ""
+
+    if version == "Unknown":
+        version = ""
+    
+    keyword = ""
+    dontsearch = [
+        "ssh",
+        "vnc",
+        "http",
+        "https",
+        "ftp",
+        "sftp",
+        "smtp",
+        "smb",
+        "smbv2",
+        "linux telnetd",
+        "microsoft windows rpc",
+        "metasploitable root shell"
+    ]
+
+    if product.lower() not in dontsearch and product != "":
+        keyword = f"{product} {version}".rstrip()
+
+    return keyword
+
+
+def GenerateKeywords(HostArray : list) -> list:
     keywords = []
     for port in HostArray:
         product = str(port[3])
         version = str(port[4])
-        templist = []
-        #dont search if keyword is equal to any of these
-        dontsearch = [
-                "ssh",
-                "vnc",
-                "http",
-                "https",
-                "ftp",
-                "sftp",
-                "smtp",
-                "smb",
-                "smbv2",
-                "linux telnetd",
-                "microsoft windows rpc"
-            ]
 
-        if product == "Unknown":
-            product = ""
-
-        if version == "Unknown":
-            version = ""
-
-        if product.lower() not in dontsearch and product != "":
-            query = (f"{product} {version}").rstrip()
-            templist.append(query)
-
-        for entry in templist:
-            if entry not in keywords and entry != "":
-                keywords.append(entry)
+        keyword = GenerateKeyword(product, version)
+        if not keyword == "" and not keyword in keywords:
+            keywords.append(keyword)
 
     return keywords
 
 
-def SearchKeyword(keyword, log, apiKey=None):
+def SearchKeyword(keyword : str, log, apiKey=None) -> list:
     clear_line()
     print(
         "Searching vulnerability database for keyword"
@@ -60,8 +62,7 @@ def SearchKeyword(keyword, log, apiKey=None):
     )
 
     try:
-        ApiResponseCPE = searchCPE(keyword=keyword, key=apiKey)
-        ApiResponseCVE = searchCVE(keyword=keyword, key=apiKey)
+        ApiResponseCVE = searchCVE(keyword, log, apiKey)
     except KeyboardInterrupt:
         log.logger(
             "warning", f"Skipping vulnerability detection for keyword {keyword}"
@@ -69,24 +70,12 @@ def SearchKeyword(keyword, log, apiKey=None):
     except Exception as e:
         log.logger("error", e)
     else:
-        tempTitleList, TitleList = [], []
-        for CPE in ApiResponseCPE:
-            tempTitleList.append(CPE.title)
+        return ApiResponseCVE
 
-        for title in tempTitleList:
-            if title not in TitleList and title != "":
-                TitleList.append(title)
-
-        CPETitle = ""
-        if len(TitleList) != 0:
-            CPETitle = min(TitleList)
-
-        return CPETitle, ApiResponseCVE
-
-    return "", []
+    return []
 
 
-def SearchSploits(HostArray, log, console, apiKey=None) -> list:
+def SearchSploits(HostArray : list, log, console, apiKey=None) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
@@ -106,58 +95,37 @@ def SearchSploits(HostArray, log, console, apiKey=None) -> list:
     )
 
     printed_banner = False
-
     for keyword in keywords:
-        CPETitle, ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+        ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
 
-        if CPETitle == "" and len(ApiResponseCVE) == 0:
+        if len(ApiResponseCVE) == 0:
             continue
-        elif CPETitle == "" and len(ApiResponseCVE) != 0:
-            Title = keyword
-        elif CPETitle != "":
-            Title = CPETitle
 
         if not printed_banner:
             banner(f"Possible vulnerabilities for {target}", "red", console)
             printed_banner = True
 
-        VulnObject = Vuln(Software=Title, CVEs=[])
-
         clear_line()
-        console.print(f"┌─ [yellow][{Title}][/yellow]")
+        console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
+        CVEs = []
         for CVE in ApiResponseCVE:
+            CVEs.append(CVE.CVEID)
             console.print(
-                f"│\n├─────┤ [red]{CVE.id}[/red]\n│"
+                f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│"
             )
 
-            description = str(CVE.cve.description.description_data[0].value)
-            severity = str(CVE.score[2])
-            score = str(CVE.score[1])
-            details = CVE.url
-
-            try:
-                exploitability = str(CVE.v3exploitability)
-            except AttributeError:
-                try:
-                    exploitability = str(CVE.v2exploitability)
-                except AttributeError:
-                    exploitability = (
-                           f"Could not fetch exploitability score for {CVE.id}"
-                        )
-
-            wrapped_description = wrap(description, term_width-50)
+            wrapped_description = wrap(CVE.description, term_width-50)
             console.print(f"│\t\t[cyan]Description: [/cyan]")
             for line in wrapped_description:
                 console.print(f"│\t\t\t{line}")
             console.print(
-                f"│\t\t[cyan]Severity: [/cyan]{severity} - {score}\n"
-                + f"│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
-                + f"│\t\t[cyan]Details: [/cyan] {details}"
+                f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
+                + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
+                + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
             )
 
-            VulnObject.CVEs.append(str(CVE.id))
-
+        VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)        
         VulnsArray.append(VulnObject)
         console.print("└" + "─" * (term_width-1))
 

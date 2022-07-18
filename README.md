@@ -13,10 +13,11 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 
 
 ## Features
-- Fully automatic! (Use `-y` flag to enable)
+- Fully [automatic!](#usage)
 - Detect network IP range without any user input. 
 - Vulnerability detection based on version.
 - Web app vulnerability testing. (LFI, XSS, SQLI)
+- Web app dirbusting.
 - Get information about the vulnerability right from your terminal.
 - Automatically download exploit related with vulnerability.
 - Noise mode for creating a noise on the network.
@@ -26,6 +27,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Specify your arguments using a config file.
 - Send scan results via webhook or email.
 - Works on Windows, MacOS and Linux.
+- Use as a [module!](#module-usage)
 
 
 ## How does it work?
@@ -39,7 +41,7 @@ AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the versio
 
 AutoPWN Suite has a very user friendly easy to read output.
 
-[![asciicast](https://asciinema.org/a/497930.svg)](https://asciinema.org/a/497930)
+[![asciicast](https://asciinema.org/a/509345.svg)](https://asciinema.org/a/509345)
 
 
 ## Installation
@@ -65,7 +67,7 @@ You can download debian (deb) package from [releases.](https://github.com/Gamehu
 
 ```
 sudo pip install requests rich python-nmap bs4 distro
-sudo apt-get install ./autopwn-suite_2.0.0.deb
+sudo apt-get install ./autopwn-suite_2.1.0.deb
 ```
 
 OR
@@ -79,7 +81,7 @@ You can use Google Cloud Shell.
 
 Running with root privileges (sudo) is always recommended.
 
-Automatic mode (This is the intended way of using AutoPWN Suite)
+Automatic mode
 
 ```console
 autopwn-suite -y
@@ -153,22 +155,32 @@ Reporting:
 ```
 
 
+## Module usage
+
+```python
+from autopwn_suite.api import AutoScanner
+
+scanner = AutoScanner()
+json_results = scanner.scan("192.168.0.1")
+scanner.save_to_file("autopwn.json")
+```
+
+
 ## Currently working on
-- Option to use as a module.
-- Web app dirbusting.
+
+- Function to brute force common services like `ssh`, `vnc`, `ftp`.
+- Arch Linux package for Arch based systems like BlackArch and ArchAttack.
 
 
 ## TODO
 
 Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
 
-- [x] 20 Completed.
-- [ ] Web app dirbusting.
+- [x] 22 Completed.
 - [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
-- [ ] Function to brute force common services like `ssh`, `vnc`, `ftp` etc.
+- [ ] Function to brute force common services like `ssh`, `vnc`, `ftp`.
 - [ ] GUI interface.
 - [ ] Daemon mode.
-- [ ] Option to use as a module.
 
 
 ## Contributing to AutoPWN Suite

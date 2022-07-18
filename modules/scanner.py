@@ -13,7 +13,6 @@ from modules.utils import GetIpAdress, ScanMode, ScanType, clear_line, is_root
 
 @dataclass()
 class TargetInfo:
-    ip : str
     mac : str = "Unknown"
     vendor : str = "Unknown"
     os : str = "Unknown"
@@ -82,7 +81,7 @@ def PortScan(
         host_timeout=240,
         mode=ScanMode.Normal,
         customflags="",
-    ):
+    ) -> PortScanner:
 
     log.logger(
         "info",
@@ -223,34 +222,33 @@ def DiscoverHosts(
     return OnlineHosts
 
 
-def InitHostInfo(nm, target):
+def InitHostInfo(target_key):
     try:
-        mac = nm[target]["addresses"]["mac"]
+        mac = target_key["addresses"]["mac"]
     except (KeyError, IndexError):
         mac = "Unknown"
 
     try:
-        vendor = nm[target]["vendor"][0]
+        vendor = target_key["vendor"][0]
     except (KeyError, IndexError):
         vendor = "Unknown"
 
     try:
-        os = nm[target]["osmatch"][0]["name"]
+        os = target_key["osmatch"][0]["name"]
     except (KeyError, IndexError):
         os = "Unknown"
 
     try:
-        os_accuracy = nm[target]["osmatch"][0]["accuracy"]
+        os_accuracy = target_key["osmatch"][0]["accuracy"]
     except (KeyError, IndexError):
         os_accuracy = "Unknown"
 
     try:
-        os_type = nm[target]["osmatch"][0]["osclass"][0]["type"]
+        os_type = target_key["osmatch"][0]["osclass"][0]["type"]
     except (KeyError, IndexError):
         os_type = "Unknown"
 
     return TargetInfo(
-        ip=target,
         mac=mac,
         vendor=vendor,
         os=os,
@@ -259,23 +257,23 @@ def InitHostInfo(nm, target):
     )
 
 
-def InitPortInfo(nm, target, port):
+def InitPortInfo(port):
     state = "Unknown"
     service = "Unknown"
     product = "Unknown"
     version = "Unknown"
 
-    if not len(nm[str(target)]["tcp"][int(port)]["state"]) == 0:
-        state = nm[str(target)]["tcp"][int(port)]["state"]
+    if not len(port["state"]) == 0:
+        state = port["state"]
 
-    if not len(nm[str(target)]["tcp"][int(port)]["name"]) == 0:
-        service = nm[str(target)]["tcp"][int(port)]["name"]
+    if not len(port["name"]) == 0:
+        service = port["name"]
 
-    if not len(nm[str(target)]["tcp"][int(port)]["product"]) == 0:
-        product = nm[str(target)]["tcp"][int(port)]["product"]
+    if not len(port["product"]) == 0:
+        product = port["product"]
 
-    if not len(nm[str(target)]["tcp"][int(port)]["version"]) == 0:
-        version = nm[str(target)]["tcp"][int(port)]["version"]
+    if not len(port["version"]) == 0:
+        version = port["version"]
 
     return state, service, product, version
 
@@ -295,7 +293,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
         log.logger("warning", f"Target {target} seems to be offline.")
         return []
 
-    CurrentTargetInfo = InitHostInfo(nm, target)
+    CurrentTargetInfo = InitHostInfo(nm[target])
 
     if is_root():
         if nm[target]["status"]["reason"] in ["localhost-response", "user-set"]:
@@ -322,7 +320,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     table.add_column("Version", style="purple")
 
     for port in nm[target]["tcp"].keys():
-        state, service, product, version = InitPortInfo(nm, target, port)
+        state, service, product, version = InitPortInfo(nm[target]["tcp"][port])
         table.add_row(str(port), state, service, product, version)
 
         if state == "open":

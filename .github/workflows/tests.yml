@@ -37,5 +37,7 @@ jobs:
         macos: |
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           brew install nmap
+    - name: Import test
+      run: python -c "import autopwn; import api"
     - name: Automatic test
       run: python autopwn.py -y -t 127.0.0.1 --no-color
