@@ -81,7 +81,7 @@ You can use Google Cloud Shell.
 
 Running with root privileges (sudo) is always recommended.
 
-Automatic mode (This is the intended way of using AutoPWN Suite)
+Automatic mode
 
 ```console
 autopwn-suite -y
