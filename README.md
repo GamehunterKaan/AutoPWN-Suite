@@ -41,7 +41,7 @@ AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the versio
 
 AutoPWN Suite has a very user friendly easy to read output.
 
-[![asciicast](https://asciinema.org/a/497930.svg)](https://asciinema.org/a/497930)
+[![asciicast](https://asciinema.org/a/509345.svg)](https://asciinema.org/a/509345)
 
 
 ## Installation
@@ -67,7 +67,7 @@ You can download debian (deb) package from [releases.](https://github.com/Gamehu
 
 ```
 sudo pip install requests rich python-nmap bs4 distro
-sudo apt-get install ./autopwn-suite_2.1.1.deb
+sudo apt-get install ./autopwn-suite_2.1.0.deb
 ```
 
 OR
