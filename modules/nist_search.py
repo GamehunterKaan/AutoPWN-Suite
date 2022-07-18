@@ -4,6 +4,8 @@ from time import sleep
 from requests import get
 
 
+cache = {}
+
 @dataclass
 class Vulnerability:
     title : str
@@ -76,6 +78,9 @@ def searchCVE(keyword : str, log, apiKey=None) -> list[Vulnerability]:
         sleep_time = 6
         paramaters = {"keyword": keyword}
 
+    if keyword in cache:
+        return cache[keyword]
+
     for tries in range(3):
         try:
             sleep(sleep_time)
@@ -111,4 +116,5 @@ def searchCVE(keyword : str, log, apiKey=None) -> list[Vulnerability]:
 
         Vulnerabilities.append(VulnObject)
 
+    cache[keyword] = Vulnerabilities
     return Vulnerabilities
