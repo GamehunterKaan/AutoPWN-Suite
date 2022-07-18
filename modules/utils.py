@@ -236,6 +236,11 @@ def cli():
     return argparser.parse_args()
 
 
+class fake_logger:
+        def logger(self, exception_ : str, message : str):
+            pass
+
+
 def is_root():
     try:
         return getuid() == 0
