@@ -4,66 +4,83 @@ from typing import Any, Dict, List, Type, Union
 from nmap import PortScanner
 
 from modules.nist_search import searchCVE
-from modules.utils import is_root
+from modules.searchvuln import GenerateKeyword
+from modules.utils import fake_logger, is_root
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
 
-def InitHostInfo(target_key):
-    try:
-        mac = target_key["addresses"]["mac"]
-    except (KeyError, IndexError):
-        mac = "Unknown"
-
-    try:
-        vendor = target_key["vendor"][0]
-    except (KeyError, IndexError):
-        vendor = "Unknown"
-
-    try:
-        os = target_key["osmatch"][0]["name"]
-    except (KeyError, IndexError):
-        os = "Unknown"
-
-    try:
-        os_accuracy = target_key["osmatch"][0]["accuracy"]
-    except (KeyError, IndexError):
-        os_accuracy = "Unknown"
-
-    try:
-        os_type = target_key["osmatch"][0]["osclass"][0]["type"]
-    except (KeyError, IndexError):
-        os_type = "Unknown"
-
-    return mac, vendor, os, os_accuracy, os_type
-
-
 class AutoScanner:
-    class fake_logger:
-        def logger(self, exception_ : str, message : str):
-            pass
-
     def __init__(self) -> None:
         self.scan_results = {}
+
 
     def __str__(self) -> str:
         return str(self.scan_results)
 
+
+    def InitHostInfo(self, target_key : JSON) -> JSON:
+        os_info = {}
+        try:
+            mac = target_key["addresses"]["mac"]
+        except (KeyError, IndexError):
+            mac = "Unknown"
+
+        try:
+            vendor = target_key["vendor"][0]
+        except (KeyError, IndexError):
+            vendor = "Unknown"
+
+        try:
+            os_name = target_key["osmatch"][0]["name"]
+        except (KeyError, IndexError):
+            os_name = "Unknown"
+
+        try:
+            os_accuracy = target_key["osmatch"][0]["accuracy"]
+        except (KeyError, IndexError):
+            os_accuracy = "Unknown"
+
+        try:
+            os_type = target_key["osmatch"][0]["osclass"][0]["type"]
+        except (KeyError, IndexError):
+            os_type = "Unknown"
+
+        os_info["mac"] = mac
+        os_info["vendor"] = vendor
+        os_info["os_name"] = os_name
+        os_info["os_accuracy"] = os_accuracy
+        os_info["os_type"] = os_type
+
+        return os_info
+
+
+    def ParseVulnInfo(self, vuln):
+        vuln_info = {}
+        vuln_info["description"] = vuln.description
+        vuln_info["severity"] = vuln.severity
+        vuln_info["severity_score"] = vuln.severity_score
+        vuln_info["details_url"] = vuln.details_url
+        vuln_info["exploitability"] = vuln.exploitability
+
+        return vuln_info
+
+
     def scan(
             self,
-            target,
-            host_timeout=None,
-            scan_speed=None,
-            apiKey=None,
-            debug=False,
-            output_file=None,
+            target : str | list,
+            host_timeout : int = None,
+            scan_speed : int = None,
+            apiKey : str = None,
+            os_scan : bool = False,
+            scan_vulns : bool = True,
+            nmap_args : str | list = None,
+            debug : bool = False,
         ) -> JSON:
         if type(target) == str:
             target = [target]
-        elif not type(target) in [str, list]:
-            raise TypeError("Host argument must be str or list.")
 
-        log = self.fake_logger()
+        log = fake_logger()
         nm = PortScanner()
 
         scan_args = ["-sV"]
@@ -78,8 +95,16 @@ class AutoScanner:
         elif scan_speed and not scan_speed in range(0, 6):
             raise Exception("Scanspeed must be in range of 0, 6.")
 
-        if is_root():
+        if is_root() and os_scan:
             scan_args.append("-O")
+        elif os_scan:
+            raise Exception("Root privileges are required for os scan.")
+
+        if type(nmap_args) == list:
+            for arg in nmap_args:
+                scan_args.append(arg)
+        elif type(nmap_args) == str:
+            scan_args.append(nmap_args)
 
         scan_arguments = " ".join(scan_args)
         
@@ -97,50 +122,43 @@ class AutoScanner:
                 self.scan_results[host]["ports"] = port_scan
 
             if "-O" in scan_args:
-                os_info = {}
-                os_info["mac"] = nm[host]["addresses"]["mac"]
-                os_info["vendor"] = nm[host]["vendor"][0]
-                os_info["os"] = nm[host]["osmatch"][0]["name"]
-                os_info["accuracy"] = nm[host]["osmatch"][0]["accuracy"]
-                os_info["type"] = nm[host]["osmatch"][0]["osclass"][0]["type"]
+                os_info = self.InitHostInfo(nm[host])
                 self.scan_results[host]["os"] = os_info
 
+            if not scan_vulns:
+                continue
+
             vulns = {}
+            tested_keywords = []
             for port in nm[host]["tcp"]:
                 self.scan_results[host]["vulns"] = {}
                 product = nm[host]["tcp"][port]["product"]
                 version = nm[host]["tcp"][port]["version"]
 
-                keyword = f"{product} {version}"
+                keyword = GenerateKeyword(product, version)
+                if keyword == "" or keyword in tested_keywords:
+                    continue
+
+                tested_keywords.append(keyword)
 
                 if debug:
-                    print(f"Searching for keyword {keyword}")
+                    print(f"Searching for keyword {keyword} for {host} ...")
 
                 Vulnerablities = searchCVE(keyword, log, apiKey)
                 
                 if len(Vulnerablities) == 0:
                     continue
 
-                vulns["product"] = {}
+                vulns[product] = {}
                 for vuln in Vulnerablities:
-                    vulns["product"][vuln.CVEID] = {}
-                    vulns["product"][vuln.CVEID]["description"] = vuln.description
-                    vulns["product"][vuln.CVEID]["severity"] = vuln.severity
-                    vulns["product"][vuln.CVEID]["severity_score"] = vuln.severity_score
-                    vulns["product"][vuln.CVEID]["details_url"] = vuln.details_url
-                    vulns["product"][vuln.CVEID]["exploitability"] = vuln.exploitability
+                    vulns[product][vuln.CVEID] = self.ParseVulnInfo(vuln)
 
-                self.scan_results[host]["vulns"] = vulns
-
-        if output_file:
-            with open(output_file, "w") as output:
-                json_object = dumps(self.scan_results)
-                output.write(json_object)
+            self.scan_results[host]["vulns"] = vulns
 
         return self.scan_results
 
-scanner = AutoScanner()
-results = scanner.scan("192.168.0.29")
-print(results)
-print(results["192.168.0.29"].keys())
-print(results["192.168.0.29"]["vulns"].keys())
+
+    def save_to_file(self, filename : str = "autopwn.json") -> None:
+        with open(filename, "w") as output:
+            json_object = dumps(self.scan_results)
+            output.write(json_object)
