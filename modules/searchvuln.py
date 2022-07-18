@@ -12,40 +12,44 @@ class VulnerableSoftware:
     CVEs : list
 
 
+def GenerateKeyword(product : str, version : str) -> str:
+    if product == "Unknown":
+            product = ""
+
+    if version == "Unknown":
+        version = ""
+    
+    keyword = ""
+    dontsearch = [
+        "ssh",
+        "vnc",
+        "http",
+        "https",
+        "ftp",
+        "sftp",
+        "smtp",
+        "smb",
+        "smbv2",
+        "linux telnetd",
+        "microsoft windows rpc",
+        "metasploitable root shell"
+    ]
+
+    if product.lower() not in dontsearch and product != "":
+        keyword = f"{product} {version}".rstrip()
+
+    return keyword
+
+
 def GenerateKeywords(HostArray : list) -> list:
     keywords = []
     for port in HostArray:
         product = str(port[3])
         version = str(port[4])
-        templist = []
-        dontsearch = [
-                "ssh",
-                "vnc",
-                "http",
-                "https",
-                "ftp",
-                "sftp",
-                "smtp",
-                "smb",
-                "smbv2",
-                "linux telnetd",
-                "microsoft windows rpc",
-                "metasploitable root shell"
-            ]
 
-        if product == "Unknown":
-            product = ""
-
-        if version == "Unknown":
-            version = ""
-
-        if product.lower() not in dontsearch and product != "":
-            query = (f"{product} {version}").rstrip()
-            templist.append(query)
-
-        for entry in templist:
-            if entry not in keywords and entry != "":
-                keywords.append(entry)
+        keyword = GenerateKeyword(product, version)
+        if not keyword == "":
+            keywords.append(keyword)
 
     return keywords
 
