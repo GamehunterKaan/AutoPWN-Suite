@@ -5,7 +5,6 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 ![Repo Size](https://img.shields.io/github/repo-size/GamehunterKaan/AutoPWN-Suite)
 ![GitHub top language](https://img.shields.io/github/languages/top/GamehunterKaan/AutoPWN-Suite)
 [![Tests](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml/badge.svg)](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml)
-[![CodeQL](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/codeql-analysis.yml)
 ![GitHub issues](https://img.shields.io/github/issues-raw/GamehunterKaan/AutoPWN-Suite)
 ![GitHub closed issues](https://img.shields.io/github/issues-closed-raw/GamehunterKaan/AutoPWN-Suite)
 ![GitHub Repo stars](https://img.shields.io/github/stars/GamehunterKaan/AutoPWN-Suite?style=social)
