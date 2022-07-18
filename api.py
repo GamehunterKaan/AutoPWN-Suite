@@ -65,6 +65,42 @@ class AutoScanner:
 
         return vuln_info
 
+    
+    def CreateScanArgs(
+            self, 
+            host_timeout : int | None,
+            scan_speed : int | None,
+            os_scan : bool,
+            nmap_args : str | list | None,
+        ) -> str:
+
+        scan_args = ["-sV"]
+
+        if host_timeout:
+            scan_args.append("--host-timeout")
+            scan_args.append(str(host_timeout))
+
+        if scan_speed and scan_speed in range(0, 6):
+            scan_args.append("-T")
+            scan_args.append(str(scan_speed))
+        elif scan_speed and not scan_speed in range(0, 6):
+            raise Exception("Scanspeed must be in range of 0, 5.")
+
+        if is_root() and os_scan:
+            scan_args.append("-O")
+        elif os_scan:
+            raise Exception("Root privileges are required for os scan.")
+
+        if type(nmap_args) == list:
+            for arg in nmap_args:
+                scan_args.append(arg)
+        elif type(nmap_args) == str:
+            scan_args.append(nmap_args)
+
+        scan_arguments = " ".join(scan_args)
+
+        return scan_arguments
+
 
     def scan(
             self,
@@ -82,36 +118,12 @@ class AutoScanner:
 
         log = fake_logger()
         nm = PortScanner()
-
-        scan_args = ["-sV"]
-
-        if host_timeout:
-            scan_args.append("--host-timeout")
-            scan_args.append(str(host_timeout))
-
-        if scan_speed and scan_speed in range(0, 6):
-            scan_args.append("-T")
-            scan_args.append(str(scan_speed))
-        elif scan_speed and not scan_speed in range(0, 6):
-            raise Exception("Scanspeed must be in range of 0, 6.")
-
-        if is_root() and os_scan:
-            scan_args.append("-O")
-        elif os_scan:
-            raise Exception("Root privileges are required for os scan.")
-
-        if type(nmap_args) == list:
-            for arg in nmap_args:
-                scan_args.append(arg)
-        elif type(nmap_args) == str:
-            scan_args.append(nmap_args)
-
-        scan_arguments = " ".join(scan_args)
-        
-        self.scan_results = {}
+        scan_arguments = self.CreateScanArgs(host_timeout, scan_speed,
+                                             os_scan, nmap_args)
         for host in target:
             if debug:
                 print(f"Scanning {host} ...")
+
             nm.scan(hosts=host, arguments=scan_arguments)
             try:
                 port_scan = nm[host]["tcp"]
@@ -121,7 +133,7 @@ class AutoScanner:
                 self.scan_results[host] = {}
                 self.scan_results[host]["ports"] = port_scan
 
-            if "-O" in scan_args:
+            if os_scan and is_root():
                 os_info = self.InitHostInfo(nm[host])
                 self.scan_results[host]["os"] = os_info
 
@@ -140,12 +152,10 @@ class AutoScanner:
                     continue
 
                 tested_keywords.append(keyword)
-
                 if debug:
                     print(f"Searching for keyword {keyword} for {host} ...")
 
                 Vulnerablities = searchCVE(keyword, log, apiKey)
-                
                 if len(Vulnerablities) == 0:
                     continue
 
