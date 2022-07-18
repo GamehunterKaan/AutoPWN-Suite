@@ -102,6 +102,34 @@ class AutoScanner:
         return scan_arguments
 
 
+    def SearchVuln(
+            self,
+            port_key : JSON,
+            apiKey : str =None,
+            debug : bool = False
+        ) -> JSON | None:
+        product = port_key["product"]
+        version = port_key["version"]
+        log = fake_logger()
+
+        keyword = GenerateKeyword(product, version)
+        if keyword == "":
+            return
+
+        if debug:
+            print(f"Searching for keyword {keyword} ...")
+
+        Vulnerablities = searchCVE(keyword, log, apiKey)
+        if len(Vulnerablities) == 0:
+            return
+
+        vulns = {}
+        for vuln in Vulnerablities:
+            vulns[vuln.CVEID] = self.ParseVulnInfo(vuln)
+
+        return vulns
+
+
     def scan(
             self,
             target : str | list,
@@ -111,7 +139,7 @@ class AutoScanner:
             os_scan : bool = False,
             scan_vulns : bool = True,
             nmap_args : str | list = None,
-            debug : bool = False,
+            debug : bool = False
         ) -> JSON:
         if type(target) == str:
             target = [target]
@@ -141,27 +169,11 @@ class AutoScanner:
                 continue
 
             vulns = {}
-            tested_keywords = []
             for port in nm[host]["tcp"]:
-                self.scan_results[host]["vulns"] = {}
                 product = nm[host]["tcp"][port]["product"]
-                version = nm[host]["tcp"][port]["version"]
-
-                keyword = GenerateKeyword(product, version)
-                if keyword == "" or keyword in tested_keywords:
-                    continue
-
-                tested_keywords.append(keyword)
-                if debug:
-                    print(f"Searching for keyword {keyword} for {host} ...")
-
-                Vulnerablities = searchCVE(keyword, log, apiKey)
-                if len(Vulnerablities) == 0:
-                    continue
-
-                vulns[product] = {}
-                for vuln in Vulnerablities:
-                    vulns[product][vuln.CVEID] = self.ParseVulnInfo(vuln)
+                Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], apiKey, debug)
+                if Vulnerablities:
+                    vulns[product] = Vulnerablities
 
             self.scan_results[host]["vulns"] = vulns
 
