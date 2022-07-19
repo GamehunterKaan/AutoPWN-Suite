@@ -8,7 +8,7 @@ from rich import box
 from rich.table import Table
 
 from modules.logger import banner
-from modules.utils import GetIpAdress, ScanMode, ScanType, clear_line, is_root
+from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
 
 
 @dataclass()
@@ -75,7 +75,6 @@ def TestArp(target, mode=ScanMode.Normal) -> list:
 #run a port scan on target using nmap
 def PortScan(
         target,
-        console,
         log,
         scanspeed=5,
         host_timeout=240,
@@ -187,7 +186,7 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) ->
                     while True:
                         sleep(1)
 
-        print("Noise scan complete!")
+        log.logger("info", "Noise scan complete!")
         for P in NoisyProcesses:
             P.terminate()
         raise SystemExit
@@ -282,7 +281,6 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     """
     Analyse and print scan results.
     """
-    clear_line()
     HostArray = []
     if target is None:
         target = nm.all_hosts()[0]
