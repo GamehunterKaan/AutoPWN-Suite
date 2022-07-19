@@ -891,8 +891,3 @@ def get_terminal_width() -> int:
         width -= 1
 
     return width
-
-
-def clear_line() -> None:
-    term_width = get_terminal_width()
-    print(" " * term_width, end="\r")
