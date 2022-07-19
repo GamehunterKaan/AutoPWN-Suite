@@ -45,7 +45,7 @@ def StartScanning(
 
     for host in Targets:
         if ScanPorts:
-            PortScanResults = PortScan(host, console, log, args.speed,
+            PortScanResults = PortScan(host, log, args.speed,
                                        args.host_timeout, scanmode,
                                        args.nmap_flags)
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
@@ -66,7 +66,7 @@ def StartScanning(
 
 def main() -> None:
     __author__ = "GamehunterKaan"
-    __version__ = "2.0.0"
+    __version__ = "2.1.1"
 
     args = cli()
     if args.no_color:
