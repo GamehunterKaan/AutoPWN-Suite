@@ -66,7 +66,7 @@ You can download debian (deb) package from [releases.](https://github.com/Gamehu
 
 ```
 sudo pip install requests rich python-nmap bs4 distro
-sudo apt-get install ./autopwn-suite_2.1.0.deb
+sudo apt-get install ./autopwn-suite_2.1.1.deb
 ```
 
 OR
@@ -163,12 +163,6 @@ scanner = AutoScanner()
 json_results = scanner.scan("192.168.0.1")
 scanner.save_to_file("autopwn.json")
 ```
-
-
-## Currently working on
-
-- Function to brute force common services like `ssh`, `vnc`, `ftp`.
-- Arch Linux package for Arch based systems like BlackArch and ArchAttack.
 
 
 ## TODO
