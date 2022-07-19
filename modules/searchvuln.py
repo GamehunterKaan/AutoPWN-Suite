@@ -3,7 +3,8 @@ from textwrap import wrap
 
 from modules.logger import banner
 from modules.nist_search import searchCVE
-from modules.utils import CheckConnection, clear_line, get_terminal_width
+from modules.utils import CheckConnection, get_terminal_width
+from rich.progress_bar import ProgressBar
 
 
 @dataclass
@@ -55,17 +56,12 @@ def GenerateKeywords(HostArray : list) -> list:
 
 
 def SearchKeyword(keyword : str, log, apiKey=None) -> list:
-    clear_line()
-    print(
-        "Searching vulnerability database for keyword"
-        + f" {keyword}... CTRL-C to skip", end="\r"
-    )
 
     try:
         ApiResponseCVE = searchCVE(keyword, log, apiKey)
     except KeyboardInterrupt:
         log.logger(
-            "warning", f"Skipping vulnerability detection for keyword {keyword}"
+            "warning", f"Skipped vulnerability detection for {keyword}"
         )
     except Exception as e:
         log.logger("error", e)
@@ -95,39 +91,44 @@ def SearchSploits(HostArray : list, log, console, apiKey=None) -> list:
     )
 
     printed_banner = False
-    for keyword in keywords:
-        ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
-
-        if len(ApiResponseCVE) == 0:
-            continue
-
-        if not printed_banner:
-            banner(f"Possible vulnerabilities for {target}", "red", console)
-            printed_banner = True
-
-        clear_line()
-        console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
-
-        CVEs = []
-        for CVE in ApiResponseCVE:
-            CVEs.append(CVE.CVEID)
-            console.print(
-                f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│"
+    with console.status(
+        "[white]Searching vulnerabilities ...[/white]",
+        spinner="bouncingBar"
+        ) as status:
+        for keyword in keywords:
+            status.update(
+                "[white]Searching vulnerability database for[/white] "
+                + f"[red]{keyword}[/red] [white]...[/white]"
             )
+            ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+            if len(ApiResponseCVE) == 0:
+                continue
 
-            wrapped_description = wrap(CVE.description, term_width-50)
-            console.print(f"│\t\t[cyan]Description: [/cyan]")
-            for line in wrapped_description:
-                console.print(f"│\t\t\t{line}")
-            console.print(
-                f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
-                + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
-                + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
-            )
+            if not printed_banner:
+                banner(f"Possible vulnerabilities for {target}", "red", console)
+                printed_banner = True
 
-        VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)        
-        VulnsArray.append(VulnObject)
-        console.print("└" + "─" * (term_width-1))
+            console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
-    clear_line()
+            CVEs = []
+            for CVE in ApiResponseCVE:
+                CVEs.append(CVE.CVEID)
+                console.print(
+                    f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│"
+                )
+
+                wrapped_description = wrap(CVE.description, term_width-50)
+                console.print(f"│\t\t[cyan]Description: [/cyan]")
+                for line in wrapped_description:
+                    console.print(f"│\t\t\t{line}")
+                console.print(
+                    f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
+                    + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
+                    + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
+                )
+
+            VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)        
+            VulnsArray.append(VulnObject)
+            console.print("└" + "─" * (term_width-1))
+
     return VulnsArray
