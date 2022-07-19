@@ -71,7 +71,7 @@ def SearchKeyword(keyword : str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(HostArray : list, log, console, apiKey=None) -> list:
+def SearchSploits(HostArray : list, log, console, console2, apiKey=None) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
@@ -91,16 +91,18 @@ def SearchSploits(HostArray : list, log, console, apiKey=None) -> list:
     )
 
     printed_banner = False
-    with console.status(
+    with console2.status(
         "[white]Searching vulnerabilities ...[/white]",
         spinner="bouncingBar"
         ) as status:
         for keyword in keywords:
+            status.start()
             status.update(
                 "[white]Searching vulnerability database for[/white] "
                 + f"[red]{keyword}[/red] [white]...[/white]"
             )
             ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+            status.stop()
             if len(ApiResponseCVE) == 0:
                 continue
 

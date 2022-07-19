@@ -24,6 +24,7 @@ def StartScanning(
         scanmode,
         apiKey,
         console,
+        console2,
         log
     ) -> None:
 
@@ -50,9 +51,9 @@ def StartScanning(
                                        args.nmap_flags)
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
             if ScanVulns and len(PortArray) > 0:
-                VulnsArray = SearchSploits(PortArray, log, console, apiKey)
+                VulnsArray = SearchSploits(PortArray, log, console, console2, apiKey)
                 if DownloadExploits and len(VulnsArray) > 0:
-                    GetExploitsFromArray(VulnsArray, log, console, host)
+                    GetExploitsFromArray(VulnsArray, log, console, console2, host)
 
         if ScanWeb:
             webvuln(host, log, console)
@@ -71,8 +72,10 @@ def main() -> None:
     args = cli()
     if args.no_color:
         console = Console(record=True, color_system=None)
+        console2 = Console(record=False, color_system=None)
     else:
         console = Console(record=True, color_system="truecolor")
+        console2 = Console(record=False, color_system="truecolor")
     log = Logger(console)
 
     if args.version:
@@ -108,6 +111,7 @@ def main() -> None:
         scanmode,
         apiKey,
         console,
+        console2,
         log
     )
 
