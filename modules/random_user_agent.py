@@ -17,10 +17,8 @@ def random_user_agent(log) -> str:
 
         try:
             with open(
-                    f"{base_dir}/data/user_agents.json",
-                    "r",
-                    encoding="utf-8"
-                ) as data:
+                f"{base_dir}/data/user_agents.json", "r", encoding="utf-8"
+            ) as data:
                 for user_agent_ in data:
                     user_agent_: dict[str, str] = loads(user_agent_)
 
@@ -30,7 +28,7 @@ def random_user_agent(log) -> str:
             raise SystemExit
         else:
             floor_: int = randint(1, 450)
-            top_: int = randint(floor_+1, floor_*2)
+            top_: int = randint(floor_ + 1, floor_ * 2)
 
             return user_agents[floor_:top_]
 
