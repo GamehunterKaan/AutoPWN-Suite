@@ -8,16 +8,9 @@ def crawl(target_url, log) -> set:
         target_url += "/"
 
     try:
-        get(
-            target_url, headers={
-                "User-Agent": next(random_user_agent(log))
-            }
-        )
+        get(target_url, headers={"User-Agent": next(random_user_agent(log))})
     except ConnectionError:
-        log.logger(
-            "error",
-            f"Connection error raised."
-        )
+        log.logger("error", f"Connection error raised.")
         return set()
 
     log.logger("info", f"Crawling web application at {target_url} ...")
@@ -29,7 +22,7 @@ def crawl(target_url, log) -> set:
             new_urls = link_finder(url, log)
             for new_url in new_urls:
                 temp_urls.add(new_url)
-        
+
         for url in temp_urls:
             urls.add(url)
 
@@ -42,11 +35,7 @@ def link_finder(target_url, log):
 
     urls = set()
 
-    reqs = get(
-        target_url, headers={
-                    "User-Agent": next(random_user_agent(log))
-                }
-            )
+    reqs = get(target_url, headers={"User-Agent": next(random_user_agent(log))})
     soup = BeautifulSoup(reqs.text, "html.parser")
     for link in soup.find_all("a", href=True):
         url = link["href"]
