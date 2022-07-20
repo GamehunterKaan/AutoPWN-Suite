@@ -17,13 +17,11 @@ ___           __          ____  _       __ _   __   _____         _  __
  /_/  |_|\____/ \__/ \____//_/      |__/|__//_/ |_/   /____/ \____//_/ \__/ \___/
 """
 
-
     banner_small = """\
 ╔═╗┬ ┬┌┬┐┌─┐╔═╗╦ ╦╔╗╔  ╔═╗┬ ┬┬┌┬┐┌─┐
 ╠═╣│ │ │ │ │╠═╝║║║║║║  ╚═╗│ ││ │ ├┤ 
 ╩ ╩└─┘ ┴ └─┘╩  ╚╩╝╝╚╝  ╚═╝└─┘┴ ┴ └─┘
 """
-
 
     if width < 90:
         banner = banner_small
@@ -31,13 +29,12 @@ ___           __          ____  _       __ _   __   _____         _  __
 
     panel = Panel(
         Align(
-            Text(
-                banner,
-                justify="center",
-                style="blue"
-            ),
-            vertical="middle", align="center"
+            Text(banner, justify="center", style="blue"),
+            vertical="middle",
+            align="center",
         ),
-        width=width, height=height, subtitle="by GamehunterKaan (https://auto.pwnspot.com)"
+        width=width,
+        height=height,
+        subtitle="by GamehunterKaan (https://auto.pwnspot.com)",
     )
     console.print(panel)
