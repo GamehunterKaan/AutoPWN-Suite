@@ -194,9 +194,10 @@ def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal) 
     else:
         banner(f"Scanning {target} using {scantype.name} scan ...", "green", console)
 
-    OnlineHosts = TestPing(target, mode)
     if scantype == ScanType.ARP:
         OnlineHosts = TestArp(target, mode)
+    else:
+        OnlineHosts = TestPing(target, mode)
 
     return OnlineHosts
 
