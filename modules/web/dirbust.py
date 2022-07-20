@@ -12,7 +12,7 @@ def dirbust(target_url, console, log) -> None:
     dirs_db = f"{curdir}/../data/web_discovery.txt"
 
     try:
-        with open(dirs_db, 'r') as f:
+        with open(dirs_db, "r") as f:
             dirs = f.read().splitlines()
     except FileNotFoundError:
         log.logger("error", "Web discovery database not found.")
@@ -24,9 +24,7 @@ def dirbust(target_url, console, log) -> None:
         if test_url in found_dirs:
             continue
 
-        headers = {
-            "User-Agent" : next(random_user_agent(log))
-        }
+        headers = {"User-Agent": next(random_user_agent(log))}
 
         try:
             req = get(test_url, headers=headers)
@@ -35,7 +33,7 @@ def dirbust(target_url, console, log) -> None:
         else:
             if req.status_code == 404:
                 continue
-    
+
             found_dirs.append(test_url)
 
             if req.is_redirect:
