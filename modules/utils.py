@@ -34,31 +34,32 @@ class ScanType(Enum):
 
 def cli():
     argparser = ArgumentParser(
-        description="AutoPWN Suite | A project for scanning " + 
-        "vulnerabilities and exploiting systems automatically."
+        description="AutoPWN Suite | A project for scanning "
+        + "vulnerabilities and exploiting systems automatically."
     )
     argparser.add_argument(
-        "-v", "--version",
-        help="Print version and exit.",
-        action="store_true"
+        "-v", "--version", help="Print version and exit.", action="store_true"
     )
     argparser.add_argument(
-        "-y", "--yes-please",
+        "-y",
+        "--yes-please",
         help="Don't ask for anything. (Full automatic mode)",
         action="store_true",
         required=False,
-        default=False
+        default=False,
     )
     argparser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         help="Specify a config file to use. (Default : None)",
         default=None,
         required=False,
         metavar="CONFIG",
-        type=str
+        type=str,
     )
     argparser.add_argument(
-        "-nc", "--no-color",
+        "-nc",
+        "--no-color",
         help="Disable colors.",
         default=False,
         required=False,
@@ -67,112 +68,125 @@ def cli():
 
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument(
-        "-t", "--target",
+        "-t",
+        "--target",
         help=(
-                "Target range to scan. This argument overwrites the" +
-                " hostfile argument. (192.168.0.1 or 192.168.0.0/24)"
-            ),
+            "Target range to scan. This argument overwrites the"
+            + " hostfile argument. (192.168.0.1 or 192.168.0.0/24)"
+        ),
         type=str,
         required=False,
-        default=None
+        default=None,
     )
     scanargs.add_argument(
-        "-hf", "--host-file",
+        "-hf",
+        "--host-file",
         help="File containing a list of hosts to scan.",
         type=str,
         required=False,
-        default=None
+        default=None,
     )
     scanargs.add_argument(
-        "-sd", "--skip-discovery",
+        "-sd",
+        "--skip-discovery",
         help="Skips the host discovery phase.",
         required=False,
         default=False,
-        action="store_true"
+        action="store_true",
     )
     scanargs.add_argument(
-        "-st", "--scan-type",
+        "-st",
+        "--scan-type",
         help="Scan type.",
         type=str,
         required=False,
         default=None,
-        choices=["arp", "ping"]
+        choices=["arp", "ping"],
     )
     scanargs.add_argument(
-        "-nf", "--nmap-flags",
+        "-nf",
+        "--nmap-flags",
         help=(
-                "Custom nmap flags to use for portscan." +
-                " (Has to be specified like : -nf=\"-O\")"
-            ),
+            "Custom nmap flags to use for portscan."
+            + ' (Has to be specified like : -nf="-O")'
+        ),
         default="",
         type=str,
-        required=False
+        required=False,
     )
     scanargs.add_argument(
-        "-s", "--speed",
+        "-s",
+        "--speed",
         help="Scan speed. (Default : 3)",
         default=3,
         type=int,
         required=False,
-        choices=range(0,6)
+        choices=range(0, 6),
     )
     scanargs.add_argument(
-        "-ht", "--host-timeout",
+        "-ht",
+        "--host-timeout",
         help="Timeout for every host. (Default :240)",
         default=240,
         type=int,
-        required=False
+        required=False,
     )
     scanargs.add_argument(
-        "-a", "--api",
+        "-a",
+        "--api",
         help=(
-                "Specify API key for vulnerability detection " +
-                "for faster scanning. (Default : None)"
-            ),
+            "Specify API key for vulnerability detection "
+            + "for faster scanning. (Default : None)"
+        ),
         default=None,
         type=str,
-        required=False
+        required=False,
     )
     scanargs.add_argument(
-        "-m", "--mode",
+        "-m",
+        "--mode",
         help="Scan mode.",
         default="normal",
         type=str,
         required=False,
-        choices=["evade", "noise", "normal"]
+        choices=["evade", "noise", "normal"],
     )
     scanargs.add_argument(
-        "-nt", "--noise-timeout",
+        "-nt",
+        "--noise-timeout",
         help="Noise mode timeout.",
         default=None,
         type=int,
         required=False,
-        metavar="TIMEOUT"
+        metavar="TIMEOUT",
     )
 
     reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
     reportargs.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         help="Output file name. (Default : autopwn.log)",
         default="autopwn",
         type=str,
-        required=False
+        required=False,
     )
     reportargs.add_argument(
-        "-ot", "--output-type",
+        "-ot",
+        "--output-type",
         help="Output file type. (Default : html)",
         default="html",
         type=str,
         required=False,
-        choices=["html", "txt", "svg"]
+        choices=["html", "txt", "svg"],
     )
     reportargs.add_argument(
-        "-rp", "--report",
+        "-rp",
+        "--report",
         help="Report sending method.",
         type=str,
         required=False,
         default=None,
-        choices=["email", "webhook"]
+        choices=["email", "webhook"],
     )
     reportargs.add_argument(
         "-rpe",
@@ -181,7 +195,7 @@ def cli():
         type=str,
         required=False,
         default=None,
-        metavar="EMAIL"
+        metavar="EMAIL",
     )
     reportargs.add_argument(
         "-rpep",
@@ -190,55 +204,60 @@ def cli():
         type=str,
         required=False,
         default=None,
-        metavar="PASSWORD"
+        metavar="PASSWORD",
     )
     reportargs.add_argument(
-        "-rpet", "--report-email-to",
+        "-rpet",
+        "--report-email-to",
         help="Email address to send report to.",
         type=str,
         required=False,
         default=None,
-        metavar="EMAIL"
+        metavar="EMAIL",
     )
     reportargs.add_argument(
-        "-rpef", "--report-email-from",
+        "-rpef",
+        "--report-email-from",
         help="Email to send from.",
         type=str,
         required=False,
         default=None,
-        metavar="EMAIL"
+        metavar="EMAIL",
     )
     reportargs.add_argument(
-        "-rpes", "--report-email-server",
+        "-rpes",
+        "--report-email-server",
         help="Email server to use for sending report.",
         type=str,
         required=False,
         default=None,
-        metavar="SERVER"
+        metavar="SERVER",
     )
     reportargs.add_argument(
-        "-rpesp", "--report-email-server-port",
+        "-rpesp",
+        "--report-email-server-port",
         help="Port of the email server.",
         type=int,
         required=False,
         default=None,
-        metavar="PORT"
+        metavar="PORT",
     )
     reportargs.add_argument(
-        "-rpw", "--report-webhook",
+        "-rpw",
+        "--report-webhook",
         help="Webhook to use for sending report.",
         type=str,
         required=False,
         default=None,
-        metavar="WEBHOOK"
+        metavar="WEBHOOK",
     )
 
     return argparser.parse_args()
 
 
 class fake_logger:
-        def logger(self, exception_ : str, message : str):
-            pass
+    def logger(self, exception_: str, message: str):
+        pass
 
 
 def is_root():
@@ -258,10 +277,10 @@ def GetIpAdress() -> str:
 def DetectIPRange() -> str:
     PrivateIPAdress = GetIpAdress().split(".")
     target = (
-            f"{PrivateIPAdress[0]}." +
-            f"{PrivateIPAdress[1]}." +
-            f"{PrivateIPAdress[2]}.0/24"
-        )
+        f"{PrivateIPAdress[0]}."
+        + f"{PrivateIPAdress[1]}."
+        + f"{PrivateIPAdress[2]}.0/24"
+    )
     return target
 
 
@@ -288,12 +307,10 @@ def InitArgsAPI(args, log) -> str:
                 "No API key specified and no api.txt file found. "
                 + "Vulnerability detection is going to be slower! "
                 + "You can get your own NIST API key from "
-                + "https://nvd.nist.gov/developers/request-an-api-key"
+                + "https://nvd.nist.gov/developers/request-an-api-key",
             )
         except PermissionError:
-            log.logger(
-                "error", "Permission denied while trying to read api.txt!"
-            )
+            log.logger("error", "Permission denied while trying to read api.txt!")
 
     return apiKey
 
@@ -305,8 +322,9 @@ def InitArgsScanType(args, log):
             scantype = ScanType.ARP
         else:
             log.logger(
-                "warning", "You need to be root in order to run arp scan.\n" +
-                            "Changed scan mode to Ping Scan."
+                "warning",
+                "You need to be root in order to run arp scan.\n"
+                + "Changed scan mode to Ping Scan.",
             )
     elif args.scan_type is None or args.scan_type == "":
         if is_root():
@@ -327,14 +345,9 @@ def InitArgsTarget(args, log):
             except FileNotFoundError:
                 log.logger("error", "Host file not found!")
             except PermissionError:
-                log.logger(
-                    "error",
-                    "Permission denied while trying to read host file!"
-                )
+                log.logger("error", "Permission denied while trying to read host file!")
             except Exception:
-                log.logger(
-                    "error", "Unknown error while trying to read host file!"
-                )
+                log.logger("error", "Unknown error while trying to read host file!")
             else:
                 return target
 
@@ -344,10 +357,7 @@ def InitArgsTarget(args, log):
                 try:
                     target = DetectIPRange()
                 except Exception as e:
-                    log.logger(
-                        "error", 
-                        e
-                    )
+                    log.logger("error", e)
                     target = input("Enter target range to scan : ")
             else:
                 try:
@@ -369,7 +379,7 @@ def InitArgsMode(args, log):
             log.logger(
                 "error",
                 "You must be root to use evasion mode!"
-                + " Switching back to normal mode ..."
+                + " Switching back to normal mode ...",
             )
     elif args.mode == "noise":
         scanmode = ScanMode.Noise
@@ -397,9 +407,7 @@ def InitReport(args, log):
         if args.reportemailto:
             ReportMailTo = args.reportemailto
         else:
-            ReportMailTo = input(
-                    "Enter the email address to send the report to : "
-                )
+            ReportMailTo = input("Enter the email address to send the report to : ")
 
         if args.reportemailfrom:
             ReportMailFrom = args.reportemailfrom
@@ -410,12 +418,11 @@ def InitReport(args, log):
             ReportMailServer = args.reportemailserver
         else:
             ReportMailServer = input(
-                    "Enter the email server to send the report from : "
-                )
+                "Enter the email server to send the report from : "
+            )
             if ReportMailServer == "smtp.gmail.com":
                 log.logger(
-                    "warning",
-                    "Google no longer supports sending mails via SMTP."
+                    "warning", "Google no longer supports sending mails via SMTP."
                 )
                 return ReportType.NONE, None
 
@@ -424,20 +431,20 @@ def InitReport(args, log):
         else:
             while True:
                 ReportMailPort = input(
-                        "Enter the email port to send the report from : "
-                    )
+                    "Enter the email port to send the report from : "
+                )
                 if not isinstance(ReportMailPort, int):
                     break
                 log.logger("error", "Invalid port number!")
 
         EmailObj = ReportMail(
-                ReportEmail,
-                ReportMailPassword,
-                ReportMailTo,
-                ReportMailFrom,
-                ReportMailServer,
-                int(ReportMailPort),
-            )
+            ReportEmail,
+            ReportMailPassword,
+            ReportMailTo,
+            ReportMailFrom,
+            ReportMailServer,
+            int(ReportMailPort),
+        )
 
         return Method, EmailObj
 
@@ -467,30 +474,24 @@ def UserConfirmation():
     if not portscan:
         return False, False, False
 
-    vulnscan = Confirmation(
-            "Do you want to scan for vulnerabilities? [Y/n] : "
-        )
+    vulnscan = Confirmation("Do you want to scan for vulnerabilities? [Y/n] : ")
     if not vulnscan:
         return True, False, False
 
-    downloadexploits = Confirmation(
-            "Do you want to download exploits? [Y/n] : "
-        )
+    downloadexploits = Confirmation("Do you want to download exploits? [Y/n] : ")
 
     return portscan, vulnscan, downloadexploits
 
 
 def WebScan() -> bool:
-    return Confirmation(
-        "Do you want to scan for web vulnerabilities? [Y/n] : "
-    )
+    return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
 
 
 def GetHostsToScan(hosts, console):
     if len(hosts) == 0:
         raise SystemExit(
             "No hosts found! {time} - Scan completed.".format(
-                time = datetime.now().strftime("%b %d %Y %H:%M:%S")
+                time=datetime.now().strftime("%b %d %Y %H:%M:%S")
             )
         )
 
@@ -501,10 +502,7 @@ def GetHostsToScan(hosts, console):
 
         msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
 
-        console.print(
-            msg,
-            justify="center"
-        )
+        console.print(msg, justify="center")
 
         index += 1
 
@@ -530,7 +528,7 @@ def GetHostsToScan(hosts, console):
             elif host == "exit":
                 raise SystemExit(
                     "{time} - Scan completed.".format(
-                        time = datetime.now().strftime("%b %d %Y %H:%M:%S")
+                        time=datetime.now().strftime("%b %d %Y %H:%M:%S")
                     )
                 )
             else:
@@ -539,9 +537,9 @@ def GetHostsToScan(hosts, console):
                     break
                 else:
                     console.print(
-                    "Please enter a valid host number or 'all' "
-                    + "or 'exit'", style="red"
-                )
+                        "Please enter a valid host number or 'all' " + "or 'exit'",
+                        style="red",
+                    )
 
     return Targets
 
@@ -570,10 +568,7 @@ def InitArgsConf(args, log):
             try:
                 args.speed = int(config.get("AUTOPWN", "speed"))
             except ValueError:
-                log.logger(
-                    "error",
-                    "Invalid speed value in config file. (Default : 3)"
-                )
+                log.logger("error", "Invalid speed value in config file. (Default : 3)")
 
         if config.has_option("AUTOPWN", "apikey"):
             args.api = config.get("AUTOPWN", "apikey").lower()
@@ -600,9 +595,7 @@ def InitArgsConf(args, log):
             args.report_email = config.get("REPORT", "email").lower()
 
         if config.has_option("REPORT", "email_password"):
-            args.report_email_password = config.get(
-                    "REPORT", "email_password"
-                ).lower()
+            args.report_email_password = config.get("REPORT", "email_password").lower()
 
         if config.has_option("REPORT", "email_to"):
             args.report_email_to = config.get("REPORT", "email_to").lower()
@@ -611,14 +604,10 @@ def InitArgsConf(args, log):
             args.report_email_from = config.get("REPORT", "email_from").lower()
 
         if config.has_option("REPORT", "email_server"):
-            args.report_email_server = config.get(
-                    "REPORT", "email_server"
-                ).lower()
+            args.report_email_server = config.get("REPORT", "email_server").lower()
 
         if config.has_option("REPORT", "email_port"):
-            args.report_email_server_port = config.get(
-                    "REPORT", "email_port"
-                ).lower()
+            args.report_email_server_port = config.get("REPORT", "email_port").lower()
 
         if config.has_option("REPORT", "webhook"):
             args.report_webhook = config.get("REPORT", "webhook")
@@ -627,9 +616,7 @@ def InitArgsConf(args, log):
         log.logger("error", "Config file not found!")
         raise SystemExit
     except PermissionError:
-        log.logger(
-            "error", "Permission denied while trying to read config file!"
-        )
+        log.logger("error", "Permission denied while trying to read config file!")
         raise SystemExit
 
 
@@ -637,65 +624,39 @@ def install_nmap_linux(log):
     distro_ = distro.id().lower()
     while True:
         try:
-            if distro_ in ["ubuntu", "debian", "linuxmint",
-                           "raspbian", "kali", "parrot"]:
+            if distro_ in [
+                "ubuntu",
+                "debian",
+                "linuxmint",
+                "raspbian",
+                "kali",
+                "parrot",
+            ]:
                 check_call(
-                    [
-                        "/usr/bin/sudo",
-                        "apt-get",
-                        "install",
-                        "nmap",
-                        "-y"
-                        ],
-                    stderr=DEVNULL
+                    ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"],
+                    stderr=DEVNULL,
                 )
                 break
             elif distro_ in ["arch", "manjaro"]:
                 check_call(
-                        [
-                            "/usr/bin/sudo",
-                            "pacman",
-                            "-S",
-                            "nmap",
-                            "--noconfirm"
-                            ],
-                        stderr=DEVNULL
+                    ["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"],
+                    stderr=DEVNULL,
                 )
                 break
             elif distro_ in ["fedora", "oracle"]:
                 check_call(
-                    [
-                        "/usr/bin/sudo",
-                        "dnf",
-                        "install",
-                        "nmap",
-                        "-y"
-                        ],
-                    stderr=DEVNULL
+                    ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"], stderr=DEVNULL
                 )
                 break
             elif distro in ["rhel", "centos"]:
                 check_call(
-                    [
-                        "/usr/bin/sudo",
-                        "yum",
-                        "install",
-                        "nmap",
-                        "-y"
-                        ],
-                    stderr=DEVNULL
+                    ["/usr/bin/sudo", "yum", "install", "nmap", "-y"], stderr=DEVNULL
                 )
                 break
             elif distro in ["sles", "opensuse"]:
                 check_call(
-                    [
-                        "/usr/bin/sudo",
-                        "zypper",
-                        "install",
-                        "nmap",
-                        "--non-interactive"
-                        ],
-                    stderr=DEVNULL
+                    ["/usr/bin/sudo", "zypper", "install", "nmap", "--non-interactive"],
+                    stderr=DEVNULL,
                 )
                 break
             else:
@@ -703,14 +664,14 @@ def install_nmap_linux(log):
 
         except CalledProcessError:
             _distro_ = input(
-                    "Cannot recognize the needed package manager for your "
-                    + f"system that seems to be running in: {distro_} and "
-                    + f"{sys_platform}, {platform()}, kindly select the "
-                    + "correct package manager below to proceed to the "
-                    + "installation, else, select, n.\n\t0 Abort installation\n"
-                    + "\t1 apt-get\n\t2 dnf\n\t3 yum\n\t4 pacman\n\t5 zypper."
-                    + "\nSelect option [0-5] >"
-                )
+                "Cannot recognize the needed package manager for your "
+                + f"system that seems to be running in: {distro_} and "
+                + f"{sys_platform}, {platform()}, kindly select the "
+                + "correct package manager below to proceed to the "
+                + "installation, else, select, n.\n\t0 Abort installation\n"
+                + "\t1 apt-get\n\t2 dnf\n\t3 yum\n\t4 pacman\n\t5 zypper."
+                + "\nSelect option [0-5] >"
+            )
             if _distro_ == 1:
                 distro_ = "ubuntu"
             elif _distro_ == 2:
@@ -735,14 +696,11 @@ def install_nmap_windows(log):
                 "winget",
                 "install",
                 "nmap",
-                "--silent"
-                ],
-            stderr=DEVNULL
+                "--silent",
+            ],
+            stderr=DEVNULL,
         )
-        log.logger(
-            "warning",
-            "Nmap is installed but shell restart is required."
-        )
+        log.logger("warning", "Nmap is installed but shell restart is required.")
         raise SystemExit
     except CalledProcessError:
         log.logger("error", "Couldn't install nmap! (Windows)")
@@ -751,34 +709,22 @@ def install_nmap_windows(log):
 
 def install_nmap_mac(log):
     try:
-        check_call(
-            [
-                "/usr/bin/sudo",
-                "brew",
-                "install",
-                "nmap"
-                ],
-            stderr=DEVNULL
-        )
+        check_call(["/usr/bin/sudo", "brew", "install", "nmap"], stderr=DEVNULL)
     except CalledProcessError:
         log.logger("error", "Couldn't install nmap! (Mac)")
 
 
 def check_nmap(log):
     try:
-        check_call(
-            ["nmap", "-h"],
-            stdout=DEVNULL,
-            stderr=DEVNULL
-        )
+        check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
     except (CalledProcessError, FileNotFoundError):
         log.logger("warning", "Nmap is not installed.")
         if DontAskForConfirmation:
             auto_install = True
         else:
-            auto_install = input(
-                    f"Install Nmap on your system ({distro.id()})? "
-                ).lower() != "n"
+            auto_install = (
+                input(f"Install Nmap on your system ({distro.id()})? ").lower() != "n"
+            )
         if auto_install:
             platform_ = system().lower()
             if platform_ == "linux":
@@ -788,35 +734,28 @@ def check_nmap(log):
             elif platform_ == "darwin":
                 install_nmap_mac(log)
             else:
-                raise SystemExit(
-                    "Unknown OS! Auto installation not supported!"
-                )
+                raise SystemExit("Unknown OS! Auto installation not supported!")
         else:
             log.logger("error", "Denied permission to install Nmap.")
             raise SystemExit
 
-def ParamPrint(
-        args,
-        targetarg,
-        scantype_name,
-        scanmode_name,
-        apiKey,
-        console,
-        log
-    ):
+
+def ParamPrint(args, targetarg, scantype_name, scanmode_name, apiKey, console, log):
 
     if not is_root():
         log.logger(
             "warning",
             "It is recommended to run this script as root"
-            + " since it is more silent and accurate."
+            + " since it is more silent and accurate.",
         )
 
     term_width = get_terminal_width()
 
     msg = (
         "\n┌─[ Scanning with the following parameters ]\n"
-        + f"├" + "─" * (term_width-1) + "\n"
+        + f"├"
+        + "─" * (term_width - 1)
+        + "\n"
         + f"│\tTarget : {targetarg}\n"
         + f"│\tOutput file : [yellow]{args.output}[/yellow]\n"
         + f"│\tAPI Key : {type(apiKey) == str}\n"
@@ -848,11 +787,11 @@ def ParamPrint(
 
     if not args.nmap_flags == None and not args.nmap_flags == "":
         msg += f"│\tNmap flags : [blue]{args.nmap_flags}[/blue]\n"
-    
+
     if args.report:
         msg += f"│\tReporting method : {args.report}\n"
 
-    msg += "└" + "─" * (term_width-1)
+    msg += "└" + "─" * (term_width - 1)
 
     console.print(msg)
 
@@ -891,3 +830,36 @@ def get_terminal_width() -> int:
         width -= 1
 
     return width
+
+
+def check_version(cur_version: str, log) -> None:
+    try:
+        data = get("https://pypi.org/pypi/autopwn-suite/json").json()
+    except Exception as e:
+        log.logger("error", "An error occured while checking AutoPWN Suite version.")
+        log.logger("error", e)
+    else:
+        version = list(data["releases"].keys())[-1]
+        version_major = int(version.split(".")[0])
+        version_minor = int(version.split(".")[1])
+        version_patch = int(version.split(".")[2])
+
+        cur_version_major = int(cur_version.split(".")[0])
+        cur_version_minor = int(cur_version.split(".")[1])
+        cur_version_patch = int(cur_version.split(".")[2])
+
+        if version_major > cur_version_major:
+            log.logger(
+                "warning",
+                "Your version of AutoPWN Suite is outdated. Update is advised.",
+            )
+        elif version_minor > cur_version_minor:
+            log.logger(
+                "warning",
+                "Your version of AutoPWN Suite is outdated. Update is advised.",
+            )
+        elif version_patch > cur_version_patch:
+            log.logger(
+                "warning",
+                "Your version of AutoPWN Suite is outdated. Update is advised.",
+            )
