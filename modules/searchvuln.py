@@ -9,17 +9,17 @@ from rich.progress_bar import ProgressBar
 
 @dataclass
 class VulnerableSoftware:
-    title : str
-    CVEs : list
+    title: str
+    CVEs: list
 
 
-def GenerateKeyword(product : str, version : str) -> str:
+def GenerateKeyword(product: str, version: str) -> str:
     if product == "Unknown":
-            product = ""
+        product = ""
 
     if version == "Unknown":
         version = ""
-    
+
     keyword = ""
     dontsearch = [
         "ssh",
@@ -33,7 +33,8 @@ def GenerateKeyword(product : str, version : str) -> str:
         "smbv2",
         "linux telnetd",
         "microsoft windows rpc",
-        "metasploitable root shell"
+        "metasploitable root shell",
+        "gnu classpath grmiregistry",
     ]
 
     if product.lower() not in dontsearch and product != "":
@@ -42,7 +43,7 @@ def GenerateKeyword(product : str, version : str) -> str:
     return keyword
 
 
-def GenerateKeywords(HostArray : list) -> list:
+def GenerateKeywords(HostArray: list) -> list:
     keywords = []
     for port in HostArray:
         product = str(port[3])
@@ -55,14 +56,12 @@ def GenerateKeywords(HostArray : list) -> list:
     return keywords
 
 
-def SearchKeyword(keyword : str, log, apiKey=None) -> list:
+def SearchKeyword(keyword: str, log, apiKey=None) -> list:
 
     try:
         ApiResponseCVE = searchCVE(keyword, log, apiKey)
     except KeyboardInterrupt:
-        log.logger(
-            "warning", f"Skipped vulnerability detection for {keyword}"
-        )
+        log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
         log.logger("error", e)
     else:
@@ -71,7 +70,7 @@ def SearchKeyword(keyword : str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(HostArray : list, log, console, console2, apiKey=None) -> list:
+def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
@@ -86,15 +85,13 @@ def SearchSploits(HostArray : list, log, console, console2, apiKey=None) -> list
         return []
 
     log.logger(
-        "info",
-        f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
+        "info", f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
     )
 
     printed_banner = False
     with console2.status(
-        "[white]Searching vulnerabilities ...[/white]",
-        spinner="bouncingBar"
-        ) as status:
+        "[white]Searching vulnerabilities ...[/white]", spinner="bouncingBar"
+    ) as status:
         for keyword in keywords:
             status.start()
             status.update(
@@ -115,11 +112,9 @@ def SearchSploits(HostArray : list, log, console, console2, apiKey=None) -> list
             CVEs = []
             for CVE in ApiResponseCVE:
                 CVEs.append(CVE.CVEID)
-                console.print(
-                    f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│"
-                )
+                console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
 
-                wrapped_description = wrap(CVE.description, term_width-50)
+                wrapped_description = wrap(CVE.description, term_width - 50)
                 console.print(f"│\t\t[cyan]Description: [/cyan]")
                 for line in wrapped_description:
                     console.print(f"│\t\t\t{line}")
@@ -129,8 +124,8 @@ def SearchSploits(HostArray : list, log, console, console2, apiKey=None) -> list
                     + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
                 )
 
-            VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)        
+            VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)
             VulnsArray.append(VulnObject)
-            console.print("└" + "─" * (term_width-1))
+            console.print("└" + "─" * (term_width - 1))
 
     return VulnsArray
