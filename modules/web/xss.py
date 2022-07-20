@@ -34,7 +34,7 @@ class TestXSS:
             r"¼script¾alert(¢PAYLOAD¢)¼/script¾",
             r"d=\\\"alert('PAYLOAD');\\\\\")\\\";",
             r"&lt;DIV STYLE=\\\"background-image&#58; url(javascript&#058;"
-            + r"alert('PAYLOAD'))\\\"&gt;"
+            + r"alert('PAYLOAD'))\\\"&gt;",
         ]
 
     def exploit_xss(self, base_url, url_params) -> None:
@@ -42,7 +42,7 @@ class TestXSS:
             for test in self.xss_test:
                 param_no_value = param.split("=")[0]
                 payload_length = randint(5, 15)
-                payload_text = ''.join(choices(ascii_letters, k = payload_length))
+                payload_text = "".join(choices(ascii_letters, k=payload_length))
                 payload = test.replace("PAYLOAD", payload_text)
                 main_url = f"{base_url}?{param_no_value}"
 
@@ -56,8 +56,7 @@ class TestXSS:
                     response = get(test_url)
                 except ConnectionError:
                     self.log.logger(
-                        "error",
-                        f"Connection error raised on: {test_url}, skipping"
+                        "error", f"Connection error raised on: {test_url}, skipping"
                     )
                     continue
                 else:
