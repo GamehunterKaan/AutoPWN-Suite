@@ -14,12 +14,10 @@ class AutoScanner:
     def __init__(self) -> None:
         self.scan_results = {}
 
-
     def __str__(self) -> str:
         return str(self.scan_results)
 
-
-    def InitHostInfo(self, target_key : JSON) -> JSON:
+    def InitHostInfo(self, target_key: JSON) -> JSON:
         os_info = {}
         try:
             mac = target_key["addresses"]["mac"]
@@ -54,7 +52,6 @@ class AutoScanner:
 
         return os_info
 
-
     def ParseVulnInfo(self, vuln):
         vuln_info = {}
         vuln_info["description"] = vuln.description
@@ -65,14 +62,13 @@ class AutoScanner:
 
         return vuln_info
 
-    
     def CreateScanArgs(
-            self, 
-            host_timeout,
-            scan_speed,
-            os_scan : bool,
-            nmap_args,
-        ) -> str:
+        self,
+        host_timeout,
+        scan_speed,
+        os_scan: bool,
+        nmap_args,
+    ) -> str:
 
         scan_args = ["-sV"]
 
@@ -101,13 +97,9 @@ class AutoScanner:
 
         return scan_arguments
 
-
     def SearchVuln(
-            self,
-            port_key : JSON,
-            apiKey : str =None,
-            debug : bool = False
-        ) -> JSON:
+        self, port_key: JSON, apiKey: str = None, debug: bool = False
+    ) -> JSON:
         product = port_key["product"]
         version = port_key["version"]
         log = fake_logger()
@@ -129,25 +121,25 @@ class AutoScanner:
 
         return vulns
 
-
     def scan(
-            self,
-            target,
-            host_timeout : int = None,
-            scan_speed : int = None,
-            apiKey : str = None,
-            os_scan : bool = False,
-            scan_vulns : bool = True,
-            nmap_args=None,
-            debug : bool = False
-        ) -> JSON:
+        self,
+        target,
+        host_timeout: int = None,
+        scan_speed: int = None,
+        apiKey: str = None,
+        os_scan: bool = False,
+        scan_vulns: bool = True,
+        nmap_args=None,
+        debug: bool = False,
+    ) -> JSON:
         if type(target) == str:
             target = [target]
 
         log = fake_logger()
         nm = PortScanner()
-        scan_arguments = self.CreateScanArgs(host_timeout, scan_speed,
-                                             os_scan, nmap_args)
+        scan_arguments = self.CreateScanArgs(
+            host_timeout, scan_speed, os_scan, nmap_args
+        )
         for host in target:
             if debug:
                 print(f"Scanning {host} ...")
@@ -179,8 +171,7 @@ class AutoScanner:
 
         return self.scan_results
 
-
-    def save_to_file(self, filename : str = "autopwn.json") -> None:
+    def save_to_file(self, filename: str = "autopwn.json") -> None:
         with open(filename, "w") as output:
             json_object = dumps(self.scan_results)
             output.write(json_object)
