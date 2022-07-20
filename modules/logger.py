@@ -9,12 +9,12 @@ from modules.utils import get_terminal_width
 def banner(msg, color, console) -> None:
     term_width = get_terminal_width()
 
-    console.print("─"*term_width, style=color)
+    console.print("─" * term_width, style=color)
     console.print(Text(msg), justify="center", style=color)
-    console.print("─"*term_width, style=color)
+    console.print("─" * term_width, style=color)
 
 
-class Logger():
+class Logger:
     """
     Custom logger
     """
@@ -27,20 +27,15 @@ class Logger():
             handlers=[RichHandler(console=console)],
         )
 
-        RichHandler.KEYWORDS = [
-                "[+]",
-                "[-]",
-                "[*]"
-            ]
+        RichHandler.KEYWORDS = ["[+]", "[-]", "[*]"]
 
         self.log: object = logging.getLogger("rich")
 
-
     def logger(
-            self,
-            exception_: str,
-            message: str,
-        ) -> None:
+        self,
+        exception_: str,
+        message: str,
+    ) -> None:
         """
         * Log the proccesses with the passed message depending on the
         * exception_ variable
