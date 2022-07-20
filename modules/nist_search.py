@@ -6,15 +6,16 @@ from requests import get
 
 cache = {}
 
+
 @dataclass
 class Vulnerability:
-    title : str
-    CVEID : str
-    description : str
-    severity : str
-    severity_score : float
-    details_url : str
-    exploitability : float
+    title: str
+    CVEID: str
+    description: str
+    severity: str
+    severity_score: float
+    details_url: str
+    exploitability: float
 
     def __str__(self) -> str:
         return (
@@ -27,7 +28,7 @@ class Vulnerability:
         )
 
 
-def FindVars(vuln : dict) -> tuple:
+def FindVars(vuln: dict) -> tuple:
     CVE_ID = vuln["cve"]["CVE_data_meta"]["ID"]
     description = vuln["cve"]["description"]["description_data"][0]["value"]
 
@@ -39,7 +40,9 @@ def FindVars(vuln : dict) -> tuple:
         if "exploitabilityScore" in vuln["impact"]["baseMetricV3"]:
             exploitability = vuln["impact"]["baseMetricV3"]["exploitabilityScore"]
         elif "cvssV3" in vuln["impact"]["baseMetricV3"]:
-            exploitability = vuln["impact"]["baseMetricV3"]["cvssV3"]["exploitabilityScore"]
+            exploitability = vuln["impact"]["baseMetricV3"]["cvssV3"][
+                "exploitabilityScore"
+            ]
 
         if "cvssV3" in vuln["impact"]["baseMetricV3"]:
             if "baseSeverity" in vuln["impact"]["baseMetricV3"]["cvssV3"]:
@@ -52,7 +55,9 @@ def FindVars(vuln : dict) -> tuple:
         if "exploitabilityScore" in vuln["impact"]["baseMetricV2"].keys():
             exploitability = vuln["impact"]["baseMetricV2"]["exploitabilityScore"]
         elif "cvssV2" in vuln["impact"]["baseMetricV2"]:
-            exploitability = vuln["impact"]["baseMetricV2"]["cvssV2"]["exploitabilityScore"]
+            exploitability = vuln["impact"]["baseMetricV2"]["cvssV2"][
+                "exploitabilityScore"
+            ]
 
         if "cvssV2" in vuln["impact"]["baseMetricV2"]:
             if "baseSeverity" in vuln["impact"]["baseMetricV2"]["cvssV2"]:
@@ -63,13 +68,12 @@ def FindVars(vuln : dict) -> tuple:
             if "baseScore" in vuln["impact"]["baseMetricV2"]["cvssV2"]:
                 severity_score = vuln["impact"]["baseMetricV2"]["cvssV2"]["baseScore"]
 
-
     details_url = vuln["cve"]["references"]["reference_data"][0]["url"]
 
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
 
-def searchCVE(keyword : str, log, apiKey=None) -> list[Vulnerability]:
+def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/1.0?"
     if apiKey:
         sleep_time = 0.6
@@ -90,8 +94,8 @@ def searchCVE(keyword : str, log, apiKey=None) -> list[Vulnerability]:
             if request.status_code == 403:
                 log.logger(
                     "error",
-                    "Requests are being rate limited by NIST API," 
-                    + " please get a NIST API key to prevent this."
+                    "Requests are being rate limited by NIST API,"
+                    + " please get a NIST API key to prevent this.",
                 )
                 sleep(sleep_time)
         else:
@@ -103,7 +107,14 @@ def searchCVE(keyword : str, log, apiKey=None) -> list[Vulnerability]:
 
     for vuln in data["result"]["CVE_Items"]:
         title = keyword
-        CVE_ID, description, severity, severity_score, details_url, exploitability = FindVars(vuln)
+        (
+            CVE_ID,
+            description,
+            severity,
+            severity_score,
+            details_url,
+            exploitability,
+        ) = FindVars(vuln)
         VulnObject = Vulnerability(
             title=title,
             CVEID=CVE_ID,
@@ -111,7 +122,7 @@ def searchCVE(keyword : str, log, apiKey=None) -> list[Vulnerability]:
             severity=severity,
             severity_score=severity_score,
             details_url=details_url,
-            exploitability=exploitability
+            exploitability=exploitability,
         )
 
         Vulnerabilities.append(VulnObject)
