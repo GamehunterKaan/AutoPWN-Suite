@@ -21,9 +21,7 @@ def webvuln(target, log, console) -> None:
         """
         Get the target url
         """
-        headers = {
-            "User-Agent" : next(random_user_agent(log))
-        }
+        headers = {"User-Agent": next(random_user_agent(log))}
         url_ = [f"http://{target}/", f"https://{target}/"]
         for url in url_:
             try:
@@ -32,7 +30,6 @@ def webvuln(target, log, console) -> None:
                 return None
             else:
                 return url
-
 
     target_url = get_url(target)
 
