@@ -15,7 +15,7 @@ class TestSQLI:
             "sybase message",
             "oracle error",
             "microsoft access driver",
-            "you have an error"
+            "you have an error",
             "corresponds to your",
             "syntax to use near",
             "sqlite.exception",
@@ -36,8 +36,7 @@ class TestSQLI:
                 response = get(test_url)
             except ConnectionError:
                 self.log.logger(
-                    "errro",
-                    f"Connection error raised on: {test_url}, skipping"
+                    "errro", f"Connection error raised on: {test_url}, skipping"
                 )
             else:
                 for error in self.sql_dbms_errors:
@@ -47,7 +46,6 @@ class TestSQLI:
                             + f" [white]SQLI :[/white] {test_url}"
                         )
                         break
-
 
     def test_sqli(self, url) -> None:
         """
