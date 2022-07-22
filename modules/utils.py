@@ -11,8 +11,9 @@ from datetime import datetime
 from enum import Enum
 from os import get_terminal_size
 from platform import platform, system
+from re import search
 from socket import AF_INET, SOCK_DGRAM, socket
-from subprocess import DEVNULL, CalledProcessError, check_call
+from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
 
 from requests import get
@@ -260,7 +261,7 @@ class fake_logger:
         pass
 
 
-def is_root():
+def is_root() -> bool:
     try:
         return getuid() == 0
     except Exception as e:
@@ -270,18 +271,47 @@ def is_root():
 def GetIpAdress() -> str:
     s = socket(AF_INET, SOCK_DGRAM)
     s.connect(("8.8.8.8", 80))
-    PrivateIPAdress = str(s.getsockname()[0])
+    PrivateIPAdress = s.getsockname()[0]
     return PrivateIPAdress
 
 
 def DetectIPRange() -> str:
-    PrivateIPAdress = GetIpAdress().split(".")
-    target = (
-        f"{PrivateIPAdress[0]}."
-        + f"{PrivateIPAdress[1]}."
-        + f"{PrivateIPAdress[2]}.0/24"
-    )
-    return target
+    net_dict = {
+        "255.255.255.255": 32,
+        "255.255.255.254": 31,
+        "255.255.255.252": 30,
+        "255.255.255.248": 29,
+        "255.255.255.240": 28,
+        "255.255.255.224": 27,
+        "255.255.255.192": 26,
+        "255.255.255.128": 25,
+        "255.255.255.0": 24,
+        "255.255.254.0": 23,
+        "255.255.252.0": 22,
+        "255.255.248.0": 21,
+        "255.255.240.0": 20,
+        "255.255.224.0": 19,
+        "255.255.192.0": 18,
+        "255.255.128.0": 17,
+        "255.255.0.0": 16,
+    }
+    ip = GetIpAdress()
+    if system().lower() == "windows":
+        proc = Popen("ipconfig", stdout=PIPE)
+        while True:
+            line = proc.stdout.readline()
+            if ip.encode() in line:
+                break
+        mask = (
+            proc.stdout.readline().rstrip().split(b":")[-1].replace(b" ", b"").decode()
+        )
+        net_range = f"{ip}/{net_dict[mask]}"
+    else:
+        proc = Popen(["ip", "-o", "-f", "inet", "addr", "show"], stdout=PIPE)
+        regex = f"\\b{ip}\/\\b([0-9]|[12][0-9]|3[0-2])\\b"
+        cmd_output = proc.stdout.read().decode()
+        net_range = search(regex, cmd_output).group()
+    return net_range
 
 
 def InitAutomation(args) -> None:
@@ -315,7 +345,7 @@ def InitArgsAPI(args, log) -> str:
     return apiKey
 
 
-def InitArgsScanType(args, log):
+def InitArgsScanType(args, log) -> ScanType:
     scantype = ScanType.Ping
     if args.scan_type == "arp":
         if is_root():
@@ -368,7 +398,7 @@ def InitArgsTarget(args, log):
     return target
 
 
-def InitArgsMode(args, log):
+def InitArgsMode(args, log) -> ScanMode:
     scanmode = ScanMode.Normal
 
     if args.mode == "evade":
@@ -388,7 +418,7 @@ def InitArgsMode(args, log):
     return scanmode
 
 
-def InitReport(args, log):
+def InitReport(args, log) -> tuple:
     if not args.report:
         return ReportType.NONE, None
 
@@ -466,7 +496,7 @@ def Confirmation(message) -> bool:
     return confirmation.lower() != "n"
 
 
-def UserConfirmation():
+def UserConfirmation() -> tuple[bool, bool, bool]:
     if DontAskForConfirmation:
         return True, True, True
 
@@ -487,7 +517,7 @@ def WebScan() -> bool:
     return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
 
 
-def GetHostsToScan(hosts, console):
+def GetHostsToScan(hosts, console) -> list[str]:
     if len(hosts) == 0:
         raise SystemExit(
             "No hosts found! {time} - Scan completed.".format(
@@ -544,9 +574,9 @@ def GetHostsToScan(hosts, console):
     return Targets
 
 
-def InitArgsConf(args, log):
+def InitArgsConf(args, log) -> None:
     if not args.config:
-        return None
+        return
 
     try:
         config = ConfigParser()
@@ -620,7 +650,7 @@ def InitArgsConf(args, log):
         raise SystemExit
 
 
-def install_nmap_linux(log):
+def install_nmap_linux(log) -> None:
     distro_ = distro.id().lower()
     while True:
         try:
@@ -688,7 +718,7 @@ def install_nmap_linux(log):
             continue
 
 
-def install_nmap_windows(log):
+def install_nmap_windows(log) -> None:
     try:
         check_call(
             [
@@ -707,14 +737,14 @@ def install_nmap_windows(log):
         raise SystemExit
 
 
-def install_nmap_mac(log):
+def install_nmap_mac(log) -> None:
     try:
         check_call(["/usr/bin/sudo", "brew", "install", "nmap"], stderr=DEVNULL)
     except CalledProcessError:
         log.logger("error", "Couldn't install nmap! (Mac)")
 
 
-def check_nmap(log):
+def check_nmap(log) -> None:
     try:
         check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
     except (CalledProcessError, FileNotFoundError):
@@ -740,7 +770,7 @@ def check_nmap(log):
             raise SystemExit
 
 
-def ParamPrint(args, targetarg, scantype_name, scanmode_name, apiKey, console, log):
+def ParamPrint(args, targetarg : str, scantype_name : ScanType, scanmode_name : ScanMode, apiKey : str, console, log) -> None:
 
     if not is_root():
         log.logger(
@@ -807,7 +837,7 @@ def CheckConnection(log) -> bool:
         return True
 
 
-def SaveOutput(console, out_type, report, output_file):
+def SaveOutput(console, out_type, report, output_file) -> None:
     if out_type == "html":
         if not output_file.endswith(".html"):
             output_file += ".html"
