@@ -139,7 +139,7 @@ def PortScan(
         return nm
 
 
-def CreateNoise(target):
+def CreateNoise(target) -> None:
     nm = PortScanner()
     while True:
         try:
@@ -202,7 +202,7 @@ def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal) 
     return OnlineHosts
 
 
-def InitHostInfo(target_key):
+def InitHostInfo(target_key) -> TargetInfo:
     try:
         mac = target_key["addresses"]["mac"]
     except (KeyError, IndexError):
@@ -237,7 +237,7 @@ def InitHostInfo(target_key):
     )
 
 
-def InitPortInfo(port):
+def InitPortInfo(port) -> tuple[str, str, str, str]:
     state = "Unknown"
     service = "Unknown"
     product = "Unknown"
