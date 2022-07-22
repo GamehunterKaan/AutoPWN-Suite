@@ -3,7 +3,7 @@ from modules.random_user_agent import random_user_agent
 from requests import get
 
 
-def crawl(target_url, log) -> set:
+def crawl(target_url, log) -> set[str]:
     if not target_url.endswith("/"):
         target_url += "/"
 
@@ -29,7 +29,7 @@ def crawl(target_url, log) -> set:
     return urls
 
 
-def link_finder(target_url, log):
+def link_finder(target_url, log) -> set[str]:
     if not target_url.endswith("/"):
         target_url += "/"
 
