@@ -76,7 +76,7 @@ def FindVars(vuln: dict) -> tuple:
 def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/1.0?"
     if apiKey:
-        sleep_time = 0.6
+        sleep_time = 0.1
         paramaters = {"keyword": keyword, "apiKey": apiKey}
     else:
         sleep_time = 6
