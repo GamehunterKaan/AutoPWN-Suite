@@ -770,7 +770,15 @@ def check_nmap(log) -> None:
             raise SystemExit
 
 
-def ParamPrint(args, targetarg : str, scantype_name : ScanType, scanmode_name : ScanMode, apiKey : str, console, log) -> None:
+def ParamPrint(
+    args,
+    targetarg: str,
+    scantype_name: ScanType,
+    scanmode_name: ScanMode,
+    apiKey: str,
+    console,
+    log,
+) -> None:
 
     if not is_root():
         log.logger(
