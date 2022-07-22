@@ -66,7 +66,7 @@ You can download debian (deb) package from [releases.](https://github.com/Gamehu
 
 ```
 sudo pip install requests rich python-nmap bs4 distro
-sudo apt-get install ./autopwn-suite_2.1.1.deb
+sudo apt-get install ./autopwn-suite_2.1.2.deb
 ```
 
 OR
