@@ -72,6 +72,9 @@ sudo apt-get install ./autopwn-suite_2.1.2.deb
 
 OR
 
+If you are on Arch Linux based system you can install `python-autopwn-suite` package using AUR helper of your choice.
+
+
 You can use Google Cloud Shell.
 
 [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/GamehunterKaan/AutoPWN-Suite.git)
@@ -170,8 +173,7 @@ scanner.save_to_file("autopwn.json")
 
 Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
 
-- [x] 22 Completed.
-- [ ] Arch Linux package for Arch based systems like BlackArch and ArchAttack.
+- [x] 23 Completed.
 - [ ] Function to brute force common services like `ssh`, `vnc`, `ftp`.
 - [ ] GUI interface.
 - [ ] Daemon mode.
