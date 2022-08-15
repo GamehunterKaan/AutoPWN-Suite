@@ -61,6 +61,7 @@ git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
 sudo pip install -r requirements.txt
 ```
+
 OR
 
 You can download debian (deb) package from [releases.](https://github.com/GamehunterKaan/AutoPWN-Suite/releases)
@@ -74,6 +75,7 @@ OR
 
 If you are on Arch Linux based system you can install `python-autopwn-suite` package using AUR helper of your choice.
 
+OR
 
 You can use Google Cloud Shell.
 
