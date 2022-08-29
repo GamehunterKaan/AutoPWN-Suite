@@ -85,7 +85,6 @@ def InitializeWebhookReport(Webhook, log, console) -> None:
     """
     Initialize webhook report.
     """
-    # Send webhook report
     log.logger("info", "Sending webhook report...")
     console.save_text("report.log")
     SendWebhook(Webhook, log)
@@ -96,7 +95,7 @@ def SendWebhook(url, log) -> None:
     """
     Send webhook report.
     """
-    file = open("report.log", "r")  # read of closed file
+    file = open("report.log", "r", encoding="utf-8")
     payload = {"payload": file}
 
     try:
