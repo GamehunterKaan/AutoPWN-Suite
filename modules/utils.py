@@ -424,28 +424,28 @@ def InitReport(args, log) -> tuple:
 
     if args.report == "email":
         Method = ReportType.EMAIL
-        if args.reportemail:
-            ReportEmail = args.reportemail
+        if args.report_email:
+            ReportEmail = args.report_email
         else:
             ReportEmail = input("Enter your email address : ")
 
-        if args.reportemailpassword:
-            ReportMailPassword = args.reportemailpassword
+        if args.report_email_password:
+            ReportMailPassword = args.report_email_password
         else:
             ReportMailPassword = input("Enter your email password : ")
 
-        if args.reportemailto:
-            ReportMailTo = args.reportemailto
+        if args.report_email_to:
+            ReportMailTo = args.report_email_to
         else:
             ReportMailTo = input("Enter the email address to send the report to : ")
 
-        if args.reportemailfrom:
-            ReportMailFrom = args.reportemailfrom
+        if args.report_email_from:
+            ReportMailFrom = args.report_email_from
         else:
             ReportMailFrom = ReportEmail
 
-        if args.reportemailserver:
-            ReportMailServer = args.reportemailserver
+        if args.report_email_server:
+            ReportMailServer = args.report_email_server
         else:
             ReportMailServer = input(
                 "Enter the email server to send the report from : "
@@ -456,8 +456,8 @@ def InitReport(args, log) -> tuple:
                 )
                 return ReportType.NONE, None
 
-        if args.reportemailserverport:
-            ReportMailPort = args.reportemailserverport
+        if args.report_email_server_port:
+            ReportMailPort = args.report_email_server_port
         else:
             while True:
                 ReportMailPort = input(
@@ -480,8 +480,8 @@ def InitReport(args, log) -> tuple:
 
     elif args.report == "webhook":
         Method = ReportType.WEBHOOK
-        if args.reportwebhook:
-            Webhook = args.reportwebhook
+        if args.report_webhook:
+            Webhook = args.report_webhook
         else:
             Webhook = input("Enter your webhook URL : ")
 
