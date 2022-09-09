@@ -70,7 +70,7 @@ def StartScanning(
 
 def main() -> None:
     __author__ = "GamehunterKaan"
-    __version__ = "2.1.4"
+    __version__ = "2.1.5"
 
     args = cli()
     if args.no_color:
