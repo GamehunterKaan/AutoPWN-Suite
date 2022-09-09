@@ -79,7 +79,7 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
         sleep_time = 0.1
         paramaters = {"keyword": keyword, "apiKey": apiKey}
     else:
-        sleep_time = 6
+        sleep_time = 8
         paramaters = {"keyword": keyword}
 
     if keyword in cache:
