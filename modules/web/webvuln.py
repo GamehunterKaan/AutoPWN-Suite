@@ -6,6 +6,10 @@ from modules.web.lfi import TestLFI
 from modules.web.sqli import TestSQLI
 from modules.web.xss import TestXSS
 from requests import get
+from requests import packages
+
+
+packages.urllib3.disable_warnings()
 
 
 def webvuln(target, log, console) -> None:
@@ -25,11 +29,12 @@ def webvuln(target, log, console) -> None:
         url_ = [f"http://{target}/", f"https://{target}/"]
         for url in url_:
             try:
-                get(url, headers=headers, timeout=10)
+                get(url, headers=headers, timeout=10, verify=False)
             except Exception as e:
-                return None
+                continue
             else:
                 return url
+        return None
 
     target_url = get_url(target)
 

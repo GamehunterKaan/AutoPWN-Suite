@@ -1,14 +1,17 @@
 from bs4 import BeautifulSoup
 from modules.random_user_agent import random_user_agent
 from requests import get
+from requests import packages
 
+
+packages.urllib3.disable_warnings()
 
 def crawl(target_url, log) -> set[str]:
     if not target_url.endswith("/"):
         target_url += "/"
 
     try:
-        get(target_url, headers={"User-Agent": next(random_user_agent(log))})
+        get(target_url, headers={"User-Agent": next(random_user_agent(log))}, verify=False)
     except ConnectionError:
         log.logger("error", f"Connection error raised.")
         return set()
@@ -35,7 +38,7 @@ def link_finder(target_url, log) -> set[str]:
 
     urls = set()
 
-    reqs = get(target_url, headers={"User-Agent": next(random_user_agent(log))})
+    reqs = get(target_url, headers={"User-Agent": next(random_user_agent(log))}, verify=False)
     soup = BeautifulSoup(reqs.text, "html.parser")
     for link in soup.find_all("a", href=True):
         url = link["href"]

@@ -2,7 +2,10 @@ from random import choices, randint
 from string import ascii_letters
 
 from requests import get
+from requests import packages
 
+
+packages.urllib3.disable_warnings()
 
 class TestXSS:
     def __init__(self, log, console) -> None:
@@ -53,7 +56,7 @@ class TestXSS:
                     continue
 
                 try:
-                    response = get(test_url)
+                    response = get(test_url, verify=False)
                 except ConnectionError:
                     self.log.logger(
                         "error", f"Connection error raised on: {test_url}, skipping"

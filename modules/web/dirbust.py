@@ -2,7 +2,10 @@ from os.path import dirname
 
 from modules.random_user_agent import random_user_agent
 from requests import get
+from requests import packages
 
+
+packages.urllib3.disable_warnings()
 
 def dirbust(target_url, console, log) -> None:
     if not target_url.endswith("/"):
@@ -27,7 +30,7 @@ def dirbust(target_url, console, log) -> None:
         headers = {"User-Agent": next(random_user_agent(log))}
 
         try:
-            req = get(test_url, headers=headers)
+            req = get(test_url, headers=headers, verify=False)
         except Exception as e:
             log.logger("error", e)
         else:
