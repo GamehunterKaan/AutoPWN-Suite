@@ -3,7 +3,7 @@
 AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems automatically.
 
 ![GitHub top language](https://img.shields.io/github/languages/top/GamehunterKaan/AutoPWN-Suite)
-![Lines of code](https://img.shields.io/tokei/lines/github/GamehunterKaan/AutoPWN-Suite?label=total%20lines%20of%20code)
+![Lines of code](https://img.shields.io/tokei/lines/github/GamehunterKaan/AutoPWN-Suite)
 ![Repo Size](https://img.shields.io/github/repo-size/GamehunterKaan/AutoPWN-Suite)
 [![Tests](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml/badge.svg)](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml)
 ![GitHub issues](https://img.shields.io/github/issues-raw/GamehunterKaan/AutoPWN-Suite)
@@ -74,6 +74,15 @@ sudo apt-get install ./autopwn-suite_2.1.5.deb
 OR
 
 If you are on Arch Linux based system you can install `python-autopwn-suite` package using AUR helper of your choice.
+
+OR
+
+You can use the [docker image.](https://github.com/GamehunterKaan/AutoPWN-Suite/pull/42)
+
+```
+docker pull gamehunterkaan/autopwn-suite
+docker run -it gamehunterkaan/autopwn-suite
+```
 
 OR
 
@@ -169,16 +178,6 @@ scanner = AutoScanner()
 json_results = scanner.scan("192.168.0.1")
 scanner.save_to_file("autopwn.json")
 ```
-
-
-## TODO
-
-Do you have a cool feature idea? [Create a feature request!](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new?assignees=&labels=&template=feature_request.md&title=)
-
-- [x] 23 Completed.
-- [ ] Function to brute force common services like `ssh`, `vnc`, `ftp`.
-- [ ] GUI interface.
-- [ ] Daemon mode.
 
 
 ## Contributing to AutoPWN Suite
