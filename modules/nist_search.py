@@ -29,60 +29,41 @@ class Vulnerability:
 
 
 def FindVars(vuln: dict) -> tuple:
-    CVE_ID = vuln["cve"]["CVE_data_meta"]["ID"]
-    description = vuln["cve"]["description"]["description_data"][0]["value"]
-
+    CVE_ID = vuln["cve"]["id"]
+    description = vuln["cve"]["descriptions"][0]["value"]
     exploitability = 0.0
     severity_score = 0.0
     severity = "UNKNOWN"
 
-    if "baseMetricV3" in vuln["impact"].keys():
-        if "exploitabilityScore" in vuln["impact"]["baseMetricV3"]:
-            exploitability = vuln["impact"]["baseMetricV3"]["exploitabilityScore"]
-        elif "cvssV3" in vuln["impact"]["baseMetricV3"]:
-            exploitability = vuln["impact"]["baseMetricV3"]["cvssV3"][
-                "exploitabilityScore"
-            ]
+    metrics = vuln["cve"].get("metrics")
+    if metrics is not None and len(metrics) > 0:
+        # In testing this appears to contain cvssMetricV31 and cvssMetricV2
+        # Get a list of the score types and sort them in reverse order to get v3 first
+        metrics_types = list(metrics.keys())
+        metrics_types.sort(reverse=True)
+        for score_type in metrics_types:
+            if exploitability == 0.0:
+                exploitability = metrics[score_type][0].get("exploitabilityScore", 0.0)
+            if severity_score == 0.0:
+                severity_score = metrics[score_type][0].get("cvssData", {}).get("baseScore", 0.0)
+            if severity == "UNKNOWN":
+                severity = metrics[score_type][0].get("cvssData", {}).get("baseSeverity", "UNKNOWN")
 
-        if "cvssV3" in vuln["impact"]["baseMetricV3"]:
-            if "baseSeverity" in vuln["impact"]["baseMetricV3"]["cvssV3"]:
-                severity = vuln["impact"]["baseMetricV3"]["cvssV3"]["baseSeverity"]
-
-            if "baseScore" in vuln["impact"]["baseMetricV3"]["cvssV3"]:
-                severity_score = vuln["impact"]["baseMetricV3"]["cvssV3"]["baseScore"]
-
-    elif "baseMetricV2" in vuln["impact"].keys():
-        if "exploitabilityScore" in vuln["impact"]["baseMetricV2"].keys():
-            exploitability = vuln["impact"]["baseMetricV2"]["exploitabilityScore"]
-        elif "cvssV2" in vuln["impact"]["baseMetricV2"]:
-            exploitability = vuln["impact"]["baseMetricV2"]["cvssV2"][
-                "exploitabilityScore"
-            ]
-
-        if "cvssV2" in vuln["impact"]["baseMetricV2"]:
-            if "baseSeverity" in vuln["impact"]["baseMetricV2"]["cvssV2"]:
-                severity = vuln["impact"]["baseMetricV2"]["cvssV2"]["baseSeverity"]
-            elif "severity" in vuln["impact"]["baseMetricV2"].keys():
-                severity = vuln["impact"]["baseMetricV2"]["severity"]
-
-            if "baseScore" in vuln["impact"]["baseMetricV2"]["cvssV2"]:
-                severity_score = vuln["impact"]["baseMetricV2"]["cvssV2"]["baseScore"]
-
-    details_url = vuln["cve"]["references"]["reference_data"][0]["url"]
+    details_url = "https://nvd.nist.gov/vuln/detail/" + CVE_ID
 
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
 
 def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
+    # https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=OpenSSH+8.8
     if apiKey:
         sleep_time = 0.1
-        parameters = {"keyword": keyword}
         headers = {"apiKey": apiKey}
     else:
         sleep_time = 8
-        parameters = {"keyword": keyword}
         headers = {}
+    parameters = {"keywordSearch": keyword}
 
     if keyword in cache:
         return cache[keyword]
@@ -90,10 +71,10 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     for tries in range(3):
         try:
             sleep(sleep_time)
-            request = get(url, params=parameters, headers=headers)
-            data = request.json()
+            response = get(url, params=parameters, headers=headers)
+            data = response.json()
         except Exception as e:
-            if request.status_code == 403:
+            if response.status_code == 403:
                 log.logger(
                     "error",
                     "Requests are being rate limited by NIST API,"
@@ -104,10 +85,10 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
             break
 
     Vulnerabilities = []
-    if not "result" in data:
+    if not "vulnerabilities" in data:
         return []
 
-    for vuln in data["result"]["CVE_Items"]:
+    for vuln in data["vulnerabilities"]:
         title = keyword
         (
             CVE_ID,
