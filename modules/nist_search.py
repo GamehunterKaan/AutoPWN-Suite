@@ -85,10 +85,10 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
             break
 
     Vulnerabilities = []
-    if not "vulnerabilities" in data:
+    if not data or not "vulnerabilities" in data:
         return []
 
-    for vuln in data["vulnerabilities"]:
+    for vuln in data.get("vulnerabilities", []):
         title = keyword
         (
             CVE_ID,
