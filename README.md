@@ -46,20 +46,20 @@ AutoPWN Suite has a very user friendly easy to read output.
 
 ## Installation
 
-You can install it using pip. (sudo recommended)
-
-```
-sudo pip install autopwn-suite
-```
-
-OR
-
-You can clone the repo.
+You can clone the repo. (This is the recommended installation method as other methods are no longer maintained)
 
 ```
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
 sudo pip install -r requirements.txt
+```
+
+OR
+
+You can install it using pip. (sudo recommended)
+
+```
+sudo pip install autopwn-suite
 ```
 
 OR
