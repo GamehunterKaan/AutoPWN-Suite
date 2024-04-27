@@ -15,6 +15,7 @@ from re import search
 from socket import AF_INET, SOCK_DGRAM, socket
 from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
+from platform import platform
 
 from requests import get
 from rich.text import Text
@@ -753,7 +754,7 @@ def check_nmap(log) -> None:
             auto_install = True
         else:
             auto_install = (
-                input(f"Install Nmap on your system ({distro.id()})? ").lower() != "n"
+                input(f"Install Nmap on your system ({system()})? ").lower() != "n"
             )
         if auto_install:
             platform_ = system().lower()

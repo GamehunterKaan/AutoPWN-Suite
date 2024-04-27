@@ -9,3 +9,4 @@ exploits/
 __pycache__/
 modules/__pycache__
 modules/web/__pycache__
+venv/*
