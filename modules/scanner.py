@@ -1,15 +1,15 @@
 from dataclasses import dataclass
-import shodan
 from enum import Enum
 from multiprocessing import Process
 from time import sleep
 
+import shodan
 from nmap import PortScanner
 from rich import box
 from rich.table import Table
 
 from modules.logger import banner
-from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
+from modules.utils import GetIpAddress, ScanMode, ScanType, is_root
 
 
 @dataclass()
@@ -21,7 +21,6 @@ class TargetInfo:
     os_type: str = "Unknown"
 
     def colored(self) -> str:
-
         return (
             f"[yellow]MAC Address :[/yellow] {self.mac}\n"
             + f"[yellow]Vendor :[/yellow] {self.vendor}\n"
@@ -50,6 +49,8 @@ def ShodanScan(target, shodan_api_key, log) -> dict:
     except shodan.APIError as e:
         log.logger("error", f"Shodan scan failed for {target}: {e}")
         return {}
+
+
 def TestPing(target, mode=ScanMode.Normal) -> list:
     nm = PortScanner()
     if isinstance(target, list):
@@ -57,15 +58,10 @@ def TestPing(target, mode=ScanMode.Normal) -> list:
     if mode == ScanMode.Evade and is_root():
         nm.scan(hosts=target, arguments="-sn -T 2 -f -g 53 --data-length 10")
     else:
-        if shodan_api_key and shodan_results:
-            for vuln in shodan_results.get('vulns', []):
-                log.logger("info", f"Vulnerability found: {vuln}")
         nm.scan(hosts=target, arguments="-sn")
-
     return nm.all_hosts()
 
 
-# do a arp scan using nmap
 def TestArp(target, mode=ScanMode.Normal) -> list:
     nm = PortScanner()
     if isinstance(target, list):
@@ -74,11 +70,9 @@ def TestArp(target, mode=ScanMode.Normal) -> list:
         nm.scan(hosts=target, arguments="-sn -PR -T 2 -f -g 53 --data-length 10")
     else:
         nm.scan(hosts=target, arguments="-sn -PR")
-
     return nm.all_hosts()
 
 
-# run a port scan on target using nmap
 def PortScan(
     target,
     log,
@@ -87,31 +81,11 @@ def PortScan(
     mode=ScanMode.Normal,
     customflags="",
     shodan_api_key=None,
-    log,
-    scanspeed=5,
-    host_timeout=240,
-    mode=ScanMode.Normal,
-    customflags="",
-    shodan_api_key=None,
-    log,
-    scanspeed=5,
-    host_timeout=240,
-    mode=ScanMode.Normal,
-    customflags="",
-    shodan_api_key=None,
 ) -> PortScanner:
-
     if shodan_api_key:
         shodan_results = ShodanScan(target, shodan_api_key, log)
         if shodan_results:
             log.logger("info", f"Shodan results for {target}: {shodan_results}")
-    target,
-    log,
-    scanspeed=5,
-    host_timeout=240,
-    mode=ScanMode.Normal,
-    customflags="",
-) -> PortScanner:
 
     log.logger("info", f"Scanning {target} for open ports ...")
 
@@ -185,7 +159,7 @@ def CreateNoise(target) -> None:
             else:
                 nm.scan(hosts=target, arguments="-A -T 5")
         except KeyboardInterrupt:
-            raise SystemExit("Ctr+C, aborting.")
+            raise SystemExit("Ctrl+C, aborting.")
         else:
             break
 
@@ -275,30 +249,14 @@ def InitHostInfo(target_key) -> TargetInfo:
 
 
 def InitPortInfo(port) -> tuple[str, str, str, str]:
-    state = "Unknown"
-    service = "Unknown"
-    product = "Unknown"
-    version = "Unknown"
-
-    if not len(port["state"]) == 0:
-        state = port["state"]
-
-    if not len(port["name"]) == 0:
-        service = port["name"]
-
-    if not len(port["product"]) == 0:
-        product = port["product"]
-
-    if not len(port["version"]) == 0:
-        version = port["version"]
-
+    state = port.get("state", "Unknown")
+    service = port.get("name", "Unknown")
+    product = port.get("product", "Unknown")
+    version = port.get("version", "Unknown")
     return state, service, product, version
 
 
 def AnalyseScanResults(nm, log, console, target=None) -> list:
-    """
-    Analyse and print scan results.
-    """
     HostArray = []
     if target is None:
         target = nm.all_hosts()[0]
@@ -314,7 +272,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     if is_root():
         if nm[target]["status"]["reason"] in ["localhost-response", "user-set"]:
             log.logger("info", f"Target {target} seems to be us.")
-    elif GetIpAdress() == target:
+    elif GetIpAddress() == target:
         log.logger("info", f"Target {target} seems to be us.")
 
     if len(nm[target].all_tcp()) == 0:
@@ -339,7 +297,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
         table.add_row(str(port), state, service, product, version)
 
         if state == "open":
-            HostArray.insert(len(HostArray), [target, port, service, product, version])
+            HostArray.append([target, port, service, product, version])
 
     console.print(table, justify="center")
 
