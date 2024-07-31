@@ -42,7 +42,14 @@ def cli():
         description="AutoPWN Suite | A project for scanning "
         + "vulnerabilities and exploiting systems automatically."
     )
-    scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
+    scanargs.add_argument(
+        "-e",
+        "--exploit",
+        help="Exploit the target after vulnerabilities have been checked and downloaded.",
+        action="store_true",
+        required=False,
+        default=False,
+    )
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument(
         "-zoomeye",
