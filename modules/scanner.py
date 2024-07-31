@@ -83,11 +83,6 @@ def PortScan(
     customflags="",
     shodan_api_key=None,
 ) -> PortScanner:
-    if shodan_api_key:
-        shodan_results = ShodanScan(target, shodan_api_key, log)
-        if shodan_results:
-            display_shodan_results(shodan_results)
-            #log.logger("info", f"Shodan results for {target}: {shodan_results}")
 
     log.logger("info", f"Scanning {target} for open ports ...")
 
@@ -148,8 +143,12 @@ def PortScan(
             )
     except Exception as e:
         raise SystemExit(f"Error: {e}")
-    else:
-        return nm
+    if shodan_api_key:
+        shodan_results = ShodanScan(target, shodan_api_key, log)
+        if shodan_results:
+            display_shodan_results(shodan_results)
+            #log.logger("info", f"Shodan results for {target}: {shodan_results}")
+    return nm
 
 
 def display_shodan_results(shodan_results):
