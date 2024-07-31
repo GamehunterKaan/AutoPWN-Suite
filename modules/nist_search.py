@@ -3,7 +3,6 @@ from time import sleep
 
 from requests import get
 
-
 cache = {}
 
 
@@ -68,6 +67,7 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     if keyword in cache:
         return cache[keyword]
 
+    data = None  # Initialize 'data' here
     for tries in range(3):
         try:
             sleep(sleep_time)
@@ -84,10 +84,10 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
         else:
             break
 
-    Vulnerabilities = []
-    if not data or not "vulnerabilities" in data:
+    if data is None or "vulnerabilities" not in data:
         return []
 
+    Vulnerabilities = []
     for vuln in data.get("vulnerabilities", []):
         title = keyword
         (
