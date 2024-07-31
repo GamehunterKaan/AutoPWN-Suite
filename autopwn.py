@@ -47,7 +47,7 @@ def StartScanning(
             PortScanResults = PortScan(
                 host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags, shodan_api_key
             )
-            PortArray = AnalyseScanResults(PortScanResults, log, console, host)
+            PortArray = AnalyseScanResults(PortScanResults, log, console, host, shodan_results=None)
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = []
             if args.metasploit_scan:

@@ -357,7 +357,7 @@ def InitPortInfo(port) -> tuple:
     return state, service, product, version
 
 
-def AnalyseScanResults(nm, shodan_results, log, console, target=None) -> list:
+def AnalyseScanResults(nm, log, console, target=None, shodan_results=None) -> list:
     HostArray = [] if nm else []
     if target is None:
         target = nm.all_hosts()[0]
@@ -369,7 +369,7 @@ def AnalyseScanResults(nm, shodan_results, log, console, target=None) -> list:
         return []
 
     # Integrate Shodan ports
-    shodan_ports = extract_shodan_ports(shodan_results)
+    shodan_ports = extract_shodan_ports(shodan_results) if shodan_results else []
     add_shodan_ports_to_nmap(nm, target, shodan_ports)
 
     CurrentTargetInfo = InitHostInfo(nm[target])
