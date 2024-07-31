@@ -98,7 +98,7 @@ class AutoScanner:
         return scan_arguments
 
     def SearchVuln(
-        self, port_key: JSON, apiKey: str = None, debug: bool = False
+        self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, debug: bool = False
     ) -> JSON:
         product = port_key["product"]
         version = port_key["version"]
@@ -111,7 +111,8 @@ class AutoScanner:
         if debug:
             print(f"Searching for keyword {keyword} ...")
 
-        Vulnerablities = searchCVE(keyword, log, apiKey)
+        Vulnerablities = searchCVE(keyword, log, vuln_api_key)
+        # Add Shodan scanning logic here using shodan_api_key if needed
         if len(Vulnerablities) == 0:
             return
 
@@ -126,7 +127,8 @@ class AutoScanner:
         target,
         host_timeout: int = None,
         scan_speed: int = None,
-        apiKey: str = None,
+        vuln_api_key: str = None,
+        shodan_api_key: str = None,
         os_scan: bool = False,
         scan_vulns: bool = True,
         nmap_args=None,
@@ -163,7 +165,7 @@ class AutoScanner:
             vulns = {}
             for port in nm[host]["tcp"]:
                 product = nm[host]["tcp"][port]["product"]
-                Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], apiKey, debug)
+                Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], vuln_api_key, shodan_api_key, debug)
                 if Vulnerablities:
                     vulns[product] = Vulnerablities
 

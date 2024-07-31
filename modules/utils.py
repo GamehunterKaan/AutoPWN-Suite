@@ -134,11 +134,22 @@ def cli():
         required=False,
     )
     scanargs.add_argument(
-        "-a",
-        "--api",
+        "-vuln",
+        "--vuln-api",
         help=(
             "Specify API key for vulnerability detection "
             + "for faster scanning. (Default : None)"
+        ),
+        default=None,
+        type=str,
+        required=False,
+    )
+    scanargs.add_argument(
+        "-shodan",
+        "--shodan-api",
+        help=(
+            "Specify Shodan API key for additional scanning capabilities. "
+            + "(Default : None)"
         ),
         default=None,
         type=str,
@@ -323,27 +334,45 @@ def InitAutomation(args) -> None:
         DontAskForConfirmation = False
 
 
-def InitArgsAPI(args, log) -> str:
-    if args.api:
-        apiKey = args.api
-
+def InitArgsAPI(args, log) -> tuple[str, str]:
+    if args.vuln_api:
+        vuln_api_key = args.vuln_api
     else:
-        apiKey = None
+        vuln_api_key = None
         try:
-            with open("api.txt", "r", encoding="utf-8") as f:
-                apiKey = f.readline().strip("\n")
+            with open("vuln_api.txt", "r", encoding="utf-8") as f:
+                vuln_api_key = f.readline().strip("\n")
         except FileNotFoundError:
             log.logger(
                 "warning",
-                "No API key specified and no api.txt file found. "
+                "No vulnerability API key specified and no vuln_api.txt file found. "
                 + "Vulnerability detection is going to be slower! "
                 + "You can get your own NIST API key from "
                 + "https://nvd.nist.gov/developers/request-an-api-key",
             )
         except PermissionError:
-            log.logger("error", "Permission denied while trying to read api.txt!")
+            log.logger("error", "Permission denied while trying to read vuln_api.txt!")
 
-    return apiKey
+    if args.shodan_api:
+        shodan_api_key = args.shodan_api
+
+    else:
+        shodan_api_key = None
+        try:
+            with open("shodan_api.txt", "r", encoding="utf-8") as f:
+                shodan_api_key = f.readline().strip("\n")
+        except FileNotFoundError:
+            log.logger(
+                "warning",
+                "No Shodan API key specified and no shodan_api.txt file found. "
+                + "Shodan scanning capabilities will be disabled! "
+                + "You can get your own Shodan API key from "
+                + "https://account.shodan.io/register",
+            )
+        except PermissionError:
+            log.logger("error", "Permission denied while trying to read shodan_api.txt!")
+
+    return vuln_api_key, shodan_api_key
 
 
 def InitArgsScanType(args, log) -> ScanType:
