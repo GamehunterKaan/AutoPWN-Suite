@@ -4,12 +4,12 @@ import requests
 from rich.console import Console
 
 from modules.banners import print_banner
-from modules.getexploits import GetExploitsFromArray
 from modules.exploit import exploit_vulnerabilities
+from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
 from modules.report import InitializeReport
 from modules.scanner import (AnalyseScanResults, DiscoverHosts, NoiseScan,
-                             PortScan)
+                             PortScan, ShodanScan, display_shodan_results)
 from modules.searchvuln import SearchSploits
 from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
                            InitArgsAPI, InitArgsConf, InitArgsMode,
@@ -17,7 +17,6 @@ from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
                            InitReport, ParamPrint, SaveOutput, ScanMode,
                            UserConfirmation, WebScan, check_nmap,
                            check_version, cli, resolve_hostnames_to_ips)
-from modules.scanner import ShodanScan, display_shodan_results
 from modules.web.webvuln import webvuln
 
 
@@ -60,6 +59,7 @@ def StartScanning(
                     all_vulnerabilities.extend(VulnsArray)
 
     if all_vulnerabilities:
+        GetExploitsFromArray(all_vulnerabilities, log, console)
         exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console)
 
     if ScanWeb:
