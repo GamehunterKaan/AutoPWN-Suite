@@ -135,15 +135,15 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
             CVEs.append(CVE.CVEID)
             console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
 
-                wrapped_description = wrap(CVE.description, term_width - 50)
-                console.print(f"│\t\t[cyan]Description: [/cyan]")
-                for line in wrapped_description:
-                    console.print(f"│\t\t\t{line}")
-                console.print(
-                    f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
-                    + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
-                    + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
-                )
+            wrapped_description = wrap(CVE.description, term_width - 50)
+            console.print(f"│\t\t[cyan]Description: [/cyan]")
+            for line in wrapped_description:
+                console.print(f"│\t\t\t{line}")
+            console.print(
+                f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
+                + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
+                + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
+            )
 
             VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)
             VulnsArray.append(VulnObject)
