@@ -873,6 +873,7 @@ def ParamPrint(
         + f"│\tAPI Keys Used : {api_keys_used}/3\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
+    msg += f"│\tExploit : {args.exploit}\n"
 
     if args.skip_discovery:
         msg += f"│\tSkip discovery: True\n"
@@ -903,7 +904,6 @@ def ParamPrint(
     if args.report:
         msg += f"│\tReporting method : {args.report}\n"
 
-    msg += f"│\tExploit : {args.exploit}\n"
     msg += "└" + "─" * (term_width - 1)
 
     console.print(msg)
