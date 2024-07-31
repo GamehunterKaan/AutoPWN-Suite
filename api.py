@@ -5,7 +5,7 @@ from nmap import PortScanner
 
 from modules.nist_search import searchCVE, searchShodan
 from modules.searchvuln import GenerateKeyword
-from modules.utils import fake_logger, is_root, GetZoomEyeVulns
+from modules.utils import GetZoomEyeVulns, fake_logger, is_root
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
@@ -107,7 +107,6 @@ class AutoScanner:
             print(f"Searching Shodan for keyword {keyword} ...")
 
         shodan_vulns = searchShodan(keyword, log, shodan_api_key)
-        zoomeye_vulns = []
         zoomeye_vulns = []
         if zoomeye_api_key:
             zoomeye_vulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
