@@ -55,12 +55,16 @@ def StartScanning(
                 for port in PortArray:
                     metasploit_vulns.extend(metasploitSearch(port[3]))
                 for vuln in metasploit_vulns:
-                    vuln_obj = VulnerableSoftware(
-                        title=vuln['title'],
-                        CVEs=vuln['CVEs'],
-                        severity_score=vuln['severity_score'],
-                        exploitability=vuln['exploitability']
-                    )
+                    if 'title' in vuln:
+                        vuln_obj = VulnerableSoftware(
+                            title=vuln['title'],
+                            CVEs=vuln['CVEs'],
+                            severity_score=vuln['severity_score'],
+                            exploitability=vuln['exploitability']
+                        )
+                        all_vulnerabilities.append(vuln_obj)
+                    else:
+                        log.logger("warning", f"Vulnerability data missing 'title' key: {vuln}")
                     all_vulnerabilities.append(vuln_obj)
             else:
                 sploits = SearchSploits(PortArray, log, console, apiKey)
