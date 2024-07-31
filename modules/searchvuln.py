@@ -16,14 +16,14 @@ class VulnerableSoftware:
     CVEs: list
 
 
-def GenerateKeyword(product: str, version: str) -> str:
+def GenerateKeywords(product: str, version: str) -> list:
     if product == "Unknown":
         product = ""
 
     if version == "Unknown":
         version = ""
 
-    keyword = ""
+    keywords = []
     dontsearch = [
         "ssh",
         "vnc",
@@ -40,10 +40,13 @@ def GenerateKeyword(product: str, version: str) -> str:
         "gnu classpath grmiregistry",
     ]
 
-    if product.lower() not in dontsearch and product != "":
-        keyword = f"{product} {version}".rstrip()
+    product_parts = product.split()
+    for part in product_parts:
+        if part.lower() not in dontsearch and part != "":
+            keywords.append(f"{part} {version}".rstrip())
+            keywords.append(part)
 
-    return keyword
+    return keywords
 
 
 def GenerateKeywords(HostArray: list) -> list:
@@ -52,9 +55,10 @@ def GenerateKeywords(HostArray: list) -> list:
         product = str(port[3])
         version = str(port[4])
 
-        keyword = GenerateKeyword(product, version)
-        if not keyword == "" and not keyword in keywords:
-            keywords.append(keyword)
+        new_keywords = GenerateKeywords(product, version)
+        for keyword in new_keywords:
+            if keyword not in keywords:
+                keywords.append(keyword)
 
     return keywords
 
