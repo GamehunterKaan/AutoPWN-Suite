@@ -15,11 +15,12 @@ from re import search
 from socket import AF_INET, SOCK_DGRAM, socket
 from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
-from platform import platform
 
 import requests
+import shodan
 from requests import get
 from rich.text import Text
+from zoomeye.sdk import ZoomEye
 
 from modules.report import ReportMail, ReportType
 
@@ -840,7 +841,7 @@ def ParamPrint(
         + "\n"
         + f"│\tTarget : {targetarg}\n"
         + f"│\tOutput file : [yellow]{args.output}[/yellow]\n"
-        + f"│\tAPI Key : {type(apiKey) == str}\n"
+        + f"│\tAPI Keys : {type(apiKey) == str}\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
 
@@ -945,29 +946,28 @@ def check_version(cur_version: str, log) -> None:
                 "warning",
                 "Your version of AutoPWN Suite is outdated. Update is advised.",
             )
-def GetZoomEyeVulns(host, zoomeye_api_key, log):
-    url = f"https://api.zoomeye.org/host/search?query=ip:{host}"
-    headers = {"API-KEY": zoomeye_api_key}
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        vulns = data.get("matches", [])
-        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from ZoomEye.")
-        return vulns
-    except requests.RequestException as e:
-        log.logger("ERROR", f"Error fetching ZoomEye vulnerabilities: {e}")
-        return []
 
 def GetShodanVulns(host, shodan_api_key, log):
-    url = f"https://api.shodan.io/shodan/host/{host}?key={shodan_api_key}"
+    api = shodan.Shodan(shodan_api_key)
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        vulns = data.get("vulns", [])
+        host_info = api.host(host)
+        vulns = host_info.get("vulns", [])
         log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from Shodan.")
         return vulns
-    except requests.RequestException as e:
+    except shodan.APIError as e:
         log.logger("ERROR", f"Error fetching Shodan vulnerabilities: {e}")
+        return []
+
+def GetZoomEyeVulns(host, zoomeye_api_key, log):
+    # Initialize ZoomEye API client
+    api = ZoomEye(api_key=zoomeye_api_key)
+    
+    try:
+        # Perform the search
+        results = api.dork_search(f"ip:{host}", page=1)
+        vulns = results.get('matches', [])
+        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from ZoomEye.")
+        return vulns
+    except Exception as e:
+        log.logger("ERROR", f"Error fetching ZoomEye vulnerabilities: {e}")
         return []
