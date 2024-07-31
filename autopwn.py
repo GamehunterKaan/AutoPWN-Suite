@@ -57,7 +57,7 @@ def StartScanning(
                     ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
                     VulnsArray.extend(ZoomEyeVulns)
                 if DownloadExploits and len(VulnsArray) > 0:
-                    GetExploitsFromArray(VulnsArray, log, console, console2, host)
+                    all_vulnerabilities.extend(VulnsArray)
 
     if all_vulnerabilities:
         exploit_vulnerabilities(all_vulnerabilities, targetarg, log)
