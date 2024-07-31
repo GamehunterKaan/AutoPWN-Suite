@@ -110,7 +110,7 @@ class AutoScanner:
         return shodan_vulns
 
     def SearchVuln(
-        self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, debug: bool = False
+        self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False
     ) -> JSON:
         product = port_key["product"]
         version = port_key["version"]
