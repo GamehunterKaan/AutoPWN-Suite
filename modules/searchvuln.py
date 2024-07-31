@@ -130,10 +130,10 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
 
         console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
-            CVEs = []
-            for CVE in ApiResponseCVE:
-                CVEs.append(CVE.CVEID)
-                console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
+        CVEs = []
+        for CVE in ApiResponseCVE:
+            CVEs.append(CVE.CVEID)
+            console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
 
                 wrapped_description = wrap(CVE.description, term_width - 50)
                 console.print(f"│\t\t[cyan]Description: [/cyan]")
