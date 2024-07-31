@@ -97,7 +97,7 @@ class AutoScanner:
 
         return scan_arguments
 
-    def SearchShodan(self, product: str, version: str, shodan_api_key: str, debug: bool = False) -> list:
+    def SearchShodan(self, product: str, version: str, shodan_api_key: str, zoomeye_api_key: str = None, host: str = None, debug: bool = False) -> list:
         log = fake_logger()
         keyword = GenerateKeyword(product, version)
         if keyword == "":
@@ -111,7 +111,7 @@ class AutoScanner:
         zoomeye_vulns = []
         if zoomeye_api_key:
             zoomeye_vulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
-        return shodan_vulns
+        return shodan_vulns + zoomeye_vulns
 
     def SearchVuln(
         self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False
@@ -164,7 +164,7 @@ class AutoScanner:
             nm.scan(hosts=host, arguments=scan_arguments)
             shodan_ports = {}
             if shodan_api_key:
-                shodan_results = self.SearchShodan(host, "", shodan_api_key, debug)
+                shodan_results = self.SearchShodan(host, "", shodan_api_key, zoomeye_api_key, host, debug)
                 for result in shodan_results:
                     shodan_ports[result.CVEID] = {
                         "product": result.title,
@@ -198,7 +198,7 @@ class AutoScanner:
                 product = nm[host]["tcp"][port]["product"]
                 Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], vuln_api_key, shodan_api_key, debug)
                 if shodan_api_key:
-                    ShodanVulns = self.SearchShodan(nm[host]["tcp"][port]["product"], nm[host]["tcp"][port]["version"], shodan_api_key, debug)
+                    ShodanVulns = self.SearchShodan(nm[host]["tcp"][port]["product"], nm[host]["tcp"][port]["version"], shodan_api_key, zoomeye_api_key, host, debug)
                     if ShodanVulns:
                         for shodan_vuln in ShodanVulns:
                             vulns[shodan_vuln.CVEID] = self.ParseVulnInfo(shodan_vuln)
