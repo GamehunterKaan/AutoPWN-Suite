@@ -47,7 +47,7 @@ def cli():
         help="Enable auto-scanning of any hostnames found.",
         action="store_true",
         required=False,
-        default=False,
+        default=True,
     )
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument(
