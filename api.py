@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Type, Union
 
 from nmap import PortScanner
 
-from modules.nist_search import searchCVE
+from modules.nist_search import searchCVE, searchShodan
 from modules.searchvuln import GenerateKeyword
 from modules.utils import fake_logger, is_root
 
@@ -97,7 +97,17 @@ class AutoScanner:
 
         return scan_arguments
 
-    def SearchVuln(
+    def SearchShodan(self, product: str, version: str, shodan_api_key: str, debug: bool = False) -> list:
+        log = fake_logger()
+        keyword = GenerateKeyword(product, version)
+        if keyword == "":
+            return []
+
+        if debug:
+            print(f"Searching Shodan for keyword {keyword} ...")
+
+        shodan_vulns = searchShodan(keyword, log, shodan_api_key)
+        return shodan_vulns
         self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, debug: bool = False
     ) -> JSON:
         product = port_key["product"]
@@ -112,7 +122,10 @@ class AutoScanner:
             print(f"Searching for keyword {keyword} ...")
 
         Vulnerablities = searchCVE(keyword, log, vuln_api_key)
-        # Add Shodan scanning logic here using shodan_api_key if needed
+        if shodan_api_key:
+            shodan_vulns = self.SearchShodan(product, version, shodan_api_key, debug)
+            for shodan_vuln in shodan_vulns:
+                vulns[shodan_vuln.CVEID] = self.ParseVulnInfo(shodan_vuln)
         if len(Vulnerablities) == 0:
             return
 
@@ -166,6 +179,11 @@ class AutoScanner:
             for port in nm[host]["tcp"]:
                 product = nm[host]["tcp"][port]["product"]
                 Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], vuln_api_key, shodan_api_key, debug)
+                if shodan_api_key:
+                    ShodanVulns = self.SearchShodan(nm[host]["tcp"][port]["product"], nm[host]["tcp"][port]["version"], shodan_api_key, debug)
+                    if ShodanVulns:
+                        for shodan_vuln in ShodanVulns:
+                            vulns[shodan_vuln.CVEID] = self.ParseVulnInfo(shodan_vuln)
                 if Vulnerablities:
                     vulns[product] = Vulnerablities
 
