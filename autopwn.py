@@ -1,38 +1,26 @@
 from datetime import datetime
-import requests
 
+import requests
 from rich.console import Console
 
 from modules.banners import print_banner
 from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
 from modules.report import InitializeReport
-from modules.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan
+from modules.scanner import (AnalyseScanResults, DiscoverHosts, NoiseScan,
+                             PortScan)
 from modules.searchvuln import SearchSploits
-from modules.utils import (
-    GetShodanVulns,
-    GetHostsToScan, GetZoomEyeVulns,
-    InitArgsAPI,
-    InitArgsConf,
-    InitArgsMode,
-    InitArgsScanType,
-    InitArgsTarget,
-    InitAutomation,
-    InitReport,
-    ParamPrint,
-    SaveOutput,
-    ScanMode,
-    UserConfirmation,
-    WebScan,
-    check_nmap,
-    cli,
-    check_version,
-)
+from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
+                           InitArgsAPI, InitArgsConf, InitArgsMode,
+                           InitArgsScanType, InitArgsTarget, InitAutomation,
+                           InitReport, ParamPrint, SaveOutput, ScanMode,
+                           UserConfirmation, WebScan, check_nmap,
+                           check_version, cli)
 from modules.web.webvuln import webvuln
 
 
 def StartScanning(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, console, console2, log
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, console2, log
 ) -> None:
 
     check_nmap(log)
@@ -60,8 +48,8 @@ def StartScanning(
                 if shodan_api_key:
                     ShodanVulns = GetShodanVulns(host, shodan_api_key, log)
                     VulnsArray.extend(ShodanVulns)
-                if args.zoomeye_api:
-                    ZoomEyeVulns = GetZoomEyeVulns(host, args.zoomeye_api, log)
+                if zoomeye_api_key:
+                    ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
                     VulnsArray.extend(ZoomEyeVulns)
                 if DownloadExploits and len(VulnsArray) > 0:
                     GetExploitsFromArray(VulnsArray, log, console, console2, host)
