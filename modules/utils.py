@@ -58,6 +58,7 @@ def cli():
     scanargs.add_argument("-vuln", "--vuln-api", help="Specify API key for vulnerability detection for faster scanning. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-w", "--web", help="Enable web search for the target.", action="store_true", required=False, default=False)
     scanargs.add_argument("-shodan", "--shodan-api", help="Specify Shodan API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
+    scanargs.add_argument("--metasploit-scan", help="Enable Metasploit scan for the target.", action="store_true", required=False, default=False)
     scanargs.add_argument("-m", "--mode", help="Scan mode.", default="normal", type=str, required=False, choices=["evade", "noise", "normal"])
     scanargs.add_argument("-nt", "--noise-timeout", help="Noise mode timeout.", default=None, type=int, required=False, metavar="TIMEOUT")
     
