@@ -54,8 +54,9 @@ def ShodanScan(target, shodan_api_key, log, collect_hostnames=False) -> dict:
                 if hostname not in resolved_hostnames:
                     try:
                         ip = socket.gethostbyname(hostname)
-                        log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
-                        resolved_hostnames.add(hostname)
+                        if ip != target:
+                            log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
+                            resolved_hostnames.add(hostname)
                     except socket.gaierror:
                         log.logger("error", f"Failed to resolve hostname {hostname}")
         return host_info
