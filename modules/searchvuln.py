@@ -16,7 +16,7 @@ class VulnerableSoftware:
     CVEs: list
 
 
-def GenerateKeywords(product: str, version: str) -> list:
+def GenerateKeywordList(product: str, version: str) -> list:
     if product == "Unknown":
         product = ""
 
@@ -55,7 +55,7 @@ def GenerateKeywords(HostArray: list) -> list:
         product = str(port[3])
         version = str(port[4])
 
-        new_keywords = GenerateKeywords(product, version)
+        new_keywords = GenerateKeywordList(product, version)
         for keyword in new_keywords:
             if keyword not in keywords:
                 keywords.append(keyword)
