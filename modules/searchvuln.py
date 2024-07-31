@@ -43,7 +43,6 @@ def GenerateKeywordList(product: str, version: str) -> list:
     product_parts = product.split()
     for part in product_parts:
         if part.lower() not in dontsearch and part != "":
-            keywords.append(f"{part} {version}".rstrip())
             keywords.append(part)
 
     return keywords
