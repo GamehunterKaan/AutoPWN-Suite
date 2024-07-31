@@ -54,15 +54,7 @@ You can clone the repo. (This is the recommended installation method as other me
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
 sudo pip install -r requirements.txt
-# Ensure you have the following additional dependencies installed:
-# - pymetasploit3
-# - shodan
-# - zoomeye
-# - rich
-# - requests
-# - nmap
-# - bs4
-# - distro
+# Ensure you have the following additional dependencies installed: pymetasploit3, shodan, zoomeye, rich, requests, nmap, bs4, distro
 ```
 
 OR
@@ -78,7 +70,7 @@ OR
 You can download debian (deb) package from [releases.](https://github.com/GamehunterKaan/AutoPWN-Suite/releases)
 
 ```
-sudo pip install requests rich python-nmap bs4 distro
+sudo pip install requests rich python-nmap bs4 distro pymetasploit3 shodan zoomeye
 sudo apt-get install ./autopwn-suite_2.1.5.deb
 ```
 
