@@ -58,7 +58,7 @@ def cli():
         required=False,
         default=False,
     )
-    argparser = argparser.add_argument_group("Scanning", "Options for scanning")
+    scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     argparser.add_argument(
         "-zoomeye",
         "--zoomeye-api",
