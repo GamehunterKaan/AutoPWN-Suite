@@ -55,7 +55,7 @@ def StartScanning(
                 for port in PortArray:
                     metasploit_vulns.extend(metasploitSearch(port[3]))
                 for vuln in metasploit_vulns:
-                    if 'title' in vuln and 'CVEs' in vuln and 'severity_score' in vuln and 'exploitability' in vuln:
+                    if isinstance(vuln, dict) and all(key in vuln for key in ['title', 'CVEs', 'severity_score', 'exploitability']):
                         vuln_obj = VulnerableSoftware(
                             title=vuln['title'],
                             CVEs=vuln['CVEs'],
