@@ -12,6 +12,7 @@ from rich.table import Table
 
 from modules.logger import banner
 from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
+from modules.exploit import exploit_vulnerabilities
 
 
 @dataclass()
@@ -367,4 +368,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
 
     console.print(table, justify="center")
 
+    if HostArray:
+        log.logger("info", f"Exploiting vulnerabilities for {target}")
+        exploit_vulnerabilities(HostArray, target, log)
     return HostArray
