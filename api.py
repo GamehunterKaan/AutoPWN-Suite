@@ -132,11 +132,18 @@ class AutoScanner:
             print(f"Searching for keyword {keyword} ...")
 
         Vulnerablities = searchCVE(keyword, log, vuln_api_key)
-        shodan_vulns = searchShodan(keyword, log, shodan_api_key)
+        shodan_vulns = []
+        if shodan_api_key:
+            shodan_vulns = searchShodan(keyword, log, shodan_api_key)
+
+        zoomeye_vulns = []
+        if zoomeye_api_key:
+            zoomeye_vulns = self.SearchZoomEye(port_key.get("host", ""), zoomeye_api_key, debug)
+
         vulns = {}
-        if len(Vulnerablities) == 0 and len(shodan_vulns) == 0:
+        if len(Vulnerablities) == 0 and len(shodan_vulns) == 0 and len(zoomeye_vulns) == 0:
             return
-        for vuln in Vulnerablities + shodan_vulns:
+        for vuln in Vulnerablities + shodan_vulns + zoomeye_vulns:
             vulns[vuln.CVEID] = self.ParseVulnInfo(vuln)
 
         return vulns
@@ -211,14 +218,10 @@ class AutoScanner:
             vulns = {}
             for port in nm[host]["tcp"]:
                 product = nm[host]["tcp"][port]["product"]
-                Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], vuln_api_key, shodan_api_key, debug)
-                if shodan_api_key:
-                    ShodanVulns = self.SearchShodan(nm[host]["tcp"][port]["product"], nm[host]["tcp"][port]["version"], shodan_api_key, debug)
-                if ShodanVulns:
-                    for shodan_vuln in ShodanVulns:
-                        vulns[shodan_vuln.CVEID] = self.ParseVulnInfo(shodan_vuln)
+                Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], vuln_api_key, shodan_api_key, zoomeye_api_key, debug)
                 if Vulnerablities:
-                    vulns[product] = Vulnerablities
+                    for vuln_id, vuln_info in Vulnerablities.items():
+                        vulns[vuln_id] = vuln_info
 
             self.scan_results[host]["vulns"] = vulns
 
