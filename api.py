@@ -137,6 +137,7 @@ class AutoScanner:
             return hostnames
         except socket.gaierror:
             return []
+    def SearchVuln(
         self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False
     ) -> JSON:
         product = port_key.get("product", "")
