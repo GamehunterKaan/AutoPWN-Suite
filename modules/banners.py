@@ -38,13 +38,4 @@ ___           __          ____  _       __ _   __   _____         _  __
         height=height,
         subtitle=f"by GamehunterKaan + Overtime (https://auto.pwnspot.com) | {api_keys_info}",
     )
-        Align(
-            Text(banner, justify="center", style="blue"),
-            vertical="middle",
-            align="center",
-        ),
-        width=width,
-        height=height,
-        subtitle="by GamehunterKaan + Overtime (https://auto.pwnspot.com)",
-    )
     console.print(panel)
