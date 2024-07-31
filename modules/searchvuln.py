@@ -14,6 +14,8 @@ from rich.progress_bar import ProgressBar
 class VulnerableSoftware:
     title: str
     CVEs: list
+    severity_score: float
+    exploitability: float
 
 
 def GenerateKeywordList(product: str, version: str) -> list:
