@@ -848,6 +848,7 @@ def ParamPrint(
     scanmode_name: ScanMode,
     apiKey: str,
     shodan_api_key: str,
+    api_keys_used: int,
     console,
     log,
 ) -> None:
@@ -868,7 +869,7 @@ def ParamPrint(
         + "\n"
         + f"│\tTarget : {targetarg}\n"
         + f"│\tOutput file : [yellow]{args.output}[/yellow]\n"
-        + f"│\tAPI Keys : {type(apiKey) == str}\n"
+        + f"│\tAPI Keys Used : {api_keys_used}/3\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
 
