@@ -16,17 +16,19 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Fully [automatic!](#usage)
 - Detect network IP range without any user input. 
 - Vulnerability detection based on version.
-- Web app vulnerability testing. (LFI, XSS, SQLI)
+- Web app vulnerability testing. (LFI, XSS, SQLI, Web Search)
 - Web app dirbusting.
 - Get information about the vulnerability right from your terminal.
-- Automatically download exploit related with vulnerability.
-- Noise mode for creating a noise on the network.
+- Automatically download and exploit vulnerabilities.
+- Noise mode for creating noise on the network.
+- Metasploit scan for enhanced vulnerability detection.
 - Evasion mode for being sneaky.
 - Automatically decide which scan types to use based on privilege.
 - Easy to read output.
 - Specify your arguments using a config file.
 - Send scan results via webhook or email.
-- Works on Windows, MacOS and Linux.
+- Integrates with Shodan and ZoomEye for additional vulnerability data.
+- Works on Windows, MacOS, and Linux.
 - Use as a [module!](#module-usage)
 
 
@@ -107,7 +109,7 @@ Help Menu
 ```console
 $ autopwn-suite -h
 
-usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-a API] [-m {evade,noise,normal}] [-nt TIMEOUT]
+usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-vuln API] [-w] [-shodan API] [--metasploit-scan] [-m {evade,noise,normal}] [-nt TIMEOUT]
                   [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK]
 
 AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.
@@ -137,7 +139,10 @@ Scanning:
                         Scan speed. (Default : 3)
   -ht HOST_TIMEOUT, --host-timeout HOST_TIMEOUT
                         Timeout for every host. (Default :240)
-  -a API, --api API     Specify API key for vulnerability detection for faster scanning. (Default : None)
+  -vuln API, --vuln-api API     Specify API key for vulnerability detection for faster scanning. (Default : None)
+  -w, --web             Enable web search for the target.
+  -shodan API, --shodan-api API Specify Shodan API key for additional scanning capabilities. (Default: None)
+  --metasploit-scan     Enable Metasploit scan for the target.
   -m {evade,noise,normal}, --mode {evade,noise,normal}
                         Scan mode.
   -nt TIMEOUT, --noise-timeout TIMEOUT
@@ -169,7 +174,7 @@ Reporting:
 ```
 
 
-## Module usage
+## Module Usage
 
 ```python
 from autopwn_suite.api import AutoScanner
@@ -182,7 +187,7 @@ scanner.save_to_file("autopwn.json")
 
 ## Contributing to AutoPWN Suite
 
-I would be glad if you are willing to contribute this project. I am looking forward to merge your pull request unless its something that is not needed or just a personal preference. Also minor changes and bug fixes will not be merged. Please create an issue for those and I will do it myself. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
+I would be glad if you are willing to contribute to this project. I am looking forward to merging your pull request unless it's something that is not needed or just a personal preference. Also, minor changes and bug fixes will not be merged. Please create an issue for those and I will do it myself. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
 
 
 ## Legal
