@@ -136,8 +136,7 @@ def searchCVE(keyword: str, log, apiKey=None, max_exploits: int = 10) -> list[Vu
     # Sort vulnerabilities by severity and exploitability
     Vulnerabilities.sort(key=lambda x: (x.severity_score, x.exploitability), reverse=True)
     
-    # Limit the number of vulnerabilities if max_exploits is set
-    if max_exploits > 0:
-        Vulnerabilities = Vulnerabilities[:max_exploits]
+    # Display the number of vulnerabilities found
+    log.logger("info", f"Found {len(Vulnerabilities)} vulnerabilities for {keyword}")
     
     return Vulnerabilities
