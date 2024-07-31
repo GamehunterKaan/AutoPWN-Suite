@@ -107,11 +107,11 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
     )
 
     printed_banner = False
-    with console2.status(
+    with console.status(
         "[white]Searching vulnerabilities ...[/white]", spinner="bouncingBar"
     ) as status:
         for keyword in keywords:
-            with console2.status(
+            with console.status(
                 f"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] [white]...[/white]",
                 spinner="bouncingBar"
             ) as status:
