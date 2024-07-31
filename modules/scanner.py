@@ -9,7 +9,7 @@ from rich import box
 from rich.table import Table
 
 from modules.logger import banner
-from modules.utils import GetIpAddress, ScanMode, ScanType, is_root
+from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
 
 
 @dataclass()
@@ -232,7 +232,7 @@ def InitHostInfo(target_key) -> TargetInfo:
     try:
         os_accuracy = target_key["osmatch"][0]["accuracy"]
     except (KeyError, IndexError):
-        os_accuracy = "Unknown"
+        os_accuracy = 0
 
     try:
         os_type = target_key["osmatch"][0]["osclass"][0]["type"]
@@ -248,7 +248,7 @@ def InitHostInfo(target_key) -> TargetInfo:
     )
 
 
-def InitPortInfo(port) -> tuple[str, str, str, str]:
+def InitPortInfo(port) -> tuple:
     state = port.get("state", "Unknown")
     service = port.get("name", "Unknown")
     product = port.get("product", "Unknown")
