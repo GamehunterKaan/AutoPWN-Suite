@@ -37,15 +37,12 @@ class ScanType(Enum):
     ARP = 1
 
 
-import argparse
-
 def cli():
-    scanargs = argparse.ArgumentParser(description="AutoPWN Suite")
     argparser = ArgumentParser(
         description="AutoPWN Suite | A project for scanning "
         + "vulnerabilities and exploiting systems automatically."
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-me",
         "--max-exploits",
         help="Maximum number of exploits to display per service. Set to 0 to display all.",
@@ -53,7 +50,7 @@ def cli():
         type=int,
         required=False,
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-e",
         "--exploit",
         help="Exploit the target after vulnerabilities have been checked and downloaded.",
@@ -61,8 +58,8 @@ def cli():
         required=False,
         default=False,
     )
-    scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
-    scanargs.add_argument(
+    argparser = argparser.add_argument_group("Scanning", "Options for scanning")
+    argparser.add_argument(
         "-zoomeye",
         "--zoomeye-api",
         help=(
@@ -102,8 +99,8 @@ def cli():
         action="store_true",
     )
 
-    scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
-    scanargs.add_argument(
+    argparser = argparser.add_argument_group("Scanning", "Options for scanning")
+    argparser.add_argument(
         "-t",
         "--target",
         help=(
@@ -114,7 +111,7 @@ def cli():
         required=False,
         default=None,
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-hf",
         "--host-file",
         help="File containing a list of hosts to scan.",
@@ -122,7 +119,7 @@ def cli():
         required=False,
         default=None,
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-sd",
         "--skip-discovery",
         help="Skips the host discovery phase.",
@@ -130,7 +127,7 @@ def cli():
         default=False,
         action="store_true",
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-st",
         "--scan-type",
         help="Scan type.",
@@ -139,7 +136,7 @@ def cli():
         default=None,
         choices=["arp", "ping"],
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-nf",
         "--nmap-flags",
         help=(
@@ -150,7 +147,7 @@ def cli():
         type=str,
         required=False,
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-s",
         "--speed",
         help="Scan speed. (Default : 3)",
@@ -159,7 +156,7 @@ def cli():
         required=False,
         choices=range(0, 6),
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-ht",
         "--host-timeout",
         help="Timeout for every host. (Default :240)",
@@ -167,7 +164,7 @@ def cli():
         type=int,
         required=False,
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-vuln",
         "--vuln-api",
         help=(
@@ -178,7 +175,7 @@ def cli():
         type=str,
         required=False,
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-shodan",
         "--shodan-api",
         help=(
@@ -189,7 +186,7 @@ def cli():
         type=str,
         required=False,
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-m",
         "--mode",
         help="Scan mode.",
@@ -198,7 +195,7 @@ def cli():
         required=False,
         choices=["evade", "noise", "normal"],
     )
-    scanargs.add_argument(
+    argparser.add_argument(
         "-nt",
         "--noise-timeout",
         help="Noise mode timeout.",
