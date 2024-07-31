@@ -38,6 +38,28 @@ def GenerateKeywordList(product: str, version: str) -> list:
         "microsoft windows rpc",
         "metasploitable root shell",
         "gnu classpath grmiregistry",
+        "server",
+        "service",
+        "application",
+        "software",
+        "system",
+        "device",
+        "tool",
+        "utility",
+        "daemon",
+        "agent",
+        "client",
+        "server",
+        "service",
+        "application",
+        "software",
+        "system",
+        "device",
+        "tool",
+        "utility",
+        "daemon",
+        "agent",
+        "client",
     ]
 
     product_parts = product.split()
@@ -55,9 +77,7 @@ def GenerateKeywords(HostArray: list) -> list:
         version = str(port[4])
 
         new_keywords = GenerateKeywordList(product, version)
-        for keyword in new_keywords:
-            if keyword not in keywords:
-                keywords.append(keyword)
+        keywords.extend(new_keywords)
 
     return keywords
 
@@ -66,18 +86,6 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
 
     try:
         ApiResponseCVE = searchCVE(keyword, log, apiKey)
-        # Search for Metasploit exploits
-        metasploit_exploits = search_exploits({"CVEID": keyword}, log)
-        for exploit in metasploit_exploits:
-            ApiResponseCVE.append(Vulnerability(
-                title=keyword,
-                CVEID=exploit,
-                description="Metasploit exploit",
-                severity="N/A",
-                severity_score=0.0,
-                details_url=f"https://www.rapid7.com/db/modules/{exploit}",
-                exploitability=0.0
-            ))
         log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
         log.logger("error", e)
@@ -115,6 +123,19 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
             sleep(1)  # Adding a delay to ensure proper logging and searching
         if len(ApiResponseCVE) == 0:
             continue
+
+        # Search for Metasploit exploits
+        metasploit_exploits = search_exploits({"CVEID": keyword}, log)
+        for exploit in metasploit_exploits:
+            ApiResponseCVE.append(Vulnerability(
+                title=keyword,
+                CVEID=exploit,
+                description="Metasploit exploit",
+                severity="N/A",
+                severity_score=0.0,
+                details_url=f"https://www.rapid7.com/db/modules/{exploit}",
+                exploitability=0.0
+            ))
 
             if not printed_banner:
                 banner(f"Possible vulnerabilities for {target}", "red", console)
