@@ -367,3 +367,4 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
             HostArray.append([target, port, service, product, version])
 
     console.print(table, justify="center")
+    return HostArray

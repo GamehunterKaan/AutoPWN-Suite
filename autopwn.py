@@ -45,6 +45,7 @@ def StartScanning(
             PortScanResults = PortScan(
                 host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags, shodan_api_key
             )
+            print("PortScanResults: ", PortScanResults)
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
             print("PortArray: ", PortArray)
             if ScanVulns and PortArray and len(PortArray) > 0:
