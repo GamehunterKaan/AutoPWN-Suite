@@ -659,6 +659,8 @@ def ParamPrint(
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
     msg += f"│\tExploit : {args.exploit}\n"
+    msg += f"│\tMetasploit Scan : {args.metasploit_scan}\n"
+    msg += f"│\tMax Exploits : {args.max_exploits}\n"
 
     if args.skip_discovery:
         msg += f"│\tSkip discovery: True\n"
