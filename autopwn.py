@@ -45,13 +45,13 @@ def StartScanning(
             PortScanResults = PortScan(
                 host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags, shodan_api_key
             )
-            print("PortScanResults: ", PortScanResults)
+            #print("PortScanResults: ", PortScanResults)
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
-            print("PortArray: ", PortArray)
-            print("ScanVulns: ", ScanVulns)
+            #print("PortArray: ", PortArray)
+            #print("ScanVulns: ", ScanVulns)
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = SearchSploits(PortArray, log, console, apiKey)
-            print("VulnsArray: ", VulnsArray)
+            #print("VulnsArray: ", VulnsArray)
             if shodan_api_key:
                 ShodanVulns = GetShodanVulns(host, shodan_api_key, log)
                 VulnsArray.extend(ShodanVulns)
@@ -61,7 +61,7 @@ def StartScanning(
             if DownloadExploits and len(VulnsArray) > 0:
                 all_vulnerabilities.extend(VulnsArray)
     
-    print("All vulnerabilities: ", all_vulnerabilities)
+    #print("All vulnerabilities: ", all_vulnerabilities)
 
     if len(all_vulnerabilities) > 0:
         GetExploitsFromArray(all_vulnerabilities, log, console, console, max_exploits=max_exploits)
