@@ -60,6 +60,9 @@ def StartScanning(
                 if shodan_api_key:
                     ShodanVulns = GetShodanVulns(host, shodan_api_key, log)
                     VulnsArray.extend(ShodanVulns)
+                if args.zoomeye_api:
+                    ZoomEyeVulns = GetZoomEyeVulns(host, args.zoomeye_api, log)
+                    VulnsArray.extend(ZoomEyeVulns)
                 if DownloadExploits and len(VulnsArray) > 0:
                     GetExploitsFromArray(VulnsArray, log, console, console2, host)
 
