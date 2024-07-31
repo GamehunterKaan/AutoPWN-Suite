@@ -124,11 +124,11 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
         if len(ApiResponseCVE) == 0:
             continue
 
-            if not printed_banner:
-                banner(f"Possible vulnerabilities for {target}", "red", console)
-                printed_banner = True
+        if not printed_banner:
+            banner(f"Possible vulnerabilities for {target}", "red", console)
+            printed_banner = True
 
-            console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
+        console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
             CVEs = []
             for CVE in ApiResponseCVE:
