@@ -148,25 +148,6 @@ def PortScan(
     if shodan_api_key:
         shodan_results = ShodanScan(target, shodan_api_key, log, collect_hostnames=True)
         if shodan_results:
-            #display_shodan_results(shodan_results)
-            hostnames = shodan_results.get('hostnames', [])
-            additional_ips = resolve_hostnames_to_ips(hostnames, log)
-            for ip in additional_ips:
-                nm.scan(hosts=ip, arguments=" ".join(
-                    [
-                        "-sS",
-                        "-sV",
-                        "--host-timeout",
-                        str(host_timeout),
-                        "-Pn",
-                        "-O",
-                        "-T",
-                        str(scanspeed),
-                        customflags,
-                    ]
-                ))
-                log.logger("info", f"Scanned additional IP {ip} from hostname resolution")
-        if shodan_results:
             display_shodan_results(shodan_results)
             #log.logger("info", f"Shodan results for {target}: {shodan_results}")
     return nm
