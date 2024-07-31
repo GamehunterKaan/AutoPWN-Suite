@@ -37,10 +37,6 @@ def StartScanning(
 
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
     ScanWeb = WebScan()
-    
-    print("ScanPorts: ", ScanPorts)
-    print("ScanVulns: ", ScanVulns)
-    print("DownloadExploits: ", DownloadExploits)
 
     all_vulnerabilities = []
 
@@ -50,6 +46,7 @@ def StartScanning(
                 host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags, shodan_api_key
             )
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
+            print("PortArray: ", PortArray)
             if ScanVulns and PortArray and len(PortArray) > 0:
                 VulnsArray = SearchSploits(PortArray, log, console, apiKey)
                 if shodan_api_key:
