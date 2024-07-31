@@ -15,12 +15,12 @@ from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
                            InitArgsScanType, InitArgsTarget, InitAutomation,
                            InitReport, ParamPrint, SaveOutput, ScanMode,
                            UserConfirmation, WebScan, check_nmap,
-                           check_version, cli)
+                           check_version, cli, resolve_hostnames_to_ips)
 from modules.web.webvuln import webvuln
 
 
 def StartScanning(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, console2, log
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, console2, log, auto_scan_hostnames=False
 ) -> None:
 
     check_nmap(log)
@@ -37,7 +37,19 @@ def StartScanning(
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
     ScanWeb = WebScan()
 
+    all_shodan_results = []
+    all_hostnames = []
+    all_ips = []
+
     for host in Targets:
+        if auto_scan_hostnames:
+            shodan_results = ShodanScan(host, shodan_api_key, log, collect_hostnames=True)
+            if shodan_results:
+                all_shodan_results.append(shodan_results)
+                hostnames = shodan_results.get('hostnames', [])
+                all_hostnames.extend(hostnames)
+                additional_ips = resolve_hostnames_to_ips(hostnames, log)
+                all_ips.extend(additional_ips)
         if ScanPorts:
             PortScanResults = PortScan(
                 host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags, shodan_api_key
@@ -56,6 +68,15 @@ def StartScanning(
 
         if ScanWeb:
             webvuln(host, log, console)
+
+    if auto_scan_hostnames:
+        console.print("\n[bold cyan]Shodan Results Summary[/bold cyan]", justify="center")
+        for result in all_shodan_results:
+            display_shodan_results(result)
+
+        console.print("\n[bold cyan]Hostnames and their IPs[/bold cyan]", justify="center")
+        for hostname, ip in zip(all_hostnames, all_ips):
+            console.print(f"Hostname: {hostname} -> IP: {ip}")
 
     console.print(
         "{time} - Scan completed.".format(
@@ -96,7 +117,7 @@ def main() -> None:
 
     ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, console, log)
 
-    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, console, console2, log)
+    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, console, console2, log, auto_scan_hostnames=args.auto_scan_hostnames)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
