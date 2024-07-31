@@ -6,7 +6,7 @@ from modules.utils import get_terminal_width
 
 
 # https://patorjk.com/software/taag/
-def print_banner(console) -> None:
+def print_banner(console, api_keys_used: int) -> None:
     width = get_terminal_width()
     height = 8
     banner = """\
@@ -27,7 +27,17 @@ ___           __          ____  _       __ _   __   _____         _  __
         banner = banner_small
         height = 5
 
+    api_keys_info = f"API Keys Used: {api_keys_used}/3"
     panel = Panel(
+        Align(
+            Text(banner, justify="center", style="blue"),
+            vertical="middle",
+            align="center",
+        ),
+        width=width,
+        height=height,
+        subtitle=f"by GamehunterKaan + Overtime (https://auto.pwnspot.com) | {api_keys_info}",
+    )
         Align(
             Text(banner, justify="center", style="blue"),
             vertical="middle",
