@@ -236,9 +236,6 @@ class AutoScanner:
         nm = PortScanner()
         scan_arguments = self.CreateScanArgs(host_timeout, scan_speed, os_scan, nmap_args)
         for host in target:
-            if auto_scan_hostnames:
-                additional_hosts = self.HostCrawler(host, debug)
-                target.extend(additional_hosts)
 
             if debug:
                 print(f"Scanning {host} ...")
