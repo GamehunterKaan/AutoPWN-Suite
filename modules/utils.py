@@ -806,6 +806,7 @@ def ParamPrint(
     scantype_name: ScanType,
     scanmode_name: ScanMode,
     apiKey: str,
+    shodan_api_key: str,
     console,
     log,
 ) -> None:
