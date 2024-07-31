@@ -35,6 +35,6 @@ ___           __          ____  _       __ _   __   _____         _  __
         ),
         width=width,
         height=height,
-        subtitle="by GamehunterKaan (https://auto.pwnspot.com)",
+        subtitle="by GamehunterKaan + Overtime (https://auto.pwnspot.com)",
     )
     console.print(panel)
