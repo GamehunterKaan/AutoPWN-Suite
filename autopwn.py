@@ -22,7 +22,7 @@ from modules.web.webvuln import webvuln
 
 
 def StartScanning(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, console2, log
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, log
 ) -> None:
 
     check_nmap(log)
@@ -78,12 +78,7 @@ def main() -> None:
     __version__ = "2.1.5"
 
     args = cli()
-    if args.no_color:
-        console = Console(record=True, color_system=None)
-        console2 = Console(record=False, color_system=None)
-    else:
-        console = Console(record=True, color_system="truecolor")
-        console2 = Console(record=False, color_system="truecolor")
+    console = Console(record=True, color_system=None if args.no_color else "truecolor")
     log = Logger(console)
 
     if args.version:
@@ -107,7 +102,7 @@ def main() -> None:
 
     ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, api_keys_used, console, log)
 
-    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, console, console2, log)
+    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, console, log)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
