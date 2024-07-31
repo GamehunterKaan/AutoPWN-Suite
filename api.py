@@ -5,7 +5,7 @@ from nmap import PortScanner
 
 from modules.nist_search import searchCVE, searchShodan
 from modules.searchvuln import GenerateKeyword
-from modules.utils import fake_logger, is_root
+from modules.utils import fake_logger, is_root, GetZoomEyeVulns
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
@@ -108,15 +108,16 @@ class AutoScanner:
 
         shodan_vulns = searchShodan(keyword, log, shodan_api_key)
         zoomeye_vulns = []
+        zoomeye_vulns = []
         if zoomeye_api_key:
-            zoomeye_vulns = GetZoomEyeVulns(port_key["host"], zoomeye_api_key, self.log)
+            zoomeye_vulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
         return shodan_vulns
 
     def SearchVuln(
         self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False
     ) -> JSON:
-        product = port_key["product"]
-        version = port_key["version"]
+        product = port_key.get("product", "")
+        version = port_key.get("version", "")
         log = fake_logger()
 
         keyword = GenerateKeyword(product, version)
@@ -129,9 +130,9 @@ class AutoScanner:
         Vulnerablities = searchCVE(keyword, log, vuln_api_key)
         shodan_vulns = searchShodan(keyword, log, shodan_api_key)
         vulns = {}
-        if len(Vulnerablities) == 0 and len(shodan_vulns) == 0 and len(zoomeye_vulns) == 0:
+        if len(Vulnerablities) == 0 and len(shodan_vulns) == 0:
             return
-        for vuln in Vulnerablities + shodan_vulns + zoomeye_vulns:
+        for vuln in Vulnerablities + shodan_vulns:
             vulns[vuln.CVEID] = self.ParseVulnInfo(vuln)
 
         return vulns
