@@ -348,7 +348,7 @@ def InitAutomation(args) -> None:
         DontAskForConfirmation = False
 
 
-def InitArgsAPI(args, log) -> tuple[str, str]:
+def InitArgsAPI(args, log) -> tuple[str, str, str]:
     if args.vuln_api:
         vuln_api_key = args.vuln_api
     else:
@@ -386,7 +386,25 @@ def InitArgsAPI(args, log) -> tuple[str, str]:
         except PermissionError:
             log.logger("error", "Permission denied while trying to read shodan_api.txt!")
 
-    return vuln_api_key, shodan_api_key
+    if args.zoomeye_api:
+        zoomeye_api_key = args.zoomeye_api
+    else:
+        zoomeye_api_key = None
+        try:
+            with open("zoomeye_api.txt", "r", encoding="utf-8") as f:
+                zoomeye_api_key = f.readline().strip("\n")
+        except FileNotFoundError:
+            log.logger(
+                "warning",
+                "No ZoomEye API key specified and no zoomeye_api.txt file found. "
+                + "ZoomEye scanning capabilities will be disabled! "
+                + "You can get your own ZoomEye API key from "
+                + "https://www.zoomeye.org/api"
+            )
+        except PermissionError:
+            log.logger("error", "Permission denied while trying to read zoomeye_api.txt!")
+
+    return vuln_api_key, shodan_api_key, zoomeye_api_key
 
 
 def InitArgsScanType(args, log) -> ScanType:

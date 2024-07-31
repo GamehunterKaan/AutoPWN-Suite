@@ -91,12 +91,12 @@ def main() -> None:
     targetarg = InitArgsTarget(args, log)
     scantype = InitArgsScanType(args, log)
     scanmode = InitArgsMode(args, log)
-    vuln_api_key, shodan_api_key = InitArgsAPI(args, log)
+    vuln_api_key, shodan_api_key, zoomeye_api_key = InitArgsAPI(args, log)
     ReportMethod, ReportObject = InitReport(args, log)
 
     ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, console, log)
 
-    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, console, console2, log)
+    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, console, console2, log)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
