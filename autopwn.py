@@ -48,6 +48,7 @@ def StartScanning(
             print("PortScanResults: ", PortScanResults)
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
             print("PortArray: ", PortArray)
+            print("ScanVulns: ", ScanVulns)
             if ScanVulns and PortArray and len(PortArray) > 0:
                 VulnsArray = SearchSploits(PortArray, log, console, apiKey)
                 print("VulnsArray: ", VulnsArray)
