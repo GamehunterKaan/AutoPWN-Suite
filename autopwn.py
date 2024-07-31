@@ -10,7 +10,7 @@ from modules.logger import Logger
 from modules.report import InitializeReport
 from modules.scanner import (AnalyseScanResults, DiscoverHosts, NoiseScan,
                              PortScan, ShodanScan, display_shodan_results)
-from modules.searchvuln import SearchSploits
+from modules.searchvuln import SearchSploits, VulnerableSoftware
 from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
                            InitArgsAPI, InitArgsConf, InitArgsMode,
                            InitArgsScanType, InitArgsTarget, InitAutomation,
@@ -54,20 +54,48 @@ def StartScanning(
                 metasploit_vulns = []
                 for port in PortArray:
                     metasploit_vulns.extend(metasploitSearch(port[3]))
-                VulnsArray.extend(metasploit_vulns)
+                for vuln in metasploit_vulns:
+                    vuln_obj = VulnerableSoftware(
+                        title=vuln['title'],
+                        CVEs=vuln['CVEs'],
+                        severity_score=vuln['severity_score'],
+                        exploitability=vuln['exploitability']
+                    )
+                    all_vulnerabilities.append(vuln_obj)
             else:
                 sploits = SearchSploits(PortArray, log, console, apiKey)
-                VulnsArray.extend(sploits)
+                for sploit in sploits:
+                    vuln_obj = VulnerableSoftware(
+                        title=sploit['title'],
+                        CVEs=sploit['CVEs'],
+                        severity_score=sploit['severity_score'],
+                        exploitability=sploit['exploitability']
+                    )
+                    all_vulnerabilities.append(vuln_obj)
             if shodan_api_key:
                 ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
                 for port in ShodanPorts:
                     PortArray.append((host, port, "tcp", "shodan", ""))
-                VulnsArray.extend(ShodanVulns)
+                for vuln in ShodanVulns:
+                    vuln_obj = VulnerableSoftware(
+                        title=vuln['title'],
+                        CVEs=vuln['CVEs'],
+                        severity_score=vuln['severity_score'],
+                        exploitability=vuln['exploitability']
+                    )
+                    all_vulnerabilities.append(vuln_obj)
             if zoomeye_api_key:
                 ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
-                VulnsArray.extend(ZoomEyeVulns)
-            if DownloadExploits and len(VulnsArray) > 0:
-                all_vulnerabilities.extend(VulnsArray)
+                for vuln in ZoomEyeVulns:
+                    vuln_obj = VulnerableSoftware(
+                        title=vuln['title'],
+                        CVEs=vuln['CVEs'],
+                        severity_score=vuln['severity_score'],
+                        exploitability=vuln['exploitability']
+                    )
+                    all_vulnerabilities.append(vuln_obj)
+            if DownloadExploits and len(all_vulnerabilities) > 0:
+                GetExploitsFromArray(all_vulnerabilities, log, console, console, max_exploits=max_exploits)
     
     if len(all_vulnerabilities) > 0:
         GetExploitsFromArray(all_vulnerabilities, log, console, console, max_exploits=max_exploits)
