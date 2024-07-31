@@ -53,14 +53,14 @@ def StartScanning(
             if args.metasploit_scan:
                 metasploit_vulns = []
                 for port in PortArray:
-                    metasploit_vulns.extend(metasploitSearch(port[3]))
+                    metasploit_vulns.extend(metasploitSearch(port[3], max_exploits))
                 for vuln in metasploit_vulns:
-                    if isinstance(vuln, dict) and all(key in vuln for key in ['title', 'CVEs', 'severity_score', 'exploitability']):
+                    if isinstance(vuln, dict) and all(key in vuln for key in ['name', 'fullname']):
                         vuln_obj = VulnerableSoftware(
-                            title=vuln['title'],
-                            CVEs=vuln['CVEs'],
-                            severity_score=vuln['severity_score'],
-                            exploitability=vuln['exploitability']
+                            title=vuln['name'],
+                            CVEs=[vuln['fullname']],
+                            severity_score=0.0,
+                            exploitability=0.0
                         )
                         all_vulnerabilities.append(vuln_obj)
                     else:
