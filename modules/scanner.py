@@ -42,26 +42,11 @@ class TargetInfo:
         )
 
 
-def ShodanScan(target, shodan_api_key, log, collect_hostnames=False) -> dict:
+def ShodanScan(target, shodan_api_key, log) -> dict:
     api = shodan.Shodan(shodan_api_key)
     try:
         host_info = api.host(target)
         log.logger("info", f"Shodan scan successful for {target}")
-        if collect_hostnames:
-            hostnames = host_info.get('hostnames', [])
-            resolved_hostnames = set()
-            for hostname in hostnames:
-                if hostname not in resolved_hostnames:
-                    try:
-                        ip = socket.gethostbyname(hostname)
-                        if ip != target:
-                            if ip != target:
-                                log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
-                                resolved_hostnames.add(hostname)
-                            else:
-                                log.logger("info", f"Skipping hostname {hostname} as it resolves to the target IP {ip}")
-                    except socket.gaierror:
-                        log.logger("error", f"Failed to resolve hostname {hostname}")
         return host_info
     except shodan.APIError as e:
         log.logger("error", f"Shodan scan failed for {target}: {e} (The Target Doesnt Exist in Shodan)")
@@ -90,16 +75,6 @@ def TestArp(target, mode=ScanMode.Normal) -> list:
     return nm.all_hosts()
 
 
-def resolve_hostnames_to_ips(hostnames, log):
-    ips = []
-    for hostname in hostnames:
-        try:
-            ip = socket.gethostbyname(hostname)
-            ips.append(ip)
-            log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
-        except socket.gaierror:
-            log.logger("error", f"Failed to resolve hostname {hostname}")
-    return ips
 
 def PortScan(
     target,
