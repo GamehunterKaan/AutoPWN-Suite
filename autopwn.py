@@ -103,6 +103,7 @@ def main() -> None:
         print(f"AutoPWN Suite v{__version__}")
         raise SystemExit
 
+    vuln_api_key, shodan_api_key, zoomeye_api_key = InitArgsAPI(args, log)
     api_keys_used = sum([1 for key in [vuln_api_key, shodan_api_key, zoomeye_api_key] if key])
     print_banner(console, api_keys_used)
     check_version(__version__, log)
