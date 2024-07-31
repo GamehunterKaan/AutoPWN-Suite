@@ -6,6 +6,7 @@ from time import sleep
 import shodan
 from nmap import PortScanner
 from rich import box
+from rich.console import Console
 from rich.table import Table
 
 from modules.logger import banner
@@ -85,7 +86,8 @@ def PortScan(
     if shodan_api_key:
         shodan_results = ShodanScan(target, shodan_api_key, log)
         if shodan_results:
-            log.logger("info", f"Shodan results for {target}: {shodan_results}")
+            display_shodan_results(shodan_results)
+            #log.logger("info", f"Shodan results for {target}: {shodan_results}")
 
     log.logger("info", f"Scanning {target} for open ports ...")
 
@@ -148,6 +150,69 @@ def PortScan(
         raise SystemExit(f"Error: {e}")
     else:
         return nm
+
+
+def display_shodan_results(shodan_results):
+    console = Console()
+
+    # General information about the host
+    console.print(f"[bold cyan]Shodan Results for {shodan_results['ip_str']}[/bold cyan]", justify="center")
+    
+    general_table = Table(box=box.MINIMAL)
+    general_table.add_column("Key", style="cyan")
+    general_table.add_column("Value", style="white")
+
+    general_info = {
+        "IP Address": shodan_results['ip_str'],
+        "Organization": shodan_results.get('org', 'Unknown'),
+        "ISP": shodan_results.get('isp', 'Unknown'),
+        "Country": shodan_results.get('country_name', 'Unknown'),
+        "City": shodan_results.get('city', 'Unknown'),
+        "Hostnames": ', '.join(shodan_results.get('hostnames', [])),
+        "Domains": ', '.join(shodan_results.get('domains', [])),
+        "ASN": shodan_results.get('asn', 'Unknown')
+    }
+
+    for key, value in general_info.items():
+        general_table.add_row(key, value)
+
+    console.print(general_table)
+
+    # Vulnerabilities information
+    console.print(f"[bold red]Vulnerabilities[/bold red]", justify="center")
+
+    vuln_table = Table(box=box.MINIMAL)
+    vuln_table.add_column("CVE", style="cyan")
+    vuln_table.add_column("CVSS", style="white")
+    vuln_table.add_column("Summary", style="white")
+
+    vulnerabilities = shodan_results.get('vulns', {})
+    if isinstance(vulnerabilities, dict):
+        for vuln, details in vulnerabilities.items():
+            vuln_table.add_row(vuln, str(details.get('cvss', 'Unknown')), details.get('summary', 'No summary available'))
+    elif isinstance(vulnerabilities, list):
+        for vuln in vulnerabilities:
+            vuln_info = shodan_results.get('vuln_info', {}).get(vuln, {})
+            vuln_table.add_row(vuln, str(vuln_info.get('cvss', 'Unknown')), vuln_info.get('summary', 'No summary available'))
+    else:
+        console.print("[red]No vulnerabilities found or vulnerabilities data is not in expected format.[/red]")
+
+    console.print(vuln_table)
+
+    # Ports information
+    console.print(f"[bold green]Open Ports[/bold green]", justify="center")
+
+    ports_table = Table(box=box.MINIMAL)
+    ports_table.add_column("Port", style="cyan")
+    ports_table.add_column("Transport", style="white")
+    ports_table.add_column("Service", style="blue")
+    ports_table.add_column("Version", style="purple")
+
+    for data in shodan_results.get('data', []):
+        ports_table.add_row(str(data.get('port', 'Unknown')), data.get('transport', 'Unknown'), 
+                            data.get('product', 'Unknown'), data.get('version', 'Unknown'))
+
+    console.print(ports_table)
 
 
 def CreateNoise(target) -> None:
