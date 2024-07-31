@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import shodan
 from time import sleep
 
 from requests import get
@@ -52,6 +53,27 @@ def FindVars(vuln: dict) -> tuple:
 
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
+
+def searchShodan(keyword: str, log, shodan_api_key: str) -> list[Vulnerability]:
+    api = shodan.Shodan(shodan_api_key)
+    vulns = []
+
+    try:
+        results = api.search(keyword)
+        for result in results['matches']:
+            for vuln in result.get('vulns', []):
+                vulns.append(Vulnerability(
+                    CVEID=vuln,
+                    description=result['vulns'][vuln].get('summary', 'No description available'),
+                    severity='N/A',
+                    severity_score='N/A',
+                    details_url=f"https://www.shodan.io/search?query={vuln}",
+                    exploitability='N/A'
+                ))
+    except shodan.APIError as e:
+        log.logger("error", f"Shodan API error: {e}")
+
+    return vulns
 
 def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
