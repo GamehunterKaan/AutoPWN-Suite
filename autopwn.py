@@ -21,7 +21,7 @@ from modules.web.webvuln import webvuln
 
 
 def StartScanning(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, log, exploit, max_exploits=10, web_search=False
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, log, exploit, max_exploits=10
 ) -> None:
 
     check_nmap(log)
@@ -36,7 +36,7 @@ def StartScanning(
         Targets = [targetarg]
 
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
-    ScanWeb = args.web or WebScan()
+    ScanWeb = WebScan()
 
     all_vulnerabilities = []
 
@@ -107,7 +107,7 @@ def main() -> None:
 
     ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, api_keys_used, console, log)
 
-    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, console, log, args.exploit, max_exploits=args.max_exploits, web_search=args.web)
+    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, console, log, args.exploit)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
