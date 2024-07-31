@@ -148,7 +148,12 @@ def SearchSploits(HostArray: list, log, console, apiKey=None, max_exploits: int 
                 + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
             )
 
-            VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)
+            VulnObject = VulnerableSoftware(
+                title=keyword,
+                CVEs=CVEs,
+                severity_score=CVE.severity_score,
+                exploitability=CVE.exploitability
+            )
             VulnsArray.append(VulnObject)
             console.print("└" + "─" * (term_width - 1))
 
