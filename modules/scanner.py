@@ -48,7 +48,7 @@ def ShodanScan(target, shodan_api_key, log) -> dict:
         log.logger("info", f"Shodan scan successful for {target}")
         return host_info
     except shodan.APIError as e:
-        log.logger("error", f"Shodan scan failed for {target}: {e}")
+        log.logger("error", f"Shodan scan failed for {target}: {e} (The Target Doesnt Exist in Shodan)")
         return {}
 
 
