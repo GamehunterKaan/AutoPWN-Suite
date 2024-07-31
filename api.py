@@ -107,6 +107,9 @@ class AutoScanner:
             print(f"Searching Shodan for keyword {keyword} ...")
 
         shodan_vulns = searchShodan(keyword, log, shodan_api_key)
+        zoomeye_vulns = []
+        if zoomeye_api_key:
+            zoomeye_vulns = GetZoomEyeVulns(port_key["host"], zoomeye_api_key, self.log)
         return shodan_vulns
 
     def SearchVuln(
