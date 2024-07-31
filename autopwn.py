@@ -36,7 +36,7 @@ def StartScanning(
         Targets = [targetarg]
 
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
-    ScanWeb = WebScan()
+    ScanWeb = args.web or WebScan()
 
     all_vulnerabilities = []
 
