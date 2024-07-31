@@ -163,13 +163,29 @@ class AutoScanner:
                 print(f"Scanning {host} ...")
 
             nm.scan(hosts=host, arguments=scan_arguments)
+            shodan_ports = {}
+            if shodan_api_key:
+                shodan_results = self.SearchShodan(host, "", shodan_api_key, debug)
+                for result in shodan_results:
+                    shodan_ports[result.CVEID] = {
+                        "product": result.title,
+                        "version": "",
+                        "name": result.CVEID,
+                        "state": "open",
+                        "reason": "shodan",
+                        "conf": "10",
+                        "extrainfo": "",
+                        "cpe": "",
+                    }
+
             try:
-                port_scan = nm[host]["tcp"]
+                nmap_ports = nm[host]["tcp"]
             except KeyError:
-                pass
-            else:
-                self.scan_results[host] = {}
-                self.scan_results[host]["ports"] = port_scan
+                nmap_ports = {}
+
+            combined_ports = {**shodan_ports, **nmap_ports}
+            self.scan_results[host] = {}
+            self.scan_results[host]["ports"] = combined_ports
 
             if os_scan and is_root():
                 os_info = self.InitHostInfo(nm[host])
