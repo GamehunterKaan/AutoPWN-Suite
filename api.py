@@ -1,5 +1,7 @@
 from json import dumps
 from typing import Any, Dict, List, Type, Union
+import re
+import socket
 
 from nmap import PortScanner
 
@@ -117,7 +119,24 @@ class AutoScanner:
         zoomeye_vulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
         return zoomeye_vulns
 
-    def SearchVuln(
+    def HostCrawler(self, target: str, debug: bool = False) -> List[str]:
+        log = fake_logger()
+        if debug:
+            print(f"Crawling for hostnames in {target} ...")
+
+        try:
+            ip = socket.gethostbyname(target)
+            hostnames = [target]
+            for i in range(1, 256):
+                try:
+                    hostname = socket.gethostbyaddr(f"{ip.rsplit('.', 1)[0]}.{i}")[0]
+                    if hostname not in hostnames:
+                        hostnames.append(hostname)
+                except socket.herror:
+                    continue
+            return hostnames
+        except socket.gaierror:
+            return []
         self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False
     ) -> JSON:
         product = port_key.get("product", "")
@@ -159,6 +178,7 @@ class AutoScanner:
         os_scan: bool = False,
         scan_vulns: bool = True,
         nmap_args=None,
+        auto_scan_hostnames: bool = False,
         debug: bool = False,
     ) -> JSON:
         if type(target) == str:
@@ -168,6 +188,10 @@ class AutoScanner:
         nm = PortScanner()
         scan_arguments = self.CreateScanArgs(host_timeout, scan_speed, os_scan, nmap_args)
         for host in target:
+            if auto_scan_hostnames:
+                additional_hosts = self.HostCrawler(host, debug)
+                target.extend(additional_hosts)
+
             if debug:
                 print(f"Scanning {host} ...")
 
