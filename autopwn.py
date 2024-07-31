@@ -1,4 +1,5 @@
 from datetime import datetime
+import requests
 
 from rich.console import Console
 
@@ -9,6 +10,7 @@ from modules.report import InitializeReport
 from modules.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan
 from modules.searchvuln import SearchSploits
 from modules.utils import (
+    GetShodanVulns,
     GetHostsToScan,
     InitArgsAPI,
     InitArgsConf,
@@ -55,6 +57,9 @@ def StartScanning(
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
             if ScanVulns and len(PortArray) > 0:
                 VulnsArray = SearchSploits(PortArray, log, console, console2, apiKey)
+                if shodan_api_key:
+                    ShodanVulns = GetShodanVulns(host, shodan_api_key, log)
+                    VulnsArray.extend(ShodanVulns)
                 if DownloadExploits and len(VulnsArray) > 0:
                     GetExploitsFromArray(VulnsArray, log, console, console2, host)
 
