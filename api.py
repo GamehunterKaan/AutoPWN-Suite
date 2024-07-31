@@ -126,9 +126,9 @@ class AutoScanner:
         Vulnerablities = searchCVE(keyword, log, vuln_api_key)
         shodan_vulns = searchShodan(keyword, log, shodan_api_key)
         vulns = {}
-        if len(Vulnerablities) == 0 and len(shodan_vulns) == 0:
+        if len(Vulnerablities) == 0 and len(shodan_vulns) == 0 and len(zoomeye_vulns) == 0:
             return
-        for vuln in Vulnerablities + shodan_vulns:
+        for vuln in Vulnerablities + shodan_vulns + zoomeye_vulns:
             vulns[vuln.CVEID] = self.ParseVulnInfo(vuln)
 
         return vulns
