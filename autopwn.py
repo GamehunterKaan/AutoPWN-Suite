@@ -40,6 +40,8 @@ def StartScanning(
     ScanWeb = WebScan()
 
 
+    all_vulnerabilities = []
+
     for host in Targets:
         if ScanPorts:
             PortScanResults = PortScan(
@@ -56,9 +58,11 @@ def StartScanning(
                     VulnsArray.extend(ZoomEyeVulns)
                 if DownloadExploits and len(VulnsArray) > 0:
                     GetExploitsFromArray(VulnsArray, log, console, console2, host)
-                    exploit_vulnerabilities(VulnsArray, host, log)
 
-        if ScanWeb:
+    if all_vulnerabilities:
+        exploit_vulnerabilities(all_vulnerabilities, targetarg, log)
+
+    if ScanWeb:
             webvuln(host, log, console)
 
 
