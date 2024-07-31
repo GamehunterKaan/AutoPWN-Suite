@@ -66,7 +66,7 @@ def StartScanning(
     if len(all_vulnerabilities) > 0:
         GetExploitsFromArray(all_vulnerabilities, log, console, max_exploits=max_exploits)
         if exploit:
-            exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console)
+            exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console, max_exploits=max_exploits)
             
     if ScanWeb:
             webvuln(host, log, console)

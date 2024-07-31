@@ -240,7 +240,7 @@ class AutoScanner:
         if all_vulnerabilities:
             GetExploitsFromArray(all_vulnerabilities, log, console, max_exploits=max_exploits)
             if scan_vulns:
-                exploit_vulnerabilities(all_vulnerabilities, target, log, console)
+                exploit_vulnerabilities(all_vulnerabilities, target, log, console, max_exploits=max_exploits)
 
         return self.scan_results
         if type(target) == str:
