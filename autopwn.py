@@ -1,10 +1,10 @@
 from datetime import datetime
 
-import requests
 from rich.console import Console
 
 from modules.banners import print_banner
-from modules.exploit import exploit_vulnerabilities
+from modules.exploit import (exploit_vulnerabilities, metasploitSearch,
+                             search_exploits)
 from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
 from modules.report import InitializeReport
@@ -47,16 +47,17 @@ def StartScanning(
             PortScanResults = PortScan(
                 host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags, shodan_api_key
             )
-            #print("PortScanResults: ", PortScanResults)
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
-            #print("PortArray: ", PortArray)
-            #print("ScanVulns: ", ScanVulns)
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = []
-            
-            sploits = SearchSploits(PortArray, log, console, apiKey)
-            VulnsArray.extend(sploits)
-            #print("VulnsArray: ", VulnsArray)
+            if args.metasploit_scan:
+                metasploit_vulns = []
+                for port in PortArray:
+                    metasploit_vulns.extend(metasploitSearch(port[3]))
+                VulnsArray.extend(metasploit_vulns)
+            else:
+                sploits = SearchSploits(PortArray, log, console, apiKey)
+                VulnsArray.extend(sploits)
             if shodan_api_key:
                 ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
                 for port in ShodanPorts:
@@ -68,14 +69,13 @@ def StartScanning(
             if DownloadExploits and len(VulnsArray) > 0:
                 all_vulnerabilities.extend(VulnsArray)
     
-    #print("All vulnerabilities: ", all_vulnerabilities)
-
     if len(all_vulnerabilities) > 0:
         GetExploitsFromArray(all_vulnerabilities, log, console, console, max_exploits=max_exploits)
         if exploit:
             exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console, max_exploits=max_exploits)
             
     if ScanWeb:
+        for host in Targets:
             webvuln(host, log, console)
 
     console.print(
@@ -83,7 +83,6 @@ def StartScanning(
             time=datetime.now().strftime("%b %d %Y %H:%M:%S")
         )
     )
-
 
 def main() -> None:
     __author__ = "GamehunterKaan"
@@ -118,7 +117,6 @@ def main() -> None:
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
-
 
 if __name__ == "__main__":
     try:
