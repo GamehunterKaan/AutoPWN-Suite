@@ -36,6 +36,8 @@ def StartScanning(
         Targets = [targetarg]
 
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
+    if args.metasploit_scan:
+        log.logger("info", "Metasploit scan enabled.")
     ScanWeb = args.web or WebScan()
 
     all_vulnerabilities = []
