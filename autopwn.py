@@ -16,8 +16,7 @@ from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
                            InitArgsScanType, InitArgsTarget, InitAutomation,
                            InitReport, ParamPrint, SaveOutput, ScanMode,
                            UserConfirmation, WebScan, check_nmap,
-                           check_version, cli, resolve_hostnames_to_ips,
-                           DontAskForConfirmation)
+                           check_version, cli, resolve_hostnames_to_ips)
 from modules.web.webvuln import webvuln
 
 
@@ -61,7 +60,7 @@ def StartScanning(
 
     if all_vulnerabilities:
         GetExploitsFromArray(all_vulnerabilities, log, console)
-        if DontAskForConfirmation or exploit:
+        if exploit:
             exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console)
 
     if ScanWeb:
