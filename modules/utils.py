@@ -37,7 +37,10 @@ class ScanType(Enum):
     ARP = 1
 
 
+import argparse
+
 def cli():
+    scanargs = argparse.ArgumentParser(description="AutoPWN Suite")
     argparser = ArgumentParser(
         description="AutoPWN Suite | A project for scanning "
         + "vulnerabilities and exploiting systems automatically."
