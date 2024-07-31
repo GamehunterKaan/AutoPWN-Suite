@@ -932,3 +932,15 @@ def check_version(cur_version: str, log) -> None:
                 "warning",
                 "Your version of AutoPWN Suite is outdated. Update is advised.",
             )
+def GetShodanVulns(host, shodan_api_key, log):
+    url = f"https://api.shodan.io/shodan/host/{host}?key={shodan_api_key}"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        vulns = data.get("vulns", [])
+        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from Shodan.")
+        return vulns
+    except requests.RequestException as e:
+        log.logger("ERROR", f"Error fetching Shodan vulnerabilities: {e}")
+        return []
