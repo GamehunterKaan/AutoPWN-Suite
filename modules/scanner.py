@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import shodan
 from enum import Enum
 from multiprocessing import Process
 from time import sleep
@@ -40,7 +41,15 @@ class TargetInfo:
         )
 
 
-# do a ping scan using nmap
+def ShodanScan(target, shodan_api_key, log) -> dict:
+    api = shodan.Shodan(shodan_api_key)
+    try:
+        host_info = api.host(target)
+        log.logger("info", f"Shodan scan successful for {target}")
+        return host_info
+    except shodan.APIError as e:
+        log.logger("error", f"Shodan scan failed for {target}: {e}")
+        return {}
 def TestPing(target, mode=ScanMode.Normal) -> list:
     nm = PortScanner()
     if isinstance(target, list):
@@ -48,6 +57,9 @@ def TestPing(target, mode=ScanMode.Normal) -> list:
     if mode == ScanMode.Evade and is_root():
         nm.scan(hosts=target, arguments="-sn -T 2 -f -g 53 --data-length 10")
     else:
+        if shodan_api_key and shodan_results:
+            for vuln in shodan_results.get('vulns', []):
+                log.logger("info", f"Vulnerability found: {vuln}")
         nm.scan(hosts=target, arguments="-sn")
 
     return nm.all_hosts()
@@ -68,6 +80,19 @@ def TestArp(target, mode=ScanMode.Normal) -> list:
 
 # run a port scan on target using nmap
 def PortScan(
+    target,
+    log,
+    scanspeed=5,
+    host_timeout=240,
+    mode=ScanMode.Normal,
+    customflags="",
+    shodan_api_key=None,
+) -> PortScanner:
+
+    if shodan_api_key:
+        shodan_results = ShodanScan(target, shodan_api_key, log)
+        if shodan_results:
+            log.logger("info", f"Shodan results for {target}: {shodan_results}")
     target,
     log,
     scanspeed=5,
