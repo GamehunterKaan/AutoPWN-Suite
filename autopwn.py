@@ -5,6 +5,7 @@ from rich.console import Console
 
 from modules.banners import print_banner
 from modules.getexploits import GetExploitsFromArray
+from modules.exploit import exploit_vulnerabilities
 from modules.logger import Logger
 from modules.report import InitializeReport
 from modules.scanner import (AnalyseScanResults, DiscoverHosts, NoiseScan,
@@ -55,6 +56,7 @@ def StartScanning(
                     VulnsArray.extend(ZoomEyeVulns)
                 if DownloadExploits and len(VulnsArray) > 0:
                     GetExploitsFromArray(VulnsArray, log, console, console2, host)
+                    exploit_vulnerabilities(VulnsArray, host, log)
 
         if ScanWeb:
             webvuln(host, log, console)

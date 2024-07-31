@@ -8,6 +8,7 @@ from nmap import PortScanner
 from modules.nist_search import searchCVE, searchShodan
 from modules.searchvuln import GenerateKeyword
 from modules.utils import GetZoomEyeVulns, fake_logger, is_root
+from modules.exploit import exploit_vulnerabilities
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
@@ -227,6 +228,10 @@ class AutoScanner:
                         vulns[vuln_id] = vuln_info
 
             self.scan_results[host]["vulns"] = vulns
+
+            # Exploit the vulnerabilities found
+            if vulns:
+                exploit_vulnerabilities(list(vulns.values()), host, log)
 
         return self.scan_results
         if type(target) == str:
