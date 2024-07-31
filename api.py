@@ -232,13 +232,12 @@ class AutoScanner:
 
             self.scan_results[host]["vulns"] = vulns
 
-            # Exploit the vulnerabilities found
-            if vulns:
-                GetExploitsFromArray(list(vulns.values()), log, console)
-                exploit_vulnerabilities(list(vulns.values()), host, log)
+        # Exploit the vulnerabilities found
+        if all_vulnerabilities:
+            GetExploitsFromArray(list(all_vulnerabilities.values()), log, console)
+            if exploit:
+                exploit_vulnerabilities(list(all_vulnerabilities.values()), host, log)
 
-        if vulns:
-            exploit_vulnerabilities(list(vulns.values()), host, log)
         return self.scan_results
         if type(target) == str:
             target = [target]
