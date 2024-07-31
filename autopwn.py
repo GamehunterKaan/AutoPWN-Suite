@@ -60,9 +60,8 @@ def StartScanning(
 
     if all_vulnerabilities:
         GetExploitsFromArray(all_vulnerabilities, log, console)
-        if exploit:
-            if exploit:
-                exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console)
+        if DontAskForConfirmation or exploit:
+            exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console)
 
     if ScanWeb:
             webvuln(host, log, console)
