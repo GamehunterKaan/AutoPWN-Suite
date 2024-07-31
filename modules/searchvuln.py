@@ -82,10 +82,10 @@ def GenerateKeywords(HostArray: list) -> list:
     return keywords
 
 
-def SearchKeyword(keyword: str, log, apiKey=None) -> list:
+def SearchKeyword(keyword: str, log, apiKey=None, max_exploits: int = 10) -> list:
 
     try:
-        ApiResponseCVE = searchCVE(keyword, log, apiKey)
+        ApiResponseCVE = searchCVE(keyword, log, apiKey, max_exploits)
         log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
         log.logger("error", e)
@@ -95,7 +95,7 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
+def SearchSploits(HostArray: list, log, console, apiKey=None, max_exploits: int = 10) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
@@ -119,7 +119,7 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
             f"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] [white]...[/white]",
             spinner="bouncingBar"
         ) as status:
-            ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+            ApiResponseCVE = SearchKeyword(keyword, log, apiKey, max_exploits)
             sleep(1)  # Adding a delay to ensure proper logging and searching
         if len(ApiResponseCVE) == 0:
             continue

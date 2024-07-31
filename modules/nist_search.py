@@ -75,7 +75,7 @@ def searchShodan(keyword: str, log, shodan_api_key: str) -> list[Vulnerability]:
 
     return vulns
 
-def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
+def searchCVE(keyword: str, log, apiKey=None, max_exploits: int = 10) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     # https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=OpenSSH+8.8
     if apiKey:
