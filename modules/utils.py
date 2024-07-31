@@ -17,6 +17,7 @@ from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
 from platform import platform
 
+import requests
 from requests import get
 from rich.text import Text
 
