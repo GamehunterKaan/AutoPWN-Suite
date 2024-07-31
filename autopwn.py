@@ -16,6 +16,7 @@ from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
                            InitReport, ParamPrint, SaveOutput, ScanMode,
                            UserConfirmation, WebScan, check_nmap,
                            check_version, cli, resolve_hostnames_to_ips)
+from modules.scanner import ShodanScan, display_shodan_results
 from modules.web.webvuln import webvuln
 
 
