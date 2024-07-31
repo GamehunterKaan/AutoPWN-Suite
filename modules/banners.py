@@ -27,7 +27,6 @@ ___           __          ____  _       __ _   __   _____         _  __
         banner = banner_small
         height = 5
 
-    api_keys_info = f"API Keys Used: {api_keys_used}/3"
     panel = Panel(
         Align(
             Text(banner, justify="center", style="blue"),
@@ -36,6 +35,6 @@ ___           __          ____  _       __ _   __   _____         _  __
         ),
         width=width,
         height=height,
-        subtitle=f"by GamehunterKaan + Overtime (https://auto.pwnspot.com) | {api_keys_info}",
+        subtitle=f"by GamehunterKaan + Overtime (https://auto.pwnspot.com)",
     )
     console.print(panel)
