@@ -124,11 +124,12 @@ class AutoScanner:
             print(f"Searching for keyword {keyword} ...")
 
         Vulnerablities = searchCVE(keyword, log, vuln_api_key)
+        vulns = {}
         if shodan_api_key:
             shodan_vulns = self.SearchShodan(product, version, shodan_api_key, debug)
             for shodan_vuln in shodan_vulns:
                 vulns[shodan_vuln.CVEID] = self.ParseVulnInfo(shodan_vuln)
-        if len(Vulnerablities) == 0:
+        if len(Vulnerablities) == 0 and len(vulns) == 0:
             return
 
         vulns = {}
