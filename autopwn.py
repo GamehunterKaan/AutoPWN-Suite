@@ -11,7 +11,7 @@ from modules.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortSc
 from modules.searchvuln import SearchSploits
 from modules.utils import (
     GetShodanVulns,
-    GetHostsToScan,
+    GetHostsToScan, GetZoomEyeVulns,
     InitArgsAPI,
     InitArgsConf,
     InitArgsMode,
