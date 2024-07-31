@@ -146,7 +146,7 @@ def PortScan(
     except Exception as e:
         raise SystemExit(f"Error: {e}")
     if shodan_api_key:
-        shodan_results = ShodanScan(target, shodan_api_key, log, collect_hostnames=True)
+        shodan_results = ShodanScan(target, shodan_api_key, log)
         if shodan_results:
             display_shodan_results(shodan_results)
             #log.logger("info", f"Shodan results for {target}: {shodan_results}")
