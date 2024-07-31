@@ -272,7 +272,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     if is_root():
         if nm[target]["status"]["reason"] in ["localhost-response", "user-set"]:
             log.logger("info", f"Target {target} seems to be us.")
-    elif GetIpAddress() == target:
+    elif GetIpAdress() == target:
         log.logger("info", f"Target {target} seems to be us.")
 
     if len(nm[target].all_tcp()) == 0:
