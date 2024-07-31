@@ -42,7 +42,14 @@ def cli():
         description="AutoPWN Suite | A project for scanning "
         + "vulnerabilities and exploiting systems automatically."
     )
-    scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
+    scanargs.add_argument(
+        "-me",
+        "--max-exploits",
+        help="Maximum number of exploits to display per service. Set to 0 to display all.",
+        default=10,
+        type=int,
+        required=False,
+    )
     scanargs.add_argument(
         "-e",
         "--exploit",
