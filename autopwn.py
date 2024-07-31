@@ -50,7 +50,11 @@ def StartScanning(
                 hostnames = shodan_results.get('hostnames', [])
                 all_hostnames.extend(hostnames)
                 additional_ips = resolve_hostnames_to_ips(hostnames, log)
-                all_ips.extend(additional_ips)
+                for ip in additional_ips:
+                    if ip != host:
+                        all_ips.append(ip)
+                    else:
+                        log.logger("info", f"Skipping IP {ip} as it is the same as the target IP {host}")
         if ScanPorts:
             PortScanResults = PortScan(
                 host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags, shodan_api_key
