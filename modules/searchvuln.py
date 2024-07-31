@@ -124,19 +124,6 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
         if len(ApiResponseCVE) == 0:
             continue
 
-        # Search for Metasploit exploits
-        metasploit_exploits = search_exploits({"CVEID": keyword}, log)
-        for exploit in metasploit_exploits:
-            ApiResponseCVE.append(Vulnerability(
-                title=keyword,
-                CVEID=exploit,
-                description="Metasploit exploit",
-                severity="N/A",
-                severity_score=0.0,
-                details_url=f"https://www.rapid7.com/db/modules/{exploit}",
-                exploitability=0.0
-            ))
-
             if not printed_banner:
                 banner(f"Possible vulnerabilities for {target}", "red", console)
                 printed_banner = True
@@ -161,5 +148,18 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
             VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)
             VulnsArray.append(VulnObject)
             console.print("└" + "─" * (term_width - 1))
+
+        # Search for Metasploit exploits
+        metasploit_exploits = search_exploits({"CVEID": keyword}, log)
+        for exploit in metasploit_exploits:
+            ApiResponseCVE.append(Vulnerability(
+                title=keyword,
+                CVEID=exploit,
+                description="Metasploit exploit",
+                severity="N/A",
+                severity_score=0.0,
+                details_url=f"https://www.rapid7.com/db/modules/{exploit}",
+                exploitability=0.0
+            ))
 
     return VulnsArray
