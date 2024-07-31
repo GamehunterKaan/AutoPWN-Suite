@@ -945,6 +945,20 @@ def check_version(cur_version: str, log) -> None:
                 "warning",
                 "Your version of AutoPWN Suite is outdated. Update is advised.",
             )
+def GetZoomEyeVulns(host, zoomeye_api_key, log):
+    url = f"https://api.zoomeye.org/host/search?query=ip:{host}"
+    headers = {"API-KEY": zoomeye_api_key}
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        vulns = data.get("matches", [])
+        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from ZoomEye.")
+        return vulns
+    except requests.RequestException as e:
+        log.logger("ERROR", f"Error fetching ZoomEye vulnerabilities: {e}")
+        return []
+
 def GetShodanVulns(host, shodan_api_key, log):
     url = f"https://api.shodan.io/shodan/host/{host}?key={shodan_api_key}"
     try:
