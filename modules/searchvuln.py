@@ -20,13 +20,6 @@ class VulnerableSoftware:
 
 def GenerateKeywordList(product: str, version: str) -> list:
     # Example of creating a VulnerableSoftware instance with severity_score
-    example_vuln = VulnerableSoftware(
-        product=product,
-        version=version,
-        description="Example vulnerability",
-        severity_score=5.0,
-        exploitability=2.5
-    )
     if product == "Unknown":
         product = ""
 
