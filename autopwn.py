@@ -49,17 +49,17 @@ def StartScanning(
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
             print("PortArray: ", PortArray)
             print("ScanVulns: ", ScanVulns)
-            if ScanVulns and PortArray and len(PortArray) > 0:
-                VulnsArray = SearchSploits(PortArray, log, console, apiKey)
-                print("VulnsArray: ", VulnsArray)
-                if shodan_api_key:
-                    ShodanVulns = GetShodanVulns(host, shodan_api_key, log)
-                    VulnsArray.extend(ShodanVulns)
-                if zoomeye_api_key:
-                    ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
-                    VulnsArray.extend(ZoomEyeVulns)
-                if DownloadExploits and len(VulnsArray) > 0:
-                    all_vulnerabilities.extend(VulnsArray)
+        if ScanVulns and PortArray and len(PortArray) > 0:
+            VulnsArray = SearchSploits(PortArray, log, console, apiKey)
+            print("VulnsArray: ", VulnsArray)
+            if shodan_api_key:
+                ShodanVulns = GetShodanVulns(host, shodan_api_key, log)
+                VulnsArray.extend(ShodanVulns)
+            if zoomeye_api_key:
+                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
+                VulnsArray.extend(ZoomEyeVulns)
+            if DownloadExploits and len(VulnsArray) > 0:
+                all_vulnerabilities.extend(VulnsArray)
     
     print("All vulnerabilities: ", all_vulnerabilities)
 
