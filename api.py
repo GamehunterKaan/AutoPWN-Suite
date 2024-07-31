@@ -173,6 +173,8 @@ class AutoScanner:
         log = fake_logger()
         nm = PortScanner()
         scan_arguments = self.CreateScanArgs(host_timeout, scan_speed, os_scan, nmap_args)
+        all_vulnerabilities = []
+        all_vulnerabilities = []
         for host in target:
 
             if debug:
@@ -232,11 +234,12 @@ class AutoScanner:
 
             self.scan_results[host]["vulns"] = vulns
 
+
         # Exploit the vulnerabilities found
         if all_vulnerabilities:
-            GetExploitsFromArray(list(all_vulnerabilities.values()), log, console)
-            if exploit:
-                exploit_vulnerabilities(list(all_vulnerabilities.values()), host, log)
+            GetExploitsFromArray(all_vulnerabilities, log, console)
+            if scan_vulns:
+                exploit_vulnerabilities(all_vulnerabilities, target, log, console)
 
         return self.scan_results
         if type(target) == str:
