@@ -106,13 +106,12 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
         "[white]Searching vulnerabilities ...[/white]", spinner="bouncingBar"
     ) as status:
         for keyword in keywords:
-            status.start()
-            status.update(
-                "[white]Searching vulnerability database for[/white] "
-                + f"[red]{keyword}[/red] [white]...[/white]"
-            )
-            ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
-            status.stop()
+            with console2.status(
+                f"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] [white]...[/white]",
+                spinner="bouncingBar"
+            ) as status:
+                ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+                sleep(1)  # Adding a delay to ensure proper logging and searching
             if len(ApiResponseCVE) == 0:
                 continue
 
