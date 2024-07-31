@@ -323,7 +323,7 @@ def InitPortInfo(port) -> tuple:
     return state, service, product, version
 
 
-def AnalyseScanResults(nm, log, console, target=None) -> list:
+def AnalyseScanResults(nm, log, console, target=None, console2=None) -> list:
     HostArray = []
     if target is None:
         target = nm.all_hosts()[0]
@@ -370,5 +370,5 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
 
     if HostArray:
         log.logger("info", f"Exploiting vulnerabilities for {target}")
-        exploit_vulnerabilities(HostArray, target, log)
+        exploit_vulnerabilities(HostArray, target, log, console2)
     return HostArray
