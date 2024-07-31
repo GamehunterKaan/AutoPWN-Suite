@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import socket
+from dataclasses import dataclass
 from enum import Enum
 from multiprocessing import Process
 from time import sleep
@@ -166,7 +166,7 @@ def PortScan(
     if shodan_api_key:
         shodan_results = ShodanScan(target, shodan_api_key, log, collect_hostnames=True)
         if shodan_results:
-            display_shodan_results(shodan_results)
+            #display_shodan_results(shodan_results)
             hostnames = shodan_results.get('hostnames', [])
             additional_ips = resolve_hostnames_to_ips(hostnames, log)
             for ip in additional_ips:
