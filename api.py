@@ -165,6 +165,7 @@ class AutoScanner:
         scan_vulns: bool = True,
         nmap_args=None,
         debug: bool = False,
+        console = None,
     ) -> JSON:
         if type(target) == str:
             target = [target]
