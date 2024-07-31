@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import socket
 from enum import Enum
 from multiprocessing import Process
 from time import sleep
@@ -41,11 +42,19 @@ class TargetInfo:
         )
 
 
-def ShodanScan(target, shodan_api_key, log) -> dict:
+def ShodanScan(target, shodan_api_key, log, collect_hostnames=False) -> dict:
     api = shodan.Shodan(shodan_api_key)
     try:
         host_info = api.host(target)
         log.logger("info", f"Shodan scan successful for {target}")
+        if collect_hostnames:
+            hostnames = host_info.get('hostnames', [])
+            for hostname in hostnames:
+                try:
+                    ip = socket.gethostbyname(hostname)
+                    log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
+                except socket.gaierror:
+                    log.logger("error", f"Failed to resolve hostname {hostname}")
         return host_info
     except shodan.APIError as e:
         log.logger("error", f"Shodan scan failed for {target}: {e} (The Target Doesnt Exist in Shodan)")
@@ -73,6 +82,17 @@ def TestArp(target, mode=ScanMode.Normal) -> list:
         nm.scan(hosts=target, arguments="-sn -PR")
     return nm.all_hosts()
 
+
+def resolve_hostnames_to_ips(hostnames, log):
+    ips = []
+    for hostname in hostnames:
+        try:
+            ip = socket.gethostbyname(hostname)
+            ips.append(ip)
+            log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
+        except socket.gaierror:
+            log.logger("error", f"Failed to resolve hostname {hostname}")
+    return ips
 
 def PortScan(
     target,
@@ -144,7 +164,26 @@ def PortScan(
     except Exception as e:
         raise SystemExit(f"Error: {e}")
     if shodan_api_key:
-        shodan_results = ShodanScan(target, shodan_api_key, log)
+        shodan_results = ShodanScan(target, shodan_api_key, log, collect_hostnames=True)
+        if shodan_results:
+            display_shodan_results(shodan_results)
+            hostnames = shodan_results.get('hostnames', [])
+            additional_ips = resolve_hostnames_to_ips(hostnames, log)
+            for ip in additional_ips:
+                nm.scan(hosts=ip, arguments=" ".join(
+                    [
+                        "-sS",
+                        "-sV",
+                        "--host-timeout",
+                        str(host_timeout),
+                        "-Pn",
+                        "-O",
+                        "-T",
+                        str(scanspeed),
+                        customflags,
+                    ]
+                ))
+                log.logger("info", f"Scanned additional IP {ip} from hostname resolution")
         if shodan_results:
             display_shodan_results(shodan_results)
             #log.logger("info", f"Shodan results for {target}: {shodan_results}")
