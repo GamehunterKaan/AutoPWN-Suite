@@ -58,14 +58,15 @@ def StartScanning(
                 if DownloadExploits and len(VulnsArray) > 0:
                     all_vulnerabilities.extend(VulnsArray)
 
-    if all_vulnerabilities:
-        GetExploitsFromArray(all_vulnerabilities, log, console)
-        if exploit:
-            exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console)
 
     if ScanWeb:
             webvuln(host, log, console)
 
+
+    if all_vulnerabilities:
+        GetExploitsFromArray(all_vulnerabilities, log, console)
+        if exploit:
+            exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console)
 
     console.print(
         "{time} - Scan completed.".format(
