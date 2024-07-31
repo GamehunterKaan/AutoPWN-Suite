@@ -53,7 +53,9 @@ def StartScanning(
             VulnsArray = SearchSploits(PortArray, log, console, apiKey)
             #print("VulnsArray: ", VulnsArray)
             if shodan_api_key:
-                ShodanVulns = GetShodanVulns(host, shodan_api_key, log)
+                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
+                for port in ShodanPorts:
+                    PortArray.append((host, port, "tcp", "shodan", ""))
                 VulnsArray.extend(ShodanVulns)
             if zoomeye_api_key:
                 ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
