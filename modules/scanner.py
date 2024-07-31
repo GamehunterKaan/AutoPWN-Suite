@@ -93,6 +93,12 @@ def PortScan(
     mode=ScanMode.Normal,
     customflags="",
     shodan_api_key=None,
+    log,
+    scanspeed=5,
+    host_timeout=240,
+    mode=ScanMode.Normal,
+    customflags="",
+    shodan_api_key=None,
 ) -> PortScanner:
 
     if shodan_api_key:
