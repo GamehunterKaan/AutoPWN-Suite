@@ -54,6 +54,15 @@ You can clone the repo. (This is the recommended installation method as other me
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
 sudo pip install -r requirements.txt
+# Ensure you have the following additional dependencies installed:
+# - pymetasploit3
+# - shodan
+# - zoomeye
+# - rich
+# - requests
+# - nmap
+# - bs4
+# - distro
 ```
 
 OR
@@ -109,8 +118,8 @@ Help Menu
 ```console
 $ autopwn-suite -h
 
-usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-vuln API] [-w] [-shodan API] [--metasploit-scan] [-m {evade,noise,normal}] [-nt TIMEOUT]
-                  [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK]
+usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-vuln API] [-w] [-shodan API] [-zoomeye API] [--metasploit-scan] [-m {evade,noise,normal}] [-nt TIMEOUT]
+                  [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK] [-me MAX_EXPLOITS] [-e]
 
 AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.
 
@@ -139,7 +148,14 @@ Scanning:
                         Scan speed. (Default : 3)
   -ht HOST_TIMEOUT, --host-timeout HOST_TIMEOUT
                         Timeout for every host. (Default :240)
-  -vuln API, --vuln-api API     Specify API key for vulnerability detection for faster scanning. (Default : None)
+  -vuln API, --vuln-api API     Specify API key for vulnerability detection for faster scanning. (Default: None)
+  -w, --web                     Enable web search for the target.
+  -shodan API, --shodan-api API Specify Shodan API key for additional scanning capabilities. (Default: None)
+  -zoomeye API, --zoomeye-api API Specify ZoomEye API key for additional scanning capabilities. (Default: None)
+  --metasploit-scan             Enable Metasploit scan for the target.
+  -me MAX_EXPLOITS, --max-exploits MAX_EXPLOITS
+                                Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)
+  -e, --exploit                 Exploit the target after vulnerabilities have been checked and downloaded.
   -w, --web             Enable web search for the target.
   -shodan API, --shodan-api API Specify Shodan API key for additional scanning capabilities. (Default: None)
   --metasploit-scan     Enable Metasploit scan for the target.
