@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from textwrap import wrap
 
 from modules.logger import banner
-from modules.nist_search import searchCVE
+from modules.nist_search import searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
 from rich.progress_bar import ProgressBar
 
