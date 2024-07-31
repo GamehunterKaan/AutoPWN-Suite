@@ -37,7 +37,10 @@ def StartScanning(
 
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
     ScanWeb = WebScan()
-
+    
+    print("ScanPorts: ", ScanPorts)
+    print("ScanVulns: ", ScanVulns)
+    print("DownloadExploits: ", DownloadExploits)
 
     all_vulnerabilities = []
 
@@ -57,6 +60,8 @@ def StartScanning(
                     VulnsArray.extend(ZoomEyeVulns)
                 if DownloadExploits and len(VulnsArray) > 0:
                     all_vulnerabilities.extend(VulnsArray)
+    
+    print("All vulnerabilities: ", all_vulnerabilities)
 
     if len(all_vulnerabilities) > 0:
         GetExploitsFromArray(all_vulnerabilities, log, console)
