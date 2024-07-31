@@ -162,4 +162,11 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
                 exploitability=0.0
             ))
 
+    # Sort vulnerabilities by severity and exploitability
+    VulnsArray.sort(key=lambda x: (x.severity_score, x.exploitability), reverse=True)
+    
+    # Limit the number of vulnerabilities if max_exploits is set
+    if max_exploits > 0:
+        VulnsArray = VulnsArray[:max_exploits]
+    
     return VulnsArray
