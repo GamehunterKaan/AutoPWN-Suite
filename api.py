@@ -144,6 +144,7 @@ class AutoScanner:
         scan_speed: int = None,
         vuln_api_key: str = None,
         shodan_api_key: str = None,
+        zoomeye_api_key: str = None,
         os_scan: bool = False,
         scan_vulns: bool = True,
         nmap_args=None,
@@ -154,9 +155,7 @@ class AutoScanner:
 
         log = fake_logger()
         nm = PortScanner()
-        scan_arguments = self.CreateScanArgs(
-            host_timeout, scan_speed, os_scan, nmap_args
-        )
+        scan_arguments = self.CreateScanArgs(host_timeout, scan_speed, os_scan, nmap_args)
         for host in target:
             if debug:
                 print(f"Scanning {host} ...")
