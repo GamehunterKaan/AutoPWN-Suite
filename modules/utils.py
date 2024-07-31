@@ -903,6 +903,7 @@ def ParamPrint(
     if args.report:
         msg += f"│\tReporting method : {args.report}\n"
 
+    msg += f"│\tExploit : {args.exploit}\n"
     msg += "└" + "─" * (term_width - 1)
 
     console.print(msg)
