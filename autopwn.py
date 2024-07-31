@@ -30,7 +30,7 @@ from modules.web.webvuln import webvuln
 
 
 def StartScanning(
-    args, targetarg, scantype, scanmode, apiKey, console, console2, log
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, console, console2, log
 ) -> None:
 
     check_nmap(log)
@@ -50,7 +50,7 @@ def StartScanning(
     for host in Targets:
         if ScanPorts:
             PortScanResults = PortScan(
-                host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags
+                host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags, shodan_api_key
             )
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
             if ScanVulns and len(PortArray) > 0:
