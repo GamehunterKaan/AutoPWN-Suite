@@ -62,9 +62,9 @@ def StartScanning(
                             severity_score=vuln['severity_score'],
                             exploitability=vuln['exploitability']
                         )
-                        all_vulnerabilities.append(vuln_obj)
                     else:
                         log.logger("warning", f"Vulnerability data missing 'title' key: {vuln}")
+                    all_vulnerabilities.append(vuln_obj)
             else:
                 sploits = SearchSploits(PortArray, log, console, apiKey)
                 for sploit in sploits:
