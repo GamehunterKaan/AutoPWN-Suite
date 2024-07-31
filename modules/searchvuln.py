@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from time import sleep
 from textwrap import wrap
 
 from modules.logger import banner

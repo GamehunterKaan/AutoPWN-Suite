@@ -60,7 +60,7 @@ def StartScanning(
                     all_vulnerabilities.extend(VulnsArray)
 
     if all_vulnerabilities:
-        exploit_vulnerabilities(all_vulnerabilities, targetarg, log)
+        exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console2)
 
     if ScanWeb:
             webvuln(host, log, console)
