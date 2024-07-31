@@ -4,6 +4,7 @@ from textwrap import wrap
 from modules.logger import banner
 from modules.nist_search import searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
+from modules.exploit import search_exploits
 from rich.progress_bar import ProgressBar
 
 
@@ -60,7 +61,18 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
 
     try:
         ApiResponseCVE = searchCVE(keyword, log, apiKey)
-    except KeyboardInterrupt:
+        # Search for Metasploit exploits
+        metasploit_exploits = search_exploits({"CVEID": keyword}, log)
+        for exploit in metasploit_exploits:
+            ApiResponseCVE.append(Vulnerability(
+                title=keyword,
+                CVEID=exploit,
+                description="Metasploit exploit",
+                severity="N/A",
+                severity_score=0.0,
+                details_url=f"https://www.rapid7.com/db/modules/{exploit}",
+                exploitability=0.0
+            ))
         log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
         log.logger("error", e)
