@@ -49,12 +49,15 @@ def ShodanScan(target, shodan_api_key, log, collect_hostnames=False) -> dict:
         log.logger("info", f"Shodan scan successful for {target}")
         if collect_hostnames:
             hostnames = host_info.get('hostnames', [])
+            resolved_hostnames = set()
             for hostname in hostnames:
-                try:
-                    ip = socket.gethostbyname(hostname)
-                    log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
-                except socket.gaierror:
-                    log.logger("error", f"Failed to resolve hostname {hostname}")
+                if hostname not in resolved_hostnames:
+                    try:
+                        ip = socket.gethostbyname(hostname)
+                        log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
+                        resolved_hostnames.add(hostname)
+                    except socket.gaierror:
+                        log.logger("error", f"Failed to resolve hostname {hostname}")
         return host_info
     except shodan.APIError as e:
         log.logger("error", f"Shodan scan failed for {target}: {e} (The Target Doesnt Exist in Shodan)")
