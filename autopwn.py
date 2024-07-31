@@ -50,7 +50,10 @@ def StartScanning(
             #print("PortArray: ", PortArray)
             #print("ScanVulns: ", ScanVulns)
         if ScanVulns and PortArray and len(PortArray) > 0:
-            VulnsArray = SearchSploits(PortArray, log, console, apiKey)
+            VulnsArray = []
+            
+            sploits = SearchSploits(PortArray, log, console, apiKey)
+            VulnsArray.extend(sploits)
             #print("VulnsArray: ", VulnsArray)
             if shodan_api_key:
                 ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
