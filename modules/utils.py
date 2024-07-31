@@ -5,6 +5,7 @@ try:
 except ImportError:
     from ctypes import windll
 
+import socket
 from argparse import ArgumentParser
 from configparser import ConfigParser
 from datetime import datetime
@@ -12,7 +13,6 @@ from enum import Enum
 from os import get_terminal_size
 from platform import platform, system
 from re import search
-import socket
 from socket import AF_INET, SOCK_DGRAM
 from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
