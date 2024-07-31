@@ -9,6 +9,7 @@ from modules.nist_search import searchCVE, searchShodan
 from modules.searchvuln import GenerateKeyword
 from modules.utils import GetZoomEyeVulns, fake_logger, is_root
 from modules.exploit import exploit_vulnerabilities
+from modules.getexploits import GetExploitsFromArray
 from modules.exploit import exploit_vulnerabilities
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
@@ -232,6 +233,7 @@ class AutoScanner:
 
             # Exploit the vulnerabilities found
             if vulns:
+                GetExploitsFromArray(list(vulns.values()), log, console)
                 exploit_vulnerabilities(list(vulns.values()), host, log)
 
         if vulns:
