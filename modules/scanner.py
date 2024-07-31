@@ -50,7 +50,7 @@ def ShodanScan(target, shodan_api_key, log) -> dict:
         log.logger("info", f"Shodan scan successful for {target}")
         return host_info
     except shodan.APIError as e:
-        log.logger("error", f"Shodan scan failed for {target}: {e} (The Target Doesnt Exist in Shodan)")
+        log.logger("error", f"Shodan scan failed for {target}: {e} (The Target Doesn't Exist in Shodan)")
         return {}
 
 
@@ -74,7 +74,6 @@ def TestArp(target, mode=ScanMode.Normal) -> list:
     else:
         nm.scan(hosts=target, arguments="-sn -PR")
     return nm.all_hosts()
-
 
 
 def PortScan(
@@ -146,12 +145,47 @@ def PortScan(
             )
     except Exception as e:
         raise SystemExit(f"Error: {e}")
+    
     if shodan_api_key:
         shodan_results = ShodanScan(target, shodan_api_key, log)
         if shodan_results:
             display_shodan_results(shodan_results)
-            #log.logger("info", f"Shodan results for {target}: {shodan_results}")
+            shodan_ports = extract_shodan_ports(shodan_results)
+            add_shodan_ports_to_nmap(nm, target, shodan_ports)
+            # log.logger("info", f"Shodan results for {target}: {shodan_results}")
+    
     return nm
+
+
+def extract_shodan_ports(shodan_results: dict) -> list:
+    """Extracts the open ports information from Shodan results."""
+    ports = []
+    for data in shodan_results.get('data', []):
+        ports.append({
+            'port': data.get('port', 'Unknown'),
+            'transport': data.get('transport', 'Unknown'),
+            'product': data.get('product', 'Unknown'),
+            'version': data.get('version', 'Unknown')
+        })
+    return ports
+
+
+def add_shodan_ports_to_nmap(nm: PortScanner, target: str, shodan_ports: list) -> None:
+    """Adds the Shodan ports to the Nmap scan results."""
+    if target not in nm.all_hosts():
+        nm.add_host(target)
+
+    if 'tcp' not in nm[target]:
+        nm[target]['tcp'] = {}
+
+    for port in shodan_ports:
+        port_number = port['port']
+        nm[target]['tcp'][port_number] = {
+            'state': 'open',
+            'name': port['product'],
+            'product': port['product'],
+            'version': port['version']
+        }
 
 
 def display_shodan_results(shodan_results):
@@ -323,7 +357,7 @@ def InitPortInfo(port) -> tuple:
     return state, service, product, version
 
 
-def AnalyseScanResults(nm, log, console, target=None) -> list:
+def AnalyseScanResults(nm, shodan_results, log, console, target=None) -> list:
     HostArray = [] if nm else []
     if target is None:
         target = nm.all_hosts()[0]
@@ -333,6 +367,10 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     except KeyError:
         log.logger("warning", f"Target {target} seems to be offline.")
         return []
+
+    # Integrate Shodan ports
+    shodan_ports = extract_shodan_ports(shodan_results)
+    add_shodan_ports_to_nmap(nm, target, shodan_ports)
 
     CurrentTargetInfo = InitHostInfo(nm[target])
 
