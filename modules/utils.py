@@ -41,6 +41,13 @@ def cli():
         description="AutoPWN Suite | A project for scanning "
         + "vulnerabilities and exploiting systems automatically."
     )
+    scanargs.add_argument(
+        "--auto-scan-hostnames",
+        help="Enable auto-scanning of any hostnames found.",
+        action="store_true",
+        required=False,
+        default=False,
+    )
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument(
         "-zoomeye",
