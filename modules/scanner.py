@@ -324,7 +324,7 @@ def InitPortInfo(port) -> tuple:
 
 
 def AnalyseScanResults(nm, log, console, target=None) -> list:
-    HostArray = []
+    HostArray = [] if nm else []
     if target is None:
         target = nm.all_hosts()[0]
 
