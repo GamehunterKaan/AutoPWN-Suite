@@ -4,6 +4,7 @@ from textwrap import wrap
 from modules.logger import banner
 from modules.nist_search import searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
+from modules.nist_search import Vulnerability
 from modules.exploit import search_exploits
 from rich.progress_bar import ProgressBar
 
