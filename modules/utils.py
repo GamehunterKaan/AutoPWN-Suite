@@ -941,6 +941,17 @@ def get_terminal_width() -> int:
     return width
 
 
+def resolve_hostnames_to_ips(hostnames, log):
+    ips = []
+    for hostname in hostnames:
+        try:
+            ip = socket.gethostbyname(hostname)
+            ips.append(ip)
+            log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
+        except socket.gaierror:
+            log.logger("error", f"Failed to resolve hostname {hostname}")
+    return ips
+
 def check_version(cur_version: str, log) -> None:
     try:
         data = get("https://pypi.org/pypi/autopwn-suite/json").json()
