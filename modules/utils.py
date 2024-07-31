@@ -40,6 +40,17 @@ def cli():
         description="AutoPWN Suite | A project for scanning "
         + "vulnerabilities and exploiting systems automatically."
     )
+    scanargs.add_argument(
+        "-zoomeye",
+        "--zoomeye-api",
+        help=(
+            "Specify ZoomEye API key for additional scanning capabilities. "
+            + "(Default : None)"
+        ),
+        default=None,
+        type=str,
+        required=False,
+    )
     argparser.add_argument(
         "-v", "--version", help="Print version and exit.", action="store_true"
     )
