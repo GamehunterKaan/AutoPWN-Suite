@@ -55,7 +55,7 @@ def StartScanning(
             VulnsArray = []
             if args.metasploit_scan:
                 log.logger("info", "Running Metasploit scan...")
-                keywords = GenerateKeywords(host)
+                keywords = GenerateKeywords(host, [vuln['fullname'] for vuln in metasploit_vulns])
                 metasploit_vulns = []
                 for keyword in keywords:
                     metasploit_vulns.extend(search_metasploit(keyword, log))
@@ -70,7 +70,7 @@ def StartScanning(
                         all_vulnerabilities.append(vuln_obj)
                     else:
                         log.logger("warning", f"Vulnerability data missing required keys: {vuln}")
-            sploits = SearchSploits(PortArray, log, console, apiKey)
+            sploits = SearchSploits(PortArray, log, console, apiKey, max_exploits)
             for sploit in sploits:
                 vuln_obj = VulnerableSoftware(
                     title=sploit['title'],
