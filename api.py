@@ -122,8 +122,8 @@ class AutoScanner:
         version = port_key.get("version", "")
         log = fake_logger()
 
-        keyword = generate_keywords(product, version)
-        if keyword == "":
+        keywords = generate_keywords(product, version)
+        if not keywords:
             return
 
         if debug:
