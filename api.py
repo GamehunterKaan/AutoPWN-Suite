@@ -154,7 +154,7 @@ class AutoScanner:
         os_scan: bool = False,
         scan_vulns: bool = True,
         nmap_args=None,
-        debug: bool = False,
+        debug: bool = True,
         console = None,
         max_exploits: int = 10,
     ) -> JSON:
