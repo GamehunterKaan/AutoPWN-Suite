@@ -1,13 +1,12 @@
-from datetime import datetime
 import re
+from datetime import datetime
 
 from rich.console import Console
 
 from modules.banners import print_banner
-
 from modules.exploit import exploit_vulnerabilities
-from modules.utils import generate_keywords
 from modules.getexploits import GetExploitsFromArray
+from modules.keyword_generator import generate_keywords
 from modules.logger import Logger
 from modules.report import InitializeReport
 from modules.scanner import (AnalyseScanResults, DiscoverHosts, NoiseScan,
