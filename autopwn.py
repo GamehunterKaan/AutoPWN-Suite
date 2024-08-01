@@ -77,6 +77,8 @@ def StartScanning(
                         exploitability=vuln['exploitability']
                     )
                     all_vulnerabilities.append(vuln_obj)
+                    
+            print("All vulnerabilities: ", all_vulnerabilities)
             if DownloadExploits and len(all_vulnerabilities) > 0:
                 GetExploitsFromArray(all_vulnerabilities, log, console, console)
     
