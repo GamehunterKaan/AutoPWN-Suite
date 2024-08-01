@@ -5,27 +5,9 @@ from rich.console import Console
 
 from modules.banners import print_banner
 
-def generate_keywords(host: str) -> list:
-    """
-    Generate a list of keywords based on the host.
-    
-    Args:
-        host (str): The host to generate keywords for.
-
-    Returns:
-        list: A list of keywords.
-    """
-    keywords = []
-    # Add the host itself as a keyword
-    keywords.append(host)
-    
-    # Extract parts of the host (e.g., domain, subdomain)
-    parts = re.split(r'\.|-', host)
-    keywords.extend(parts)
-    
-    return keywords
 from modules.exploit import (exploit_vulnerabilities, search_metasploit,
                              search_exploits)
+from modules.keyword_generator import generate_keywords
 from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
 from modules.report import InitializeReport
