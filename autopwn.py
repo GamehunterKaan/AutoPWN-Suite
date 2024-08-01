@@ -51,31 +51,8 @@ def StartScanning(
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = []
             if args.metasploit_scan:
-                metasploit_vulns = []
-                for port in PortArray:
-                    log.logger("info", f"Searching Metasploit for exploits related to {port[3]} and CVE {port[4]} ...")
-                    metasploit_vulns.extend(metasploitSearch(port[3]))
-                    if port[4]:  # Assuming port[4] contains the CVE
-                        metasploit_vulns.extend(metasploitSearch(port[4]))
-                    if port[4]:  # Assuming port[4] contains the CVE
-                        metasploit_vulns.extend(metasploitSearch(port[4]))
-                for vuln in metasploit_vulns:
-                    log.logger("info", f"Metasploit Vuln: {vuln['name']} - CVEs: {vuln['fullname']}")
-                    if isinstance(vuln, dict) and all(key in vuln for key in ['name', 'fullname']):
-                        vuln_obj = VulnerableSoftware(
-                            title=vuln['name'],
-                            CVEs=[vuln['fullname']],
-                            severity_score=0.0,
-                            exploitability=0.0
-                        )
-                        all_vulnerabilities.append(vuln_obj)
-                    else:
-                        log.logger("warning", f"Vulnerability data missing required keys: {vuln}")
-            if args.metasploit_scan:
                 log.logger("info", "Running Metasploit scan...")
                 metasploit_vulns = []
-                for port in PortArray:
-                    metasploit_vulns.extend(metasploitSearch(port[3]))
                 for vuln in metasploit_vulns:
                     if isinstance(vuln, dict) and all(key in vuln for key in ['name', 'fullname']):
                         vuln_obj = VulnerableSoftware(
