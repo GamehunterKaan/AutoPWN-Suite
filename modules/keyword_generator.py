@@ -7,8 +7,7 @@ DONT_SEARCH = {
     "service", "application", "software", "system", "device", "tool", 
     "utility", "daemon", "agent", "client", "remote", "desktop", "protocol", 
     "windows", "linux", "unix", "mac", "os", "operating", "system", 
-    "microsoft", "apple", "gnu", "unknown", "unspecified", "unspecified", 
-    "none"
+    "microsoft", "apple", "gnu", "none", "unknown", "", 
 }
 
 def generate_keyword_list_from_product(product: str, version: str, seen_products: set) -> List[str]:
@@ -28,6 +27,9 @@ def generate_keyword_list_from_product(product: str, version: str, seen_products
         return []
     
     keywords = [f"{part} {version}" for part in product.split() if part.lower() not in DONT_SEARCH]
+    if version.lower() not in DONT_SEARCH:
+        keywords.append(version)
+    
     seen_products.add(product_key)
     print(f"Product: {product}, Version: {version}, Keywords: {keywords}")
     return keywords
