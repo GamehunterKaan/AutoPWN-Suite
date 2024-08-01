@@ -56,6 +56,18 @@ def GenerateKeywordList(product: str, version: str) -> List[str]:
             keywords.append(part)
 
 
+
+    return keywords
+
+def GenerateKeywords(HostArray: List, CVEs: List[str] = None) -> List[str]:
+    keywords = []
+    for port in HostArray:
+        product = str(port[3])
+        version = str(port[4])
+
+        new_keywords = GenerateKeywordList(product, version)
+        keywords.extend(new_keywords)
+
     if CVEs:
         keywords.extend(GenerateKeywordsFromCVEs(CVEs))
 
