@@ -55,6 +55,7 @@ def GenerateKeywordList(product: str, version: str) -> List[str]:
         if part.lower() not in dontsearch and part != "":
             keywords.append(part)
 
+
     if CVEs:
         keywords.extend(GenerateKeywordsFromCVEs(CVEs))
 
