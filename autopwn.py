@@ -23,7 +23,7 @@ from modules.web.webvuln import webvuln
 
 
 def StartScanning(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, log, max_exploits=10
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, log
 ) -> None:
 
     check_nmap(log)
@@ -38,8 +38,6 @@ def StartScanning(
         Targets = [targetarg]
 
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
-    if args.metasploit_scan:
-        log.logger("info", "Metasploit scan enabled.")
     ScanWeb = args.web or WebScan()
     PortArray = []
 
@@ -53,7 +51,7 @@ def StartScanning(
             PortArray = AnalyseScanResults(PortScanResults, log, console, host, shodan_results=None)
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = []
-            sploits = SearchSploits(PortArray, log, console, apiKey, max_exploits)
+            sploits = SearchSploits(PortArray, log, console, apiKey)
             for sploit in sploits:
                 vuln_obj = VulnerableSoftware(
                     title=sploit['title'],
@@ -125,7 +123,7 @@ def main() -> None:
     vuln_api_key, shodan_api_key, zoomeye_api_key = InitArgsAPI(args, log)
     ReportMethod, ReportObject = InitReport(args, log)
 
-    ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, api_keys_used, console, log)
+    ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, api_keys_used, console, log)
 
     StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, console, log)
 

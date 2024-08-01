@@ -20,10 +20,10 @@ class VulnerableSoftware:
     exploitability: float
 
 
-def SearchKeyword(keyword: str, log, apiKey=None, max_exploits: int = 10) -> list:
+def SearchKeyword(keyword: str, log, apiKey=None) -> list:
 
     try:
-        ApiResponseCVE = searchCVE(keyword, log, apiKey, max_exploits)
+        ApiResponseCVE = searchCVE(keyword, log, apiKey)
         log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
         log.logger("error", e)
@@ -33,7 +33,7 @@ def SearchKeyword(keyword: str, log, apiKey=None, max_exploits: int = 10) -> lis
     return []
 
 
-def SearchSploits(HostArray: list, log, console, apiKey=None, max_exploits: int = 10) -> list:
+def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
@@ -42,7 +42,7 @@ def SearchSploits(HostArray: list, log, console, apiKey=None, max_exploits: int 
         return []
 
     ApiResponseCVE = []
-    keywords = GenerateKeywords(HostArray, [vuln.CVEID for vuln in ApiResponseCVE])
+    keywords = GenerateKeywords(HostArray)
 
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
@@ -58,7 +58,7 @@ def SearchSploits(HostArray: list, log, console, apiKey=None, max_exploits: int 
             f"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] [white]...[/white]",
             spinner="bouncingBar"
         ) as status:
-            ApiResponseCVE = SearchKeyword(keyword, log, apiKey, max_exploits)
+            ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
             sleep(1)  # Adding a delay to ensure proper logging and searching
         if len(ApiResponseCVE) == 0:
             continue
@@ -97,8 +97,5 @@ def SearchSploits(HostArray: list, log, console, apiKey=None, max_exploits: int 
     # Sort vulnerabilities by severity and exploitability
     VulnsArray.sort(key=lambda x: (x.severity_score, x.exploitability), reverse=True)
     
-    # Limit the number of vulnerabilities if max_exploits is set
-    if max_exploits > 0:
-        VulnsArray = VulnsArray[:max_exploits]
     
     return VulnsArray
