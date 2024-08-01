@@ -658,7 +658,6 @@ def ParamPrint(
         + f"│\tAPI Keys Used : {api_keys_used}/3\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
-    msg += f"│\tExploit : {args.exploit}\n"
     msg += f"│\tMetasploit Scan : {args.metasploit_scan}\n"
     msg += f"│\tMax Exploits : {args.max_exploits}\n"
 
