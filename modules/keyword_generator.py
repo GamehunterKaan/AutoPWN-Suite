@@ -22,11 +22,12 @@ def generate_keyword_list_from_product(product: str, version: str, seen_products
     Returns:
         List[str]: A list of keywords.
     """
-    if product.lower() in seen_products:
+    product_key = f"{product.lower()} {version.lower()}"
+    if product_key in seen_products:
         return []
     
     keywords = [f"{part} {version}" for part in product.split() if part.lower() not in DONT_SEARCH]
-    seen_products.add(product.lower())
+    seen_products.add(product_key)
     print(f"Product: {product}, Version: {version}, Keywords: {keywords}")
     return keywords
 
@@ -64,7 +65,7 @@ def generate_keywords_list_from_host_array(host_array: List[Union[List, tuple]],
     for port in host_array:
         if not isinstance(port, (list, tuple)) or len(port) < 5:
             continue
-        product = str(port[3])
+        product = str(port[2])  # Adjusted to use the correct product field
         version = str(port[4])
 
         new_keywords = generate_keyword_list_from_product(product, version, seen_products)
