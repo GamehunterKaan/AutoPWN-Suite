@@ -782,7 +782,15 @@ def GetShodanVulns(host, shodan_api_key, log):
         vulns = host_info.get("vulns", [])
         log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from Shodan.")
         open_ports = [service['port'] for service in host_info.get('data', [])]
-        return vulns, open_ports
+        formatted_vulns = []
+        for vuln in vulns:
+            formatted_vulns.append({
+                'title': vuln,
+                'CVEs': [vuln],
+                'severity_score': 0.0,
+                'exploitability': 0.0
+            })
+        return formatted_vulns, open_ports
     except shodan.APIError as e:
         log.logger("ERROR", f"Error fetching Shodan vulnerabilities: {e}")
         return []
