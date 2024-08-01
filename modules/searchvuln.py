@@ -24,7 +24,7 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
 
     try:
         ApiResponseCVE = searchCVE(keyword, log, apiKey)
-        log.logger("warning", f"Skipped vulnerability detection for {keyword}")
+        #log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
         log.logger("error", e)
     else:

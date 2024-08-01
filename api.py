@@ -1,16 +1,16 @@
-from json import dumps
-from typing import Any, Dict, List, Type, Union
 import re
 import socket
+from json import dumps
+from typing import Any, Dict, List, Type, Union
 
 from nmap import PortScanner
 
+from modules.exploit import exploit_vulnerabilities
+from modules.getexploits import GetExploitsFromArray
+from modules.keyword_generator import generate_keyword_list
 from modules.nist_search import searchCVE, searchShodan
 from modules.searchvuln import GenerateKeyword
 from modules.utils import GetZoomEyeVulns, fake_logger, is_root
-from modules.exploit import exploit_vulnerabilities
-from modules.getexploits import GetExploitsFromArray
-from modules.exploit import exploit_vulnerabilities
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
@@ -104,23 +104,16 @@ class AutoScanner:
 
     def SearchShodan(self, product: str, version: str, shodan_api_key: str, debug: bool = False) -> list:
         log = fake_logger()
-        keyword = GenerateKeyword(product, version)
-        if keyword == "":
-            return []
-
-        if debug:
-            print(f"Searching Shodan for keyword {keyword} ...")
-
-        shodan_vulns = searchShodan(keyword, log, shodan_api_key)
-        return shodan_vulns
+        keywords = generate_keyword_list(product, version)
+        for word in keywords:
+            if debug:
+                print(f"Searching Shodan for keyword {word} ...")
+            shodan_vulns = searchShodan(word, log, shodan_api_key)
+            return shodan_vulns
 
     def SearchZoomEye(self, host: str, zoomeye_api_key: str, debug: bool = False) -> list:
         log = fake_logger()
-        if debug:
-            print(f"Searching ZoomEye for host {host} ...")
-
-        zoomeye_vulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
-        return zoomeye_vulns
+        
 
     def SearchVuln(
         self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False
