@@ -61,7 +61,7 @@ def generate_keywords_list_from_host_array(host_array: List[Union[List, tuple]],
     Returns:
         List[str]: List of keywords generated from HostArray and CVEs.
     """
-    print(f"HostArray: {host_array}")
+    #print(f"HostArray: {host_array}")
     keywords = set()
     seen_products = set()
     
@@ -106,5 +106,5 @@ def generate_keywords(source: Union[str, List[Union[List, tuple]], List[str]], v
     else:
         raise ValueError("Invalid source type")
     
-    print(f"Generated Keywords: {all_keywords}")
+    #print(f"Generated Keywords: {all_keywords}")
     return list(all_keywords)
