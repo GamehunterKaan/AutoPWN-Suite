@@ -3,11 +3,9 @@ from textwrap import wrap
 from time import sleep
 from typing import Any, Dict, List
 
-from pymetasploit3.msfrpc import MsfRpcClient
 from rich.console import Console
 from rich.progress_bar import ProgressBar
 
-from modules.exploit_search import search_exploits
 from modules.keyword_generator import GenerateKeywords
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
@@ -95,18 +93,6 @@ def SearchSploits(HostArray: list, log, console, apiKey=None, max_exploits: int 
             VulnsArray.append(VulnObject)
             console.print("└" + "─" * (term_width - 1))
 
-        # Search for Metasploit exploits
-        metasploit_exploits = search_exploits({"CVEID": keyword}, log)
-        for exploit in metasploit_exploits:
-            ApiResponseCVE.append(Vulnerability(
-                title=keyword,
-                CVEID=exploit,
-                description="Metasploit exploit",
-                severity="N/A",
-                severity_score=0.0,
-                details_url=f"https://www.rapid7.com/db/modules/{exploit}",
-                exploitability=0.0
-            ))
 
     # Sort vulnerabilities by severity and exploitability
     VulnsArray.sort(key=lambda x: (x.severity_score, x.exploitability), reverse=True)

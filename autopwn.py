@@ -5,8 +5,7 @@ from rich.console import Console
 
 from modules.banners import print_banner
 
-from modules.exploit import (exploit_vulnerabilities, search_metasploit,
-                             search_exploits)
+from modules.exploit import exploit_vulnerabilities
 from modules.keyword_generator import GenerateKeywords
 from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
@@ -42,6 +41,7 @@ def StartScanning(
     if args.metasploit_scan:
         log.logger("info", "Metasploit scan enabled.")
     ScanWeb = args.web or WebScan()
+    PortArray = []
 
     all_vulnerabilities = []
 
@@ -53,24 +53,6 @@ def StartScanning(
             PortArray = AnalyseScanResults(PortScanResults, log, console, host, shodan_results=None)
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = []
-            if args.metasploit_scan:
-                log.logger("info", "Running Metasploit scan...")
-                metasploit_vulns = []
-                keywords = GenerateKeywords(host, [vuln['fullname'] for vuln in metasploit_vulns])
-                metasploit_vulns = []
-                for keyword in keywords:
-                    metasploit_vulns.extend(search_metasploit(keyword, log))
-                for vuln in metasploit_vulns:
-                    if isinstance(vuln, dict) and all(key in vuln for key in ['name', 'fullname']):
-                        vuln_obj = VulnerableSoftware(
-                            title=vuln['name'],
-                            CVEs=[vuln['fullname']],
-                            severity_score=0.0,
-                            exploitability=0.0
-                        )
-                        all_vulnerabilities.append(vuln_obj)
-                    else:
-                        log.logger("warning", f"Vulnerability data missing required keys: {vuln}")
             sploits = SearchSploits(PortArray, log, console, apiKey, max_exploits)
             for sploit in sploits:
                 vuln_obj = VulnerableSoftware(
@@ -104,7 +86,7 @@ def StartScanning(
                     )
                     all_vulnerabilities.append(vuln_obj)
             if DownloadExploits and len(all_vulnerabilities) > 0:
-                GetExploitsFromArray(all_vulnerabilities, log, console, console, max_exploits=max_exploits)
+                GetExploitsFromArray(all_vulnerabilities, log, console, console)
     
     if ScanWeb:
         for host in Targets:
