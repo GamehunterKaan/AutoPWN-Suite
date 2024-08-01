@@ -87,10 +87,19 @@ def GenerateKeywordsFromCVEs(CVEs: List[str]) -> List[str]:
     return CVEs
 
 def GenerateKeywords(HostArray: List, CVEs: List[str] = None) -> List[str]:
+    """
+    Generate keywords from HostArray and optionally from a list of CVEs.
+    
+    Args:
+        HostArray (List): List of host information.
+        CVEs (List[str], optional): List of CVEs.
+    
+    Returns:
+        List[str]: List of keywords generated from HostArray and CVEs.
+    """
     keywords = []
     if CVEs:
-        keywords.extend(GenerateKeywordsFromCVEs(CVEs))
-        
+        keywords.extend(CVEs)
     for port in HostArray:
         if not isinstance(port, (list, tuple)) or len(port) < 5:
             continue
