@@ -65,16 +65,33 @@ def StartScanning(
                         all_vulnerabilities.append(vuln_obj)
                     else:
                         log.logger("warning", f"Vulnerability data missing required keys: {vuln}")
-            else:
-                sploits = SearchSploits(PortArray, log, console, apiKey)
-                for sploit in sploits:
-                    vuln_obj = VulnerableSoftware(
-                        title=sploit['title'],
-                        CVEs=sploit['CVEs'],
-                        severity_score=sploit['severity_score'],
-                        exploitability=sploit['exploitability']
-                    )
-                    all_vulnerabilities.append(vuln_obj)
+            if args.metasploit_scan:
+                log.logger("info", "Running Metasploit scan...")
+                metasploit_vulns = []
+                for port in PortArray:
+                    metasploit_vulns.extend(metasploitSearch(port[3]))
+                for vuln in metasploit_vulns:
+                    if isinstance(vuln, dict) and all(key in vuln for key in ['name', 'fullname']):
+                        vuln_obj = VulnerableSoftware(
+                            title=vuln['name'],
+                            CVEs=[vuln['fullname']],
+                            severity_score=0.0,
+                            exploitability=0.0
+                        )
+                        all_vulnerabilities.append(vuln_obj)
+                    else:
+                        log.logger("warning", f"Vulnerability data missing required keys: {vuln}")
+                if exploit:
+                    exploit_vulnerabilities(all_vulnerabilities, host, log, console, max_exploits=max_exploits)
+            sploits = SearchSploits(PortArray, log, console, apiKey)
+            for sploit in sploits:
+                vuln_obj = VulnerableSoftware(
+                    title=sploit['title'],
+                    CVEs=sploit['CVEs'],
+                    severity_score=sploit['severity_score'],
+                    exploitability=sploit['exploitability']
+                )
+                all_vulnerabilities.append(vuln_obj)
             if shodan_api_key:
                 ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
                 for port in ShodanPorts:
