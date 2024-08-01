@@ -1,20 +1,13 @@
 from dataclasses import dataclass
 from textwrap import wrap
 from time import sleep
+from typing import Any, Dict, List
 
-from typing import Dict, Any, List
 from pymetasploit3.msfrpc import MsfRpcClient
+from rich.console import Console
 from rich.progress_bar import ProgressBar
 
-def search_exploits(vulnerability: Dict[str, Any], log) -> List[str]:
-    """
-    Search for exploits related to a given vulnerability using Metasploit.
-    
-    :param vulnerability: A dictionary containing vulnerability details.
-    :param log: Logger object for logging.
-    :return: A list of exploit module names.
-    """
-from typing import Dict, Any, List
+from modules.exploit_search import search_exploits
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
