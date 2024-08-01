@@ -41,7 +41,6 @@ def StartScanning(
         Targets = [targetarg]
 
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
-    ScanWeb = args.web or WebScan()
     PortArray = []
 
     all_vulnerabilities = []
@@ -87,9 +86,8 @@ def StartScanning(
             if DownloadExploits and len(all_vulnerabilities) > 0:
                 GetExploitsFromArray(all_vulnerabilities, log, console, console)
     
-    if ScanWeb:
-        for host in Targets:
-            webvuln(host, log, console)
+    for host in Targets:
+        webvuln(host, log, console)
 
     console.print(
         "{time} - Scan completed.".format(
