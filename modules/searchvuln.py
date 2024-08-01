@@ -6,19 +6,7 @@ from typing import Any, Dict, List
 from rich.console import Console
 from rich.progress_bar import ProgressBar
 
-from modules.utils import generate_keywords
-
-def GenerateKeyword(input_data):
-    """
-    Generate keywords from the given input data.
-    
-    Args:
-        input_data: The input data to generate keywords from.
-        
-    Returns:
-        List[str]: A list of generated keywords.
-    """
-    return generate_keywords(input_data)
+from modules.keyword_generator import generate_keywords
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
