@@ -40,7 +40,6 @@ class ScanType(Enum):
 def cli():
     argparser = ArgumentParser(description="AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.")
     argparser.add_argument("-me", "--max-exploits", help="Maximum number of exploits to display per service. Set to 0 to display all.", default=10, type=int, required=False)
-    argparser.add_argument("-e", "--exploit", help="Exploit the target after vulnerabilities have been checked and downloaded.", action="store_true", required=False, default=False)
     
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument("-zoomeye", "--zoomeye-api", help="Specify ZoomEye API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
