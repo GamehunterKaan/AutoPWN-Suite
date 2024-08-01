@@ -53,6 +53,7 @@ def GenerateKeywordList(product: str, version: str) -> list:
         "daemon",
         "agent",
         "client",
+        "remote",
         "server",
         "service",
         "application",
@@ -149,17 +150,14 @@ def SearchSploits(HostArray: list, log, console, apiKey=None, max_exploits: int 
                 + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
             )
 
-            if all(key in CVE for key in ['CVEID', 'description', 'severity', 'severity_score', 'details_url', 'exploitability']):
-                VulnObject = VulnerableSoftware(
-                    title=keyword,
-                    CVEs=CVEs,
-                    severity_score=CVE.severity_score,
-                    exploitability=CVE.exploitability
-                )
-                VulnsArray.append(VulnObject)
-                console.print("└" + "─" * (term_width - 1))
-            else:
-                log.logger("warning", f"Vulnerability data missing required keys: {CVE}")
+            VulnObject = VulnerableSoftware(
+                title=keyword,
+                CVEs=CVEs,
+                severity_score=CVE.severity_score,
+                exploitability=CVE.exploitability
+            )
+            VulnsArray.append(VulnObject)
+            console.print("└" + "─" * (term_width - 1))
 
         # Search for Metasploit exploits
         metasploit_exploits = search_exploits({"CVEID": keyword}, log)
