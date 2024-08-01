@@ -10,18 +10,23 @@ DONT_SEARCH = {
     "microsoft", "apple", "gnu"
 }
 
-def generate_keyword_list_from_product(product: str, version: str) -> List[str]:
+def generate_keyword_list_from_product(product: str, version: str, seen_products: set) -> List[str]:
     """
     Generate a list of keywords from product and version strings.
     
     Args:
         product (str): The product name.
         version (str): The version name.
+        seen_products (set): Set of already seen products.
         
     Returns:
         List[str]: A list of keywords.
     """
+    if product.lower() in seen_products:
+        return []
+    
     keywords = [f"{part} {version}" for part in product.split() if part.lower() not in DONT_SEARCH]
+    seen_products.add(product.lower())
     print(f"Product: {product}, Version: {version}, Keywords: {keywords}")
     return keywords
 
@@ -51,15 +56,18 @@ def generate_keywords_list_from_host_array(host_array: List[Union[List, tuple]],
     """
     print(f"HostArray: {host_array}")
     keywords = set()
+    seen_products = set()
+    
     if cves:
         keywords.update(cves)
+    
     for port in host_array:
         if not isinstance(port, (list, tuple)) or len(port) < 5:
             continue
         product = str(port[3])
         version = str(port[4])
 
-        new_keywords = generate_keyword_list_from_product(product, version)
+        new_keywords = generate_keyword_list_from_product(product, version, seen_products)
         keywords.update(new_keywords)
 
     return list(keywords)
@@ -76,14 +84,20 @@ def generate_keywords(source: Union[str, List[Union[List, tuple]], List[str]], v
     Returns:
         List[str]: List of keywords generated from the source.
     """
+    all_keywords = set()
+    seen_products = set()
+    
     if isinstance(source, str) and version:
         # Source is a product with a version
-        return generate_keyword_list_from_product(source, version)
+        all_keywords.update(generate_keyword_list_from_product(source, version, seen_products))
     elif isinstance(source, list) and all(isinstance(item, str) for item in source):
         # Source is a list of CVEs
-        return generate_keywords_from_cves(source)
+        all_keywords.update(generate_keywords_from_cves(source))
     elif isinstance(source, list) and all(isinstance(item, (list, tuple)) for item in source):
         # Source is a host array
-        return generate_keywords_list_from_host_array(source, cves)
+        all_keywords.update(generate_keywords_list_from_host_array(source, cves))
     else:
         raise ValueError("Invalid source type")
+    
+    print(f"Generated Keywords: {all_keywords}")
+    return list(all_keywords)
