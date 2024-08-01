@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from textwrap import wrap
 from time import sleep
 
+from typing import Dict, Any, List
 from pymetasploit3.msfrpc import MsfRpcClient
 from rich.progress_bar import ProgressBar
 
