@@ -39,7 +39,6 @@ class ScanType(Enum):
 
 def cli():
     argparser = ArgumentParser(description="AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.")
-    argparser.add_argument("-me", "--max-exploits", help="Maximum number of exploits to display per service. Set to 0 to display all.", default=10, type=int, required=False)
     
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument("-zoomeye", "--zoomeye-api", help="Specify ZoomEye API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
@@ -57,7 +56,6 @@ def cli():
     scanargs.add_argument("-vuln", "--vuln-api", help="Specify API key for vulnerability detection for faster scanning. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-w", "--web", help="Enable web search for the target.", action="store_true", required=False, default=False)
     scanargs.add_argument("-shodan", "--shodan-api", help="Specify Shodan API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
-    scanargs.add_argument("--metasploit-scan", help="Enable Metasploit scan for the target.", action="store_true", required=False, default=False)
     scanargs.add_argument("-m", "--mode", help="Scan mode.", default="normal", type=str, required=False, choices=["evade", "noise", "normal"])
     scanargs.add_argument("-nt", "--noise-timeout", help="Noise mode timeout.", default=None, type=int, required=False, metavar="TIMEOUT")
     
@@ -657,8 +655,6 @@ def ParamPrint(
         + f"│\tAPI Keys Used : {api_keys_used}/3\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
-    msg += f"│\tMetasploit Scan : {args.metasploit_scan}\n"
-    msg += f"│\tMax Exploits : {args.max_exploits}\n"
 
     if args.skip_discovery:
         msg += f"│\tSkip discovery: True\n"
