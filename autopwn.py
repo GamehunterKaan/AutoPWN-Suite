@@ -3,7 +3,7 @@ from datetime import datetime
 from rich.console import Console
 
 from modules.banners import print_banner
-from modules.exploit import (exploit_vulnerabilities, metasploitSearch,
+from modules.exploit import (exploit_vulnerabilities, search_metasploit,
                              search_exploits)
 from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
@@ -52,7 +52,7 @@ def StartScanning(
             VulnsArray = []
             if args.metasploit_scan:
                 log.logger("info", "Running Metasploit scan...")
-                metasploit_vulns = metasploitSearch(host)
+                metasploit_vulns = search_metasploit(host, log)
                 for vuln in metasploit_vulns:
                     if isinstance(vuln, dict) and all(key in vuln for key in ['name', 'fullname']):
                         vuln_obj = VulnerableSoftware(
