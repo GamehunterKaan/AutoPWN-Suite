@@ -66,6 +66,8 @@ def GenerateKeywords(HostArray: List, CVEs: List[str] = None) -> List[str]:
         keywords.extend(GenerateKeywordsFromCVEs(CVEs))
         
     for port in HostArray:
+        if len(port) < 5:
+            continue
         product = str(port[3])
         version = str(port[4])
 
