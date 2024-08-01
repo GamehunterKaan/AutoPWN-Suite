@@ -5,7 +5,7 @@ from time import sleep
 from pymetasploit3.msfrpc import MsfRpcClient
 from rich.progress_bar import ProgressBar
 
-from modules.search_exploits import search_exploits
+from modules.exploit import search_exploits
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
