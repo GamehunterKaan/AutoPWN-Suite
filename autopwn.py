@@ -6,7 +6,7 @@ from rich.console import Console
 from modules.banners import print_banner
 
 from modules.exploit import exploit_vulnerabilities
-from modules.keyword_generator import GenerateKeywords
+from modules.utils import generate_keywords
 from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
 from modules.report import InitializeReport
@@ -51,7 +51,8 @@ def StartScanning(
             PortArray = AnalyseScanResults(PortScanResults, log, console, host, shodan_results=None)
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = []
-            sploits = SearchSploits(PortArray, log, console, apiKey)
+            keywords = generate_keywords(PortArray)
+            sploits = SearchSploits(keywords, log, console, apiKey)
             for sploit in sploits:
                 vuln_obj = VulnerableSoftware(
                     title=sploit['title'],
