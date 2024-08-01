@@ -7,7 +7,7 @@ from nmap import PortScanner
 
 from modules.exploit import exploit_vulnerabilities
 from modules.getexploits import GetExploitsFromArray
-from modules.keyword_generator import generate_keyword_list
+from modules.keyword_generator import generate_keywords
 from modules.nist_search import searchCVE, searchShodan
 from modules.searchvuln import GenerateKeyword
 from modules.utils import GetZoomEyeVulns, fake_logger, is_root
@@ -104,7 +104,7 @@ class AutoScanner:
 
     def SearchShodan(self, product: str, version: str, shodan_api_key: str, debug: bool = False) -> list:
         log = fake_logger()
-        keywords = generate_keyword_list(product, version)
+        keywords = generate_keywords(product, version)
         for word in keywords:
             if debug:
                 print(f"Searching Shodan for keyword {word} ...")
@@ -122,7 +122,7 @@ class AutoScanner:
         version = port_key.get("version", "")
         log = fake_logger()
 
-        keyword = generate_keyword_list(product, version)
+        keyword = generate_keywords(product, version)
         if keyword == "":
             return
 
@@ -132,11 +132,11 @@ class AutoScanner:
         Vulnerablities = searchCVE(keyword, log, vuln_api_key)
         shodan_vulns = []
         if shodan_api_key:
-            shodan_vulns = searchShodan(keyword, log, shodan_api_key)
+            shodan_vulns = searchShodan(keywords, log, shodan_api_key)
 
         zoomeye_vulns = []
         if zoomeye_api_key:
-            zoomeye_vulns = self.SearchZoomEye(port_key.get("host", ""), zoomeye_api_key, debug)
+            zoomeye_vulns = self.SearchZoomEye(keywords, zoomeye_api_key, debug)
 
         vulns = {}
         if len(Vulnerablities) == 0 and len(shodan_vulns) == 0 and len(zoomeye_vulns) == 0:
