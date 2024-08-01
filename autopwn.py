@@ -1,8 +1,29 @@
 from datetime import datetime
+import re
 
 from rich.console import Console
 
 from modules.banners import print_banner
+
+def generate_keywords(host: str) -> list:
+    """
+    Generate a list of keywords based on the host.
+    
+    Args:
+        host (str): The host to generate keywords for.
+
+    Returns:
+        list: A list of keywords.
+    """
+    keywords = []
+    # Add the host itself as a keyword
+    keywords.append(host)
+    
+    # Extract parts of the host (e.g., domain, subdomain)
+    parts = re.split(r'\.|-', host)
+    keywords.extend(parts)
+    
+    return keywords
 from modules.exploit import (exploit_vulnerabilities, search_metasploit,
                              search_exploits)
 from modules.getexploits import GetExploitsFromArray
@@ -52,7 +73,10 @@ def StartScanning(
             VulnsArray = []
             if args.metasploit_scan:
                 log.logger("info", "Running Metasploit scan...")
-                metasploit_vulns = search_metasploit(host, log)
+                keywords = generate_keywords(host)
+                metasploit_vulns = []
+                for keyword in keywords:
+                    metasploit_vulns.extend(search_metasploit(keyword, log))
                 for vuln in metasploit_vulns:
                     if isinstance(vuln, dict) and all(key in vuln for key in ['name', 'fullname']):
                         vuln_obj = VulnerableSoftware(
