@@ -147,7 +147,6 @@ Scanning:
   --metasploit-scan             Enable Metasploit scan for the target.
   -me MAX_EXPLOITS, --max-exploits MAX_EXPLOITS
                                 Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)
-  -e, --exploit                 Exploit the target after vulnerabilities have been checked and downloaded.
   -w, --web             Enable web search for the target.
   -shodan API, --shodan-api API Specify Shodan API key for additional scanning capabilities. (Default: None)
   --metasploit-scan     Enable Metasploit scan for the target.
