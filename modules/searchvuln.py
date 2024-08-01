@@ -5,7 +5,21 @@ from time import sleep
 from pymetasploit3.msfrpc import MsfRpcClient
 from rich.progress_bar import ProgressBar
 
-from modules.exploit import search_exploits
+def search_exploits(vulnerability: Dict[str, Any], log) -> List[str]:
+    """
+    Search for exploits related to a given vulnerability using Metasploit.
+    
+    :param vulnerability: A dictionary containing vulnerability details.
+    :param log: Logger object for logging.
+    :return: A list of exploit module names.
+    """
+    log.logger("info", f"Searching for exploits related to {vulnerability['CVEID']}")
+    
+    exploits = metasploitSearch(vulnerability['CVEID'])
+    exploit_names = [exploit['fullname'] for exploit in exploits if exploit['type'] == 'exploit']
+    
+    log.logger("info", f"Found {len(exploit_names)} exploits for {vulnerability['CVEID']}")
+    return exploit_names
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
