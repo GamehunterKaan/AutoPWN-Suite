@@ -56,22 +56,6 @@ def GenerateKeywordList(product: str, version: str) -> List[str]:
         if part.lower() not in dontsearch and part != "":
             keywords.append(part)
 
-
-
-    return keywords
-
-def GenerateKeywords(HostArray: List) -> List[str]:
-    keywords = []
-
-    for port in HostArray:
-        if not isinstance(port, (list, tuple)) or len(port) < 5:
-            continue
-        product = str(port[3])
-        version = str(port[4])
-
-        new_keywords = GenerateKeywordList(product, version)
-        keywords.extend(new_keywords)
-
     return keywords
 
 def GenerateKeywordsFromCVEs(CVEs: List[str]) -> List[str]:
