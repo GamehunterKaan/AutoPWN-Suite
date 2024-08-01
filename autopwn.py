@@ -81,8 +81,6 @@ def StartScanning(
                         all_vulnerabilities.append(vuln_obj)
                     else:
                         log.logger("warning", f"Vulnerability data missing required keys: {vuln}")
-                if exploit:
-                    exploit_vulnerabilities(all_vulnerabilities, host, log, console, max_exploits=max_exploits)
             sploits = SearchSploits(PortArray, log, console, apiKey)
             for sploit in sploits:
                 vuln_obj = VulnerableSoftware(
@@ -120,8 +118,6 @@ def StartScanning(
     
     if len(all_vulnerabilities) > 0:
         GetExploitsFromArray(all_vulnerabilities, log, console, console, max_exploits=max_exploits)
-        if exploit:
-            exploit_vulnerabilities(all_vulnerabilities, targetarg, log, console, max_exploits=max_exploits)
             
     if ScanWeb:
         for host in Targets:
