@@ -21,6 +21,10 @@ from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
 from modules.web.webvuln import webvuln
 
 
+def remove_duplicate_vulnerabilities(vulnerabilities):
+    unique_vulns = list({frozenset(vuln.CVEs): vuln for vuln in vulnerabilities}.values())
+    return unique_vulns
+
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, log
 ) -> None:
@@ -78,6 +82,7 @@ def StartScanning(
                     )
                     all_vulnerabilities.append(vuln_obj)
                     
+            all_vulnerabilities = remove_duplicate_vulnerabilities(all_vulnerabilities)
             print("All vulnerabilities: ", all_vulnerabilities)
             if DownloadExploits and len(all_vulnerabilities) > 0:
                 GetExploitsFromArray(all_vulnerabilities, log, console, console)
