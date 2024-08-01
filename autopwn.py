@@ -55,6 +55,7 @@ def StartScanning(
             VulnsArray = []
             if args.metasploit_scan:
                 log.logger("info", "Running Metasploit scan...")
+                metasploit_vulns = []
                 keywords = GenerateKeywords(host, [vuln['fullname'] for vuln in metasploit_vulns])
                 metasploit_vulns = []
                 for keyword in keywords:

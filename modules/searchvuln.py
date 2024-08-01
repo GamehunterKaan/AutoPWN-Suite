@@ -43,6 +43,7 @@ def SearchSploits(HostArray: list, log, console, apiKey=None, max_exploits: int 
     if not CheckConnection(log):
         return []
 
+    ApiResponseCVE = []
     keywords = GenerateKeywords(HostArray, [vuln.CVEID for vuln in ApiResponseCVE])
 
     if len(keywords) == 0:
