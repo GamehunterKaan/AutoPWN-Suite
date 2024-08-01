@@ -7,7 +7,8 @@ DONT_SEARCH = {
     "service", "application", "software", "system", "device", "tool", 
     "utility", "daemon", "agent", "client", "remote", "desktop", "protocol", 
     "windows", "linux", "unix", "mac", "os", "operating", "system", 
-    "microsoft", "apple", "gnu"
+    "microsoft", "apple", "gnu", "unknown", "unspecified", "unspecified", 
+    "none"
 }
 
 def generate_keyword_list_from_product(product: str, version: str, seen_products: set) -> List[str]:
