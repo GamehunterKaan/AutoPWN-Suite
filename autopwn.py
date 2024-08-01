@@ -52,7 +52,7 @@ def StartScanning(
             VulnsArray = []
             if args.metasploit_scan:
                 log.logger("info", "Running Metasploit scan...")
-                metasploit_vulns = []
+                metasploit_vulns = metasploitSearch(host)
                 for vuln in metasploit_vulns:
                     if isinstance(vuln, dict) and all(key in vuln for key in ['name', 'fullname']):
                         vuln_obj = VulnerableSoftware(
