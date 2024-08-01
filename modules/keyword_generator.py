@@ -48,7 +48,6 @@ def generate_keywords_from_cves(cves: List[str]) -> List[str]:
     Returns:
         List[str]: List of keywords generated from CVEs.
     """
-    print(f"CVEs: {cves}")
     return cves
 
 def generate_keywords_list_from_host_array(host_array: List[Union[List, tuple]], cves: Optional[List[str]] = None) -> List[str]:
