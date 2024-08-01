@@ -80,7 +80,7 @@ def StartScanning(
                 for port in ShodanPorts:
                     PortArray.append((host, port, "tcp", "shodan", ""))
                 for vuln in ShodanVulns:
-                    print("Shodan Vuln: ", vuln)
+                    log.logger("info", f"Shodan Vuln: {vuln['title']} - CVEs: {', '.join(vuln['CVEs'])}")
                     vuln_obj = VulnerableSoftware(
                         title=vuln['title'],
                         CVEs=vuln['CVEs'],
