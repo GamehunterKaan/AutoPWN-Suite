@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from rich.console import Console
 from rich.progress_bar import ProgressBar
 
-from modules.keyword_generator import GenerateKeywords
+from modules.utils import generate_keywords
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
