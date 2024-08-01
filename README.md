@@ -21,7 +21,6 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Get information about the vulnerability right from your terminal.
 - Automatically download and exploit vulnerabilities.
 - Noise mode for creating noise on the network.
-- Metasploit scan for enhanced vulnerability detection.
 - Evasion mode for being sneaky.
 - Automatically decide which scan types to use based on privilege.
 - Easy to read output.
@@ -110,8 +109,9 @@ Help Menu
 ```console
 $ autopwn-suite -h
 
-usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-vuln API] [-w] [-shodan API] [-zoomeye API] [--metasploit-scan] [-m {evade,noise,normal}] [-nt TIMEOUT]
-                  [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK] [-me MAX_EXPLOITS] [-e]
+usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-vuln API] [-w] [--shodan API] [--zoomeye API] [-m {evade,noise,normal}] [-nt TIMEOUT] [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK] [-me MAX_EXPLOITS]
+
+ex. python3.11 autopwn.py -y --vuln-api KEY --shodan-api DIFFERENT_KEY --zoomeye-api DIFFERENT_KEY2 --web -t TARGET
 
 AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.
 
@@ -147,9 +147,6 @@ Scanning:
   --metasploit-scan             Enable Metasploit scan for the target.
   -me MAX_EXPLOITS, --max-exploits MAX_EXPLOITS
                                 Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)
-  -w, --web             Enable web search for the target.
-  -shodan API, --shodan-api API Specify Shodan API key for additional scanning capabilities. (Default: None)
-  --metasploit-scan     Enable Metasploit scan for the target.
   -m {evade,noise,normal}, --mode {evade,noise,normal}
                         Scan mode.
   -nt TIMEOUT, --noise-timeout TIMEOUT
