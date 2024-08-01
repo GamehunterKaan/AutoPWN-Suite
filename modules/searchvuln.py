@@ -54,6 +54,8 @@ def GenerateKeywordList(product: str, version: str) -> list:
         "agent",
         "client",
         "remote",
+        "desktop",
+        "protocol",
         "server",
         "service",
         "application",
