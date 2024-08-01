@@ -13,6 +13,7 @@ def search_exploits(vulnerability: Dict[str, Any], log) -> List[str]:
     :param log: Logger object for logging.
     :return: A list of exploit module names.
     """
+from typing import Dict, Any, List
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
