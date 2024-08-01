@@ -8,9 +8,9 @@ from rich.console import Console
 from rich.progress_bar import ProgressBar
 
 from modules.exploit_search import search_exploits
+from modules.keyword_generator import GenerateKeywords
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
-from modules.keyword_generator import GenerateKeywords
 from modules.utils import CheckConnection, get_terminal_width
 
 
@@ -20,8 +20,6 @@ class VulnerableSoftware:
     CVEs: list
     severity_score: float
     exploitability: float
-
-
 
 
 def SearchKeyword(keyword: str, log, apiKey=None, max_exploits: int = 10) -> list:

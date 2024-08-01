@@ -7,7 +7,7 @@ from modules.banners import print_banner
 
 from modules.exploit import (exploit_vulnerabilities, search_metasploit,
                              search_exploits)
-from modules.keyword_generator import generate_keywords
+from modules.keyword_generator import GenerateKeywords
 from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
 from modules.report import InitializeReport
@@ -55,7 +55,7 @@ def StartScanning(
             VulnsArray = []
             if args.metasploit_scan:
                 log.logger("info", "Running Metasploit scan...")
-                keywords = generate_keywords(host)
+                keywords = GenerateKeywords(host)
                 metasploit_vulns = []
                 for keyword in keywords:
                     metasploit_vulns.extend(search_metasploit(keyword, log))

@@ -1,5 +1,6 @@
-from typing import List
 import re
+from typing import List
+
 
 def GenerateKeywordList(product: str, version: str) -> List[str]:
     if product == "Unknown":
@@ -61,15 +62,15 @@ def GenerateKeywordList(product: str, version: str) -> List[str]:
 
 def GenerateKeywords(HostArray: List, CVEs: List[str] = None) -> List[str]:
     keywords = []
+    if CVEs:
+        keywords.extend(GenerateKeywordsFromCVEs(CVEs))
+        
     for port in HostArray:
         product = str(port[3])
         version = str(port[4])
 
         new_keywords = GenerateKeywordList(product, version)
         keywords.extend(new_keywords)
-
-    if CVEs:
-        keywords.extend(GenerateKeywordsFromCVEs(CVEs))
 
     return keywords
 
@@ -83,13 +84,7 @@ def GenerateKeywordsFromCVEs(CVEs: List[str]) -> List[str]:
     Returns:
         List[str]: List of keywords generated from CVEs.
     """
-    keywords = []
-    for cve in CVEs:
-        # Extract keywords from CVE (e.g., CVE-2021-12345 -> 2021, 12345)
-        parts = re.findall(r'\d+', cve)
-        keywords.extend(parts)
-    
-    return keywords
+    return CVEs
 
 def GenerateKeywords(HostArray: List, CVEs: List[str] = None) -> List[str]:
     keywords = []
