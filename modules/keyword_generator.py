@@ -26,8 +26,12 @@ def generate_keyword_list_from_product(product: str, version: str, seen_products
     if product_key in seen_products:
         return []
     
-    keywords = [f"{part} {version}" for part in product.split() if part.lower() not in DONT_SEARCH]
-    if version.lower() not in DONT_SEARCH:
+    keywords = [
+        f"{part} {version}" for part in product.split()
+        if part.lower() not in DONT_SEARCH and not part.replace('.', '', 1).isdigit()
+    ]
+    
+    if version.lower() not in DONT_SEARCH and not version.replace('.', '', 1).isdigit():
         keywords.append(version)
     
     seen_products.add(product_key)
