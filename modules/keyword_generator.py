@@ -60,15 +60,11 @@ def GenerateKeywordList(product: str, version: str) -> List[str]:
 
     return keywords
 
-def GenerateKeywords(HostArray: List, CVEs: List[str] = None) -> List[str]:
+def GenerateKeywords(HostArray: List) -> List[str]:
     keywords = []
-    if CVEs:
-        keywords.extend(GenerateKeywordsFromCVEs(CVEs))
-        
+
     for port in HostArray:
         if not isinstance(port, (list, tuple)) or len(port) < 5:
-            continue
-        if len(port) < 5:
             continue
         product = str(port[3])
         version = str(port[4])
