@@ -143,7 +143,7 @@ def generate_keywords_with_ai(api_key: str, source: Union[str, List[Union[List, 
     
     prompt = "\n".join(prompt_parts)
     
-    prompt += "\nthe code after this point will strip() and split(',') the response, so please to format your response accordingly, ONLY RESPONSES IN THE FORMAT 'CVE-XXXX-XXXX, CVE-XXXX-XXXX, ...' WILL BE ACCEPTED"
+    prompt += "\nONLY RESPONSES IN THE FORMAT 'CVE-XXXX-XXXX, CVE-XXXX-XXXX, ...' WILL BE ACCEPTED"
     
     # Send the prompt to the OpenAI API
     response = openai.chat.completions.create(
