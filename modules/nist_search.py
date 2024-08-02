@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-import shodan
 from time import sleep
 
+import shodan
 from requests import get
 
 cache = {}
