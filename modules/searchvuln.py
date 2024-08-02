@@ -46,14 +46,9 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None) -> list:
     keywords = generate_keywords(HostArray)
     if args.openai_api_key:
         log.logger("info", "Using OpenAI API for vulnerability detection.")
-        for keyword in keywords:
-            with console.status(
-                f"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] [white]...[/white]",
-                spinner="bouncingBar"
-            ) as status:
-                GPTkeywords = generate_keywords_with_ai(args.openai_api_key, keyword)
-                for GPTkeyword in GPTkeywords:
-                    ApiResponseCVE.extend(SearchKeyword(GPTkeyword, log, apiKey))
+        GPTkeywords = generate_keywords_with_ai(args.openai_api_key, HostArray)
+        for GPTkeyword in GPTkeywords:
+            ApiResponseCVE.extend(SearchKeyword(GPTkeyword, log, apiKey))
                     
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
