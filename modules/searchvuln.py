@@ -52,7 +52,7 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None) -> list:
             ) as status:
                 GPTkeywords = generate_keywords_with_ai(args.openai_api_key, keyword)
                 for GPTkeyword in GPTkeywords:
-                    
+                    ApiResponseCVE.extend(SearchKeyword(GPTkeyword, log, apiKey))
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
         return []
