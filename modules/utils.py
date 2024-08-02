@@ -44,7 +44,7 @@ def cli():
     scanargs.add_argument("-vuln", "--vuln-api", help="Specify API key for vulnerability detection for faster scanning. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-shodan", "--shodan-api", help="Specify Shodan API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-zoomeye", "--zoomeye-api", help="Specify ZoomEye API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
-    scanargs.add_argument("-gpt", "--openai-api-key", help="Specify OpenAI API key for GPT4. (Default: None)", default=None, type=str, required=False)
+    scanargs.add_argument("-gpt", "--openai-api-key", help="Specify OpenAI API key for GPT-4. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-v", "--version", help="Print version and exit.", action="store_true")
     scanargs.add_argument("-y", "--yes-please", help="Don't ask for anything. (Full automatic mode)", action="store_true", required=False, default=False)
     scanargs.add_argument("-c", "--config", help="Specify a config file to use. (Default: None)", default=None, required=False, metavar="CONFIG", type=str)

@@ -51,7 +51,7 @@ def generate_keywords_from_cves(cves: List[str]) -> List[str]:
     """
     return cves
 
-def generate_keywords_list_from_host_array(host_array: List[Union[List, tuple]], cves: Optional[List[str]] = None) -> List[str]:
+def generate_keywords_list_from_host_array(host_array: List[Union[List, tuple]], cves: Optional[List[str]] = None, openai_api_key: Optional[str] = None) -> List[str]:
     """
     Generate keywords from HostArray and optionally from a list of CVEs.
     
@@ -74,7 +74,10 @@ def generate_keywords_list_from_host_array(host_array: List[Union[List, tuple]],
         product = str(port[2])  # Adjusted to use the correct product field
         version = str(port[4])
 
-        new_keywords = generate_keyword_list_from_product(product, version, seen_products)
+        if openai_api_key:
+            new_keywords = generate_keywords_with_ai(openai_api_key, product, version, cves)
+        else:
+            new_keywords = generate_keyword_list_from_product(product, version, seen_products)
         keywords.update(new_keywords)
 
     return list(keywords)

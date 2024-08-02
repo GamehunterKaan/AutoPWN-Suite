@@ -42,7 +42,7 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
         return []
 
     ApiResponseCVE = []
-    keywords = generate_keywords(HostArray)
+    keywords = generate_keywords_list_from_host_array(HostArray, cves=None, openai_api_key=args.openai_api_key)
 
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
