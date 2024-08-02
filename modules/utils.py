@@ -45,6 +45,7 @@ def cli():
     scanargs.add_argument("-shodan", "--shodan-api", help="Specify Shodan API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-zoomeye", "--zoomeye-api", help="Specify ZoomEye API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-gpt", "--openai-api-key", help="Specify OpenAI API key for GPT-4. (Default: None)", default=None, type=str, required=False)
+    scanargs.add_argument("-gpt", "--openai-api-key", help="Specify OpenAI API key for GPT-4. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-v", "--version", help="Print version and exit.", action="store_true")
     scanargs.add_argument("-y", "--yes-please", help="Don't ask for anything. (Full automatic mode)", action="store_true", required=False, default=False)
     scanargs.add_argument("-c", "--config", help="Specify a config file to use. (Default: None)", default=None, required=False, metavar="CONFIG", type=str)
@@ -140,7 +141,7 @@ def InitAutomation(args) -> None:
         DontAskForConfirmation = False
 
 
-def InitArgsAPI(args, log) -> tuple[str, str, str]:
+def InitArgsAPI(args, log) -> tuple[str, str, str, str]:
     if args.vuln_api:
         vuln_api_key = args.vuln_api
     else:
@@ -196,7 +197,25 @@ def InitArgsAPI(args, log) -> tuple[str, str, str]:
         except PermissionError:
             log.logger("error", "Permission denied while trying to read zoomeye_api.txt!")
 
-    return vuln_api_key, shodan_api_key, zoomeye_api_key
+    if args.openai_api_key:
+        openai_api_key = args.openai_api_key
+    else:
+        openai_api_key = None
+        try:
+            with open("openai_api.txt", "r", encoding="utf-8") as f:
+                openai_api_key = f.readline().strip("\n")
+        except FileNotFoundError:
+            log.logger(
+                "warning",
+                "No OpenAI API key specified and no openai_api.txt file found. "
+                + "AI keyword generation capabilities will be disabled! "
+                + "You can get your own OpenAI API key from "
+                + "https://beta.openai.com/signup/",
+            )
+        except PermissionError:
+            log.logger("error", "Permission denied while trying to read openai_api.txt!")
+
+    return vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key
 
 
 def InitArgsScanType(args, log) -> ScanType:
