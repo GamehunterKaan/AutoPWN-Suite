@@ -124,7 +124,7 @@ def generate_keywords_with_ai(api_key: str, source: Union[str, List[Union[List, 
     openai.api_key = api_key
     
     # Create a detailed prompt based on the input data
-    prompt_parts = ["Generate a list of relevant keywords based on the following data:"]
+    prompt_parts = ["Generate a list of relevant CVE's based on the following data:"]
     
     if isinstance(source, str) and version:
         prompt_parts.append(f"Product: {source}, Version: {version}")
@@ -142,6 +142,8 @@ def generate_keywords_with_ai(api_key: str, source: Union[str, List[Union[List, 
         prompt_parts.append(f"Additional CVEs: {', '.join(cves)}")
     
     prompt = "\n".join(prompt_parts)
+    
+    prompt += "\nMake sure The CVEs you provide, exist, and are relevant to the product and version, the code after this point will strip() and split(',') the response, so remember to format your response accordingly."
     
     # Send the prompt to the OpenAI API
     response = openai.chat.completions.create(
