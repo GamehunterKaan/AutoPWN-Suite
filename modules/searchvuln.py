@@ -33,7 +33,7 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(HostArray: list, log, console, apiKey=None, openai_api_key=None) -> list:
+def SearchSploits(HostArray: list, log, console, args, apiKey=None) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
@@ -42,8 +42,17 @@ def SearchSploits(HostArray: list, log, console, apiKey=None, openai_api_key=Non
         return []
 
     ApiResponseCVE = []
-    keywords = generate_keywords(HostArray, cves=None)
-
+    keywords = generate_keywords(HostArray)
+    if args.openai_api_key:
+        log.logger("info", "Using OpenAI API for vulnerability detection.")
+        for keyword in keywords:
+            with console.status(
+                f"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] [white]...[/white]",
+                spinner="bouncingBar"
+            ) as status:
+                GPTkeywords = generate_keywords_with_ai(args.openai_api_key, keyword)
+                for GPTkeyword in GPTkeywords:
+                    
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
         return []
