@@ -650,6 +650,7 @@ def ParamPrint(
     apiKey: str,
     shodan_api_key: str,
     api_keys_used: int,
+    openai_api_key: str,
     console,
     log,
 ) -> None:
@@ -670,7 +671,7 @@ def ParamPrint(
         + "\n"
         + f"│\tTarget : {targetarg}\n"
         + f"│\tOutput file : [yellow]{args.output}[/yellow]\n"
-        + f"│\tAPI Keys Used : {api_keys_used}/3\n"
+        + f"│\tAPI Keys Used : {api_keys_used}/4\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
 
