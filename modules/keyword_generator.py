@@ -1,5 +1,7 @@
 from typing import List, Optional, Union
 
+import openai
+
 DONT_SEARCH = {
     "ssh", "vnc", "http", "https", "ftp", "sftp", "smtp", "smb", "smbv2", 
     "httpd", "apache", "nginx", "linux telnetd", "microsoft windows rpc", 
@@ -35,7 +37,6 @@ def generate_keyword_list_from_product(product: str, version: str, seen_products
         keywords.append(version)
     
     seen_products.add(product_key)
-    print(f"Product: {product}, Version: {version}, Keywords: {keywords}")
     return keywords
 
 def generate_keywords_from_cves(cves: List[str]) -> List[str]:
@@ -61,7 +62,6 @@ def generate_keywords_list_from_host_array(host_array: List[Union[List, tuple]],
     Returns:
         List[str]: List of keywords generated from HostArray and CVEs.
     """
-    #print(f"HostArray: {host_array}")
     keywords = set()
     seen_products = set()
     
@@ -106,5 +106,51 @@ def generate_keywords(source: Union[str, List[Union[List, tuple]], List[str]], v
     else:
         raise ValueError("Invalid source type")
     
-    #print(f"Generated Keywords: {all_keywords}")
     return list(all_keywords)
+
+def generate_keywords_with_ai(api_key: str, source: Union[str, List[Union[List, tuple]], List[str]], version: Optional[str] = None, cves: Optional[List[str]] = None) -> List[str]:
+    """
+    Generate keywords from different sources by sending all the data to the OpenAI model.
+    
+    Args:
+        api_key (str): The OpenAI API key.
+        source (Union[str, List[Union[List, tuple]], List[str]]): The source of keywords.
+        version (Optional[str]): The version name if source is a product.
+        cves (Optional[List[str]]): List of CVEs.
+    
+    Returns:
+        List[str]: List of generated keywords.
+    """
+    openai.api_key = api_key
+    
+    # Create a detailed prompt based on the input data
+    prompt_parts = ["Generate a list of relevant keywords based on the following data:"]
+    
+    if isinstance(source, str) and version:
+        prompt_parts.append(f"Product: {source}, Version: {version}")
+    
+    if isinstance(source, list) and all(isinstance(item, str) for item in source):
+        prompt_parts.append(f"CVEs: {', '.join(source)}")
+    
+    if isinstance(source, list) and all(isinstance(item, (list, tuple)) for item in source):
+        for port_info in source:
+            if len(port_info) >= 5:
+                port, proto, product, service, version = port_info[:5]
+                prompt_parts.append(f"Port: {port}, Protocol: {proto}, Product: {product}, Service: {service}, Version: {version}")
+    
+    if cves:
+        prompt_parts.append(f"Additional CVEs: {', '.join(cves)}")
+    
+    prompt = "\n".join(prompt_parts)
+    
+    # Send the prompt to the OpenAI API
+    response = openai.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+    )
+    
+    # Extract and return the keywords from the response
+    keywords = response.choices[0].message.content.strip().split(', ')
+    return keywords

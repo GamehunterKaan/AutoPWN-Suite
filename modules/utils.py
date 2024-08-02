@@ -41,7 +41,10 @@ def cli():
     argparser = ArgumentParser(description="AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.")
     
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
+    scanargs.add_argument("-vuln", "--vuln-api", help="Specify API key for vulnerability detection for faster scanning. (Default: None)", default=None, type=str, required=False)
+    scanargs.add_argument("-shodan", "--shodan-api", help="Specify Shodan API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-zoomeye", "--zoomeye-api", help="Specify ZoomEye API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
+    scanargs.add_argument("-gpt", "--openai-api-key", help="Specify OpenAI API key for GPT4. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-v", "--version", help="Print version and exit.", action="store_true")
     scanargs.add_argument("-y", "--yes-please", help="Don't ask for anything. (Full automatic mode)", action="store_true", required=False, default=False)
     scanargs.add_argument("-c", "--config", help="Specify a config file to use. (Default: None)", default=None, required=False, metavar="CONFIG", type=str)
@@ -53,8 +56,6 @@ def cli():
     scanargs.add_argument("-nf", "--nmap-flags", help='Custom nmap flags to use for portscan. (Has to be specified like: -nf="-O")', default="", type=str, required=False)
     scanargs.add_argument("-s", "--speed", help="Scan speed. (Default: 3)", default=3, type=int, required=False, choices=range(0, 6))
     scanargs.add_argument("-ht", "--host-timeout", help="Timeout for every host. (Default: 240)", default=240, type=int, required=False)
-    scanargs.add_argument("-vuln", "--vuln-api", help="Specify API key for vulnerability detection for faster scanning. (Default: None)", default=None, type=str, required=False)
-    scanargs.add_argument("-shodan", "--shodan-api", help="Specify Shodan API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
     scanargs.add_argument("-m", "--mode", help="Scan mode.", default="normal", type=str, required=False, choices=["evade", "noise", "normal"])
     scanargs.add_argument("-nt", "--noise-timeout", help="Noise mode timeout.", default=None, type=int, required=False, metavar="TIMEOUT")
     
