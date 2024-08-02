@@ -6,7 +6,8 @@ from typing import Any, Dict, List
 from rich.console import Console
 from rich.progress_bar import ProgressBar
 
-from modules.keyword_generator import generate_keywords, generate_keywords_with_ai
+from modules.keyword_generator import (generate_keywords,
+                                       generate_keywords_with_ai)
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
@@ -53,6 +54,7 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None) -> list:
                 GPTkeywords = generate_keywords_with_ai(args.openai_api_key, keyword)
                 for GPTkeyword in GPTkeywords:
                     ApiResponseCVE.extend(SearchKeyword(GPTkeyword, log, apiKey))
+                    
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
         return []
