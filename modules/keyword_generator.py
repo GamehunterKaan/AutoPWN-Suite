@@ -124,7 +124,7 @@ def generate_keywords_with_ai(api_key: str, source: Union[str, List[Union[List, 
     openai.api_key = api_key
     
     # Create a detailed prompt based on the input data
-    prompt_parts = ["Generate a list of relevant CVE's based on the following data:"]
+    prompt_parts = ["give me a list of CVE's based on the following data:"]
     
     if isinstance(source, str) and version:
         prompt_parts.append(f"Product: {source}, Version: {version}")
@@ -143,11 +143,11 @@ def generate_keywords_with_ai(api_key: str, source: Union[str, List[Union[List, 
     
     prompt = "\n".join(prompt_parts)
     
-    prompt += "\nthe code after this point will strip() and split(',') the response, so remember to format your response accordingly."
+    prompt += "\nthe code after this point will strip() and split(',') the response, so please to format your response accordingly, ONLY RESPONSES IN THE FORMAT 'CVE-XXXX-XXXX, CVE-XXXX-XXXX, ...' WILL BE ACCEPTED"
     
     # Send the prompt to the OpenAI API
     response = openai.chat.completions.create(
-        model="gpt-4",
+        model="gpt-4o",
         messages=[
             {"role": "user", "content": prompt}
         ],
