@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from rich.console import Console
 from rich.progress_bar import ProgressBar
 
-from modules.keyword_generator import generate_keywords
+from modules.keyword_generator import generate_keywords, generate_keywords_list_from_host_array
 from modules.logger import banner
 from modules.nist_search import Vulnerability, searchCVE, searchShodan
 from modules.utils import CheckConnection, get_terminal_width
@@ -33,7 +33,7 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
+def SearchSploits(HostArray: list, log, console, apiKey=None, openai_api_key=None) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
@@ -42,7 +42,7 @@ def SearchSploits(HostArray: list, log, console, apiKey=None) -> list:
         return []
 
     ApiResponseCVE = []
-    keywords = generate_keywords_list_from_host_array(HostArray, cves=None, openai_api_key=args.openai_api_key)
+    keywords = generate_keywords_list_from_host_array(HostArray, cves=None, openai_api_key=openai_api_key)
 
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
