@@ -26,7 +26,7 @@ def remove_duplicate_vulnerabilities(vulnerabilities):
     return unique_vulns
 
 def StartScanning(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, console, log
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log
 ) -> None:
 
     check_nmap(log)
@@ -119,12 +119,12 @@ def main() -> None:
     targetarg = InitArgsTarget(args, log)
     scantype = InitArgsScanType(args, log)
     scanmode = InitArgsMode(args, log)
-    vuln_api_key, shodan_api_key, zoomeye_api_key = InitArgsAPI(args, log)
+    vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key = InitArgsAPI(args, log)
     ReportMethod, ReportObject = InitReport(args, log)
 
     ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, api_keys_used, console, log)
 
-    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, console, log)
+    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
