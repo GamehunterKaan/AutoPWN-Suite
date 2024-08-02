@@ -138,4 +138,4 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     # Display the number of vulnerabilities found
     log.logger("info", f"Found {len(Vulnerabilities)} vulnerabilities for {keyword}")
     
-    return Vulnerabilities
+    return Vulnerabilities[:20]
