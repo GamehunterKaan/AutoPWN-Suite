@@ -788,6 +788,10 @@ def check_version(cur_version: str, log) -> None:
                 "Your version of AutoPWN Suite is outdated. Update is advised.",
             )
 
+def remove_duplicate_vulnerabilities(vulnerabilities):
+    unique_vulns = list({frozenset(vuln.CVEs): vuln for vuln in vulnerabilities}.values())
+    return unique_vulns
+
 def GetShodanVulns(host, shodan_api_key, log):
     api = shodan.Shodan(shodan_api_key)
     try:

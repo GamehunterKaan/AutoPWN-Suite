@@ -17,13 +17,9 @@ from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
                            InitArgsScanType, InitArgsTarget, InitAutomation,
                            InitReport, ParamPrint, SaveOutput, ScanMode,
                            UserConfirmation, WebScan, check_nmap,
-                           check_version, cli, resolve_hostnames_to_ips)
+                           check_version, cli, resolve_hostnames_to_ips, remove_duplicate_vulnerabilities)
 from modules.web.webvuln import webvuln
 
-
-def remove_duplicate_vulnerabilities(vulnerabilities):
-    unique_vulns = list({frozenset(vuln.CVEs): vuln for vuln in vulnerabilities}.values())
-    return unique_vulns
 
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log
