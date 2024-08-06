@@ -1,6 +1,4 @@
-import socket
 from dataclasses import dataclass
-from enum import Enum
 from multiprocessing import Process
 from time import sleep
 
@@ -10,7 +8,6 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from modules.exploit import exploit_vulnerabilities
 from modules.logger import banner
 from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
 
