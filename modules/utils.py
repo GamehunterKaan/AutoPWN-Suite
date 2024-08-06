@@ -17,11 +17,8 @@ from socket import AF_INET, SOCK_DGRAM
 from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
 
-import requests
-import shodan
 from requests import get
 from rich.text import Text
-from zoomeye.sdk import ZoomEye
 
 from modules.report import ReportMail, ReportType
 
@@ -792,36 +789,3 @@ def remove_duplicate_vulnerabilities(vulnerabilities):
     unique_vulns = list({frozenset(vuln.CVEs): vuln for vuln in vulnerabilities}.values())
     return unique_vulns
 
-def GetShodanVulns(host, shodan_api_key, log):
-    api = shodan.Shodan(shodan_api_key)
-    try:
-        host_info = api.host(host)
-        vulns = host_info.get("vulns", [])
-        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from Shodan.")
-        open_ports = [service['port'] for service in host_info.get('data', [])]
-        formatted_vulns = []
-        for vuln in vulns:
-            formatted_vulns.append({
-                'title': vuln,
-                'CVEs': [vuln],
-                'severity_score': 0.0,
-                'exploitability': 0.0
-            })
-        return formatted_vulns, open_ports
-    except shodan.APIError as e:
-        log.logger("ERROR", f"Error fetching Shodan vulnerabilities: {e}")
-        return []
-
-def GetZoomEyeVulns(host, zoomeye_api_key, log):
-    # Initialize ZoomEye API client
-    api = ZoomEye(api_key=zoomeye_api_key)
-    
-    try:
-        # Perform the search
-        results = api.dork_search(f"ip:{host}", page=1)
-        vulns = results.get('matches', [])
-        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from ZoomEye.")
-        return vulns
-    except Exception as e:
-        log.logger("ERROR", f"Error fetching ZoomEye vulnerabilities: {e}")
-        return []

@@ -4,20 +4,19 @@ from datetime import datetime
 from rich.console import Console
 
 from modules.banners import print_banner
-from modules.exploit import exploit_vulnerabilities
 from modules.getexploits import GetExploitsFromArray
 from modules.keyword_generator import generate_keywords
 from modules.logger import Logger
 from modules.report import InitializeReport
 from modules.scanner import (AnalyseScanResults, DiscoverHosts, NoiseScan,
-                             PortScan, ShodanScan, display_shodan_results)
-from modules.searchvuln import SearchSploits, VulnerableSoftware
-from modules.utils import (GetHostsToScan, GetShodanVulns, GetZoomEyeVulns,
+                             PortScan)
+from modules.searchvuln import SearchSploits, VulnerableSoftware, GetShodanVulns, GetZoomEyeVulns
+from modules.utils import (GetHostsToScan, 
                            InitArgsAPI, InitArgsConf, InitArgsMode,
                            InitArgsScanType, InitArgsTarget, InitAutomation,
                            InitReport, ParamPrint, SaveOutput, ScanMode,
-                           UserConfirmation, WebScan, check_nmap,
-                           check_version, cli, resolve_hostnames_to_ips, remove_duplicate_vulnerabilities)
+                           UserConfirmation, check_nmap,
+                           check_version, cli, remove_duplicate_vulnerabilities)
 from modules.web.webvuln import webvuln
 
 
