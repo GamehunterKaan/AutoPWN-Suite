@@ -9,7 +9,7 @@ from modules.exploit import exploit_vulnerabilities
 from modules.getexploits import GetExploitsFromArray
 from modules.keyword_generator import generate_keywords
 from modules.nist_search import searchCVE, searchShodan
-from modules.utils import GetZoomEyeVulns, fake_logger, is_root
+from modules.utils import fake_logger, is_root
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
