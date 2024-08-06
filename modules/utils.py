@@ -13,7 +13,7 @@ from enum import Enum
 from os import get_terminal_size
 from platform import platform, system
 from re import search
-from socket import AF_INET, SOCK_DGRAM
+from socket import AF_INET, SOCK_DGRAM, socket
 from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
 
