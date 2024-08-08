@@ -76,7 +76,8 @@ def StartScanning(
                     all_vulnerabilities.append(vuln_obj)
                     
             all_vulnerabilities = remove_duplicate_vulnerabilities(all_vulnerabilities)
-            print("All vulnerabilities: ", all_vulnerabilities)
+            if all_vulnerabilities:
+                print("All vulnerabilities: ", all_vulnerabilities)
             if DownloadExploits and len(all_vulnerabilities) > 0:
                 GetExploitsFromArray(all_vulnerabilities, log, console, console)
     
