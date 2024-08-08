@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Type, Union
 
 from nmap import PortScanner
 
-from modules.exploit import exploit_vulnerabilities
+#from modules.exploit import exploit_vulnerabilities
 from modules.getexploits import GetExploitsFromArray
 from modules.keyword_generator import generate_keywords
 from modules.nist_search import searchCVE, searchShodan
@@ -228,7 +228,9 @@ class AutoScanner:
         if all_vulnerabilities:
             GetExploitsFromArray(all_vulnerabilities, log, console, max_exploits=max_exploits)
             if scan_vulns:
-                exploit_vulnerabilities(all_vulnerabilities, target, log, console, max_exploits=max_exploits)
+                # exploit_vulnerabilities(all_vulnerabilities, target, log, console, max_exploits=max_exploits)
+                pass
+            
 
         return self.scan_results
 
