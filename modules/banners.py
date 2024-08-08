@@ -5,7 +5,7 @@ from rich.text import Text
 from modules.utils import get_terminal_width
 
 
-def print_banner(console, api_keys_used: int) -> None:
+def print_banner(console) -> None:
     width = get_terminal_width()
     height = 8
     banner = """\

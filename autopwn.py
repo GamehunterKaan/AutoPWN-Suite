@@ -101,9 +101,9 @@ def main() -> None:
         print(f"AutoPWN Suite v{__version__}")
         raise SystemExit
 
+    print_banner(console)
     vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key = InitArgsAPI(args, log)
     api_keys_used = sum([1 for key in [vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key] if key])
-    print_banner(console, api_keys_used)
     check_version(__version__, log)
 
     if args.config:
@@ -113,7 +113,6 @@ def main() -> None:
     targetarg = InitArgsTarget(args, log)
     scantype = InitArgsScanType(args, log)
     scanmode = InitArgsMode(args, log)
-    vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key = InitArgsAPI(args, log)
     ReportMethod, ReportObject = InitReport(args, log)
 
     ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, api_keys_used, openai_api_key, console, log)
