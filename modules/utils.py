@@ -411,29 +411,30 @@ def GetHostsToScan(hosts, console, args) -> list[str]:
         else:
             msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
 
-        console.print(msg, justify="center")
+        if args.tag:
+            console.print(msg + " - Utils", justify="center")
+        else:
+            console.print(msg, justify="center")
 
         index += 1
 
     if DontAskForConfirmation:
         return hosts
 
-    console.print(
-        "\n[yellow]Enter the index number of the "
-        + "host you would like to enumurate further.\n"
-        + "Enter 'all' to enumurate all hosts.\n"
-        + "Enter 'exit' to exit [/yellow]"
-    )
-    console.print(
-        "\n[yellow]Enter the index number of the "
-        + "host you would like to enumurate further.\n"
-        + "Enter 'all' to enumurate all hosts.\n"
-        + "Enter 'exit' to exit [/yellow]"
-    )
     if args.tag:
-        console.print(msg + " - Utils")
+        console.print(
+            "\n[yellow]Enter the index number of the "
+            + "host you would like to enumurate further.\n"
+            + "Enter 'all' to enumurate all hosts.\n"
+            + "Enter 'exit' to exit [/yellow] - Utils"
+        )
     else:
-        console.print(msg)
+        console.print(
+            "\n[yellow]Enter the index number of the "
+            + "host you would like to enumurate further.\n"
+            + "Enter 'all' to enumurate all hosts.\n"
+            + "Enter 'exit' to exit [/yellow]"
+        )
 
     while True:
         host = input(f"────> ")
@@ -693,40 +694,43 @@ def ParamPrint(
     )
 
     if args.skip_discovery:
-        msg += f"│\tSkip discovery: True - Utils\n"
+        msg += f"│\tSkip discovery: True\n"
 
     if args.host_file:
-        msg += f"│\tHostfile: {args.host_file} - Utils\n"
+        msg += f"│\tHostfile: {args.host_file}\n"
 
     if not args.host_timeout == 240:
-        msg += f"│\tHost timeout: {args.host_timeout} - Utils\n"
+        msg += f"│\tHost timeout: {args.host_timeout}\n"
 
     if scanmode_name == ScanMode.Normal:
         msg += (
-            f"│\tScan type : [red]{scantype_name.name}[/red] - Utils\n"
-            + f"│\tScan speed : {args.speed} - Utils\n"
+            f"│\tScan type : [red]{scantype_name.name}[/red]\n"
+            + f"│\tScan speed : {args.speed}\n"
         )
     elif scanmode_name == ScanMode.Evade:
         msg += (
             f"│\tScan mode : {scanmode_name.name}\n"
-            + f"│\tScan type : [red]{scantype_name.name}[/red] - Utils\n"
-            + f"│\tScan speed : {args.speed} - Utils\n"
+            + f"│\tScan type : [red]{scantype_name.name}[/red]\n"
+            + f"│\tScan speed : {args.speed}\n"
         )
     elif scanmode_name == ScanMode.Noise:
-        msg += f"│\tScan mode : {scanmode_name.name} - Utils\n"
+        msg += f"│\tScan mode : {scanmode_name.name}\n"
 
     if not args.nmap_flags == None and not args.nmap_flags == "":
-        msg += f"│\tNmap flags : [blue]{args.nmap_flags}[/blue] - Utils\n"
+        msg += f"│\tNmap flags : [blue]{args.nmap_flags}[/blue]\n"
 
     if args.report:
-        msg += f"│\tReporting method : {args.report} - Utils\n"
+        msg += f"│\tReporting method : {args.report}\n"
 
     if hasattr(args, 'max_exploits'):
-        msg += f"│\tMax exploits : {args.max_exploits} - Utils\n"
+        msg += f"│\tMax exploits : {args.max_exploits}\n"
 
     msg += "└" + "─" * (term_width - 1)
 
-    console.print(msg + " - Utils")
+    if args.tag:
+        console.print(msg + " - Utils")
+    else:
+        console.print(msg)
 
 
 def CheckConnection(log) -> bool:
