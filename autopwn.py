@@ -177,7 +177,7 @@ def StartExploiting(
                     )
                     all_vulnerabilities.append(vuln_obj)
             if zoomeye_api_key:
-                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
+                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log, args)
                 for vuln in ZoomEyeVulns:
                     vuln_obj = VulnerableSoftware(
                         title=vuln['title'],
