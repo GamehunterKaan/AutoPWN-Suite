@@ -683,14 +683,14 @@ def ParamPrint(
     term_width = get_terminal_width()
 
     msg = (
-        "\n┌─[ Scanning with the following parameters ] - Utils\n"
+        "\n┌─[ Scanning with the following parameters ]\n"
         + f"├"
         + "─" * (term_width - 1)
         + "\n"
-        + f"│\tTarget : {targetarg} - Utils\n"
-        + f"│\tOutput file : [yellow]{args.output}[/yellow] - Utils\n"
-        + f"│\tAPI Keys Used : {api_keys_used}/4 - Utils\n"
-        + f"│\tAutomatic : {DontAskForConfirmation} - Utils\n"
+        + f"│\tTarget : {targetarg}\n"
+        + f"│\tOutput file : [yellow]{args.output}[/yellow]\n"
+        + f"│\tAPI Keys Used : {api_keys_used}/4\n"
+        + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
 
     if args.skip_discovery:
