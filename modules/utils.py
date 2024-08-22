@@ -61,6 +61,7 @@ def cli():
     exploitargs.add_argument("-me", "--max-exploits", help="Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)", default=10, type=int, required=False)
 
     scanargs.add_argument("-tag", "--tag", help="Enable source tags in print statements.", action="store_true", required=False, default=False)
+    scanargs.add_argument("-tag", "--tag", help="Enable source tags in print statements.", action="store_true", required=False, default=False)
     reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
     reportargs.add_argument("-o", "--output", help="Output file name. (Default: autopwn.log)", default="autopwn", type=str, required=False)
     reportargs.add_argument("-ot", "--output-type", help="Output file type. (Default: html)", default="html", type=str, required=False, choices=["html", "txt", "svg"])
