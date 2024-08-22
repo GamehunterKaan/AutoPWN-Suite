@@ -128,7 +128,7 @@ def generate_keywords_with_ai(api_key: str, source: Union[str, List[Union[List, 
     if args and args.tag:
         prompt_parts.append(" - Keyword Generator")
     prompt_parts = ["give me a list of CVE's based on the following data:"]
-    if args.tag:
+    if args and args.tag:
         prompt_parts.append(" - Keyword Generator")
     
     if isinstance(source, str) and version:
