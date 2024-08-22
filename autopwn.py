@@ -36,7 +36,7 @@ def check_and_start_msfrpcd(password: str, log) -> None:
     except Exception as e:
         log.logger("error", f"Failed to check/start msfrpcd: {e}")
 def StartScanning(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, max_vulns
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, args.max_exploits
 ) -> None:
 
     check_nmap(log)
@@ -107,7 +107,7 @@ def StartScanning(
     )
 
 def StartExploiting(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, max_vulns
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, args.max_exploits
 ) -> None:
     check_nmap(log)
 

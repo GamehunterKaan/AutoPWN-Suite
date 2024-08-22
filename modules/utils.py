@@ -58,7 +58,7 @@ def cli():
     
     exploitargs = argparser.add_argument_group("Exploiting", "Options for exploiting")
     exploitargs.add_argument("-e", "--exploit", help="Specify whether to exploit vulnerabilities or not.", action="store_true", required=False, default=False)
-    exploitargs.add_argument("-mv", "--max-vulns", help="Maximum number of vulnerabilities to use per keyword. (Default: 10)", default=10, type=int, required=False)
+    exploitargs.add_argument("-me", "--max-exploits", help="Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)", default=10, type=int, required=False)
 
     reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
     reportargs.add_argument("-o", "--output", help="Output file name. (Default: autopwn.log)", default="autopwn", type=str, required=False)
