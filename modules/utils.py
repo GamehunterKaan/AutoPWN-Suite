@@ -411,7 +411,7 @@ def GetHostsToScan(hosts, console, args) -> list[str]:
         else:
             msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
 
-        console.print(msg, justify="center", args=args)
+        console.print(msg, justify="center")
 
         index += 1
 
@@ -431,7 +431,7 @@ def GetHostsToScan(hosts, console, args) -> list[str]:
         + "Enter 'exit' to exit [/yellow]"
     )
     if args.tag:
-        console.print(msg + " - Utils", args=args)
+        console.print(msg + " - Utils")
     else:
         console.print(msg)
 
