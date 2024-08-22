@@ -72,7 +72,7 @@ def searchShodan(keyword: str, log, shodan_api_key: str, args) -> list[Vulnerabi
                 ))
 
         # Handle the case where max_exploits is specified
-            if len(vulns) > args.max_exploits:
+            if args and len(vulns) > args.max_exploits:
                 vulns = vulns[:args.max_exploits]
                 log_msg = f"Using the first {args.max_exploits} vulnerabilities"
                 if args.tag:
@@ -158,7 +158,7 @@ def searchCVE(keyword: str, log, apiKey=None, args=None) -> list[Vulnerability]:
     log.logger("info", log_msg)
     
     
-    if len(Vulnerabilities) > args.max_exploits:
+    if args and len(Vulnerabilities) > args.max_exploits:
         Vulnerabilities = Vulnerabilities[:args.max_exploits]
         log_msg = f"Using the first {args.max_exploits} vulnerabilities"
         if args.tag:
