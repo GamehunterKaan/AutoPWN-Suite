@@ -45,7 +45,7 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
     keywords = generate_keywords(HostArray)
     if args.openai_api_key:
         log.logger("info", "Using OpenAI API for vulnerability detection.")
-        GPTkeywords = generate_keywords_with_ai(args.openai_api_key, HostArray)
+        GPTkeywords = generate_keywords_with_ai(args.openai_api_key, HostArray, args)
         for GPTkeyword in GPTkeywords[:args.max_exploits]:
             ApiResponseCVE.extend(SearchKeyword(GPTkeyword, log, apiKey))
                     
