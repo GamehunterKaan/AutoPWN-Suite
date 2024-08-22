@@ -144,7 +144,7 @@ def InitAutomation(args) -> None:
         DontAskForConfirmation = False
 
 
-def InitArgsAPI(args, log) -> tuple[str, str, str, str]:
+def InitArgsAPI(args, log) -> tuple[str, str, str, str, dict]:
     if args.vuln_api:
         vuln_api_key = args.vuln_api
     else:
@@ -218,7 +218,7 @@ def InitArgsAPI(args, log) -> tuple[str, str, str, str]:
         except PermissionError:
             log.logger("error", "Permission denied while trying to read openai_api.txt!")
 
-    return vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key
+    return vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, args
 
 
 def InitArgsScanType(args, log) -> ScanType:
