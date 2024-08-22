@@ -117,7 +117,9 @@ class AutoScanner:
         
 
     def SearchVuln(
-        self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False
+        self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False, args=None
+        if args is None:
+            args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     ) -> JSON:
         product = port_key.get("product", "")
         version = port_key.get("version", "")
@@ -230,7 +232,7 @@ class AutoScanner:
 
         # Exploit the vulnerabilities found
         if all_vulnerabilities:
-            GetExploitsFromArray(all_vulnerabilities, log, console, args)
+            GetExploitsFromArray(all_vulnerabilities, log, console, args if args else type('Args', (object,), {'max_exploits': 10, 'tag': False})())
             if scan_vulns:
                 # exploit_vulnerabilities(all_vulnerabilities, target, log, console, max_exploits=max_exploits)
                 pass
