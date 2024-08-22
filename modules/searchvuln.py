@@ -82,9 +82,15 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
                 console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]")
 
             wrapped_description = wrap(CVE.description, term_width - 50)
-            console.print(f"│\t\t[cyan]Description: [/cyan] - SearchVuln")
+            if args.tag:
+                console.print(f"│\t\t[cyan]Description: [/cyan] - SearchVuln")
+            else:
+                console.print(f"│\t\t[cyan]Description: [/cyan]")
             for line in wrapped_description:
-                console.print(f"│\t\t\t{line} - SearchVuln")
+                if args.tag:
+                    console.print(f"│\t\t\t{line} - SearchVuln")
+                else:
+                    console.print(f"│\t\t\t{line}")
             console.print(
                 f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
                 + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
