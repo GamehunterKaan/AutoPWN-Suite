@@ -13,7 +13,8 @@ JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
 
 class AutoScanner:
-    def __init__(self) -> None:
+    def __init__(self, args=None) -> None:
+        self.args = args
         self.scan_results = {}
 
     def __str__(self) -> str:
@@ -99,16 +100,19 @@ class AutoScanner:
 
         return scan_arguments
 
-    def SearchShodan(self, product: str, version: str, shodan_api_key: str, args, debug: bool = False) -> list:
+    def SearchShodan(self, product: str, version: str, shodan_api_key: str, debug: bool = False) -> list:
         log = fake_logger()
+        self.args = args
         keywords = generate_keywords(product, version)
         for word in keywords:
             if debug:
                 print(f"Searching Shodan for keyword {word} ...")
-            shodan_vulns = searchShodan(word, log, shodan_api_key, args)
+            shodan_vulns = searchShodan(word, log, shodan_api_key, self.args)
             return shodan_vulns
 
     def SearchZoomEye(self, host: str, zoomeye_api_key: str, debug: bool = False) -> list:
+        log = fake_logger()
+        # Add your implementation here
         log = fake_logger()
         
 
@@ -127,7 +131,7 @@ class AutoScanner:
             Vulnerablities = searchCVE(word, log, vuln_api_key)
             shodan_vulns = []
             if shodan_api_key:
-                shodan_vulns = searchShodan(word, log, shodan_api_key)
+                shodan_vulns = searchShodan(word, log, shodan_api_key, self.args)
 
             zoomeye_vulns = []
             if zoomeye_api_key:
@@ -183,7 +187,7 @@ class AutoScanner:
                         "extrainfo": "",
                         "cpe": "",
                     }
-                shodan_results = self.SearchShodan(host, "", shodan_api_key, args, debug)
+                shodan_results = self.SearchShodan(host, "", shodan_api_key, debug)
                 for result in shodan_results:
                     shodan_ports[result.CVEID] = {
                         "product": result.title,
