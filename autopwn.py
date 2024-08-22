@@ -68,6 +68,37 @@ def StartScanning(
             for sploit in sploits[:args.max_exploits]:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:
+                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log, args)
+                for port in ShodanPorts:
+                    PortArray.append((host, port, "tcp", "shodan", ""))
+                for vuln in ShodanVulns:
+                    log.logger("info", f"Shodan Vuln: {vuln['title']} - CVEs: {', '.join(vuln['CVEs'])}")
+                    vuln_obj = VulnerableSoftware(
+                        title=vuln['title'],
+                        CVEs=vuln['CVEs'],
+                        severity_score=vuln['severity_score'],
+                        exploitability=vuln['exploitability']
+                    )
+                    all_vulnerabilities.append(vuln_obj)
+            if zoomeye_api_key:
+                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log, args)
+                for vuln in ZoomEyeVulns:
+                    vuln_obj = VulnerableSoftware(
+                        title=vuln['title'],
+                        CVEs=vuln['CVEs'],
+                        severity_score=vuln['severity_score'],
+                        exploitability=vuln['exploitability']
+                    )
+                    all_vulnerabilities.append(vuln_obj)
+                    
+            all_vulnerabilities = remove_duplicate_vulnerabilities(all_vulnerabilities)
+            if all_vulnerabilities:
+                print("All vulnerabilities: ", all_vulnerabilities)
+            if DownloadExploits and len(all_vulnerabilities) > 0:
+                GetExploitsFromArray(all_vulnerabilities, log, console, console)
+            for sploit in sploits[:args.max_exploits]:
+                all_vulnerabilities.append(sploit)
+            if shodan_api_key:
                 ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
                 for port in ShodanPorts:
                     PortArray.append((host, port, "tcp", "shodan", ""))
@@ -159,7 +190,7 @@ def StartExploiting(
             all_vulnerabilities = remove_duplicate_vulnerabilities(all_vulnerabilities)
             if all_vulnerabilities:
                 print("All vulnerabilities: ", all_vulnerabilities)
-                exploit_vulnerabilities(all_vulnerabilities, host, log, console)
+                exploit_vulnerabilities(all_vulnerabilities, host, log, console, args)
 
     console.print(
         "{time} - Exploitation completed.".format(
@@ -178,7 +209,7 @@ def main() -> None:
 
     print_banner(console)
     if args.exploit:
-        initialize_msf_client("yourpassword", log)
+        initialize_msf_client("yourpassword", log, args)
         check_and_start_msfrpcd("yourpassword", log)
         
     vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key = InitArgsAPI(args, log)
