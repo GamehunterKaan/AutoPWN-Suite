@@ -20,10 +20,10 @@ class VulnerableSoftware:
     exploitability: float
 
 
-def SearchKeyword(keyword: str, log, apiKey=None) -> list:
+def SearchKeyword(keyword: str, log, apiKey=None, args=None) -> list:
 
     try:
-        ApiResponseCVE = searchCVE(keyword, log, apiKey)
+        ApiResponseCVE = searchCVE(keyword, log, apiKey, args)
         #log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
         log.logger("error", e)
@@ -34,8 +34,6 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
 
 
 def SearchSploits(HostArray: list, log, console, args=None, apiKey=None, max_vulns=10) -> list:
-    if args is None:
-        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     VulnsArray = []
     target = str(HostArray[0])
     term_width = get_terminal_width()
@@ -49,7 +47,7 @@ def SearchSploits(HostArray: list, log, console, args=None, apiKey=None, max_vul
         log.logger("info", "Using OpenAI API for vulnerability detection.")
         GPTkeywords = generate_keywords_with_ai(args.openai_api_key, HostArray, args)
         for GPTkeyword in GPTkeywords[:args.max_exploits]:
-            ApiResponseCVE.extend(SearchKeyword(GPTkeyword, log, apiKey))
+            ApiResponseCVE.extend(SearchKeyword(GPTkeyword, log, apiKey, args))
                     
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
@@ -61,7 +59,7 @@ def SearchSploits(HostArray: list, log, console, args=None, apiKey=None, max_vul
 
     printed_banner = False
     for keyword in keywords:
-        ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+        ApiResponseCVE = SearchKeyword(keyword, log, apiKey, args)
         sleep(1)  # Adding a delay to ensure proper logging and searching
         if len(ApiResponseCVE) == 0:
             continue
@@ -118,8 +116,6 @@ def SearchSploits(HostArray: list, log, console, args=None, apiKey=None, max_vul
 
 
 def GetShodanVulns(host, shodan_api_key, log, args=None):
-    if args is None:
-        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     api = shodan.Shodan(shodan_api_key)
     try:
         host_info = api.host(host)
@@ -140,8 +136,6 @@ def GetShodanVulns(host, shodan_api_key, log, args=None):
         return []
 
 def GetZoomEyeVulns(host, zoomeye_api_key, log, args=None):
-    if args is None:
-        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     # Initialize ZoomEye API client
     api = ZoomEye(api_key=zoomeye_api_key)
     

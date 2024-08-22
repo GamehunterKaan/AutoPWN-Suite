@@ -82,7 +82,9 @@ def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vuln
     except shodan.APIError as e:
         log.logger("error", f"Shodan API error: {e}")
 
-    log_msg = f"Found {len(vulns)} vulnerabilities for {keyword}"
+
+    #print('Args: ', args)
+    log_msg = f"Found {len(vulns)} vulnerabilities for {keyword} with Shodan API"
     if args and getattr(args, 'tag', False):
         log_msg += " - Shodan Search"
     log.logger("info", log_msg)
@@ -90,7 +92,7 @@ def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vuln
     return vulns
 
 
-def searchCVE(keyword: str, log, args=None, apiKey=None) -> list[Vulnerability]:
+def searchCVE(keyword: str, log, apiKey=None, args=None) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     if apiKey:
         sleep_time = 0.1
@@ -151,7 +153,7 @@ def searchCVE(keyword: str, log, args=None, apiKey=None) -> list[Vulnerability]:
     Vulnerabilities.sort(key=lambda x: (x.severity_score, x.exploitability), reverse=True)
     
     # Handle the case where max_exploits is specified
-    
+    #print('Args: ', args)
     log_msg = f"Found {len(Vulnerabilities)} vulnerabilities for {keyword}"
     if args and args.tag:
         log_msg += " - NIST Search"
