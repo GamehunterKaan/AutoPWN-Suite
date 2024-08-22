@@ -36,7 +36,7 @@ def check_and_start_msfrpcd(password: str, log) -> None:
     except Exception as e:
         log.logger("error", f"Failed to check/start msfrpcd: {e}")
 def StartScanning(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, max_vulns
 ) -> None:
 
     check_nmap(log)
@@ -64,7 +64,7 @@ def StartScanning(
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = []
             keywords = generate_keywords(PortArray)
-            sploits = SearchSploits(keywords, log, console, args, apiKey)
+            sploits = SearchSploits(keywords, log, console, args, apiKey, max_vulns)
             for sploit in sploits:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:
@@ -107,7 +107,7 @@ def StartScanning(
     )
 
 def StartExploiting(
-    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, max_vulns
 ) -> None:
     check_nmap(log)
 
@@ -129,7 +129,7 @@ def StartExploiting(
         PortArray = AnalyseScanResults(PortScanResults, log, console, host, shodan_results=None)
         if PortArray and len(PortArray) > 0:
             keywords = generate_keywords(PortArray)
-            sploits = SearchSploits(keywords, log, console, args, apiKey)
+            sploits = SearchSploits(keywords, log, console, args, apiKey, max_vulns)
             for sploit in sploits:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:
@@ -197,9 +197,9 @@ def main() -> None:
     ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, api_keys_used, openai_api_key, console, log)
 
     if args.exploit:
-        StartExploiting(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
+        StartExploiting(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, args.max_vulns)
     else:
-        StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
+        StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, args.max_vulns)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
