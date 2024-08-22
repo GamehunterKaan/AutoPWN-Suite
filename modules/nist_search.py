@@ -25,6 +25,9 @@ class Vulnerability:
             + f"NIST Search - Severity : {self.severity} - {self.severity_score}\n"
             + f"NIST Search - Details : {self.details_url}\n"
             + f"NIST Search - Exploitability : {self.exploitability}"
+        if args.tag:
+            return result + " - Nist Search"
+        return result
         )
 
 

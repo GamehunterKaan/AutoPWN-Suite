@@ -60,6 +60,7 @@ def cli():
     exploitargs.add_argument("-e", "--exploit", help="Specify whether to exploit vulnerabilities or not.", action="store_true", required=False, default=False)
     exploitargs.add_argument("-me", "--max-exploits", help="Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)", default=10, type=int, required=False)
 
+    scanargs.add_argument("-tag", "--tag", help="Enable source tags in print statements.", action="store_true", required=False, default=False)
     reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
     reportargs.add_argument("-o", "--output", help="Output file name. (Default: autopwn.log)", default="autopwn", type=str, required=False)
     reportargs.add_argument("-ot", "--output-type", help="Output file type. (Default: html)", default="html", type=str, required=False, choices=["html", "txt", "svg"])
@@ -403,7 +404,10 @@ def GetHostsToScan(hosts, console) -> list[str]:
         if not len(host) % 2 == 0:
             host += " "
 
-        msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host, " - Utils")
+        if args.tag:
+            msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host, " - Utils")
+        else:
+            msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
 
         console.print(msg, justify="center")
 
@@ -416,7 +420,11 @@ def GetHostsToScan(hosts, console) -> list[str]:
         "\n[yellow]Enter the index number of the "
         + "host you would like to enumurate further.\n"
         + "Enter 'all' to enumurate all hosts.\n"
-        + "Enter 'exit' to exit [/yellow] - Utils"
+        + "Enter 'exit' to exit [/yellow]"
+        if args.tag:
+            console.print(msg + " - Utils")
+        else:
+            console.print(msg)
     )
 
     while True:
