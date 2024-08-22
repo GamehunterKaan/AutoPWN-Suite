@@ -19,12 +19,12 @@ class Vulnerability:
 
     def __str__(self) -> str:
         return (
-            f"Title : {self.title}\n"
-            + f"CVE_ID : {self.CVEID}\n"
-            + f"Description : {self.description}\n"
-            + f"Severity : {self.severity} - {self.severity_score}\n"
-            + f"Details : {self.details_url}\n"
-            + f"Exploitability : {self.exploitability}"
+            f"NIST Search - Title : {self.title}\n"
+            + f"NIST Search - CVE_ID : {self.CVEID}\n"
+            + f"NIST Search - Description : {self.description}\n"
+            + f"NIST Search - Severity : {self.severity} - {self.severity_score}\n"
+            + f"NIST Search - Details : {self.details_url}\n"
+            + f"NIST Search - Exploitability : {self.exploitability}"
         )
 
 
