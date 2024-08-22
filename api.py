@@ -14,7 +14,6 @@ JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
 class AutoScanner:
     def __init__(self, args=None) -> None:
-        self.args = args
         self.scan_results = {}
 
     def __str__(self) -> str:
