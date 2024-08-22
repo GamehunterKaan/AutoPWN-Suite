@@ -433,7 +433,6 @@ def GetHostsToScan(hosts, console) -> list[str]:
         console.print(msg + " - Utils")
     else:
         console.print(msg)
-    )
 
     while True:
         host = input(f"────> ")
