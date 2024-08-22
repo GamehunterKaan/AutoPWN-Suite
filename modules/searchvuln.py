@@ -32,7 +32,7 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(HostArray: list, log, console, args, apiKey=None) -> list:
+def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10) -> list:
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
