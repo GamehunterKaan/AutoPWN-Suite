@@ -54,9 +54,7 @@ def FindVars(vuln: dict) -> tuple:
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
 
-def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vulnerability]:
-    if args is None:
-        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
+def searchShodan(keyword: str, log, shodan_api_key: str, args) -> list[Vulnerability]:
     api = shodan.Shodan(shodan_api_key)
     vulns = []
 
@@ -74,7 +72,6 @@ def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vuln
                 ))
 
         # Handle the case where max_exploits is specified
-        if args and args.max_exploits:
             if len(vulns) > args.max_exploits:
                 vulns = vulns[:args.max_exploits]
                 log_msg = f"Using the first {args.max_exploits} vulnerabilities"
@@ -94,8 +91,6 @@ def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vuln
 
 
 def searchCVE(keyword: str, log, apiKey=None, args=None) -> list[Vulnerability]:
-    if args is None:
-        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     if apiKey:
         sleep_time = 0.1
@@ -163,7 +158,7 @@ def searchCVE(keyword: str, log, apiKey=None, args=None) -> list[Vulnerability]:
     log.logger("info", log_msg)
     
     
-    if args and args.max_exploits and len(Vulnerabilities) > args.max_exploits:
+    if len(Vulnerabilities) > args.max_exploits:
         Vulnerabilities = Vulnerabilities[:args.max_exploits]
         log_msg = f"Using the first {args.max_exploits} vulnerabilities"
         if args.tag:
