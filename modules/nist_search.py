@@ -29,7 +29,6 @@ class Vulnerability:
         if hasattr(self, 'args') and self.args.tag:
             return result + " - Nist Search"
         return result
-        )
 
 
 def FindVars(vuln: dict) -> tuple:
