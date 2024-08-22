@@ -99,16 +99,20 @@ class AutoScanner:
 
         return scan_arguments
 
-    def SearchShodan(self, product: str, version: str, shodan_api_key: str, debug: bool = False) -> list:
+    def SearchShodan(self, product: str, version: str, shodan_api_key: str, debug: bool = False, args=None) -> list:
+        if args is None:
+            args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
         log = fake_logger()
         keywords = generate_keywords(product, version)
         for word in keywords:
             if debug:
                 print(f"Searching Shodan for keyword {word} ...")
-            shodan_vulns = searchShodan(word, log, shodan_api_key)
+            shodan_vulns = searchShodan(word, log, shodan_api_key, args)
             return shodan_vulns
 
-    def SearchZoomEye(self, host: str, zoomeye_api_key: str, debug: bool = False) -> list:
+    def SearchZoomEye(self, host: str, zoomeye_api_key: str, debug: bool = False, args=None) -> list:
+        if args is None:
+            args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
         log = fake_logger()
         
 
@@ -127,11 +131,11 @@ class AutoScanner:
             Vulnerablities = searchCVE(word, log, vuln_api_key)
             shodan_vulns = []
             if shodan_api_key:
-                shodan_vulns = searchShodan(word, log, shodan_api_key)
+                shodan_vulns = searchShodan(word, log, shodan_api_key, args)
 
             zoomeye_vulns = []
             if zoomeye_api_key:
-                zoomeye_vulns = self.SearchZoomEye(word, zoomeye_api_key, debug)
+                zoomeye_vulns = self.SearchZoomEye(word, zoomeye_api_key, debug, args)
 
             vulns = {}
             if len(Vulnerablities) == 0 and len(shodan_vulns) == 0 and len(zoomeye_vulns) == 0:
@@ -226,7 +230,7 @@ class AutoScanner:
 
         # Exploit the vulnerabilities found
         if all_vulnerabilities:
-            GetExploitsFromArray(all_vulnerabilities, log, console, max_exploits=max_exploits)
+            GetExploitsFromArray(all_vulnerabilities, log, console, args)
             if scan_vulns:
                 # exploit_vulnerabilities(all_vulnerabilities, target, log, console, max_exploits=max_exploits)
                 pass

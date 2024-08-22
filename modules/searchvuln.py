@@ -33,7 +33,9 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10) -> list:
+def SearchSploits(HostArray: list, log, console, args=None, apiKey=None, max_vulns=10) -> list:
+    if args is None:
+        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     VulnsArray = []
     target = str(HostArray[0])
     term_width = get_terminal_width()
@@ -115,7 +117,9 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
     return VulnsArray
 
 
-def GetShodanVulns(host, shodan_api_key, log, args):
+def GetShodanVulns(host, shodan_api_key, log, args=None):
+    if args is None:
+        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     api = shodan.Shodan(shodan_api_key)
     try:
         host_info = api.host(host)
@@ -135,7 +139,9 @@ def GetShodanVulns(host, shodan_api_key, log, args):
         log.logger("ERROR", f"Error fetching Shodan vulnerabilities: {e}")
         return []
 
-def GetZoomEyeVulns(host, zoomeye_api_key, log, args):
+def GetZoomEyeVulns(host, zoomeye_api_key, log, args=None):
+    if args is None:
+        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     # Initialize ZoomEye API client
     api = ZoomEye(api_key=zoomeye_api_key)
     

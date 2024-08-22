@@ -54,7 +54,9 @@ def FindVars(vuln: dict) -> tuple:
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
 
-def searchShodan(keyword: str, log, shodan_api_key: str, args) -> list[Vulnerability]:
+def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vulnerability]:
+    if args is None:
+        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     api = shodan.Shodan(shodan_api_key)
     vulns = []
 
@@ -92,6 +94,8 @@ def searchShodan(keyword: str, log, shodan_api_key: str, args) -> list[Vulnerabi
 
 
 def searchCVE(keyword: str, log, apiKey=None, args=None) -> list[Vulnerability]:
+    if args is None:
+        args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     if apiKey:
         sleep_time = 0.1
