@@ -118,7 +118,6 @@ class AutoScanner:
 
     def SearchVuln(
         self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False, args=None
-    ) -> JSON:
         if args is None:
             args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
     ) -> JSON:
