@@ -106,6 +106,8 @@ class AutoScanner:
             args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
         if args is None:
             args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
+        if args is None:
+            args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
         log = fake_logger()
         keywords = generate_keywords(product, version)
         for word in keywords:
