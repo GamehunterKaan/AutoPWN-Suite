@@ -71,7 +71,7 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
         console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
         CVEs = []
-        for CVE in ApiResponseCVE[:args.max_exploits]:
+        for CVE in ApiResponseCVE[:min(len(ApiResponseCVE), args.max_exploits)]:
             CVEs.append(CVE.CVEID)
             console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
 
@@ -118,7 +118,7 @@ def GetShodanVulns(host, shodan_api_key, log, args):
                 'severity_score': 0.0,
                 'exploitability': 0.0
             })
-        return formatted_vulns, open_ports
+        return formatted_vulns[:args.max_exploits], open_ports
     except shodan.APIError as e:
         log.logger("ERROR", f"Error fetching Shodan vulnerabilities: {e}")
         return []

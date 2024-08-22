@@ -133,7 +133,7 @@ def StartExploiting(
             for sploit in sploits:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:
-                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
+                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log, args)
                 for port in ShodanPorts:
                     PortArray.append((host, port, "tcp", "shodan", ""))
                 for vuln in ShodanVulns:
