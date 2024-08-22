@@ -219,7 +219,7 @@ def main() -> None:
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
 
-    if __name__ == "__main__":
+if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
