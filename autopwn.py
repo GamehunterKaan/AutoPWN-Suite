@@ -5,7 +5,7 @@ from rich.console import Console
 
 from modules.banners import print_banner
 from modules.getexploits import GetExploitsFromArray
-from modules.exploit import exploit_vulnerabilities
+from modules.exploit import exploit_vulnerabilities, initialize_msf_client
 from modules.keyword_generator import generate_keywords
 from modules.logger import Logger
 from modules.report import InitializeReport
