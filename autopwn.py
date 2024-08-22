@@ -1,4 +1,5 @@
 from datetime import datetime
+import subprocess
 
 from rich.console import Console
 
@@ -22,7 +23,18 @@ from modules.web.webvuln import webvuln
 
 __version__ = "2.1.5"
 
-def StartScanning(
+def check_and_start_msfrpcd(password: str, log) -> None:
+    try:
+        # Check if msfrpcd is running
+        result = subprocess.run(["pgrep", "msfrpcd"], capture_output=True, text=True)
+        if result.returncode != 0:
+            log.logger("info", "msfrpcd is not running. Starting msfrpcd...")
+            subprocess.Popen(["msfrpcd", "-P", password])
+            log.logger("info", "msfrpcd started successfully.")
+        else:
+            log.logger("info", "msfrpcd is already running.")
+    except Exception as e:
+        log.logger("error", f"Failed to check/start msfrpcd: {e}")
     args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log
 ) -> None:
 
@@ -164,6 +176,10 @@ def main() -> None:
         raise SystemExit
 
     print_banner(console)
+    if args.exploit:
+        initialize_msf_client("yourpassword", log)
+        check_and_start_msfrpcd("yourpassword", log)
+        
     vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key = InitArgsAPI(args, log)
     api_keys_used = sum([1 for key in [vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key] if key])
     check_version(__version__, log)
