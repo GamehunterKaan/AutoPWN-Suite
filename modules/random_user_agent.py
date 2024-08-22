@@ -1,9 +1,10 @@
 from json import loads
 from os.path import dirname
 from random import choice, randint
+from typing import Generator
 
 
-def random_user_agent(log) -> str:
+def random_user_agent(log) -> Generator[str, None, None]:
     """
     * Generate random user agent for headers.
 

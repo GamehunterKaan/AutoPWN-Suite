@@ -5,6 +5,7 @@ try:
 except ImportError:
     from ctypes import windll
 
+import socket
 from argparse import ArgumentParser
 from configparser import ConfigParser
 from datetime import datetime
@@ -15,7 +16,6 @@ from re import search
 from socket import AF_INET, SOCK_DGRAM, socket
 from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
-from platform import platform
 
 from requests import get
 from rich.text import Text
@@ -35,225 +35,46 @@ class ScanType(Enum):
 
 
 def cli():
-    argparser = ArgumentParser(
-        description="AutoPWN Suite | A project for scanning "
-        + "vulnerabilities and exploiting systems automatically."
-    )
-    argparser.add_argument(
-        "-v", "--version", help="Print version and exit.", action="store_true"
-    )
-    argparser.add_argument(
-        "-y",
-        "--yes-please",
-        help="Don't ask for anything. (Full automatic mode)",
-        action="store_true",
-        required=False,
-        default=False,
-    )
-    argparser.add_argument(
-        "-c",
-        "--config",
-        help="Specify a config file to use. (Default : None)",
-        default=None,
-        required=False,
-        metavar="CONFIG",
-        type=str,
-    )
-    argparser.add_argument(
-        "-nc",
-        "--no-color",
-        help="Disable colors.",
-        default=False,
-        required=False,
-        action="store_true",
-    )
-
+    argparser = ArgumentParser(description="AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.")
+    
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
-    scanargs.add_argument(
-        "-t",
-        "--target",
-        help=(
-            "Target range to scan. This argument overwrites the"
-            + " hostfile argument. (192.168.0.1 or 192.168.0.0/24)"
-        ),
-        type=str,
-        required=False,
-        default=None,
-    )
-    scanargs.add_argument(
-        "-hf",
-        "--host-file",
-        help="File containing a list of hosts to scan.",
-        type=str,
-        required=False,
-        default=None,
-    )
-    scanargs.add_argument(
-        "-sd",
-        "--skip-discovery",
-        help="Skips the host discovery phase.",
-        required=False,
-        default=False,
-        action="store_true",
-    )
-    scanargs.add_argument(
-        "-st",
-        "--scan-type",
-        help="Scan type.",
-        type=str,
-        required=False,
-        default=None,
-        choices=["arp", "ping"],
-    )
-    scanargs.add_argument(
-        "-nf",
-        "--nmap-flags",
-        help=(
-            "Custom nmap flags to use for portscan."
-            + ' (Has to be specified like : -nf="-O")'
-        ),
-        default="",
-        type=str,
-        required=False,
-    )
-    scanargs.add_argument(
-        "-s",
-        "--speed",
-        help="Scan speed. (Default : 3)",
-        default=3,
-        type=int,
-        required=False,
-        choices=range(0, 6),
-    )
-    scanargs.add_argument(
-        "-ht",
-        "--host-timeout",
-        help="Timeout for every host. (Default :240)",
-        default=240,
-        type=int,
-        required=False,
-    )
-    scanargs.add_argument(
-        "-a",
-        "--api",
-        help=(
-            "Specify API key for vulnerability detection "
-            + "for faster scanning. (Default : None)"
-        ),
-        default=None,
-        type=str,
-        required=False,
-    )
-    scanargs.add_argument(
-        "-m",
-        "--mode",
-        help="Scan mode.",
-        default="normal",
-        type=str,
-        required=False,
-        choices=["evade", "noise", "normal"],
-    )
-    scanargs.add_argument(
-        "-nt",
-        "--noise-timeout",
-        help="Noise mode timeout.",
-        default=None,
-        type=int,
-        required=False,
-        metavar="TIMEOUT",
-    )
+    scanargs.add_argument("-vuln", "--vuln-api", help="Specify API key for vulnerability detection for faster scanning. (Default: None)", default=None, type=str, required=False)
+    scanargs.add_argument("-shodan", "--shodan-api", help="Specify Shodan API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
+    scanargs.add_argument("-zoomeye", "--zoomeye-api", help="Specify ZoomEye API key for additional scanning capabilities. (Default: None)", default=None, type=str, required=False)
+    scanargs.add_argument("-gpt", "--openai-api-key", help="Specify OpenAI API key for GPT-4. (Default: None)", default=None, type=str, required=False)
+    scanargs.add_argument("-v", "--version", help="Print version and exit.", action="store_true")
+    scanargs.add_argument("-y", "--yes-please", help="Don't ask for anything. (Full automatic mode)", action="store_true", required=False, default=False)
+    scanargs.add_argument("-c", "--config", help="Specify a config file to use. (Default: None)", default=None, required=False, metavar="CONFIG", type=str)
+    scanargs.add_argument("-nc", "--no-color", help="Disable colors.", default=False, required=False, action="store_true")
+    scanargs.add_argument("-t", "--target", help="Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)", type=str, required=False, default=None)
+    scanargs.add_argument("-hf", "--host-file", help="File containing a list of hosts to scan.", type=str, required=False, default=None)
+    scanargs.add_argument("-sd", "--skip-discovery", help="Skips the host discovery phase.", required=False, default=False, action="store_true")
+    scanargs.add_argument("-st", "--scan-type", help="Scan type.", type=str, required=False, default=None, choices=["arp", "ping"])
+    scanargs.add_argument("-nf", "--nmap-flags", help='Custom nmap flags to use for portscan. (Has to be specified like: -nf="-O")', default="", type=str, required=False)
+    scanargs.add_argument("-s", "--speed", help="Scan speed. (Default: 3)", default=3, type=int, required=False, choices=range(0, 6))
+    scanargs.add_argument("-ht", "--host-timeout", help="Timeout for every host. (Default: 240)", default=240, type=int, required=False)
+    scanargs.add_argument("-m", "--mode", help="Scan mode.", default="normal", type=str, required=False, choices=["evade", "noise", "normal"])
+    scanargs.add_argument("-nt", "--noise-timeout", help="Noise mode timeout.", default=None, type=int, required=False, metavar="TIMEOUT")
+    
+    exploitargs = argparser.add_argument_group("Exploiting", "Options for exploiting")
+    exploitargs.add_argument("-e", "--exploit", help="Specify whether to exploit vulnerabilities or not.", action="store_true", required=False, default=False)
+    exploitargs.add_argument("-me", "--max-exploits", help="Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)", default=10, type=int, required=False)
 
     reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
-    reportargs.add_argument(
-        "-o",
-        "--output",
-        help="Output file name. (Default : autopwn.log)",
-        default="autopwn",
-        type=str,
-        required=False,
-    )
-    reportargs.add_argument(
-        "-ot",
-        "--output-type",
-        help="Output file type. (Default : html)",
-        default="html",
-        type=str,
-        required=False,
-        choices=["html", "txt", "svg"],
-    )
-    reportargs.add_argument(
-        "-rp",
-        "--report",
-        help="Report sending method.",
-        type=str,
-        required=False,
-        default=None,
-        choices=["email", "webhook"],
-    )
-    reportargs.add_argument(
-        "-rpe",
-        "--report-email",
-        help="Email address to use for sending report.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="EMAIL",
-    )
-    reportargs.add_argument(
-        "-rpep",
-        "--report-email-password",
-        help="Password of the email report is going to be sent from.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="PASSWORD",
-    )
-    reportargs.add_argument(
-        "-rpet",
-        "--report-email-to",
-        help="Email address to send report to.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="EMAIL",
-    )
-    reportargs.add_argument(
-        "-rpef",
-        "--report-email-from",
-        help="Email to send from.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="EMAIL",
-    )
-    reportargs.add_argument(
-        "-rpes",
-        "--report-email-server",
-        help="Email server to use for sending report.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="SERVER",
-    )
-    reportargs.add_argument(
-        "-rpesp",
-        "--report-email-server-port",
-        help="Port of the email server.",
-        type=int,
-        required=False,
-        default=None,
-        metavar="PORT",
-    )
-    reportargs.add_argument(
-        "-rpw",
-        "--report-webhook",
-        help="Webhook to use for sending report.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="WEBHOOK",
-    )
-
+    reportargs.add_argument("-o", "--output", help="Output file name. (Default: autopwn.log)", default="autopwn", type=str, required=False)
+    reportargs.add_argument("-ot", "--output-type", help="Output file type. (Default: html)", default="html", type=str, required=False, choices=["html", "txt", "svg"])
+    reportargs.add_argument("-rp", "--report", help="Report sending method.", type=str, required=False, default=None, choices=["email", "webhook"])
+    reportargs.add_argument("-rpe", "--report-email", help="Email address to use for sending report.", type=str, required=False, default=None, metavar="EMAIL")
+    reportargs.add_argument("-rpep", "--report-email-password", help="Password of the email report is going to be sent from.", type=str, required=False, default=None, metavar="PASSWORD")
+    reportargs.add_argument("-rpet", "--report-email-to", help="Email address to send report to.", type=str, required=False, default=None, metavar="EMAIL")
+    reportargs.add_argument("-rpef", "--report-email-from", help="Email to send from.", type=str, required=False, default=None, metavar="EMAIL")
+    reportargs.add_argument("-rpes", "--report-email-server", help="Email server to use for sending report.", type=str, required=False, default=None, metavar="SERVER")
+    reportargs.add_argument("-rpesp", "--report-email-server-port", help="Port of the email server.", type=int, required=False, default=None, metavar="PORT")
+    reportargs.add_argument("-rpw", "--report-webhook", help="Webhook to use for sending report.", type=str, required=False, default=None, metavar="WEBHOOK")
+    
+    debugargs = argparser.add_argument_group("Debugging", "Options for debugging")
+    debugargs.add_argument("-tag", "--tag", help="Enable source tags in print statements.", action="store_true", required=False, default=False)
+    
     return argparser.parse_args()
 
 
@@ -323,27 +144,81 @@ def InitAutomation(args) -> None:
         DontAskForConfirmation = False
 
 
-def InitArgsAPI(args, log) -> str:
-    if args.api:
-        apiKey = args.api
-
+def InitArgsAPI(args, log) -> tuple[str, str, str, str, dict]:
+    if args.vuln_api:
+        vuln_api_key = args.vuln_api
     else:
-        apiKey = None
+        vuln_api_key = None
         try:
-            with open("api.txt", "r", encoding="utf-8") as f:
-                apiKey = f.readline().strip("\n")
+            with open("vuln_api.txt", "r", encoding="utf-8") as f:
+                vuln_api_key = f.readline().strip("\n")
         except FileNotFoundError:
             log.logger(
                 "warning",
-                "No API key specified and no api.txt file found. "
+                "No vulnerability API key specified and no vuln_api.txt file found. "
                 + "Vulnerability detection is going to be slower! "
                 + "You can get your own NIST API key from "
                 + "https://nvd.nist.gov/developers/request-an-api-key",
             )
         except PermissionError:
-            log.logger("error", "Permission denied while trying to read api.txt!")
+            log.logger("error", "Permission denied while trying to read vuln_api.txt!")
 
-    return apiKey
+    if args.shodan_api:
+        shodan_api_key = args.shodan_api
+
+    else:
+        shodan_api_key = None
+        try:
+            with open("shodan_api.txt", "r", encoding="utf-8") as f:
+                shodan_api_key = f.readline().strip("\n")
+        except FileNotFoundError:
+            log.logger(
+                "warning",
+                "No Shodan API key specified and no shodan_api.txt file found. "
+                + "Shodan scanning capabilities will be disabled! "
+                + "You can get your own Shodan API key from "
+                + "https://account.shodan.io/register",
+            )
+        except PermissionError:
+            log.logger("error", "Permission denied while trying to read shodan_api.txt!")
+
+    if args.zoomeye_api:
+        zoomeye_api_key = args.zoomeye_api
+    else:
+        zoomeye_api_key = None
+        try:
+            with open("zoomeye_api.txt", "r", encoding="utf-8") as f:
+                zoomeye_api_key = f.readline().strip("\n")
+        except FileNotFoundError:
+            log.logger(
+                "warning",
+                "No ZoomEye API key specified and no zoomeye_api.txt file found. "
+                + "ZoomEye scanning capabilities will be disabled! "
+                + "You can get your own ZoomEye API key from "
+                + "https://www.zoomeye.org/api"
+            )
+        except PermissionError:
+            log.logger("error", "Permission denied while trying to read zoomeye_api.txt!")
+
+    if args.openai_api_key:
+        openai_api_key = args.openai_api_key
+    else:
+        openai_api_key = None
+        try:
+            with open("openai_api.txt", "r", encoding="utf-8") as f:
+                openai_api_key = f.readline().strip("\n")
+        except FileNotFoundError:
+            log.logger(
+                "warning",
+                "No OpenAI API key specified and no openai_api.txt file found. "
+                + "AI keyword generation capabilities will be disabled! "
+                + "You can get your own OpenAI API key from "
+                + "https://beta.openai.com/signup/",
+            )
+        except PermissionError:
+            log.logger("error", "Permission denied while trying to read openai_api.txt!")
+
+    return vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, args
 
 
 def InitArgsScanType(args, log) -> ScanType:
@@ -518,7 +393,7 @@ def WebScan() -> bool:
     return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
 
 
-def GetHostsToScan(hosts, console) -> list[str]:
+def GetHostsToScan(hosts, console, args) -> list[str]:
     if len(hosts) == 0:
         raise SystemExit(
             "No hosts found! {time} - Scan completed.".format(
@@ -531,21 +406,35 @@ def GetHostsToScan(hosts, console) -> list[str]:
         if not len(host) % 2 == 0:
             host += " "
 
-        msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
+        if args.tag:
+            msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host, " - Utils")
+        else:
+            msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
 
-        console.print(msg, justify="center")
+        if args.tag:
+            console.print(msg + " - Utils", justify="center")
+        else:
+            console.print(msg, justify="center")
 
         index += 1
 
     if DontAskForConfirmation:
         return hosts
 
-    console.print(
-        "\n[yellow]Enter the index number of the "
-        + "host you would like to enumurate further.\n"
-        + "Enter 'all' to enumurate all hosts.\n"
-        + "Enter 'exit' to exit [/yellow]"
-    )
+    if args.tag:
+        console.print(
+            "\n[yellow]Enter the index number of the "
+            + "host you would like to enumurate further.\n"
+            + "Enter 'all' to enumurate all hosts.\n"
+            + "Enter 'exit' to exit [/yellow] - Utils"
+        )
+    else:
+        console.print(
+            "\n[yellow]Enter the index number of the "
+            + "host you would like to enumurate further.\n"
+            + "Enter 'all' to enumurate all hosts.\n"
+            + "Enter 'exit' to exit [/yellow]"
+        )
 
     while True:
         host = input(f"────> ")
@@ -568,7 +457,7 @@ def GetHostsToScan(hosts, console) -> list[str]:
                     break
                 else:
                     console.print(
-                        "Please enter a valid host number or 'all' " + "or 'exit'",
+                        "Please enter a valid host number or 'all' " + "or 'exit' - Utils",
                         style="red",
                     )
 
@@ -777,6 +666,9 @@ def ParamPrint(
     scantype_name: ScanType,
     scanmode_name: ScanMode,
     apiKey: str,
+    shodan_api_key: str,
+    api_keys_used: int,
+    openai_api_key: str,
     console,
     log,
 ) -> None:
@@ -797,7 +689,7 @@ def ParamPrint(
         + "\n"
         + f"│\tTarget : {targetarg}\n"
         + f"│\tOutput file : [yellow]{args.output}[/yellow]\n"
-        + f"│\tAPI Key : {type(apiKey) == str}\n"
+        + f"│\tAPI Keys Used : {api_keys_used}/4\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
 
@@ -830,9 +722,15 @@ def ParamPrint(
     if args.report:
         msg += f"│\tReporting method : {args.report}\n"
 
+    if hasattr(args, 'max_exploits'):
+        msg += f"│\tMax exploits : {args.max_exploits}\n"
+
     msg += "└" + "─" * (term_width - 1)
 
-    console.print(msg)
+    if args.tag:
+        console.print(msg + " - Utils")
+    else:
+        console.print(msg)
 
 
 def CheckConnection(log) -> bool:
@@ -871,6 +769,17 @@ def get_terminal_width() -> int:
     return width
 
 
+def resolve_hostnames_to_ips(hostnames, log):
+    ips = []
+    for hostname in hostnames:
+        try:
+            ip = socket.gethostbyname(hostname)
+            ips.append(ip)
+            log.logger("info", f"Resolved hostname {hostname} to IP {ip}")
+        except socket.gaierror:
+            log.logger("error", f"Failed to resolve hostname {hostname}")
+    return ips
+
 def check_version(cur_version: str, log) -> None:
     try:
         data = get("https://pypi.org/pypi/autopwn-suite/json").json()
@@ -902,3 +811,8 @@ def check_version(cur_version: str, log) -> None:
                 "warning",
                 "Your version of AutoPWN Suite is outdated. Update is advised.",
             )
+
+def remove_duplicate_vulnerabilities(vulnerabilities):
+    unique_vulns = list({frozenset(vuln.CVEs): vuln for vuln in vulnerabilities}.values())
+    return unique_vulns
+

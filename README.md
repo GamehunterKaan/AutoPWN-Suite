@@ -3,7 +3,6 @@
 AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems automatically.
 
 ![GitHub top language](https://img.shields.io/github/languages/top/GamehunterKaan/AutoPWN-Suite)
-![Lines of code](https://img.shields.io/tokei/lines/github/GamehunterKaan/AutoPWN-Suite)
 ![Repo Size](https://img.shields.io/github/repo-size/GamehunterKaan/AutoPWN-Suite)
 [![Tests](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml/badge.svg)](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml)
 ![GitHub issues](https://img.shields.io/github/issues-raw/GamehunterKaan/AutoPWN-Suite)
@@ -16,17 +15,18 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Fully [automatic!](#usage)
 - Detect network IP range without any user input. 
 - Vulnerability detection based on version.
-- Web app vulnerability testing. (LFI, XSS, SQLI)
+- Web app vulnerability testing. (LFI, XSS, SQLI, Web Search)
 - Web app dirbusting.
 - Get information about the vulnerability right from your terminal.
-- Automatically download exploit related with vulnerability.
-- Noise mode for creating a noise on the network.
+- Automatically download and exploit vulnerabilities.
+- Noise mode for creating noise on the network.
 - Evasion mode for being sneaky.
 - Automatically decide which scan types to use based on privilege.
 - Easy to read output.
 - Specify your arguments using a config file.
 - Send scan results via webhook or email.
-- Works on Windows, MacOS and Linux.
+- Integrates with Shodan and ZoomEye for additional vulnerability data.
+- Works on Windows, MacOS, and Linux.
 - Use as a [module!](#module-usage)
 
 
@@ -46,47 +46,13 @@ AutoPWN Suite has a very user friendly easy to read output.
 
 ## Installation
 
-You can clone the repo. (This is the recommended installation method as other methods are no longer maintained)
-
 ```
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
 sudo pip install -r requirements.txt
+# Ensure you have the following additional dependencies installed: pymetasploit3, shodan, zoomeye, rich, requests, nmap, bs4, distro
 ```
 
-OR
-
-You can install it using pip. (sudo recommended)
-
-```
-sudo pip install autopwn-suite
-```
-
-OR
-
-You can download debian (deb) package from [releases.](https://github.com/GamehunterKaan/AutoPWN-Suite/releases)
-
-```
-sudo pip install requests rich python-nmap bs4 distro
-sudo apt-get install ./autopwn-suite_2.1.5.deb
-```
-
-OR
-
-If you are on Arch Linux based system you can install `python-autopwn-suite` package using AUR helper of your choice.
-
-OR
-
-You can use the [docker image.](https://github.com/GamehunterKaan/AutoPWN-Suite/pull/42)
-
-```
-docker pull gamehunterkaan/autopwn-suite
-docker run -it gamehunterkaan/autopwn-suite
-```
-
-OR
-
-You can use Google Cloud Shell.
 
 [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/GamehunterKaan/AutoPWN-Suite.git)
 
@@ -107,8 +73,9 @@ Help Menu
 ```console
 $ autopwn-suite -h
 
-usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-a API] [-m {evade,noise,normal}] [-nt TIMEOUT]
-                  [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK]
+usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-vuln API] [-w] [--shodan API] [--zoomeye API] [-m {evade,noise,normal}] [-nt TIMEOUT] [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK] [-me MAX_EXPLOITS] [-e]
+
+ex. python3.11 autopwn.py -y --vuln-api KEY --shodan-api DIFFERENT_KEY --zoomeye-api DIFFERENT_KEY2 --web -t TARGET
 
 AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.
 
@@ -137,7 +104,14 @@ Scanning:
                         Scan speed. (Default : 3)
   -ht HOST_TIMEOUT, --host-timeout HOST_TIMEOUT
                         Timeout for every host. (Default :240)
-  -a API, --api API     Specify API key for vulnerability detection for faster scanning. (Default : None)
+  -vuln API, --vuln-api API     Specify API key for vulnerability detection for faster scanning. (Default: None)
+  -w, --web                     Enable web search for the target.
+  -shodan API, --shodan-api API Specify Shodan API key for additional scanning capabilities. (Default: None)
+  -zoomeye API, --zoomeye-api API Specify ZoomEye API key for additional scanning capabilities. (Default: None)
+  --metasploit-scan             Enable Metasploit scan for the target.
+  -me MAX_EXPLOITS, --max-exploits MAX_EXPLOITS
+                                Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)
+  -e, --exploit                Specify whether to exploit vulnerabilities or not.
   -m {evade,noise,normal}, --mode {evade,noise,normal}
                         Scan mode.
   -nt TIMEOUT, --noise-timeout TIMEOUT
@@ -169,7 +143,7 @@ Reporting:
 ```
 
 
-## Module usage
+## Module Usage
 
 ```python
 from autopwn_suite.api import AutoScanner
@@ -182,7 +156,7 @@ scanner.save_to_file("autopwn.json")
 
 ## Contributing to AutoPWN Suite
 
-I would be glad if you are willing to contribute this project. I am looking forward to merge your pull request unless its something that is not needed or just a personal preference. Also minor changes and bug fixes will not be merged. Please create an issue for those and I will do it myself. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
+I would be glad if you are willing to contribute to this project. I am looking forward to merging your pull request unless it's something that is not needed or just a personal preference. Also, minor changes and bug fixes will not be merged. Please create an issue for those and I will do it myself. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
 
 
 ## Legal
@@ -192,9 +166,28 @@ You may not rent or lease, distribute, modify, sell or transfer the software to 
 
 ## Support or Contact
 
-Having trouble using this tool? You can reach me out on [discord](https://search.discordprofile.info/374953845438021635), [create an issue](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new/choose) or [create a discussion!](https://github.com/GamehunterKaan/AutoPWN-Suite/discussions)
+Having trouble using this tool? You can [create an issue](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new/choose) or [create a discussion!](https://github.com/GamehunterKaan/AutoPWN-Suite/discussions)
 
 
-## Support & Hire Me!
+## Speacial Thanks to These People
 
-If you want to support my work and also get your job done you can hire me on [Fiverr](https://www.fiverr.com/kaangultekin)! I do various things such as website pentesting, python programming, cleaning malware, PC optimization, file recovery and mentoring.
+<div style="display: flex; align-items: center; margin-bottom: 10px;">
+  <img src="https://github.com/iaacornus.png?size=32" alt="iaacornus">
+  <span style="margin-left: 10px; font-size: 1.2em;"><b>iaacornus</b></span>
+</div>
+
+<div style="display: flex; align-items: center; margin-bottom: 10px;">
+  <img src="https://github.com/evillogic.png?size=32" alt="evillogic">
+  <span style="margin-left: 10px; font-size: 1.2em;"><b>evillogic</b></span>
+</div>
+
+<div style="display: flex; align-items: center; margin-bottom: 10px;">
+  <img src="https://github.com/eric-glb.png?size=32" alt="eric-glb">
+  <span style="margin-left: 10px; font-size: 1.2em;"><b>eric-glb</b></span>
+</div>
+
+<div style="display: flex; align-items: center; margin-bottom: 10px;">
+  <img src="https://github.com/overtimepog.png?size=32" alt="overtimepog">
+  <span style="margin-left: 10px; font-size: 1.2em;"><b>overtimepog</b></span>
+</div>
+

@@ -3,16 +3,19 @@ from typing import Any, Dict, List, Type, Union
 
 from nmap import PortScanner
 
-from modules.nist_search import searchCVE
-from modules.searchvuln import GenerateKeyword
+#from modules.exploit import exploit_vulnerabilities
+from modules.getexploits import GetExploitsFromArray
+from modules.keyword_generator import generate_keywords
+from modules.nist_search import searchCVE, searchShodan
 from modules.utils import fake_logger, is_root
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
 
 class AutoScanner:
-    def __init__(self) -> None:
+    def __init__(self, args={}) -> None:
         self.scan_results = {}
+        self.args = args
 
     def __str__(self) -> str:
         return str(self.scan_results)
@@ -97,27 +100,47 @@ class AutoScanner:
 
         return scan_arguments
 
+    def SearchShodan(self, product: str, version: str, shodan_api_key: str, debug: bool = False) -> list:
+        log = fake_logger()
+        keywords = generate_keywords(product, version)
+        for word in keywords:
+            if debug:
+                print(f"Searching Shodan for keyword {word} ...")
+            shodan_vulns = searchShodan(word, log, shodan_api_key, self.args)
+            return shodan_vulns
+
+    def SearchZoomEye(self, host: str, zoomeye_api_key: str, debug: bool = False) -> list:
+        log = fake_logger()
+        # Add your implementation here
+        log = fake_logger()
+        
+
     def SearchVuln(
-        self, port_key: JSON, apiKey: str = None, debug: bool = False
+        self, port_key: JSON, vuln_api_key: str = None, shodan_api_key: str = None, zoomeye_api_key: str = None, debug: bool = False
     ) -> JSON:
-        product = port_key["product"]
-        version = port_key["version"]
+        product = port_key.get("product", "")
+        version = port_key.get("version", "")
         log = fake_logger()
 
-        keyword = GenerateKeyword(product, version)
-        if keyword == "":
+        keywords = generate_keywords(product, version)
+        if not keywords:
             return
 
-        if debug:
-            print(f"Searching for keyword {keyword} ...")
+        for word in keywords:
+            Vulnerablities = searchCVE(word, log, vuln_api_key, self.args)
+            shodan_vulns = []
+            if shodan_api_key:
+                shodan_vulns = searchShodan(word, log, shodan_api_key, self.args)
 
-        Vulnerablities = searchCVE(keyword, log, apiKey)
-        if len(Vulnerablities) == 0:
-            return
+            zoomeye_vulns = []
+            if zoomeye_api_key:
+                zoomeye_vulns = self.SearchZoomEye(word, zoomeye_api_key, debug)
 
-        vulns = {}
-        for vuln in Vulnerablities:
-            vulns[vuln.CVEID] = self.ParseVulnInfo(vuln)
+            vulns = {}
+            if len(Vulnerablities) == 0 and len(shodan_vulns) == 0 and len(zoomeye_vulns) == 0:
+                return
+            for vuln in Vulnerablities + shodan_vulns + zoomeye_vulns:
+                vulns[vuln.CVEID] = self.ParseVulnInfo(vuln)
 
         return vulns
 
@@ -126,32 +149,64 @@ class AutoScanner:
         target,
         host_timeout: int = None,
         scan_speed: int = None,
-        apiKey: str = None,
+        vuln_api_key: str = None,
+        shodan_api_key: str = None,
+        zoomeye_api_key: str = None,
         os_scan: bool = False,
         scan_vulns: bool = True,
         nmap_args=None,
-        debug: bool = False,
+        debug: bool = True,
+        console = None,
+        max_exploits: int = 10,
     ) -> JSON:
         if type(target) == str:
             target = [target]
 
         log = fake_logger()
         nm = PortScanner()
-        scan_arguments = self.CreateScanArgs(
-            host_timeout, scan_speed, os_scan, nmap_args
-        )
+        scan_arguments = self.CreateScanArgs(host_timeout, scan_speed, os_scan, nmap_args)
+        all_vulnerabilities = []
         for host in target:
+
             if debug:
                 print(f"Scanning {host} ...")
 
             nm.scan(hosts=host, arguments=scan_arguments)
+            shodan_ports = {}
+            if zoomeye_api_key:
+                zoomeye_results = self.SearchZoomEye(host, zoomeye_api_key, debug)
+                for result in zoomeye_results:
+                    shodan_ports[result.CVEID] = {
+                        "product": result.title,
+                        "version": "",
+                        "name": result.CVEID,
+                        "state": "open",
+                        "reason": "zoomeye",
+                        "conf": "10",
+                        "extrainfo": "",
+                        "cpe": "",
+                    }
+                shodan_results = self.SearchShodan(host, "", shodan_api_key, debug)
+                for result in shodan_results:
+                    shodan_ports[result.CVEID] = {
+                        "product": result.title,
+                        "version": "",
+                        "name": result.CVEID,
+                        "state": "open",
+                        "reason": "shodan",
+                        "conf": "10",
+                        "extrainfo": "",
+                        "cpe": "",
+                    }
+
             try:
-                port_scan = nm[host]["tcp"]
+                nmap_ports = nm[host]["tcp"]
             except KeyError:
-                pass
-            else:
-                self.scan_results[host] = {}
-                self.scan_results[host]["ports"] = port_scan
+                nmap_ports = {}
+
+            combined_ports = {**shodan_ports, **nmap_ports}
+            self.scan_results[host] = {}
+            self.scan_results[host]["ports"] = combined_ports
 
             if os_scan and is_root():
                 os_info = self.InitHostInfo(nm[host])
@@ -163,11 +218,22 @@ class AutoScanner:
             vulns = {}
             for port in nm[host]["tcp"]:
                 product = nm[host]["tcp"][port]["product"]
-                Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], apiKey, debug)
+                Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], vuln_api_key, shodan_api_key, zoomeye_api_key, debug)
                 if Vulnerablities:
-                    vulns[product] = Vulnerablities
+                    for vuln_id, vuln_info in Vulnerablities.items():
+                        vulns[vuln_id] = vuln_info
 
             self.scan_results[host]["vulns"] = vulns
+            #add all vulnerabilities to the list
+            all_vulnerabilities.extend(vulns.values())
+
+        # Exploit the vulnerabilities found
+        if all_vulnerabilities:
+            GetExploitsFromArray(all_vulnerabilities, log, console, max_exploits=max_exploits)
+            if scan_vulns:
+                # exploit_vulnerabilities(all_vulnerabilities, target, log, console, max_exploits=max_exploits)
+                pass
+            
 
         return self.scan_results
 

@@ -1,67 +1,30 @@
+import shodan
+from zoomeye.sdk import ZoomEye
 from dataclasses import dataclass
 from textwrap import wrap
+from time import sleep
 
+from modules.keyword_generator import (generate_keywords,
+                                       generate_keywords_with_ai)
 from modules.logger import banner
 from modules.nist_search import searchCVE
+from modules.getexploits import GetExploitInfo
 from modules.utils import CheckConnection, get_terminal_width
-from rich.progress_bar import ProgressBar
 
 
 @dataclass
 class VulnerableSoftware:
     title: str
     CVEs: list
+    severity_score: float
+    exploitability: float
 
 
-def GenerateKeyword(product: str, version: str) -> str:
-    if product == "Unknown":
-        product = ""
-
-    if version == "Unknown":
-        version = ""
-
-    keyword = ""
-    dontsearch = [
-        "ssh",
-        "vnc",
-        "http",
-        "https",
-        "ftp",
-        "sftp",
-        "smtp",
-        "smb",
-        "smbv2",
-        "linux telnetd",
-        "microsoft windows rpc",
-        "metasploitable root shell",
-        "gnu classpath grmiregistry",
-    ]
-
-    if product.lower() not in dontsearch and product != "":
-        keyword = f"{product} {version}".rstrip()
-
-    return keyword
-
-
-def GenerateKeywords(HostArray: list) -> list:
-    keywords = []
-    for port in HostArray:
-        product = str(port[3])
-        version = str(port[4])
-
-        keyword = GenerateKeyword(product, version)
-        if not keyword == "" and not keyword in keywords:
-            keywords.append(keyword)
-
-    return keywords
-
-
-def SearchKeyword(keyword: str, log, apiKey=None) -> list:
+def SearchKeyword(keyword: str, log, apiKey=None, args=None) -> list:
 
     try:
-        ApiResponseCVE = searchCVE(keyword, log, apiKey)
-    except KeyboardInterrupt:
-        log.logger("warning", f"Skipped vulnerability detection for {keyword}")
+        ApiResponseCVE = searchCVE(keyword, log, apiKey, args)
+        #log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
         log.logger("error", e)
     else:
@@ -70,16 +33,22 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
+def SearchSploits(HostArray: list, log, console, args=None, apiKey=None, max_vulns=10) -> list:
     VulnsArray = []
-    target = str(HostArray[0][0])
+    target = str(HostArray[0])
     term_width = get_terminal_width()
 
     if not CheckConnection(log):
         return []
 
-    keywords = GenerateKeywords(HostArray)
-
+    ApiResponseCVE = []
+    keywords = generate_keywords(HostArray)
+    if args.openai_api_key:
+        log.logger("info", "Using OpenAI API for vulnerability detection.")
+        GPTkeywords = generate_keywords_with_ai(args.openai_api_key, HostArray, args)
+        for GPTkeyword in GPTkeywords[:args.max_exploits]:
+            ApiResponseCVE.extend(SearchKeyword(GPTkeyword, log, apiKey, args))
+                    
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
         return []
@@ -89,43 +58,93 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
     )
 
     printed_banner = False
-    with console2.status(
-        "[white]Searching vulnerabilities ...[/white]", spinner="bouncingBar"
-    ) as status:
-        for keyword in keywords:
-            status.start()
-            status.update(
-                "[white]Searching vulnerability database for[/white] "
-                + f"[red]{keyword}[/red] [white]...[/white]"
-            )
-            ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
-            status.stop()
-            if len(ApiResponseCVE) == 0:
-                continue
+    for keyword in keywords:
+        ApiResponseCVE = SearchKeyword(keyword, log, apiKey, args)
+        sleep(1)  # Adding a delay to ensure proper logging and searching
+        if len(ApiResponseCVE) == 0:
+            continue
 
-            if not printed_banner:
-                banner(f"Possible vulnerabilities for {target}", "red", console)
-                printed_banner = True
+        if not printed_banner:
+            banner(f"Possible vulnerabilities for {target}", "red", console)
+            printed_banner = True
 
+        if args.tag:
+            console.print(f"┌─ [yellow][ {keyword} ][/yellow] - SearchVuln")
+        else:
             console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
-            CVEs = []
-            for CVE in ApiResponseCVE:
-                CVEs.append(CVE.CVEID)
-                console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
+        CVEs = []
+        for CVE in ApiResponseCVE[:args.max_exploits]:
+            CVEs.append(CVE.CVEID)
+            if args.tag:
+                console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│ - SearchVuln")
+            else:
+                console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]")
 
-                wrapped_description = wrap(CVE.description, term_width - 50)
+            wrapped_description = wrap(CVE.description, term_width - 50)
+            if args.tag:
+                console.print(f"│\t\t[cyan]Description: [/cyan] - SearchVuln")
+            else:
                 console.print(f"│\t\t[cyan]Description: [/cyan]")
-                for line in wrapped_description:
+            for line in wrapped_description:
+                if args.tag:
+                    console.print(f"│\t\t\t{line} - SearchVuln")
+                else:
                     console.print(f"│\t\t\t{line}")
-                console.print(
-                    f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
-                    + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
-                    + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
-                )
+            console.print(
+                f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
+                + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
+                + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
+            )
 
-            VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)
+            exploits = GetExploitInfo(CVE.CVEID, log, args.max_exploits)
+            VulnObject = VulnerableSoftware(
+                title=keyword,
+                CVEs=CVEs,
+                severity_score=CVE.severity_score,
+                exploitability=CVE.exploitability
+            )
             VulnsArray.append(VulnObject)
             console.print("└" + "─" * (term_width - 1))
 
+
+    # Sort vulnerabilities by severity and exploitability
+    VulnsArray.sort(key=lambda x: (x.severity_score, x.exploitability), reverse=True)
+    
+    
     return VulnsArray
+
+
+def GetShodanVulns(host, shodan_api_key, log, args=None):
+    api = shodan.Shodan(shodan_api_key)
+    try:
+        host_info = api.host(host)
+        vulns = host_info.get("vulns", [])
+        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from Shodan. (Max Exploits: {args.max_exploits})")
+        open_ports = [service['port'] for service in host_info.get('data', [])]
+        formatted_vulns = []
+        for vuln in vulns:
+            formatted_vulns.append({
+                'title': vuln,
+                'CVEs': [vuln],
+                'severity_score': 0.0,
+                'exploitability': 0.0
+            })
+        return formatted_vulns, open_ports
+    except shodan.APIError as e:
+        log.logger("ERROR", f"Error fetching Shodan vulnerabilities: {e}")
+        return []
+
+def GetZoomEyeVulns(host, zoomeye_api_key, log, args=None):
+    # Initialize ZoomEye API client
+    api = ZoomEye(api_key=zoomeye_api_key)
+    
+    try:
+        # Perform the search
+        results = api.dork_search(f"ip:{host}", page=1)
+        vulns = results.get('matches', [])
+        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from ZoomEye. (Max Exploits: {args.max_exploits})")
+        return vulns
+    except Exception as e:
+        log.logger("ERROR", f"Error fetching ZoomEye vulnerabilities: {e}")
+        return []

@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 from time import sleep
 
+import shodan
 from requests import get
 
-
 cache = {}
-
 
 @dataclass
 class Vulnerability:
@@ -18,14 +17,17 @@ class Vulnerability:
     exploitability: float
 
     def __str__(self) -> str:
-        return (
+        result = (
             f"Title : {self.title}\n"
-            + f"CVE_ID : {self.CVEID}\n"
-            + f"Description : {self.description}\n"
-            + f"Severity : {self.severity} - {self.severity_score}\n"
-            + f"Details : {self.details_url}\n"
-            + f"Exploitability : {self.exploitability}"
+            f"CVE_ID : {self.CVEID}\n"
+            f"Description : {self.description}\n"
+            f"Severity : {self.severity} - {self.severity_score}\n"
+            f"Details : {self.details_url}\n"
+            f"Exploitability : {self.exploitability}\n"
         )
+        if hasattr(self, 'args') and getattr(self.args, 'tag', False):
+            return result + " - Nist Search"
+        return result
 
 
 def FindVars(vuln: dict) -> tuple:
@@ -37,8 +39,6 @@ def FindVars(vuln: dict) -> tuple:
 
     metrics = vuln["cve"].get("metrics")
     if metrics is not None and len(metrics) > 0:
-        # In testing this appears to contain cvssMetricV31 and cvssMetricV2
-        # Get a list of the score types and sort them in reverse order to get v3 first
         metrics_types = list(metrics.keys())
         metrics_types.sort(reverse=True)
         for score_type in metrics_types:
@@ -54,9 +54,46 @@ def FindVars(vuln: dict) -> tuple:
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
 
-def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
+def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vulnerability]:
+    api = shodan.Shodan(shodan_api_key)
+    vulns = []
+
+    try:
+        results = api.search(keyword)
+        for result in results['matches']:
+            for vuln in result.get('vulns', []):
+                vulns.append(Vulnerability(
+                    CVEID=vuln,
+                    description=result['vulns'][vuln].get('summary', 'No description available'),
+                    severity='N/A',
+                    severity_score='N/A',
+                    details_url=f"https://www.shodan.io/search?query={vuln}",
+                    exploitability='N/A'
+                ))
+
+        # Handle the case where max_exploits is specified
+            if args and hasattr(args, 'max_exploits') and len(vulns) > args.max_exploits:
+                vulns = vulns[:args.max_exploits]
+                log_msg = f"Using the first {args.max_exploits} vulnerabilities"
+                if args.tag:
+                    log_msg += " - Shodan Search"
+                log.logger("info", log_msg)
+
+    except shodan.APIError as e:
+        log.logger("error", f"Shodan API error: {e}")
+
+
+    #print('Args: ', args)
+    log_msg = f"Found {len(vulns)} vulnerabilities for {keyword} with Shodan API"
+    if args and getattr(args, 'tag', False):
+        log_msg += " - Shodan Search"
+    log.logger("info", log_msg)
+
+    return vulns
+
+
+def searchCVE(keyword: str, log, apiKey=None, args=None) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
-    # https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=OpenSSH+8.8
     if apiKey:
         sleep_time = 0.1
         headers = {"apiKey": apiKey}
@@ -68,6 +105,7 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     if keyword in cache:
         return cache[keyword]
 
+    data = None  # Initialize 'data' here
     for tries in range(3):
         try:
             sleep(sleep_time)
@@ -84,10 +122,10 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
         else:
             break
 
-    Vulnerabilities = []
-    if not data or not "vulnerabilities" in data:
+    if data is None or "vulnerabilities" not in data:
         return []
 
+    Vulnerabilities = []
     for vuln in data.get("vulnerabilities", []):
         title = keyword
         (
@@ -111,4 +149,23 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
         Vulnerabilities.append(VulnObject)
 
     cache[keyword] = Vulnerabilities
+    # Sort vulnerabilities by severity and exploitability
+    Vulnerabilities.sort(key=lambda x: (x.severity_score, x.exploitability), reverse=True)
+    
+    # Handle the case where max_exploits is specified
+    #print('Args: ', args)
+    log_msg = f"Found {len(Vulnerabilities)} vulnerabilities for {keyword}"
+    if args and args.tag:
+        log_msg += " - NIST Search"
+    log.logger("info", log_msg)
+    
+    
+    if args and hasattr(args, 'max_exploits') and len(Vulnerabilities) > args.max_exploits:
+        Vulnerabilities = Vulnerabilities[:args.max_exploits]
+        log_msg = f"Using the first {args.max_exploits} vulnerabilities"
+        if args and getattr(args, 'tag', False):
+            log_msg += " - NIST Search"
+        log.logger("info", log_msg)
+
+    # Display the number of vulnerabilities found
     return Vulnerabilities

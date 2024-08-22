@@ -3,3 +3,8 @@ rich
 python-nmap
 bs4
 distro
+zoomeye
+shodan
+pymetasploit3
+openai
+pyExploitDb
