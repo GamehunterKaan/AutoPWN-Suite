@@ -56,6 +56,9 @@ def cli():
     scanargs.add_argument("-m", "--mode", help="Scan mode.", default="normal", type=str, required=False, choices=["evade", "noise", "normal"])
     scanargs.add_argument("-nt", "--noise-timeout", help="Noise mode timeout.", default=None, type=int, required=False, metavar="TIMEOUT")
     
+    exploitargs = argparser.add_argument_group("Exploiting", "Options for exploiting")
+    exploitargs.add_argument("-e", "--exploit", help="Specify whether to exploit vulnerabilities or not.", action="store_true", required=False, default=False)
+
     reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
     reportargs.add_argument("-o", "--output", help="Output file name. (Default: autopwn.log)", default="autopwn", type=str, required=False)
     reportargs.add_argument("-ot", "--output-type", help="Output file type. (Default: html)", default="html", type=str, required=False, choices=["html", "txt", "svg"])
