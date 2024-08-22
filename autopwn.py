@@ -97,7 +97,7 @@ def StartScanning(
             
             # Download exploits if required
             if DownloadExploits and len(all_vulnerabilities) > 0:
-                GetExploitsFromArray(all_vulnerabilities, log, console, console)
+                GetExploitsFromArray(all_vulnerabilities, log, console, console, args)
 
     for host in Targets:
         webvuln(host, log, console)
