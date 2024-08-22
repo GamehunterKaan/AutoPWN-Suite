@@ -103,7 +103,7 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
     return VulnsArray
 
 
-def GetShodanVulns(host, shodan_api_key, log):
+def GetShodanVulns(host, shodan_api_key, log, args):
     api = shodan.Shodan(shodan_api_key)
     try:
         host_info = api.host(host)
@@ -123,7 +123,7 @@ def GetShodanVulns(host, shodan_api_key, log):
         log.logger("ERROR", f"Error fetching Shodan vulnerabilities: {e}")
         return []
 
-def GetZoomEyeVulns(host, zoomeye_api_key, log):
+def GetZoomEyeVulns(host, zoomeye_api_key, log, args):
     # Initialize ZoomEye API client
     api = ZoomEye(api_key=zoomeye_api_key)
     

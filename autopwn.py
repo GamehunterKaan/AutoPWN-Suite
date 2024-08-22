@@ -68,7 +68,7 @@ def StartScanning(
             for sploit in sploits[:args.max_exploits]:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:
-                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
+                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log, args)
                 for port in ShodanPorts:
                     PortArray.append((host, port, "tcp", "shodan", ""))
                 for vuln in ShodanVulns:
@@ -81,7 +81,7 @@ def StartScanning(
                     )
                     all_vulnerabilities.append(vuln_obj)
             if zoomeye_api_key:
-                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
+                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log, args)
                 for vuln in ZoomEyeVulns:
                     vuln_obj = VulnerableSoftware(
                         title=vuln['title'],
