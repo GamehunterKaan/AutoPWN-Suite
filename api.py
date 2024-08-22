@@ -13,7 +13,7 @@ JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 
 
 class AutoScanner:
-    def __init__(self, args=None) -> None:
+    def __init__(self, args={}) -> None:
         self.scan_results = {}
         self.args = args
 
