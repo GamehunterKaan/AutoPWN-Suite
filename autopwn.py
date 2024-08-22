@@ -4,6 +4,7 @@ from rich.console import Console
 
 from modules.banners import print_banner
 from modules.getexploits import GetExploitsFromArray
+from modules.exploit import exploit_vulnerabilities
 from modules.keyword_generator import generate_keywords
 from modules.logger import Logger
 from modules.report import InitializeReport
@@ -90,7 +91,66 @@ def StartScanning(
         )
     )
 
-def main() -> None:
+def StartExploiting(
+    args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log
+) -> None:
+    check_nmap(log)
+
+    if scanmode == ScanMode.Noise:
+        NoiseScan(targetarg, log, console, scantype, args.noise_timeout)
+
+    if not args.skip_discovery:
+        hosts = DiscoverHosts(targetarg, console, scantype, scanmode)
+        Targets = GetHostsToScan(hosts, console)
+    else:
+        Targets = [targetarg]
+
+    all_vulnerabilities = []
+
+    for host in Targets:
+        PortScanResults = PortScan(
+            host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags, shodan_api_key
+        )
+        PortArray = AnalyseScanResults(PortScanResults, log, console, host, shodan_results=None)
+        if PortArray and len(PortArray) > 0:
+            keywords = generate_keywords(PortArray)
+            sploits = SearchSploits(keywords, log, console, args, apiKey)
+            for sploit in sploits:
+                all_vulnerabilities.append(sploit)
+            if shodan_api_key:
+                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
+                for port in ShodanPorts:
+                    PortArray.append((host, port, "tcp", "shodan", ""))
+                for vuln in ShodanVulns:
+                    log.logger("info", f"Shodan Vuln: {vuln['title']} - CVEs: {', '.join(vuln['CVEs'])}")
+                    vuln_obj = VulnerableSoftware(
+                        title=vuln['title'],
+                        CVEs=vuln['CVEs'],
+                        severity_score=vuln['severity_score'],
+                        exploitability=vuln['exploitability']
+                    )
+                    all_vulnerabilities.append(vuln_obj)
+            if zoomeye_api_key:
+                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log)
+                for vuln in ZoomEyeVulns:
+                    vuln_obj = VulnerableSoftware(
+                        title=vuln['title'],
+                        CVEs=vuln['CVEs'],
+                        severity_score=vuln['severity_score'],
+                        exploitability=vuln['exploitability']
+                    )
+                    all_vulnerabilities.append(vuln_obj)
+                    
+            all_vulnerabilities = remove_duplicate_vulnerabilities(all_vulnerabilities)
+            if all_vulnerabilities:
+                print("All vulnerabilities: ", all_vulnerabilities)
+                exploit_vulnerabilities(all_vulnerabilities, host, log, console)
+
+    console.print(
+        "{time} - Exploitation completed.".format(
+            time=datetime.now().strftime("%b %d %Y %H:%M:%S")
+        )
+    )
     __author__ = "GamehunterKaan"
     __version__ = "2.1.5"
 
@@ -118,7 +178,10 @@ def main() -> None:
 
     ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, api_keys_used, openai_api_key, console, log)
 
-    StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
+    if args.exploit:
+        StartExploiting(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
+    else:
+        StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
