@@ -393,7 +393,7 @@ def WebScan() -> bool:
     return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
 
 
-def GetHostsToScan(hosts, console) -> list[str]:
+def GetHostsToScan(hosts, console, args) -> list[str]:
     if len(hosts) == 0:
         raise SystemExit(
             "No hosts found! {time} - Scan completed.".format(
@@ -411,7 +411,7 @@ def GetHostsToScan(hosts, console) -> list[str]:
         else:
             msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
 
-        console.print(msg, justify="center")
+        console.print(msg, justify="center", args=args)
 
         index += 1
 
@@ -431,7 +431,7 @@ def GetHostsToScan(hosts, console) -> list[str]:
         + "Enter 'exit' to exit [/yellow]"
     )
     if args.tag:
-        console.print(msg + " - Utils")
+        console.print(msg + " - Utils", args=args)
     else:
         console.print(msg)
 
