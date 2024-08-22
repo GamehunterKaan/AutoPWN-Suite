@@ -64,7 +64,7 @@ def StartScanning(
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = []
             keywords = generate_keywords(PortArray)
-            sploits = SearchSploits(keywords, log, console, args, apiKey, max_vulns)
+            sploits = SearchSploits(keywords, log, console, args, apiKey, args.max_exploits)
             for sploit in sploits:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:
@@ -129,7 +129,7 @@ def StartExploiting(
         PortArray = AnalyseScanResults(PortScanResults, log, console, host, shodan_results=None)
         if PortArray and len(PortArray) > 0:
             keywords = generate_keywords(PortArray)
-            sploits = SearchSploits(keywords, log, console, args, apiKey, max_vulns)
+            sploits = SearchSploits(keywords, log, console, args, apiKey, args.max_exploits)
             for sploit in sploits:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:
