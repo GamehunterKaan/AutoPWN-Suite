@@ -64,11 +64,11 @@ def StartScanning(
         if ScanVulns and PortArray and len(PortArray) > 0:
             VulnsArray = []
             keywords = generate_keywords(PortArray)
-            sploits = SearchSploits(keywords, log, console, args, apiKey, args.max_exploits)
+            sploits = SearchSploits(keywords, log, console, args, apiKey)
             for sploit in sploits[:args.max_exploits]:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:
-                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log, args if args else type('Args', (object,), {'max_exploits': 10, 'tag': False})())
+                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log, args)
                 for port in ShodanPorts:
                     PortArray.append((host, port, "tcp", "shodan", ""))
                 for vuln in ShodanVulns:
@@ -81,7 +81,7 @@ def StartScanning(
                     )
                     all_vulnerabilities.append(vuln_obj)
             if zoomeye_api_key:
-                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log, args if args else type('Args', (object,), {'max_exploits': 10, 'tag': False})())
+                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log, args)
                 for vuln in ZoomEyeVulns:
                     vuln_obj = VulnerableSoftware(
                         title=vuln['title'],
@@ -160,7 +160,7 @@ def StartExploiting(
         PortArray = AnalyseScanResults(PortScanResults, log, console, host, shodan_results=None)
         if PortArray and len(PortArray) > 0:
             keywords = generate_keywords(PortArray)
-            sploits = SearchSploits(keywords, log, console, args, apiKey, args.max_exploits)
+            sploits = SearchSploits(keywords, log, console, args, apiKey)
             for sploit in sploits:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:

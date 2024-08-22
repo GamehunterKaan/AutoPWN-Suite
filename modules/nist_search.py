@@ -83,7 +83,6 @@ def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vuln
         log.logger("error", f"Shodan API error: {e}")
 
     log_msg = f"Found {len(vulns)} vulnerabilities for {keyword}"
-    print(args)
     if args.tag:
         log_msg += " - Shodan Search"
     log.logger("info", log_msg)
@@ -158,7 +157,6 @@ def searchCVE(keyword: str, log, args=None, apiKey=None) -> list[Vulnerability]:
         log_msg += " - NIST Search"
     log.logger("info", log_msg)
     
-    print(args)
     
     if args and len(Vulnerabilities) > args.max_exploits:
         Vulnerabilities = Vulnerabilities[:args.max_exploits]
