@@ -46,7 +46,7 @@ def StartScanning(
 
     if not args.skip_discovery:
         hosts = DiscoverHosts(targetarg, console, scantype, scanmode)
-        Targets = GetHostsToScan(hosts, console)
+        Targets = GetHostsToScan(hosts, console, args)
     else:
         Targets = [targetarg]
 
@@ -116,7 +116,7 @@ def StartExploiting(
 
     if not args.skip_discovery:
         hosts = DiscoverHosts(targetarg, console, scantype, scanmode)
-        Targets = GetHostsToScan(hosts, console)
+        Targets = GetHostsToScan(hosts, console, args)
     else:
         Targets = [targetarg]
 
