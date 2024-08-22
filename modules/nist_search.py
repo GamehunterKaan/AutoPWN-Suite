@@ -25,7 +25,7 @@ class Vulnerability:
             f"Details : {self.details_url}\n"
             f"Exploitability : {self.exploitability}\n"
         )
-        if hasattr(self, 'args') and self.args.tag:
+        if hasattr(self, 'args') and getattr(self.args, 'tag', False):
             return result + " - Nist Search"
         return result
 
@@ -72,7 +72,7 @@ def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vuln
                 ))
 
         # Handle the case where max_exploits is specified
-            if args and len(vulns) > args.max_exploits:
+            if args and hasattr(args, 'max_exploits') and len(vulns) > args.max_exploits:
                 vulns = vulns[:args.max_exploits]
                 log_msg = f"Using the first {args.max_exploits} vulnerabilities"
                 if args.tag:
@@ -83,7 +83,7 @@ def searchShodan(keyword: str, log, shodan_api_key: str, args=None) -> list[Vuln
         log.logger("error", f"Shodan API error: {e}")
 
     log_msg = f"Found {len(vulns)} vulnerabilities for {keyword}"
-    if args.tag:
+    if args and getattr(args, 'tag', False):
         log_msg += " - Shodan Search"
     log.logger("info", log_msg)
 
@@ -158,10 +158,10 @@ def searchCVE(keyword: str, log, args=None, apiKey=None) -> list[Vulnerability]:
     log.logger("info", log_msg)
     
     
-    if args and len(Vulnerabilities) > args.max_exploits:
+    if args and hasattr(args, 'max_exploits') and len(Vulnerabilities) > args.max_exploits:
         Vulnerabilities = Vulnerabilities[:args.max_exploits]
         log_msg = f"Using the first {args.max_exploits} vulnerabilities"
-        if args.tag:
+        if args and getattr(args, 'tag', False):
             log_msg += " - NIST Search"
         log.logger("info", log_msg)
 
