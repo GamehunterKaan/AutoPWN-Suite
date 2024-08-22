@@ -29,7 +29,7 @@ def check_and_start_msfrpcd(password: str, log) -> None:
         result = subprocess.run(["pgrep", "msfrpcd"], capture_output=True, text=True)
         if result.returncode != 0:
             log.logger("info", "msfrpcd is not running. Starting msfrpcd...")
-            subprocess.Popen(["msfrpcd", "-P", password])
+            subprocess.Popen(["open", "-a", "Terminal", "msfrpcd", "-P", password])
             log.logger("info", "msfrpcd started successfully.")
         else:
             log.logger("info", "msfrpcd is already running.")
@@ -197,7 +197,7 @@ def main() -> None:
     ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, api_keys_used, openai_api_key, console, log)
 
     if args.exploit:
-        StartExploiting(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, args.max_exploits)
+        StartExploiting(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
     else:
         StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, args.max_exploits)
 
