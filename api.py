@@ -104,6 +104,8 @@ class AutoScanner:
             args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
         if args is None:
             args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
+        if args is None:
+            args = type('Args', (object,), {'max_exploits': 10, 'tag': False})()
         log = fake_logger()
         keywords = generate_keywords(product, version)
         for word in keywords:
@@ -234,7 +236,7 @@ class AutoScanner:
 
         # Exploit the vulnerabilities found
         if all_vulnerabilities:
-            GetExploitsFromArray(all_vulnerabilities, log, console, args if args else type('Args', (object,), {'max_exploits': 10, 'tag': False})())
+            GetExploitsFromArray(all_vulnerabilities, log, console, args)
             if scan_vulns:
                 # exploit_vulnerabilities(all_vulnerabilities, target, log, console, max_exploits=max_exploits)
                 pass
