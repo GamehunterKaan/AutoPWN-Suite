@@ -85,7 +85,7 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
                 + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
             )
 
-            exploits = GetExploitInfo(CVE.CVEID, log, max_exploits)
+            exploits = GetExploitInfo(CVE.CVEID, log, args.max_exploits)
             VulnObject = VulnerableSoftware(
                 title=keyword,
                 CVEs=CVEs,
