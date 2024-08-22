@@ -60,8 +60,6 @@ def cli():
     exploitargs.add_argument("-e", "--exploit", help="Specify whether to exploit vulnerabilities or not.", action="store_true", required=False, default=False)
     exploitargs.add_argument("-me", "--max-exploits", help="Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)", default=10, type=int, required=False)
 
-    scanargs.add_argument("-tag", "--tag", help="Enable source tags in print statements.", action="store_true", required=False, default=False)
-    scanargs.add_argument("-tag", "--tag", help="Enable source tags in print statements.", action="store_true", required=False, default=False)
     reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
     reportargs.add_argument("-o", "--output", help="Output file name. (Default: autopwn.log)", default="autopwn", type=str, required=False)
     reportargs.add_argument("-ot", "--output-type", help="Output file type. (Default: html)", default="html", type=str, required=False, choices=["html", "txt", "svg"])
@@ -73,6 +71,9 @@ def cli():
     reportargs.add_argument("-rpes", "--report-email-server", help="Email server to use for sending report.", type=str, required=False, default=None, metavar="SERVER")
     reportargs.add_argument("-rpesp", "--report-email-server-port", help="Port of the email server.", type=int, required=False, default=None, metavar="PORT")
     reportargs.add_argument("-rpw", "--report-webhook", help="Webhook to use for sending report.", type=str, required=False, default=None, metavar="WEBHOOK")
+    
+    debugargs = argparser.add_argument_group("Debugging", "Options for debugging")
+    debugargs.add_argument("-tag", "--tag", help="Enable source tags in print statements.", action="store_true", required=False, default=False)
     
     return argparser.parse_args()
 
