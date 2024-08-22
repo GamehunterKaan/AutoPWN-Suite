@@ -6,7 +6,6 @@ from requests import get
 
 cache = {}
 
-
 @dataclass
 class Vulnerability:
     title: str
@@ -20,14 +19,11 @@ class Vulnerability:
     def __str__(self) -> str:
         result = (
             f"Title : {self.title}\n"
-            + f"CVE_ID : {self.CVEID}\n"
-            + f"Description : {self.description}\n"
-            + f"Severity : {self.severity} - {self.severity_score}\n"
-            + f"Details : {self.details_url}\n"
-            + f"Exploitability : {self.exploitability}"
-        if hasattr(self, 'args') and self.args.tag:
-            return result + " - Nist Search"
-        return result
+            f"CVE_ID : {self.CVEID}\n"
+            f"Description : {self.description}\n"
+            f"Severity : {self.severity} - {self.severity_score}\n"
+            f"Details : {self.details_url}\n"
+            f"Exploitability : {self.exploitability}\n"
         )
         if hasattr(self, 'args') and self.args.tag:
             return result + " - Nist Search"
@@ -43,8 +39,6 @@ def FindVars(vuln: dict) -> tuple:
 
     metrics = vuln["cve"].get("metrics")
     if metrics is not None and len(metrics) > 0:
-        # In testing this appears to contain cvssMetricV31 and cvssMetricV2
-        # Get a list of the score types and sort them in reverse order to get v3 first
         metrics_types = list(metrics.keys())
         metrics_types.sort(reverse=True)
         for score_type in metrics_types:
@@ -60,7 +54,7 @@ def FindVars(vuln: dict) -> tuple:
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
 
-def searchShodan(keyword: str, log, shodan_api_key: str) -> list[Vulnerability]:
+def searchShodan(keyword: str, log, shodan_api_key: str, args) -> list[Vulnerability]:
     api = shodan.Shodan(shodan_api_key)
     vulns = []
 
@@ -76,12 +70,28 @@ def searchShodan(keyword: str, log, shodan_api_key: str) -> list[Vulnerability]:
                     details_url=f"https://www.shodan.io/search?query={vuln}",
                     exploitability='N/A'
                 ))
+
+        # Handle the case where max_exploits is specified
+        if args.max_exploits:
+            if len(vulns) > args.max_exploits:
+                vulns = vulns[:args.max_exploits]
+                log_msg = f"Using the first {args.max_exploits} vulnerabilities"
+                if args.tag:
+                    log_msg += " - Shodan Search"
+                log.logger("info", log_msg)
+
     except shodan.APIError as e:
         log.logger("error", f"Shodan API error: {e}")
 
+    log_msg = f"Found {len(vulns)} vulnerabilities for {keyword}"
+    if args.tag:
+        log_msg += " - Shodan Search"
+    log.logger("info", log_msg)
+
     return vulns
 
-def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
+
+def searchCVE(keyword: str, log, apiKey=None, args=None) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     if apiKey:
         sleep_time = 0.1
@@ -141,7 +151,20 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     # Sort vulnerabilities by severity and exploitability
     Vulnerabilities.sort(key=lambda x: (x.severity_score, x.exploitability), reverse=True)
     
-    # Display the number of vulnerabilities found
-    log.logger("info", f"Found {len(Vulnerabilities)} vulnerabilities for {keyword}")
+    # Handle the case where max_exploits is specified
     
-    return Vulnerabilities[:50]
+    log_msg = f"Found {len(Vulnerabilities)} vulnerabilities for {keyword}"
+    if args and args.tag:
+        log_msg += " - NIST Search"
+    log.logger("info", log_msg)
+    
+    
+    if len(Vulnerabilities) > args.max_exploits:
+        Vulnerabilities = Vulnerabilities[:args.max_exploits]
+        log_msg = f"Using the first {args.max_exploits} vulnerabilities"
+        if args.tag:
+            log_msg += " - NIST Search"
+        log.logger("info", log_msg)
+
+    # Display the number of vulnerabilities found
+    return Vulnerabilities
