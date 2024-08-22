@@ -212,7 +212,7 @@ def main() -> None:
         initialize_msf_client("yourpassword", log, args)
         check_and_start_msfrpcd("yourpassword", log)
         
-    vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key = InitArgsAPI(args, log)
+    vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, args = InitArgsAPI(args, log)
     api_keys_used = sum([1 for key in [vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key] if key])
     check_version(__version__, log)
 
