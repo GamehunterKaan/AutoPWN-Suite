@@ -423,10 +423,16 @@ def GetHostsToScan(hosts, console) -> list[str]:
         + "Enter 'all' to enumurate all hosts.\n"
         + "Enter 'exit' to exit [/yellow]"
     )
-    if args.tag:
-        console.print(msg + " - Utils")
-    else:
-        console.print(msg)
+        console.print(
+            "\n[yellow]Enter the index number of the "
+            + "host you would like to enumurate further.\n"
+            + "Enter 'all' to enumurate all hosts.\n"
+            + "Enter 'exit' to exit [/yellow]"
+        )
+        if args.tag:
+            console.print(msg + " - Utils")
+        else:
+            console.print(msg)
     )
 
     while True:
