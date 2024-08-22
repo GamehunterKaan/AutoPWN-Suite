@@ -15,6 +15,7 @@ JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
 class AutoScanner:
     def __init__(self, args=None) -> None:
         self.scan_results = {}
+        self.args = args
 
     def __str__(self) -> str:
         return str(self.scan_results)
@@ -126,7 +127,7 @@ class AutoScanner:
             return
 
         for word in keywords:
-            Vulnerablities = searchCVE(word, log, vuln_api_key)
+            Vulnerablities = searchCVE(word, log, vuln_api_key, self.args)
             shodan_vulns = []
             if shodan_api_key:
                 shodan_vulns = searchShodan(word, log, shodan_api_key, self.args)
