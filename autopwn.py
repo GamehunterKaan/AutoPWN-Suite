@@ -35,6 +35,7 @@ def check_and_start_msfrpcd(password: str, log) -> None:
             log.logger("info", "msfrpcd is already running.")
     except Exception as e:
         log.logger("error", f"Failed to check/start msfrpcd: {e}")
+
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, shodan_api_key, zoomeye_api_key, openai_api_key, console, log
 ) -> None:
@@ -62,7 +63,6 @@ def StartScanning(
             )
             PortArray = AnalyseScanResults(PortScanResults, log, console, host, shodan_results=None)
         if ScanVulns and PortArray and len(PortArray) > 0:
-            VulnsArray = []
             keywords = generate_keywords(PortArray)
             sploits = SearchSploits(keywords, log, console, args, apiKey)
             for sploit in sploits[:args.max_exploits]:
@@ -94,40 +94,11 @@ def StartScanning(
             all_vulnerabilities = remove_duplicate_vulnerabilities(all_vulnerabilities)
             if all_vulnerabilities:
                 print("All vulnerabilities: ", all_vulnerabilities)
+            
+            # Download exploits if required
             if DownloadExploits and len(all_vulnerabilities) > 0:
                 GetExploitsFromArray(all_vulnerabilities, log, console, console)
-            for sploit in sploits[:args.max_exploits]:
-                all_vulnerabilities.append(sploit)
-            if shodan_api_key:
-                ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log, args)
-                for port in ShodanPorts:
-                    PortArray.append((host, port, "tcp", "shodan", ""))
-                for vuln in ShodanVulns:
-                    log.logger("info", f"Shodan Vuln: {vuln['title']} - CVEs: {', '.join(vuln['CVEs'])}")
-                    vuln_obj = VulnerableSoftware(
-                        title=vuln['title'],
-                        CVEs=vuln['CVEs'],
-                        severity_score=vuln['severity_score'],
-                        exploitability=vuln['exploitability']
-                    )
-                    all_vulnerabilities.append(vuln_obj)
-            if zoomeye_api_key:
-                ZoomEyeVulns = GetZoomEyeVulns(host, zoomeye_api_key, log, args)
-                for vuln in ZoomEyeVulns:
-                    vuln_obj = VulnerableSoftware(
-                        title=vuln['title'],
-                        CVEs=vuln['CVEs'],
-                        severity_score=vuln['severity_score'],
-                        exploitability=vuln['exploitability']
-                    )
-                    all_vulnerabilities.append(vuln_obj)
-                    
-            all_vulnerabilities = remove_duplicate_vulnerabilities(all_vulnerabilities)
-            if all_vulnerabilities:
-                print("All vulnerabilities: ", all_vulnerabilities)
-            if DownloadExploits and len(all_vulnerabilities) > 0:
-                GetExploitsFromArray(all_vulnerabilities, log, console, console)
-    
+
     for host in Targets:
         webvuln(host, log, console)
 
@@ -230,7 +201,7 @@ def main() -> None:
     if args.exploit:
         StartExploiting(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
     else:
-        StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log, args.max_exploits)
+        StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
