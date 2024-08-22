@@ -73,7 +73,7 @@ Help Menu
 ```console
 $ autopwn-suite -h
 
-usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-vuln API] [-w] [--shodan API] [--zoomeye API] [-m {evade,noise,normal}] [-nt TIMEOUT] [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK] [-me MAX_EXPLOITS]
+usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-vuln API] [-w] [--shodan API] [--zoomeye API] [-m {evade,noise,normal}] [-nt TIMEOUT] [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK] [-me MAX_EXPLOITS] [-e]
 
 ex. python3.11 autopwn.py -y --vuln-api KEY --shodan-api DIFFERENT_KEY --zoomeye-api DIFFERENT_KEY2 --web -t TARGET
 
@@ -111,6 +111,7 @@ Scanning:
   --metasploit-scan             Enable Metasploit scan for the target.
   -me MAX_EXPLOITS, --max-exploits MAX_EXPLOITS
                                 Maximum number of exploits to display per service. Set to 0 to display all. (Default: 10)
+  -e, --exploit                Specify whether to exploit vulnerabilities or not.
   -m {evade,noise,normal}, --mode {evade,noise,normal}
                         Scan mode.
   -nt TIMEOUT, --noise-timeout TIMEOUT
