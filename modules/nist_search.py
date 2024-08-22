@@ -18,14 +18,15 @@ class Vulnerability:
     exploitability: float
 
     def __str__(self) -> str:
-        return (
+        result = (
             f"NIST Search - Title : {self.title}\n"
             + f"NIST Search - CVE_ID : {self.CVEID}\n"
             + f"NIST Search - Description : {self.description}\n"
             + f"NIST Search - Severity : {self.severity} - {self.severity_score}\n"
             + f"NIST Search - Details : {self.details_url}\n"
             + f"NIST Search - Exploitability : {self.exploitability}"
-        if args.tag:
+        )
+        if hasattr(self, 'args') and self.args.tag:
             return result + " - Nist Search"
         return result
         )

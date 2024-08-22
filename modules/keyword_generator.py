@@ -108,7 +108,7 @@ def generate_keywords(source: Union[str, List[Union[List, tuple]], List[str]], v
     
     return list(all_keywords)
 
-def generate_keywords_with_ai(api_key: str, source: Union[str, List[Union[List, tuple]], List[str]], version: Optional[str] = None, cves: Optional[List[str]] = None) -> List[str]:
+def generate_keywords_with_ai(api_key: str, source: Union[str, List[Union[List, tuple]], List[str]], version: Optional[str] = None, cves: Optional[List[str]] = None, args = None) -> List[str]:
     """
     Generate keywords from different sources by sending all the data to the OpenAI model.
     
