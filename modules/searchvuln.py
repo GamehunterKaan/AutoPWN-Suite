@@ -46,7 +46,7 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
     if args.openai_api_key:
         log.logger("info", "Using OpenAI API for vulnerability detection.")
         GPTkeywords = generate_keywords_with_ai(args.openai_api_key, HostArray)
-        for GPTkeyword in GPTkeywords:
+        for GPTkeyword in GPTkeywords[:args.max_exploits]:
             ApiResponseCVE.extend(SearchKeyword(GPTkeyword, log, apiKey))
                     
     if len(keywords) == 0:
@@ -71,7 +71,7 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
         console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
         CVEs = []
-        for CVE in ApiResponseCVE:
+        for CVE in ApiResponseCVE[:args.max_exploits]:
             CVEs.append(CVE.CVEID)
             console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
 
@@ -108,7 +108,7 @@ def GetShodanVulns(host, shodan_api_key, log):
     try:
         host_info = api.host(host)
         vulns = host_info.get("vulns", [])
-        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from Shodan.")
+        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from Shodan. (Max Exploits: {args.max_exploits})")
         open_ports = [service['port'] for service in host_info.get('data', [])]
         formatted_vulns = []
         for vuln in vulns:
@@ -131,7 +131,7 @@ def GetZoomEyeVulns(host, zoomeye_api_key, log):
         # Perform the search
         results = api.dork_search(f"ip:{host}", page=1)
         vulns = results.get('matches', [])
-        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from ZoomEye.")
+        log.logger("INFO", f"Found {len(vulns)} vulnerabilities for {host} from ZoomEye. (Max Exploits: {args.max_exploits})")
         return vulns
     except Exception as e:
         log.logger("ERROR", f"Error fetching ZoomEye vulnerabilities: {e}")
