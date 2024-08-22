@@ -71,7 +71,10 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
         if args.tag:
             console.print(f"┌─ [yellow][ {keyword} ][/yellow] - SearchVuln")
         else:
-            console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
+            if args.tag:
+                console.print(f"┌─ [yellow][ {keyword} ][/yellow] - SearchVuln")
+            else:
+                console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
         CVEs = []
         for CVE in ApiResponseCVE[:args.max_exploits]:
@@ -79,7 +82,10 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
             if args.tag:
                 console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│ - SearchVuln")
             else:
-                console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]")
+                if args.tag:
+                    console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red] - SearchVuln")
+                else:
+                    console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]")
 
             wrapped_description = wrap(CVE.description, term_width - 50)
             console.print(f"│\t\t[cyan]Description: [/cyan] - SearchVuln")
