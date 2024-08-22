@@ -101,7 +101,6 @@ class AutoScanner:
 
     def SearchShodan(self, product: str, version: str, shodan_api_key: str, debug: bool = False) -> list:
         log = fake_logger()
-        self.args = args
         keywords = generate_keywords(product, version)
         for word in keywords:
             if debug:
