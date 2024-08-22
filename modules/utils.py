@@ -705,6 +705,9 @@ def ParamPrint(
     if args.report:
         msg += f"│\tReporting method : {args.report}\n"
 
+    if hasattr(args, 'max_exploits'):
+        msg += f"│\tMax exploits : {args.max_exploits}\n"
+
     msg += "└" + "─" * (term_width - 1)
 
     console.print(msg)
