@@ -65,7 +65,7 @@ def StartScanning(
             VulnsArray = []
             keywords = generate_keywords(PortArray)
             sploits = SearchSploits(keywords, log, console, args, apiKey, args.max_exploits)
-            for sploit in sploits:
+            for sploit in sploits[:args.max_exploits]:
                 all_vulnerabilities.append(sploit)
             if shodan_api_key:
                 ShodanVulns, ShodanPorts = GetShodanVulns(host, shodan_api_key, log)
