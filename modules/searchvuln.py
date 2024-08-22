@@ -62,40 +62,7 @@ def SearchSploits(HostArray: list, log, console, args, apiKey=None, max_vulns=10
             f"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] [white]...[/white]",
             spinner="bouncingBar"
         ) as status:
-            ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
-            sleep(1)  # Adding a delay to ensure proper logging and searching
-        if len(ApiResponseCVE) == 0:
-            continue
-
-        if not printed_banner:
-            banner(f"Possible vulnerabilities for {target}", "red", console)
-            printed_banner = True
-
-        console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
-
-        CVEs = []
-        for CVE in ApiResponseCVE:
-            CVEs.append(CVE.CVEID)
-            console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
-
-            wrapped_description = wrap(CVE.description, term_width - 50)
-            console.print(f"│\t\t[cyan]Description: [/cyan]")
-            for line in wrapped_description:
-                console.print(f"│\t\t\t{line}")
-            console.print(
-                f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
-                + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
-                + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
-            )
-
-            VulnObject = VulnerableSoftware(
-                title=keyword,
-                CVEs=CVEs,
-                severity_score=CVE.severity_score,
-                exploitability=CVE.exploitability
-            )
-            VulnsArray.append(VulnObject)
-            console.print("└" + "─" * (term_width - 1))
+            exploits = GetExploitInfo(cve, log, max_vulns)
 
 
     # Sort vulnerabilities by severity and exploitability
