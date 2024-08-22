@@ -14,7 +14,7 @@ from modules.utils import (GetHostsToScan,
                            InitArgsAPI, InitArgsConf, InitArgsMode,
                            InitArgsScanType, InitArgsTarget, InitAutomation,
                            InitReport, ParamPrint, SaveOutput, ScanMode,
-                           UserConfirmation, check_nmap,
+                           UserConfirmation, check_nmap, cli,
                            check_version, cli, remove_duplicate_vulnerabilities)
 from modules.web.webvuln import webvuln
 
@@ -34,7 +34,7 @@ def StartScanning(
     else:
         Targets = [targetarg]
 
-    ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
+    ScanPorts, ScanVulns, DownloadExploits = UserConfirmation() if not args.exploit else (True, True, True)
     PortArray = []
 
     all_vulnerabilities = []
