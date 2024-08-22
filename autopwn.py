@@ -186,7 +186,40 @@ def StartExploiting(
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.report, args.output)
 
-if __name__ == "__main__":
+def main() -> None:
+    args = cli()
+    console = Console(record=True, color_system=None if args.no_color else "truecolor")
+    log = Logger(console)
+
+    if args.version:
+        print(f"AutoPWN Suite v{__version__}")
+        raise SystemExit
+
+    print_banner(console)
+    vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key = InitArgsAPI(args, log)
+    api_keys_used = sum([1 for key in [vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key] if key])
+    check_version(__version__, log)
+
+    if args.config:
+        InitArgsConf(args, log)
+
+    InitAutomation(args)
+    targetarg = InitArgsTarget(args, log)
+    scantype = InitArgsScanType(args, log)
+    scanmode = InitArgsMode(args, log)
+    ReportMethod, ReportObject = InitReport(args, log)
+
+    ParamPrint(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, api_keys_used, openai_api_key, console, log)
+
+    if args.exploit:
+        StartExploiting(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
+    else:
+        StartScanning(args, targetarg, scantype, scanmode, vuln_api_key, shodan_api_key, zoomeye_api_key, openai_api_key, console, log)
+
+    InitializeReport(ReportMethod, ReportObject, log, console)
+    SaveOutput(console, args.output_type, args.report, args.output)
+
+    if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
