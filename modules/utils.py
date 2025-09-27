@@ -323,15 +323,37 @@ def InitAutomation(args) -> None:
         DontAskForConfirmation = False
 
 
+def read_file_any_encoding(filepath: str) -> str:
+    # Try UTF-8 first
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return f.readline().strip("\n")
+    except UnicodeDecodeError:
+        pass
+    # Try UTF-16
+    try:
+        with open(filepath, "r", encoding="utf-16") as f:
+            return f.readline().strip("\n")
+    except UnicodeDecodeError:
+        pass
+    # Try latin-1 (very permissive)
+    try:
+        with open(filepath, "r", encoding="latin-1") as f:
+            return f.readline().strip("\n")
+    except Exception:
+        pass
+    # As a last resort, replace undecodable characters
+    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        return f.readline().strip("\n")
+
+
 def InitArgsAPI(args, log) -> str:
     if args.api:
         apiKey = args.api
-
     else:
         apiKey = None
         try:
-            with open("api.txt", "r", encoding="utf-8") as f:
-                apiKey = f.readline().strip("\n")
+            apiKey = read_file_any_encoding("api.txt")
         except FileNotFoundError:
             log.logger(
                 "warning",
@@ -342,6 +364,8 @@ def InitArgsAPI(args, log) -> str:
             )
         except PermissionError:
             log.logger("error", "Permission denied while trying to read api.txt!")
+        except Exception as e:
+            log.logger("error", f"Error reading api.txt: {e}")
 
     return apiKey
 
