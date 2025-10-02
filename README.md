@@ -2,13 +2,13 @@
 
 AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems automatically.
 
-![GitHub top language](https://img.shields.io/github/languages/top/GamehunterKaan/AutoPWN-Suite)
-![Lines of code](https://img.shields.io/tokei/lines/github/GamehunterKaan/AutoPWN-Suite)
+![GitHub Top Language](https://img.shields.io/github/languages/top/GamehunterKaan/AutoPWN-Suite)
 ![Repo Size](https://img.shields.io/github/repo-size/GamehunterKaan/AutoPWN-Suite)
 [![Tests](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml/badge.svg)](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml)
-![GitHub issues](https://img.shields.io/github/issues-raw/GamehunterKaan/AutoPWN-Suite)
-![GitHub closed issues](https://img.shields.io/github/issues-closed-raw/GamehunterKaan/AutoPWN-Suite)
-![GitHub Repo stars](https://img.shields.io/github/stars/GamehunterKaan/AutoPWN-Suite?style=social)
+![GitHub Contributors](https://img.shields.io/github/contributors/GamehunterKaan/AutoPWN-Suite)
+![GitHub Closed Pull Requests](https://img.shields.io/github/issues-pr-closed/GamehunterKaan/AutoPWN-Suite)
+![GitHub Closed Issues](https://img.shields.io/github/issues-closed-raw/GamehunterKaan/AutoPWN-Suite)
+![GitHub Repo Stars](https://img.shields.io/github/stars/GamehunterKaan/AutoPWN-Suite?style=social)
 ![Banner](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/banner.png)
 
 
@@ -34,8 +34,6 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of softwares running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of "keywords" to search [NIST vulnerability database.](https://www.nist.gov/)
 
-[Visit "PWN Spot!" for more information.](https://pwnspot.com/posts/AutoPWN/)
-
 
 ## Demo
 
@@ -46,35 +44,12 @@ AutoPWN Suite has a very user friendly easy to read output.
 
 ## Installation
 
-You can clone the repo. (This is the recommended installation method as other methods are no longer maintained)
-
+You can clone the repo. (This is the recommended installation method)
 ```
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
 sudo pip install -r requirements.txt
 ```
-
-OR
-
-You can install it using pip. (sudo recommended)
-
-```
-sudo pip install autopwn-suite
-```
-
-OR
-
-You can download debian (deb) package from [releases.](https://github.com/GamehunterKaan/AutoPWN-Suite/releases)
-
-```
-sudo pip install requests rich python-nmap bs4 distro
-sudo apt-get install ./autopwn-suite_2.1.5.deb
-```
-
-OR
-
-If you are on Arch Linux based system you can install `python-autopwn-suite` package using AUR helper of your choice.
-
 OR
 
 You can use the [docker image.](https://github.com/GamehunterKaan/AutoPWN-Suite/pull/42)
@@ -101,74 +76,6 @@ Automatic mode
 autopwn-suite -y
 ```
 
-
-Help Menu
-
-```console
-$ autopwn-suite -h
-
-usage: autopwn.py [-h] [-v] [-y] [-c CONFIG] [-nc] [-t TARGET] [-hf HOST_FILE] [-sd] [-st {arp,ping}] [-nf NMAP_FLAGS] [-s {0,1,2,3,4,5}] [-ht HOST_TIMEOUT] [-a API] [-m {evade,noise,normal}] [-nt TIMEOUT]
-                  [-o OUTPUT] [-ot {html,txt,svg}] [-rp {email,webhook}] [-rpe EMAIL] [-rpep PASSWORD] [-rpet EMAIL] [-rpef EMAIL] [-rpes SERVER] [-rpesp PORT] [-rpw WEBHOOK]
-
-AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems automatically.
-
-options:
-  -h, --help            show this help message and exit
-  -v, --version         Print version and exit.
-  -y, --yes-please      Don't ask for anything. (Full automatic mode)
-  -c CONFIG, --config CONFIG
-                        Specify a config file to use. (Default : None)
-  -nc, --no-color       Disable colors.
-
-Scanning:
-  Options for scanning
-
-  -t TARGET, --target TARGET
-                        Target range to scan. This argument overwrites the hostfile argument. (192.168.0.1 or 192.168.0.0/24)
-  -hf HOST_FILE, --host-file HOST_FILE
-                        File containing a list of hosts to scan.
-  -sd, --skip-discovery
-                        Skips the host discovery phase.
-  -st {arp,ping}, --scan-type {arp,ping}
-                        Scan type.
-  -nf NMAP_FLAGS, --nmap-flags NMAP_FLAGS
-                        Custom nmap flags to use for portscan. (Has to be specified like : -nf="-O")
-  -s {0,1,2,3,4,5}, --speed {0,1,2,3,4,5}
-                        Scan speed. (Default : 3)
-  -ht HOST_TIMEOUT, --host-timeout HOST_TIMEOUT
-                        Timeout for every host. (Default :240)
-  -a API, --api API     Specify API key for vulnerability detection for faster scanning. (Default : None)
-  -m {evade,noise,normal}, --mode {evade,noise,normal}
-                        Scan mode.
-  -nt TIMEOUT, --noise-timeout TIMEOUT
-                        Noise mode timeout.
-
-Reporting:
-  Options for reporting
-
-  -o OUTPUT, --output OUTPUT
-                        Output file name. (Default : autopwn.log)
-  -ot {html,txt,svg}, --output-type {html,txt,svg}
-                        Output file type. (Default : html)
-  -rp {email,webhook}, --report {email,webhook}
-                        Report sending method.
-  -rpe EMAIL, --report-email EMAIL
-                        Email address to use for sending report.
-  -rpep PASSWORD, --report-email-password PASSWORD
-                        Password of the email report is going to be sent from.
-  -rpet EMAIL, --report-email-to EMAIL
-                        Email address to send report to.
-  -rpef EMAIL, --report-email-from EMAIL
-                        Email to send from.
-  -rpes SERVER, --report-email-server SERVER
-                        Email server to use for sending report.
-  -rpesp PORT, --report-email-server-port PORT
-                        Port of the email server.
-  -rpw WEBHOOK, --report-webhook WEBHOOK
-                        Webhook to use for sending report.
-```
-
-
 ## Module usage
 
 ```python
@@ -192,9 +99,4 @@ You may not rent or lease, distribute, modify, sell or transfer the software to 
 
 ## Support or Contact
 
-Having trouble using this tool? You can reach me out on [discord](https://search.discordprofile.info/374953845438021635), [create an issue](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new/choose) or [create a discussion!](https://github.com/GamehunterKaan/AutoPWN-Suite/discussions)
-
-
-## Support & Hire Me!
-
-If you want to support my work and also get your job done you can hire me on [Fiverr](https://www.fiverr.com/kaangultekin)! I do various things such as website pentesting, python programming, cleaning malware, PC optimization, file recovery and mentoring.
+Having trouble using this tool? You can [create an issue](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new/choose) or [create a discussion!](https://github.com/GamehunterKaan/AutoPWN-Suite/discussions)
