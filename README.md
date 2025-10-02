@@ -70,13 +70,33 @@ You can use Google Cloud Shell.
 
 Running with root privileges (sudo) is always recommended.
 
-Automatic mode
+#### Automatic Mode
 
 ```console
 autopwn-suite -y
 ```
 
-## Module usage
+#### Scan a Specific Target
+
+```console
+autopwn-suite -t <target ip address>
+```
+
+#### Change Scanning Speed
+
+```console
+autopwn-suite -s <1, 2, 3, 4, 5>
+```
+
+#### Change Scanning Mode
+
+```console
+autopwn-suite -m <evade, noise, normal>
+```
+
+For more details about usage and flags use `-h` flag.
+
+## Module Usage
 
 ```python
 from autopwn_suite.api import AutoScanner
@@ -86,6 +106,32 @@ json_results = scanner.scan("192.168.0.1")
 scanner.save_to_file("autopwn.json")
 ```
 
+## Development and Testing
+
+You can use poetry to install dependencies and run tests.
+
+#### Installing dependencies
+```console
+poetry install
+```
+
+#### Running Tests
+```console
+# Run all tests with coverage
+poetry run test
+
+# Run tests without coverage
+poetry run test --no-cov
+
+# Run only unit tests
+poetry run test -m unit
+
+# Run only integration tests
+poetry run test -m integration
+
+# Run tests excluding slow tests
+poetry run test -m "not slow"
+```
 
 ## Contributing to AutoPWN Suite
 
