@@ -309,7 +309,7 @@ def DetectIPRange() -> str:
         net_range = f"{ip}/{net_dict[mask]}"
     else:
         proc = Popen(["ip", "-o", "-f", "inet", "addr", "show"], stdout=PIPE)
-        regex = f"\\b{ip}\/\\b([0-9]|[12][0-9]|3[0-2])\\b"
+        regex = rf"\b{ip}/\b([0-9]|[12][0-9]|3[0-2])\b"
         cmd_output = proc.stdout.read().decode()
         net_range = search(regex, cmd_output).group()
     return net_range
