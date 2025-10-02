@@ -10,3 +10,43 @@ __pycache__/
 modules/__pycache__
 modules/web/__pycache__
 venv/*
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.py[cod]
+*$py.class
+
+# Claude
+.claude/*
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+virtualenv/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# OS
+.DS_Store
+Thumbs.db
