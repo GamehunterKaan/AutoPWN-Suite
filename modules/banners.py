@@ -33,6 +33,6 @@ def print_banner(console) -> None:
         ),
         width=width,
         height=height,
-        subtitle="by GamehunterKaan (https://auto.pwnspot.com)",
+        subtitle="by GamehunterKaan",
     )
     console.print(panel)
