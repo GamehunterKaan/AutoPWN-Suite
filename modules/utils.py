@@ -879,8 +879,9 @@ def SaveOutput(console, out_type, report, output_file, target) -> None:
         # No path provided, create a default one in the 'outputs' directory
         output_dir = "outputs"
         os.makedirs(output_dir, exist_ok=True)
-        filename = f"{datetime.now().strftime('%Y-%m-%d')}_{'multihost' if isinstance(target, list) else str(target).replace('/', '_').replace('\\', '_')}"
-        full_path = os.path.join(output_dir, filename)
+        base_name = 'multihost' if isinstance(target, list) else str(target).replace('/', '_')
+        sanitized_name = base_name.replace('\\', '_')
+        full_path = os.path.join(output_dir, f"{datetime.now().strftime('%Y-%m-%d')}_{sanitized_name}")
 
     # Ensure the file has the correct extension
     if not full_path.endswith(f".{out_type}"):
