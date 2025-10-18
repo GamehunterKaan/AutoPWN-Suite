@@ -3,7 +3,7 @@ import sys
 import tempfile
 import shutil
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 import pytest
 
 # Add the project root to the Python path
@@ -236,14 +236,12 @@ def sample_html_content():
 @pytest.fixture
 def mock_rich_console(monkeypatch):
     """Mock Rich console for testing output."""
-    from unittest.mock import Mock
-    console = Mock()
-    console.print = Mock()
-    console.log = Mock()
-    console.rule = Mock()
-    console.status = Mock()
+    console = MagicMock()
+    console.print = MagicMock()
+    console.log = MagicMock()
+    console.rule = MagicMock()
+    console.status = MagicMock()
     return console
-
 
 # Markers for test categorization
 def pytest_configure(config):
