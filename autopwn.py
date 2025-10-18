@@ -103,7 +103,7 @@ def main() -> None:
     StartScanning(args, targetarg, scantype, scanmode, apiKey, console, console2, log)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
-    SaveOutput(console, args.output_type, args.report, args.output)
+    SaveOutput(console, args.output_type, args.report, args.output, targetarg)
 
 
 if __name__ == "__main__":

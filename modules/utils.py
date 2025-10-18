@@ -4,7 +4,7 @@ try:
     import distro
 except ImportError:
     from ctypes import windll
-
+import os
 from argparse import ArgumentParser
 from configparser import ConfigParser
 from datetime import datetime
@@ -168,7 +168,7 @@ def cli():
         "-o",
         "--output",
         help="Output file name. (Default : autopwn.log)",
-        default="autopwn",
+        default=None,
         type=str,
         required=False,
     )
@@ -813,14 +813,14 @@ def ParamPrint(
         )
 
     term_width = get_terminal_width()
-
+    
     msg = (
         "\n┌─[ Scanning with the following parameters ]\n"
         + f"├"
         + "─" * (term_width - 1)
         + "\n"
         + f"│\tTarget : {targetarg}\n"
-        + f"│\tOutput file : [yellow]{args.output}[/yellow]\n"
+        + f"│\tOutput file : [yellow]{args.output if args.output else 'AUTO'}[/yellow]\n"
         + f"│\tAPI Key : {type(apiKey) == str}\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
@@ -870,17 +870,34 @@ def CheckConnection(log) -> bool:
         return True
 
 
-def SaveOutput(console, out_type, report, output_file) -> None:
+
+
+def SaveOutput(console, out_type, report, output_file, target) -> None:
+    if output_file:
+        # User provided a path, use it directly
+        full_path = output_file
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(full_path) or '.', exist_ok=True)
+    else:
+        # No path provided, create a default one in the 'outputs' directory
+        output_dir = "outputs"
+        os.makedirs(output_dir, exist_ok=True)
+        filename = f"{datetime.now().strftime('%Y-%m-%d')}_{'multihost' if isinstance(target, list) else str(target).replace('/', '_').replace('\\', '_')}"
+        full_path = os.path.join(output_dir, filename)
+
+    # Ensure the file has the correct extension
+    if not full_path.endswith(f".{out_type}"):
+        full_path += f".{out_type}"
+
     if out_type == "html":
-        if not output_file.endswith(".html"):
-            output_file += ".html"
-        console.save_html(output_file)
+        console.save_html(full_path)
     elif out_type == "svg":
-        if not output_file.endswith(".svg"):
-            output_file += ".svg"
-        console.save_svg(output_file)
+        console.save_svg(full_path)
     elif out_type == "txt":
-        console.save_text(output_file)
+        console.save_text(full_path)
+
+    console.print(f"Report saved to [cyan]{full_path}[/cyan]")
+
 
 
 def get_terminal_width() -> int:
