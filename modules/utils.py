@@ -912,36 +912,3 @@ def get_terminal_width() -> int:
         width -= 1
 
     return width
-
-
-def check_version(cur_version: str, log) -> None:
-    try:
-        data = get("https://pypi.org/pypi/autopwn-suite/json").json()
-    except Exception as e:
-        log.logger("error", "An error occured while checking AutoPWN Suite version.")
-        log.logger("error", e)
-    else:
-        version = list(data["releases"].keys())[-1]
-        version_major = int(version.split(".")[0])
-        version_minor = int(version.split(".")[1])
-        version_patch = int(version.split(".")[2])
-
-        cur_version_major = int(cur_version.split(".")[0])
-        cur_version_minor = int(cur_version.split(".")[1])
-        cur_version_patch = int(cur_version.split(".")[2])
-
-        if version_major > cur_version_major:
-            log.logger(
-                "warning",
-                "Your version of AutoPWN Suite is outdated. Update is advised.",
-            )
-        elif version_minor > cur_version_minor:
-            log.logger(
-                "warning",
-                "Your version of AutoPWN Suite is outdated. Update is advised.",
-            )
-        elif version_patch > cur_version_patch:
-            log.logger(
-                "warning",
-                "Your version of AutoPWN Suite is outdated. Update is advised.",
-            )

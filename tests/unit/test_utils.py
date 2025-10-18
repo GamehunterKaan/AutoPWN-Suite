@@ -24,7 +24,6 @@ from modules.utils import (
     UserConfirmation,
     SaveOutput,
     check_nmap,
-    check_version,
     InitArgsAPI,
     read_file_any_encoding,
     CheckConnection,
@@ -622,48 +621,6 @@ class TestGetHostsToScan:
         hosts = ["192.168.1.1"]
         with pytest.raises(SystemExit):
             GetHostsToScan(hosts, mock_console)
-
-
-@pytest.mark.unit
-class TestCheckVersion:
-    """Tests for the check_version function."""
-
-    @patch("modules.utils.get")
-    def test_check_version_up_to_date(self, mock_get):
-        """Verify no warning is logged if the version is current."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"releases": {"1.0.0": []}}
-        mock_get.return_value = mock_response
-        mock_log = MagicMock()
-
-        check_version("1.0.0", mock_log)
-        mock_log.logger.assert_not_called()
-
-    @patch("modules.utils.get")
-    def test_check_version_outdated(self, mock_get):
-        """Verify a warning is logged if the version is outdated."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"releases": {"1.0.0": [], "1.0.1": []}}
-        mock_get.return_value = mock_response
-        mock_log = MagicMock()
-
-        check_version("1.0.0", mock_log)
-        mock_log.logger.assert_called_with("warning", "Your version of AutoPWN Suite is outdated. Update is advised.")
-
-    @patch("modules.utils.get", side_effect=Exception("Network error"))
-    def test_check_version_network_error(self, mock_get):
-        """Verify an error is logged if the request fails."""
-        mock_log = MagicMock()
-        check_version("1.0.0", mock_log)
-
-        # Check that the generic error message was logged
-        mock_log.logger.assert_any_call("error", "An error occured while checking AutoPWN Suite version.")
-
-        # Check that the exception itself was logged by inspecting the call arguments
-        last_call_args, _ = mock_log.logger.call_args
-        assert last_call_args[0] == "error"
-        assert isinstance(last_call_args[1], Exception)
-        assert str(last_call_args[1]) == "Network error"
 
 
 @pytest.mark.unit

@@ -22,9 +22,9 @@ from modules.utils import (
     ScanMode,
     UserConfirmation,
     WebScan,
+    CheckConnection,
     check_nmap,
     cli,
-    check_version,
 )
 from modules.web.webvuln import webvuln
 
@@ -86,7 +86,8 @@ def main() -> None:
         raise SystemExit
 
     print_banner(console)
-    check_version(__version__, log)
+
+    CheckConnection(log)
 
     if args.config:
         InitArgsConf(args, log)

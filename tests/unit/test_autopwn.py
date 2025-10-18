@@ -38,10 +38,10 @@ class TestMainExecution:
     @patch("autopwn.InitArgsTarget")
     @patch("autopwn.InitAutomation")
     @patch("autopwn.InitArgsConf")
-    @patch("autopwn.check_version")
+    @patch("autopwn.CheckConnection")
     @patch("autopwn.print_banner")
     @patch("autopwn.cli")
-    def test_main_basic_scan_flow(self, mock_cli, mock_banner, mock_check_version, mock_init_conf, mock_init_auto, mock_init_target, mock_init_scantype, mock_init_mode, mock_init_api, mock_init_report, *other_mocks):
+    def test_main_basic_scan_flow(self, mock_cli, mock_banner, mock_check_connection, mock_init_conf, mock_init_auto, mock_init_target, mock_init_scantype, mock_init_mode, mock_init_api, mock_init_report, *other_mocks):
         """Verify the main orchestration flow of the application."""
         mock_args = MagicMock()
         mock_args.version = False
@@ -56,7 +56,7 @@ class TestMainExecution:
         main()
 
         all_mocks = [
-            mock_banner, mock_check_version, mock_init_conf, mock_init_auto,
+            mock_banner, mock_check_connection, mock_init_conf, mock_init_auto,
             mock_init_target, mock_init_scantype, mock_init_mode, mock_init_api,
             mock_init_report
         ] + list(other_mocks)
@@ -80,10 +80,10 @@ class TestMainExecution:
     @patch("autopwn.InitArgsTarget")
     @patch("autopwn.InitAutomation")
     @patch("autopwn.InitArgsConf")
-    @patch("autopwn.check_version")
+    @patch("autopwn.CheckConnection")
     @patch("autopwn.print_banner")
     @patch("autopwn.cli")
-    def test_main_with_config_file(self, mock_cli, mock_banner, mock_check_version, mock_init_conf, mock_init_auto, mock_init_target, mock_init_scantype, mock_init_mode, mock_init_api, mock_init_report, *other_mocks):
+    def test_main_with_config_file(self, mock_cli, mock_banner, mock_check_connection, mock_init_conf, mock_init_auto, mock_init_target, mock_init_scantype, mock_init_mode, mock_init_api, mock_init_report, *other_mocks):
         """Verify that InitArgsConf is called when a config file is provided."""
         mock_args = MagicMock()
         mock_args.version = False
