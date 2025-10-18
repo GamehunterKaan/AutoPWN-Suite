@@ -2,9 +2,9 @@ from modules.logger import banner
 from modules.random_user_agent import random_user_agent
 from modules.web.crawler import crawl
 from modules.web.dirbust import dirbust
-from modules.web.lfi import TestLFI
-from modules.web.sqli import TestSQLI
-from modules.web.xss import TestXSS
+from modules.web.lfi import LFIScanner
+from modules.web.sqli import SQLIScanner
+from modules.web.xss import XSSScanner
 from requests import get
 from requests import packages
 
@@ -17,9 +17,9 @@ def webvuln(target, log, console) -> None:
     Test for web vulnerabilities
     """
 
-    LFI = TestLFI(log, console)
-    SQLI = TestSQLI(log, console)
-    XSS = TestXSS(log, console)
+    LFI = LFIScanner(log, console)
+    SQLI = SQLIScanner(log, console)
+    XSS = XSSScanner(log, console)
 
     def get_url(target):
         """
