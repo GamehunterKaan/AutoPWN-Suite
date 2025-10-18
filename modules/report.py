@@ -75,10 +75,15 @@ def SendEmail(email, password, email_to, email_from, server, port, log) -> None:
     mail = SMTP(server, port)
     mail.starttls()
     mail.login(email, password)
-    text = msg.as_string()
-    mail.sendmail(email, email_to, text)
-    mail.quit()
-    log.logger("success", "Email report sent successfully.")
+    try:
+        text = msg.as_string()
+        mail.sendmail(email, email_to, text)
+    except Exception:
+        log.logger("error", "An error occured while trying to send email report.")
+    else:
+        log.logger("success", "Email report sent successfully.")
+    finally:
+        mail.quit()
 
 
 def InitializeWebhookReport(Webhook, log, console) -> None:
