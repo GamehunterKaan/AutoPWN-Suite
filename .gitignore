@@ -6,6 +6,7 @@ autopwn.html
 autopwn.svg
 .vscode/
 exploits/
+outputs/
 __pycache__/
 modules/__pycache__
 modules/web/__pycache__
