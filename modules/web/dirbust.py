@@ -19,6 +19,7 @@ def dirbust(target_url, console, log) -> None:
             dirs = f.read().splitlines()
     except FileNotFoundError:
         log.logger("error", "Web discovery database not found.")
+        return
 
     found_dirs = [target_url]
 
