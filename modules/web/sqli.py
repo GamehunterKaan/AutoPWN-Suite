@@ -4,7 +4,7 @@ from requests import packages
 
 packages.urllib3.disable_warnings()
 
-class TestSQLI:
+class SQLIScanner:
     def __init__(self, log, console) -> None:
         self.log = log
         self.console = console
@@ -38,22 +38,25 @@ class TestSQLI:
             try:
                 response = get(test_url, verify=False)
             except ConnectionError:
-                self.log.logger(
-                    "errro", f"Connection error raised on: {test_url}, skipping"
-                )
-            else:
-                for error in self.sql_dbms_errors:
-                    if response.text.find(error) != -1:
-                        self.console.print(
-                            f"[red][[/red][green]+[/green][red]][/red]"
-                            + f" [white]SQLI :[/white] {test_url}"
-                        )
-                        break
+                self.log.logger("error", f"Connection error raised on: {test_url}, skipping")
+                return  # Exit if we can't connect
+
+            response_text_lower = response.text.lower()
+            for error in self.sql_dbms_errors:
+                if error in response_text_lower:
+                    self.console.print(
+                        f"[red][[/red][green]+[/green][red]][/red]"
+                        + f" [white]SQLI :[/white] {test_url}"
+                    )
+                    return  # Exit after finding the first vulnerability for this URL
 
     def test_sqli(self, url) -> None:
         """
         Test for SQLI
         """
-        base_url, params = url.split("?")[0], url.split("?")[1]
-        params_dict = params.split("&")
-        self.exploit_sqli(base_url, params_dict)
+        try:
+            base_url, params = url.split("?")[0], url.split("?")[1]
+            params_dict = params.split("&")
+            self.exploit_sqli(base_url, params_dict)
+        except ConnectionError:
+            pass
