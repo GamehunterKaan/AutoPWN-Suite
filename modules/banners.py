@@ -33,6 +33,6 @@ def print_banner(console) -> None:
         ),
         width=width,
         height=height,
-        subtitle="by GamehunterKaan",
+        subtitle="by Kaan Gültekin @ kaangultekin.net",
     )
     console.print(panel)
