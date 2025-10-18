@@ -328,14 +328,18 @@ def read_file_any_encoding(filepath: str) -> str:
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             return f.readline().strip("\n")
-    except UnicodeDecodeError:
+    except UnicodeError:
         pass
-    # Try UTF-16
+    # Try UTF-16 variations
     try:
         with open(filepath, "r", encoding="utf-16") as f:
             return f.readline().strip("\n")
-    except UnicodeDecodeError:
-        pass
+    except UnicodeError:
+        try:
+            with open(filepath, "r", encoding="utf-16-le") as f:
+                return f.readline().strip("\n")
+        except UnicodeError:
+            pass
     # Try latin-1 (very permissive)
     try:
         with open(filepath, "r", encoding="latin-1") as f:
