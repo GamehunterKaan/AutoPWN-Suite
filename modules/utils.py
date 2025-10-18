@@ -677,70 +677,67 @@ def InitArgsConf(args, log) -> None:
 
 def install_nmap_linux(log) -> None:
     distro_ = distro.id().lower()
-    while True:
-        try:
-            if distro_ in [
-                "ubuntu",
-                "debian",
-                "linuxmint",
-                "raspbian",
-                "kali",
-                "parrot",
-            ]:
-                check_call(
-                    ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"],
-                    stderr=DEVNULL,
-                )
-                break
-            elif distro_ in ["arch", "manjaro"]:
-                check_call(
-                    ["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"],
-                    stderr=DEVNULL,
-                )
-                break
-            elif distro_ in ["fedora", "oracle"]:
-                check_call(
-                    ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"], stderr=DEVNULL
-                )
-                break
-            elif distro in ["rhel", "centos"]:
-                check_call(
-                    ["/usr/bin/sudo", "yum", "install", "nmap", "-y"], stderr=DEVNULL
-                )
-                break
-            elif distro in ["sles", "opensuse"]:
-                check_call(
-                    ["/usr/bin/sudo", "zypper", "install", "nmap", "--non-interactive"],
-                    stderr=DEVNULL,
-                )
-                break
-            else:
-                raise CalledProcessError
-
-        except CalledProcessError:
-            _distro_ = input(
-                "Cannot recognize the needed package manager for your "
-                + f"system that seems to be running in: {distro_} and "
-                + f"{sys_platform}, {platform()}, kindly select the "
-                + "correct package manager below to proceed to the "
-                + "installation, else, select, n.\n\t0 Abort installation\n"
-                + "\t1 apt-get\n\t2 dnf\n\t3 yum\n\t4 pacman\n\t5 zypper."
-                + "\nSelect option [0-5] >"
+    try:
+        if distro_ in [
+            "ubuntu",
+            "debian",
+            "linuxmint",
+            "raspbian",
+            "kali",
+            "parrot",
+        ]:
+            check_call(
+                ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"],
+                stderr=DEVNULL,
             )
-            if _distro_ == 1:
-                distro_ = "ubuntu"
-            elif _distro_ == 2:
-                distro_ = "fedora"
-            elif _distro_ == 3:
-                distro_ = "centos"
-            elif _distro_ == 4:
-                distro_ = "arch"
-            elif _distro_ == 5:
-                distro_ = "opensuse"
-            else:
-                log.logger("error", "Couldn't install nmap (Linux)")
-                break
-            continue
+        elif distro_ in ["arch", "manjaro"]:
+            check_call(
+                ["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"],
+                stderr=DEVNULL,
+            )
+        elif distro_ in ["fedora", "oracle"]:
+            check_call(
+                ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"], stderr=DEVNULL
+            )
+        elif distro_ in ["rhel", "centos"]:
+            check_call(
+                ["/usr/bin/sudo", "yum", "install", "nmap", "-y"], stderr=DEVNULL
+            )
+        elif distro_ in ["sles", "opensuse"]:
+            check_call(
+                ["/usr/bin/sudo", "zypper", "install", "nmap", "--non-interactive"],
+                stderr=DEVNULL,
+            )
+        else:
+            raise CalledProcessError(1, "cmd")
+
+    except CalledProcessError:
+        _distro_choice_ = input(
+            "Cannot recognize the needed package manager for your "
+            + f"system that seems to be running in: {distro_} and "
+            + f"{sys_platform}, {platform()}, kindly select the "
+            + "correct package manager below to proceed to the "
+            + "installation, else, select, n.\n\t0 Abort installation\n"
+            + "\t1 apt-get\n\t2 dnf\n\t3 yum\n\t4 pacman\n\t5 zypper."
+            + "\nSelect option [0-5] >"
+        )
+        if _distro_choice_ == "1":
+            distro_ = "ubuntu"
+            install_nmap_linux(log) # Recursive call with the new distro choice
+        elif _distro_choice_ == "2":
+            distro_ = "fedora"
+            install_nmap_linux(log)
+        elif _distro_choice_ == "3":
+            distro_ = "centos"
+            install_nmap_linux(log)
+        elif _distro_choice_ == "4":
+            distro_ = "arch"
+            install_nmap_linux(log)
+        elif _distro_choice_ == "5":
+            distro_ = "opensuse"
+            install_nmap_linux(log)
+        else:
+            log.logger("error", "Couldn't install nmap (Linux)")
 
 
 def install_nmap_windows(log) -> None:
