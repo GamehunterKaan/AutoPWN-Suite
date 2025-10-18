@@ -7,7 +7,7 @@ from requests import packages
 
 packages.urllib3.disable_warnings()
 
-class TestXSS:
+class XSSScanner:
     def __init__(self, log, console) -> None:
         self.log = log
         self.console = console
