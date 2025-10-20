@@ -70,7 +70,7 @@ def StartScanning(
 
 def main() -> None:
     __author__ = "GamehunterKaan"
-    __version__ = "2.2.1"
+    __version__ = "2.2.2"
 
     args = cli()
     if args.no_color:
@@ -104,7 +104,7 @@ def main() -> None:
     StartScanning(args, targetarg, scantype, scanmode, apiKey, console, console2, log)
 
     InitializeReport(ReportMethod, ReportObject, log, console)
-    SaveOutput(console, args.output_type, args.report, args.output, targetarg)
+    SaveOutput(console, args.output_type, args.output, args.output_folder, targetarg)
 
 
 if __name__ == "__main__":

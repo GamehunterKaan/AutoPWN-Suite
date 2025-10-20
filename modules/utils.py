@@ -167,7 +167,7 @@ def cli():
     reportargs.add_argument(
         "-o",
         "--output",
-        help="Output file name. (Default : autopwn.log)",
+        help="Output file name. Overrides output-folder.",
         default=None,
         type=str,
         required=False,
@@ -180,6 +180,14 @@ def cli():
         type=str,
         required=False,
         choices=["html", "txt", "svg"],
+    )
+    reportargs.add_argument(
+        "-of",
+        "--output-folder",
+        help="Output file folder. (Default : outputs/)",
+        default="outputs",
+        type=str,
+        required=False,
     )
     reportargs.add_argument(
         "-rp",
@@ -646,6 +654,9 @@ def InitArgsConf(args, log) -> None:
 
         if config.has_option("REPORT", "outputtype"):
             args.output_type = config.get("REPORT", "outputtype").lower()
+        
+        if config.has_option("REPORT", "outputfolder"):
+            args.output_folder = config.get("REPORT", "outputfolder").lower()
 
         if config.has_option("REPORT", "method"):
             args.report = config.get("REPORT", "method").lower()
@@ -821,7 +832,7 @@ def ParamPrint(
         + "─" * (term_width - 1)
         + "\n"
         + f"│\tTarget : {targetarg}\n"
-        + f"│\tOutput file : [yellow]{args.output if args.output else 'AUTO'}[/yellow]\n"
+        + f"│\t{'Output file' if args.output else 'Output folder'} : [yellow]{args.output if args.output else args.output_folder}[/yellow]\n"
         + f"│\tAPI Key : {type(apiKey) == str}\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
@@ -873,12 +884,17 @@ def CheckConnection(log) -> bool:
 
 
 
-def SaveOutput(console, out_type, report, output_file, target) -> None:
+def SaveOutput(console, out_type, output_file, output_folder, target) -> None:
     if output_file:
         # User provided a path, use it directly
         full_path = output_file
         # Ensure the directory exists
         os.makedirs(os.path.dirname(full_path) or '.', exist_ok=True)
+    elif output_folder:
+        os.makedirs(output_folder, exist_ok=True)
+        base_name = 'multihost' if isinstance(target, list) else str(target).replace('/', '_')
+        sanitized_name = base_name.replace('\\', '_')
+        full_path = os.path.join(output_folder, f"{datetime.now().strftime('%Y-%m-%d')}_{sanitized_name}")
     else:
         # No path provided, create a default one in the 'outputs' directory
         output_dir = "outputs"
