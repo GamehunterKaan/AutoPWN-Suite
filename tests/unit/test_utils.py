@@ -57,7 +57,7 @@ class TestSaveOutput:
         output_path = temp_dir / "my_report.html"
         target = "127.0.0.1"
 
-        SaveOutput(mock_console, "html", None, str(output_path), target)
+        SaveOutput(mock_console, "html", str(output_path), None, target)
 
         # Verify the correct save method was called with the absolute path
         mock_console.save_html.assert_called_once_with(str(output_path))
@@ -81,7 +81,7 @@ class TestSaveOutput:
         # Change current directory to temp_dir to isolate file creation
         os.chdir(temp_dir)
 
-        SaveOutput(mock_console, "txt", None, None, target)
+        SaveOutput(mock_console, "txt", None, "outputs", target)
 
         expected_relative_path = os.path.join("outputs", expected_filename)
 
@@ -100,7 +100,7 @@ class TestSaveOutput:
         output_path = temp_dir / "my_report"  # No extension
         target = "127.0.0.1"
 
-        SaveOutput(mock_console, "svg", None, str(output_path), target)
+        SaveOutput(mock_console, "svg", str(output_path), None, target)
 
         # Verify it was called with the extension added
         mock_console.save_svg.assert_called_once_with(str(output_path) + ".svg")
@@ -118,7 +118,7 @@ class TestSaveOutput:
         # Change current directory to temp_dir to isolate file creation
         os.chdir(temp_dir)
 
-        SaveOutput(mock_console, "html", None, None, targets)
+        SaveOutput(mock_console, "html", None, "outputs", targets)
 
         expected_relative_path = os.path.join("outputs", expected_filename)
 
@@ -335,6 +335,7 @@ def test_param_print(mock_width, mock_console):
     """Verify the parameter print function formats output correctly."""
     args = argparse.Namespace(
         output=None,
+        output_folder="outputs",
         skip_discovery=True,
         host_file="hosts.txt",
         host_timeout=300,
@@ -357,7 +358,7 @@ def test_param_print(mock_width, mock_console):
     mock_console.print.assert_called_once()
     output = mock_console.print.call_args[0][0]
     assert "Target : 192.168.1.0/24" in output
-    assert "Output file : [yellow]AUTO[/yellow]" in output
+    assert "Output folder : [yellow]outputs[/yellow]" in output
     assert "Skip discovery: True" in output
     assert "Scan type : [red]ARP[/red]" in output
     assert "Nmap flags : [blue]-sC[/blue]" in output
