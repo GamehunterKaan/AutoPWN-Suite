@@ -115,6 +115,9 @@ def main() -> None:
 
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.output, args.output_folder, targetarg)
+
+    if not hasattr(args, "scan_interval"):
+        args.scan_interval = None
     if args.scan_interval and args.scan_interval > 0:
         console.print(f"Sleeping for {args.scan_interval} seconds...")
         sleep(args.scan_interval)
