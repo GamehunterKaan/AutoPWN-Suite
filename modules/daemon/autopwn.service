@@ -1,0 +1,14 @@
+[Unit]
+Description=AutoPWN Suite Daemon
+After=network.target
+
+[Service]
+ExecStart=/opt/autopwn-daemon/autopwn-daemon.sh
+Restart=always
+User=root
+WorkingDirectory=/opt/autopwn-daemon
+StandardOutput=append:/var/log/autopwn-daemon.log
+StandardError=append:/var/log/autopwn-daemon.log
+
+[Install]
+WantedBy=multi-user.target
