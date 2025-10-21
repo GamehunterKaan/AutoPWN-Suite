@@ -102,6 +102,37 @@ class TestMainExecution:
         # Specifically check that InitArgsConf was called because a config was provided
         mock_init_conf.assert_called_once()
 
+    @patch("autopwn.InstallDaemon")
+    @patch("autopwn.cli")
+    @patch("autopwn.print_banner") # Patch functions that should NOT be called
+    @patch("autopwn.CheckConnection")
+    @patch("autopwn.InitArgsConf")
+    def test_main_daemon_install_flow(self, mock_init_conf, mock_check_connection, mock_print_banner, mock_cli, mock_install_daemon):
+        """Verify that the --daemon-install flag correctly triggers the installer and exits."""
+        mock_args = MagicMock()
+        mock_args.version = False
+        mock_args.daemon_install = True # This is the key for this test
+        mock_args.no_color = True
+        mock_cli.return_value = mock_args
+
+        with pytest.raises(SystemExit):
+            main()
+
+        # Verify that InstallDaemon was called exactly once
+        mock_install_daemon.assert_called_once()
+
+        # Verify that other parts of the main flow were NOT called
+        # because daemon_install should short-circuit the execution.
+        mock_print_banner.assert_not_called()
+        mock_check_connection.assert_not_called()
+        mock_init_conf.assert_not_called()
+        # We don't need to assert on all other InitArgs* functions
+        # as they are downstream from print_banner and CheckConnection.
+        # If those aren't called, neither should the others.
+
+        # Verify that cli was called to get the arguments
+        mock_cli.assert_called_once()
+
 
 @pytest.mark.unit
 @patch("autopwn.check_nmap")
