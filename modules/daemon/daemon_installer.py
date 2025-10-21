@@ -102,12 +102,17 @@ def CreateConfig(console):
 
     target = input("Enter your target (Leave empty for auto detection): ")
     host_file = input("Enter host file (Leave empty for none - will override target): ")
+
+    if target == "" and host_file == "":
+        skip_discovery = False
+    else:
+        skip_discovery_input = input("Would you like to skip discovery? (y/n) ")
+        skip_discovery = skip_discovery_input.lower() == "y"
+
     api_key = input("Enter API key (Leave empty for none): ")
     nmap_flags = input("Enter nmap flags (Leave empty for none): ")
     speed = _get_validated_int(console, "Enter speed (0-5, Leave empty for default): ", default=3)
 
-    skip_discovery_input = input("Would you like to skip discovery? (y/n) ")
-    skip_discovery = skip_discovery_input.lower() == "y"
 
     scan_type_choice = _get_menu_choice(
         console,
