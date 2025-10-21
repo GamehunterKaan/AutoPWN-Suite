@@ -27,7 +27,7 @@ from modules.utils import (
     cli,
 )
 from modules.web.webvuln import webvuln
-
+from modules.daemon.daemon_installer import InstallDaemon
 
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, console, console2, log
@@ -83,6 +83,9 @@ def main() -> None:
 
     if args.version:
         print(f"AutoPWN Suite v{__version__}")
+        raise SystemExit
+    elif args.daemon_install:
+        InstallDaemon(console)
         raise SystemExit
 
     print_banner(console)
