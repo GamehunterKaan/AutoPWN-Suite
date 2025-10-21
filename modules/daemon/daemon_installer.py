@@ -58,9 +58,23 @@ def _get_non_empty_input(console, prompt: str) -> str:
             return user_input
         console.print("[red]This field cannot be empty.[/red]")
 
-def InstallDaemon(console):
-    print_banner(console)
+def CreateConfig(console):
     console.print("Welcome to AutoPWN Suite daemon installer!")
+    try:
+        open('autopwn-daemon.conf', 'r', encoding='utf-8')
+        console.print("[red]Config file 'autopwn-daemon.conf' already exists![/red]")
+        delete_config = input("Would you like to delete it and recreate the config file? (y/n) ")
+        if delete_config.lower() == "y":
+            console.print("Deleting existing config file...")
+            import os
+            os.remove('autopwn-daemon.conf')
+            console.print("[green]Config file 'autopwn-daemon.conf' deleted successfully![/green]")
+        else:
+            console.print("Exiting config creation...")
+            return
+    except FileNotFoundError:
+        pass
+
     scan_interval = _get_validated_int(console, "Enter the scan interval in seconds: ")
 
     report_choice = _get_menu_choice(
@@ -123,6 +137,7 @@ def InstallDaemon(console):
     console.print("Creating config file...")
     config = ConfigParser()
     config['AUTOPWN'] = {
+        'scan_interval': str(scan_interval),
         'target': target,
         'hostfile': host_file,
         'apikey': api_key,
@@ -147,8 +162,11 @@ def InstallDaemon(console):
     elif report_method == 'webhook':
         config['REPORT']['webhook'] = report_webhook
 
-    # Specify UTF-8 encoding to prevent UnicodeEncodeError on Windows
     with open('autopwn-daemon.conf', 'w', encoding='utf-8') as configfile:
         config.write(configfile)
 
     console.print("[green]Config file 'autopwn-daemon.conf' created successfully![/green]")
+
+def InstallDaemon(console):
+    print_banner(console)
+    CreateConfig(console)
