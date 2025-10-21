@@ -28,7 +28,7 @@ from modules.utils import (
     cli,
 )
 from modules.web.webvuln import webvuln
-from modules.daemon.daemon_installer import InstallDaemon
+from modules.daemon.daemon_installer import InstallDaemon, UninstallDaemon, CreateConfig
 
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, console, console2, log
@@ -87,6 +87,12 @@ def main() -> None:
         raise SystemExit
     elif args.daemon_install:
         InstallDaemon(console)
+        raise SystemExit
+    elif args.daemon_uninstall:
+        UninstallDaemon(console)
+        raise SystemExit
+    elif args.create_config:
+        CreateConfig(console)
         raise SystemExit
 
     print_banner(console)

@@ -74,6 +74,20 @@ def cli():
         required=False,
         action="store_true",
     )
+    argparser.add_argument(
+        "--daemon-uninstall",
+        help="Uninstall the AutoPWN Suite daemon.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    argparser.add_argument(
+        "--create-config",
+        help="Create a config file.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument(
         "-t",
