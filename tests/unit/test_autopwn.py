@@ -47,8 +47,11 @@ class TestMainExecution:
         mock_args.version = False
         mock_args.config = None  # No config file
         mock_args.daemon_install = False
+        mock_args.daemon_uninstall = False
+        mock_args.create_config = False
         mock_args.no_color = True
         mock_args.report = None # Explicitly set no report
+        mock_args.scan_interval = None # Prevent TypeError on comparison
         mock_cli.return_value = mock_args
 
         # Configure the mock for InitReport to return a tuple
@@ -90,8 +93,11 @@ class TestMainExecution:
         mock_args.version = False
         mock_args.config = "test.ini"
         mock_args.daemon_install = False
+        mock_args.daemon_uninstall = False
+        mock_args.create_config = False
         mock_args.no_color = True
         mock_args.report = None
+        mock_args.scan_interval = None # Prevent TypeError on comparison
         mock_cli.return_value = mock_args
 
         # Configure the mock for InitReport to return a tuple
