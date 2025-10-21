@@ -46,6 +46,7 @@ class TestMainExecution:
         mock_args = MagicMock()
         mock_args.version = False
         mock_args.config = None  # No config file
+        mock_args.daemon_install = False
         mock_args.no_color = True
         mock_args.report = None # Explicitly set no report
         mock_cli.return_value = mock_args
@@ -88,6 +89,7 @@ class TestMainExecution:
         mock_args = MagicMock()
         mock_args.version = False
         mock_args.config = "test.ini"
+        mock_args.daemon_install = False
         mock_args.no_color = True
         mock_args.report = None
         mock_cli.return_value = mock_args
