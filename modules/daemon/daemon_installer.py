@@ -142,25 +142,29 @@ def CreateConfig(console, config_filename=""):
         'apikey': api_key,
         'scan_type': scan_type,
         'nmapflags': nmap_flags,
-        'speed': speed,
+        'speed': str(speed),
         'auto': True,
         'mode': scan_method,
         'skip_discovery': str(skip_discovery),
         'output_folder': output_folder,
         'output_type': output_type,
-        'host_timeout': host_timeout,
+        'host_timeout': str(host_timeout),
     }
     if report_method == 'email':
-        config['REPORT'] = {'method': report_method}
-        config['REPORT']['email'] = report_email
-        config['REPORT']['email_password'] = report_email_password
-        config['REPORT']['email_to'] = report_email_to
-        config['REPORT']['email_from'] = report_email_from
-        config['REPORT']['email_server'] = report_email_server
-        config['REPORT']['email_port'] = str(report_email_server_port)
+        config['REPORT'] = {
+            'method': report_method,
+            'email': report_email,
+            'email_password': report_email_password,
+            'email_to': report_email_to,
+            'email_from': report_email_from or report_email,
+            'email_server': report_email_server,
+            'email_port': str(report_email_server_port)
+        }
     elif report_method == 'webhook':
-        config['REPORT'] = {'method': report_method}
-        config['REPORT']['webhook'] = report_webhook
+        config['REPORT'] = {
+            'method': report_method,
+            'webhook': report_webhook
+        }
 
 
     if not config_filename:
@@ -169,6 +173,7 @@ def CreateConfig(console, config_filename=""):
             config_file = "autopwn.conf"
     else:
         config_file = config_filename
+
     try:
         open(config_file, 'r', encoding='utf-8').close()
         overwrite_config = console.input(f"[yellow]Config file '{config_file}' already exists. Would you like to overwrite it?[/yellow] (y/n): ")
@@ -333,7 +338,7 @@ WantedBy=multi-user.target
 
 
 def InstallDaemon(console):
-    if not is_root or not system().lower() == "linux":
+    if not is_root() or not system().lower() == "linux":
         console.print("Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!")
         return
     print_banner(console)
