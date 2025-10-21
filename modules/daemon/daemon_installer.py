@@ -151,8 +151,8 @@ def CreateConfig(console):
         'output_type': output_type,
         'host_timeout': host_timeout,
     }
-    config['REPORT'] = {'method': report_method}
     if report_method == 'email':
+        config['REPORT'] = {'method': report_method}
         config['REPORT']['email'] = report_email
         config['REPORT']['email_password'] = report_email_password
         config['REPORT']['email_to'] = report_email_to
@@ -160,6 +160,7 @@ def CreateConfig(console):
         config['REPORT']['email_server'] = report_email_server
         config['REPORT']['email_port'] = str(report_email_server_port)
     elif report_method == 'webhook':
+        config['REPORT'] = {'method': report_method}
         config['REPORT']['webhook'] = report_webhook
 
     with open('autopwn-daemon.conf', 'w', encoding='utf-8') as configfile:

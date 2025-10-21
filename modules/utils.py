@@ -625,6 +625,9 @@ def InitArgsConf(args, log) -> None:
         config = ConfigParser()
         config.read(args.config)
 
+        if config.has_option("AUTOPWN", "scan_interval"):
+            args.scan_interval = int(config.get("AUTOPWN", "scan_interval").lower())
+
         if config.has_option("AUTOPWN", "target"):
             args.target = config.get("AUTOPWN", "target").lower()
 
