@@ -45,7 +45,7 @@ def StartScanning(
     else:
         Targets = [targetarg]
 
-    ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
+    ScanPorts, ScanVulns, DownloadExploits = UserConfirmation(args)
     ScanWeb = WebScan()
 
     for host in Targets:

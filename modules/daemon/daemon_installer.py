@@ -144,6 +144,7 @@ def CreateConfig(console, config_filename=""):
         'nmapflags': nmap_flags,
         'speed': str(speed),
         'auto': True,
+        'skip_exploit_download': True,
         'mode': scan_method,
         'skip_discovery': str(skip_discovery),
         'output_folder': output_folder,
