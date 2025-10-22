@@ -67,7 +67,27 @@ def cli():
         required=False,
         action="store_true",
     )
-
+    argparser.add_argument(
+        "--daemon-install",
+        help="Install the AutoPWN Suite daemon.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    argparser.add_argument(
+        "--daemon-uninstall",
+        help="Uninstall the AutoPWN Suite daemon.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    argparser.add_argument(
+        "--create-config",
+        help="Create a config file.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument(
         "-t",
@@ -161,6 +181,14 @@ def cli():
         type=int,
         required=False,
         metavar="TIMEOUT",
+    )
+    scanargs.add_argument(
+        "-sed",
+        "--skip-exploit-download",
+        help="Skip downloading exploits.",
+        default=False,
+        required=False,
+        action="store_true",
     )
 
     reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
@@ -533,10 +561,7 @@ def Confirmation(message) -> bool:
     return confirmation.lower() != "n"
 
 
-def UserConfirmation() -> tuple[bool, bool, bool]:
-    if DontAskForConfirmation:
-        return True, True, True
-
+def UserConfirmation(args) -> tuple[bool, bool, bool]:
     portscan = Confirmation("Do you want to scan ports? [Y/n] : ")
     if not portscan:
         return False, False, False
@@ -545,8 +570,11 @@ def UserConfirmation() -> tuple[bool, bool, bool]:
     if not vulnscan:
         return True, False, False
 
-    downloadexploits = Confirmation("Do you want to download exploits? [Y/n] : ")
-
+    if args.skip_exploit_download:
+        return True, True, False
+    else:
+        downloadexploits = Confirmation("Do you want to download exploits? [Y/n] : ")
+    
     return portscan, vulnscan, downloadexploits
 
 
@@ -619,6 +647,9 @@ def InitArgsConf(args, log) -> None:
         config = ConfigParser()
         config.read(args.config)
 
+        if config.has_option("AUTOPWN", "scan_interval"):
+            args.scan_interval = int(config.get("AUTOPWN", "scan_interval").lower())
+
         if config.has_option("AUTOPWN", "target"):
             args.target = config.get("AUTOPWN", "target").lower()
 
@@ -642,6 +673,9 @@ def InitArgsConf(args, log) -> None:
 
         if config.has_option("AUTOPWN", "auto"):
             args.yes_please = True
+
+        if config.has_option("AUTOPWN", "skip_exploit_download"):
+            args.skip_exploit_download = config.get("AUTOPWN", "skip_exploit_download")
 
         if config.has_option("AUTOPWN", "mode"):
             args.mode = config.get("AUTOPWN", "mode").lower()

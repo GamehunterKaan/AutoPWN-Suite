@@ -1,4 +1,5 @@
 from datetime import datetime
+from time import sleep
 
 from rich.console import Console
 
@@ -27,7 +28,7 @@ from modules.utils import (
     cli,
 )
 from modules.web.webvuln import webvuln
-
+from modules.daemon.daemon_installer import InstallDaemon, UninstallDaemon, CreateConfig
 
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, console, console2, log
@@ -44,7 +45,7 @@ def StartScanning(
     else:
         Targets = [targetarg]
 
-    ScanPorts, ScanVulns, DownloadExploits = UserConfirmation()
+    ScanPorts, ScanVulns, DownloadExploits = UserConfirmation(args)
     ScanWeb = WebScan()
 
     for host in Targets:
@@ -70,7 +71,7 @@ def StartScanning(
 
 def main() -> None:
     __author__ = "GamehunterKaan"
-    __version__ = "2.2.2"
+    __version__ = "2.3.0"
 
     args = cli()
     if args.no_color:
@@ -83,6 +84,15 @@ def main() -> None:
 
     if args.version:
         print(f"AutoPWN Suite v{__version__}")
+        raise SystemExit
+    elif args.daemon_install:
+        InstallDaemon(console)
+        raise SystemExit
+    elif args.daemon_uninstall:
+        UninstallDaemon(console)
+        raise SystemExit
+    elif args.create_config:
+        CreateConfig(console)
         raise SystemExit
 
     print_banner(console)
@@ -106,6 +116,11 @@ def main() -> None:
     InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.output, args.output_folder, targetarg)
 
+    if not hasattr(args, "scan_interval"):
+        args.scan_interval = None
+    if args.scan_interval and args.scan_interval > 0:
+        console.print(f"Sleeping for {args.scan_interval} seconds...")
+        sleep(args.scan_interval)
 
 if __name__ == "__main__":
     try:

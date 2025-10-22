@@ -4,6 +4,7 @@ hosts.txt
 autopwn.log
 autopwn.html
 autopwn.svg
+autopwn-daemon.conf
 .vscode/
 exploits/
 outputs/

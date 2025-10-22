@@ -28,6 +28,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Send scan results via webhook or email.
 - Works on Windows, MacOS and Linux.
 - Use as a [module!](#module-usage)
+- Use as a [Daemon](#install-daemon) to periodically scan the network.
 
 
 ## How does it work?
@@ -44,25 +45,41 @@ AutoPWN Suite has a very user friendly easy to read output.
 
 ## Installation
 
-You can clone the repo. (This is the recommended installation method)
-```
+### Windows
+```bash
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
-sudo pip install -r requirements.txt
+pip install -r requirements.txt
 ```
-OR
 
+### Linux
+For a system-wide installation on Linux (which requires root privileges), use the provided installation script. (Recommended)
+```bash
+# Install as root
+sudo bash install.sh
+# Uninstall
+sudo bash uninstall.sh
+```
+
+You can clone the repo and create a virtual environment. This installation method can be used for non-root installation in Linux.
+```bash
+git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
+cd AutoPWN-Suite
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+
+### Docker
 You can use the [docker image.](https://github.com/GamehunterKaan/AutoPWN-Suite/pull/42)
-
-```
+```bash
 docker pull gamehunterkaan/autopwn-suite
 docker run -it gamehunterkaan/autopwn-suite
 ```
 
-OR
-
+### Cloud
 You can use Google Cloud Shell.
-
 [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/GamehunterKaan/AutoPWN-Suite.git)
 
 
@@ -96,6 +113,11 @@ autopwn-suite -m <evade, noise, normal>
 
 For more details about usage and flags use `-h` flag.
 
+#### Install Daemon
+```console
+autopwn-suite --daemon-install
+```
+
 ## Module Usage
 
 ```python
@@ -105,6 +127,8 @@ scanner = AutoScanner()
 json_results = scanner.scan("192.168.0.1")
 scanner.save_to_file("autopwn.json")
 ```
+
+
 
 ## Development and Testing
 
