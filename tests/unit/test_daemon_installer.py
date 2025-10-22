@@ -151,6 +151,7 @@ class TestCreateConfig:
             'nmapflags': '-sC',
             'speed': '4', # This was correct, but the source code was wrong.
             'auto': True,
+            'skip_exploit_download': True,
             'mode': 'normal',
             'skip_discovery': 'True',
             'output_folder': 'my_outputs',

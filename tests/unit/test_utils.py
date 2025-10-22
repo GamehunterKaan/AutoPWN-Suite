@@ -414,42 +414,54 @@ def test_param_print(mock_width, mock_console):
 class TestUserConfirmation:
     """Tests for the UserConfirmation function."""
 
-    def test_automatic_mode_returns_all_true(self, monkeypatch):
+    def test_automatic_mode_returns_all_true(self):
         """Verify it returns (True, True, True) when DontAskForConfirmation is True."""
-        monkeypatch.setattr("modules.utils.DontAskForConfirmation", True)
-        result = UserConfirmation()
+        mock_args = argparse.Namespace(yes_please=True, skip_exploit_download=False)
+        InitAutomation(mock_args) # Initialize the global DontAskForConfirmation
+        result = UserConfirmation(mock_args)
         assert result == (True, True, True)
 
     @patch("modules.utils.Confirmation")
-    def test_interactive_mode_all_yes(self, mock_confirmation, monkeypatch):
+    def test_interactive_mode_all_yes(self, mock_confirmation):
         """Verify it returns (True, True, True) when user answers 'y' to all prompts."""
-        monkeypatch.setattr("modules.utils.DontAskForConfirmation", False)
+        mock_args = argparse.Namespace(yes_please=False, skip_exploit_download=False)
+        InitAutomation(mock_args) # Initialize the global DontAskForConfirmation
         mock_confirmation.return_value = True  # Simulate user always saying 'y'
 
-        result = UserConfirmation()
+        result = UserConfirmation(mock_args)
 
         assert result == (True, True, True)
         assert mock_confirmation.call_count == 3
 
     @patch("modules.utils.Confirmation", return_value=False)
-    def test_interactive_mode_no_to_portscan(self, mock_confirmation, monkeypatch):
+    def test_interactive_mode_no_to_portscan(self, mock_confirmation):
         """Verify it returns (False, False, False) if user says 'n' to portscan."""
-        monkeypatch.setattr("modules.utils.DontAskForConfirmation", False)
+        mock_args = argparse.Namespace(yes_please=False, skip_exploit_download=False)
+        InitAutomation(mock_args) # Initialize the global DontAskForConfirmation
 
-        result = UserConfirmation()
+        result = UserConfirmation(mock_args)
 
         assert result == (False, False, False)
         mock_confirmation.assert_called_once()  # Should exit after the first question
 
     @patch("modules.utils.Confirmation", side_effect=[True, False])
-    def test_interactive_mode_no_to_vulnscan(self, mock_confirmation, monkeypatch):
+    def test_interactive_mode_no_to_vulnscan(self, mock_confirmation):
         """Verify it returns (True, False, False) if user says 'n' to vulnscan."""
-        monkeypatch.setattr("modules.utils.DontAskForConfirmation", False)
+        mock_args = argparse.Namespace(yes_please=False, skip_exploit_download=False)
+        InitAutomation(mock_args) # Initialize the global DontAskForConfirmation
 
-        result = UserConfirmation()
+        result = UserConfirmation(mock_args)
 
         assert result == (True, False, False)
         assert mock_confirmation.call_count == 2  # Should exit after the second question
+
+    @patch("modules.utils.Confirmation", return_value=True)
+    def test_interactive_mode_skip_exploit_download(self, mock_confirmation):
+        """Verify it returns (True, True, False) when skip_exploit_download is True."""
+        mock_args = argparse.Namespace(yes_please=False, skip_exploit_download=True)
+        InitAutomation(mock_args)
+        result = UserConfirmation(mock_args) # This will call Confirmation twice
+        assert result == (True, True, False)
 
 
 @pytest.mark.unit
