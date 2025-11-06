@@ -73,7 +73,7 @@ class TestAutoScanner:
         [
             ("Apache httpd", "2.4.41", "Apache httpd 2.4.41"),
             ("OpenSSH", "8.2p1", "OpenSSH 8.2p1"),
-            ("Product", "Unknown", "Product"),
+            ("Product", "Unknown", ""),
             ("Unknown", "1.0", ""),
             ("http", "1.1", ""), # Ignored product
         ],

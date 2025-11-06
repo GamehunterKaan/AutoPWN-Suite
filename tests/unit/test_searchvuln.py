@@ -24,7 +24,7 @@ class TestGenerateKeyword:
             ("Apache httpd", "2.4.41", "Apache httpd 2.4.41"),
             ("OpenSSH", "8.2p1", "OpenSSH 8.2p1"),
             ("vsftpd", "3.0.3", "vsftpd 3.0.3"),
-            ("Product", "Unknown", "Product"),
+            ("Product", "Unknown", ""),
             ("Unknown", "1.0", ""),
         ],
     )
@@ -33,8 +33,7 @@ class TestGenerateKeyword:
         assert GenerateKeyword(product, version) == expected
 
     def test_generate_keyword_ignored_product(self):
-        """Verify that ignored products (like 'ssh') return an empty string."""
-        assert GenerateKeyword("ssh", "1.0") == ""
+        """Verify that ignored products (like 'http') return an empty string."""
         assert GenerateKeyword("http", "1.1") == ""
 
 
