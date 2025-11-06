@@ -22,23 +22,22 @@ def GenerateKeyword(product: str, version: str) -> str:
 
     keyword = ""
     dontsearch = [
-        "ssh",
-        "vnc",
         "http",
         "https",
-        "ftp",
-        "sftp",
-        "smtp",
-        "smb",
-        "smbv2",
         "linux telnetd",
         "microsoft windows rpc",
         "metasploitable root shell",
         "gnu classpath grmiregistry",
     ]
-
-    if product.lower() not in dontsearch and product != "":
-        keyword = f"{product} {version}".rstrip()
+    known_vulns = [
+        "unrealircd"
+    ]
+    if product.lower() not in dontsearch and product != "" and (
+        product.lower() in known_vulns or version != ""
+    ):
+        stripped_name = product.split("/")[0]
+        stripped_version = version.split(" ")[0].split("-")[0]
+        keyword = f"{stripped_name} {stripped_version}".rstrip()
 
     return keyword
 
