@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autopwn-suite"
-version = "0.1.0"
+version = "2.3.2"
 description = "AutoPWN Suite - Automated Vulnerability Scanning and Exploitation Tool"
 authors = ["AutoPWN Suite Contributors"]
 readme = "README.md"
@@ -15,7 +15,6 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -29,12 +28,13 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 requests = "*"
 rich = "*"
 python-nmap = "*"
 beautifulsoup4 = "*"
 distro = "*"
+urllib3 = "^2.6.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
