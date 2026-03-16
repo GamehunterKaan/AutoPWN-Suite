@@ -290,6 +290,31 @@ def cli():
         metavar="WEBHOOK",
     )
 
+    webuiargs = argparser.add_argument_group("Web UI", "Browser-based dashboard for controlling scans")
+    webuiargs.add_argument(
+        "--web",
+        help="Start the web UI dashboard (scans are launched from the browser).",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    webuiargs.add_argument(
+        "--web-host",
+        help="Web UI bind adresi. (Default: 0.0.0.0)",
+        default="0.0.0.0",
+        type=str,
+        required=False,
+        metavar="HOST",
+    )
+    webuiargs.add_argument(
+        "--web-port",
+        help="Web UI portu. (Default: 8080)",
+        default=8080,
+        type=int,
+        required=False,
+        metavar="PORT",
+    )
+
     return argparser.parse_args()
 
 
@@ -715,6 +740,16 @@ def InitArgsConf(args, log) -> None:
 
         if config.has_option("REPORT", "webhook"):
             args.report_webhook = config.get("REPORT", "webhook")
+
+        if config.has_option("WEBUI", "enabled"):
+            args.web = config.get("WEBUI", "enabled").strip().lower() in ("true", "1", "yes")
+        if config.has_option("WEBUI", "host"):
+            args.web_host = config.get("WEBUI", "host").strip()
+        if config.has_option("WEBUI", "port"):
+            try:
+                args.web_port = int(config.get("WEBUI", "port"))
+            except ValueError:
+                pass
 
     except FileNotFoundError:
         log.logger("error", "Config file not found!")
