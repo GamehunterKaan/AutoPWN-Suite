@@ -95,6 +95,23 @@ def main() -> None:
         CreateConfig(console)
         raise SystemExit
 
+    # ── Web UI mode: server only, scans are launched from the browser ───────────
+    if getattr(args, "web", False):
+        try:
+            from modules.web_ui import start_server, FLASK_AVAILABLE
+            if not FLASK_AVAILABLE:
+                console.print("[red]Flask not found. Install it with: pip install flask flask-cors[/red]")
+                raise SystemExit(1)
+            web_host = getattr(args, "web_host", "0.0.0.0")
+            web_port = getattr(args, "web_port", 8080)
+            print_banner(console)
+            # start_server blocks until Ctrl+C
+            start_server(host=web_host, port=web_port)
+        except KeyboardInterrupt:
+            raise SystemExit("\nWeb UI closed.")
+        raise SystemExit
+    # ─────────────────────────────────────────────────────────────────────────
+
     print_banner(console)
 
     CheckConnection(log)
