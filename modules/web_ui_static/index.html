@@ -74,7 +74,13 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px}
 .btn-success:hover{background:rgba(0,255,136,.08)}
 
 /* ── Scan form ── */
-#scan-form{padding:14px;display:flex;flex-direction:column;gap:10px;flex-shrink:0;border-bottom:1px solid var(--border);overflow-y:auto;max-height:calc(100% - 48px)}
+#scan-form{padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;border-bottom:1px solid var(--border);overflow-y:auto}
+.left-footer{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;flex-shrink:0}
+.left-footer-links{display:flex;align-items:center;justify-content:center;gap:16px}
+.left-footer a{color:var(--text3);transition:color .2s;display:flex}
+.left-footer a:hover{color:var(--accent)}
+.left-footer svg{width:18px;height:18px}
+.left-footer .version{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:1px}
 #adv-toggle{font-family:var(--mono);font-size:10px;color:var(--text3);cursor:pointer;letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;gap:6px}
 #adv-toggle:hover{color:var(--text2)}
 #adv-arr{transition:transform .2s}
@@ -302,6 +308,20 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       Start Scan
     </button>
+  </div>
+  <div class="left-footer">
+    <div class="left-footer-links">
+      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite" target="_blank" title="GitHub">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+      </a>
+      <a href="https://kaangultekin.net/projects/autopwn-suite/" target="_blank" title="Wiki">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+      </a>
+      <a href="https://kaangultekin.net/" target="_blank" title="Website">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+      </a>
+    </div>
+    <div class="version" id="app-version"></div>
   </div>
 </aside>
 
@@ -553,6 +573,38 @@ let pollT    = null;
 // ── Utilities ──────────────────────────────────────────────────────────────────
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function shortId(id){ return id ? id.slice(0,8) : ''; }
+function downloadHostJson(ip) {
+  const h = hosts[ip];
+  if(!h) return;
+  const portList = (h.ports||[]).map(p => {
+    const portVulns = (h.vulns||[]).filter(v => v.port == p.port);
+    return {
+      port: p.port,
+      service: p.service,
+      product: p.product,
+      version: p.version,
+      vulnerabilities: portVulns
+    };
+  });
+  const data = {
+    ip: h.ip,
+    mac: h.mac,
+    vendor: h.vendor,
+    os: h.os,
+    ports: portList
+  };
+  const mappedVulns = portList.flatMap(p => p.vulnerabilities);
+  const unmappedVulns = (h.vulns||[]).filter(v => !mappedVulns.includes(v));
+  if (unmappedVulns.length) data.unmapped_vulnerabilities = unmappedVulns;
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `host_${ip.replace(/\./g, '_')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 function timeAgo(iso){
   if(!iso) return '';
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -693,7 +745,10 @@ function renderScans(){
       <div class="sc-bar"><div class="sc-bar-fill${running?'':' done'}"></div></div>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div class="sc-time">${esc(job.finished_at?`Finished ${timeAgo(job.finished_at)}`:`Started ${timeAgo(job.started_at)}`)}</div>
-        ${running?`<button class="btn btn-danger btn-sm" onclick="stopScan('${job.id}')">Stop</button>`:''}
+        <div style="display:flex;gap:8px">
+          ${running?`<button class="btn btn-danger btn-sm" onclick="stopScan('${job.id}')">Stop</button>`:''}
+          ${!running?`<a class="btn btn-ghost btn-sm" href="/api/scans/${job.id}/download" download style="text-decoration:none">Download JSON</a>`:''}
+        </div>
       </div>
       ${job.error?`<div style="font-family:var(--mono);font-size:11px;color:var(--red)">${esc(job.error)}</div>`:''}
     `;
@@ -755,13 +810,22 @@ function renderDetail(h){
     :h.scan_status==='scanning'
       ?'<div style="color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 0">Scanning in progress…</div>'
       :'<div style="color:var(--green2);font-family:var(--mono);font-size:11px;padding:4px 0">No vulnerabilities found.</div>';
-  el.innerHTML=`<div><div class="ds">Host Info</div>${kvs}</div><div><div class="ds">Open Ports (${ports.length})</div>${prs}</div><div><div class="ds">Vulnerabilities (${vulns.length})</div>${vrs}</div>`;
+  el.innerHTML=`
+    <div><div class="ds">Host Info</div>${kvs}</div><div><div class="ds">Open Ports (${ports.length})</div>${prs}</div><div><div class="ds">Vulnerabilities (${vulns.length})</div>${vrs}</div>
+    ${h.scan_status === 'completed' ? `
+    <div style="margin-top:14px;">
+      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="downloadHostJson('${h.ip}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Host JSON
+      </button>
+    </div>` : ''}
+  `;
 }
 
 // ── Render: Vuln table ────────────────────────────────────────────────────────
 function renderVulnTable(){
   const all=[];
-  Object.values(hosts).forEach(h=>(h.vulns||[]).forEach(v=>all.push({...v,host:h.ip})));
+  Object.values(hosts).forEach(h=>(h.vulns||[]).forEach(v=>all.push({...v,host:h.ip+(v.port?':'+v.port:'')})));
   all.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
   const tb=document.getElementById('vtb');
   if(!all.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px;font-family:var(--mono);font-size:12px">No vulnerabilities found yet.</td></tr>';return;}
@@ -1030,11 +1094,13 @@ async function loadSettingsIntoForm(){
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async()=>{
   try{
-    const [scansR,hostsR,logR]=await Promise.all([
+    const [scansR,hostsR,logR,verR]=await Promise.all([
       fetch('/api/scans').then(r=>r.json()),
       fetch('/api/hosts').then(r=>r.json()),
       fetch('/api/log').then(r=>r.json()),
+      fetch('/api/version').then(r=>r.json()).catch(()=>({version:''})),
     ]);
+    if(verR.version) document.getElementById('app-version').textContent = 'v' + verR.version;
     scansR.forEach(s=>{ scans[s.id]=s; scansR.length && addTermFilterOption(s.id,s.target); });
     hostsR.forEach(h=>{ hosts[h.ip]=h; });
     logR.forEach(e=>addLog(e.scan_id,e.msg,e.level,e.ts));
