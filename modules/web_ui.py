@@ -820,6 +820,10 @@ def _build_app(static_dir: Path) -> "Flask":
     def index():
         return send_from_directory(str(static_dir), "index.html")
 
+    @app.route("/favicon.ico")
+    def favicon():
+        return send_from_directory(str(static_dir), "favicon.ico", mimetype="image/vnd.microsoft.icon")
+
     @app.route("/api/version")
     def api_version():
         return jsonify({"version": __version__})
