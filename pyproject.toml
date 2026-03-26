@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autopwn-suite"
-version = "2.3.2"
+version = "2.3.3"
 description = "AutoPWN Suite - Automated Vulnerability Scanning and Exploitation Tool"
 authors = ["AutoPWN Suite Contributors"]
 readme = "README.md"
@@ -9,15 +9,18 @@ homepage = "https://github.com/GamehunterKaan/AutoPWN-Suite"
 repository = "https://github.com/GamehunterKaan/AutoPWN-Suite"
 keywords = ["security", "penetration-testing", "vulnerability-scanner", "exploitation"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
+    "Environment :: Web Environment",
     "Intended Audience :: Information Technology",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security",
 ]
 packages = [
@@ -28,8 +31,8 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-requests = "*"
+python = "^3.10"
+requests = ">=2.33.0"
 rich = "*"
 python-nmap = "*"
 beautifulsoup4 = "*"
