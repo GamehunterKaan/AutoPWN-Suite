@@ -279,6 +279,44 @@ class ScanJob:
             "vuln_count":  sum(len(h["vulns"])  for h in hosts),
         }
 
+    def to_full_dict(self) -> dict:
+        with self._lock:
+            hosts = list(self._hosts.values())
+        
+        structured_hosts = []
+        for h in hosts:
+            sh = {
+                "ip": h.get("ip", ""),
+                "mac": h.get("mac", ""),
+                "vendor": h.get("vendor", ""),
+                "os": h.get("os", ""),
+                "ports": []
+            }
+            mapped_vulns = []
+            for p in h.get("ports", []):
+                port_num = p.get("port")
+                port_vulns = []
+                for v in h.get("vulns", []):
+                    if v.get("port") == port_num:
+                        port_vulns.append(v)
+                        if v not in mapped_vulns:
+                            mapped_vulns.append(v)
+                sh["ports"].append({
+                    "port": p.get("port"),
+                    "service": p.get("service"),
+                    "product": p.get("product"),
+                    "version": p.get("version"),
+                    "vulnerabilities": port_vulns
+                })
+            
+            unmapped = [v for v in h.get("vulns", []) if v not in mapped_vulns]
+            if unmapped:
+                sh["unmapped_vulnerabilities"] = unmapped
+            structured_hosts.append(sh)
+            
+        base_dict = self.to_dict()
+        base_dict["hosts"] = structured_hosts
+        return base_dict
 
 # ── Global scan registry + SSE ────────────────────────────────────────────────
 
@@ -596,20 +634,22 @@ def _run_scan(job: ScanJob) -> None:
 
             _log(job, f"[*] Searching vulnerabilities for {host_ip}")
 
-            from modules.searchvuln import GenerateKeywords
+            from modules.searchvuln import GenerateKeyword
             from modules.nist_search import searchCVE
 
-            keywords = GenerateKeywords(port_array)
-            if not keywords:
-                _log(job, f"[*] Insufficient version info for {host_ip}, skipping", "warning")
-                job.mark_host_done(host_ip)
-                continue
-
             vulns_out = []
-            for kw in keywords:
+            for row in port_array:
                 if job.should_stop():
                     break
-                _log(job, f"[*] Querying NIST: {kw}")
+                
+                port_num = row[1]
+                product = str(row[3])
+                version = str(row[4])
+                kw = GenerateKeyword(product, version)
+                if not kw:
+                    continue
+
+                _log(job, f"[*] Querying NIST for port {port_num}: {kw}")
                 try:
                     cve_list = searchCVE(kw, log, api_key)
                 except Exception as e:
@@ -622,6 +662,7 @@ def _run_scan(job: ScanJob) -> None:
                         "cve": cve.CVEID, "description": cve.description,
                         "severity": sev, "cvss": cve.severity_score or 0,
                         "keyword": kw,
+                        "port": port_num
                     })
                     _log(job, f"    └─ {cve.CVEID} [{sev.upper()}] CVSS:{cve.severity_score}", "warning")
 
@@ -779,6 +820,10 @@ def _build_app(static_dir: Path) -> "Flask":
     def index():
         return send_from_directory(str(static_dir), "index.html")
 
+    @app.route("/api/version")
+    def api_version():
+        return jsonify({"version": __version__})
+
     # ── Scans ──
 
     @app.route("/api/scans")
@@ -791,6 +836,17 @@ def _build_app(static_dir: Path) -> "Flask":
         if not job:
             return jsonify({"error": "Scan not found"}), 404
         return jsonify(job.to_dict())
+
+    @app.route("/api/scans/<scan_id>/download")
+    def api_scan_download(scan_id):
+        job = _get_scan(scan_id)
+        if not job:
+            return jsonify({"error": "Scan not found"}), 404
+        return Response(
+            json.dumps(job.to_full_dict(), indent=2),
+            mimetype="application/json",
+            headers={"Content-Disposition": f"attachment; filename=autopwn_scan_{scan_id[:8]}.json"}
+        )
 
     @app.route("/api/scan/start", methods=["POST"])
     def api_scan_start():
@@ -1039,8 +1095,10 @@ def _build_app(static_dir: Path) -> "Flask":
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-def start_server(host: str = "0.0.0.0", port: int = 8080) -> None:
+def start_server(host: str = "0.0.0.0", port: int = 8080, version: str = "Unkown") -> None:
     """Start the web UI server and block until Ctrl+C."""
+    global __version__
+    __version__ = version
     if not FLASK_AVAILABLE:
         raise RuntimeError("Flask is not installed. Run:  pip install flask flask-cors")
 
