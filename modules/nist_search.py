@@ -49,6 +49,16 @@ def FindVars(vuln: dict) -> tuple:
             if severity == "UNKNOWN":
                 severity = metrics[score_type][0].get("cvssData", {}).get("baseSeverity", "UNKNOWN")
 
+        if severity == "UNKNOWN" and severity_score > 0.0:
+            if severity_score >= 9.0:
+                severity = "CRITICAL"
+            elif severity_score >= 7.0:
+                severity = "HIGH"
+            elif severity_score >= 4.0:
+                severity = "MEDIUM"
+            elif severity_score >= 0.1:
+                severity = "LOW"
+
     details_url = "https://nvd.nist.gov/vuln/detail/" + CVE_ID
 
     return CVE_ID, description, severity, severity_score, details_url, exploitability
