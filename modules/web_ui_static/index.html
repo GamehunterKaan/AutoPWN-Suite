@@ -260,7 +260,7 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
   <div id="scan-form">
     <div>
       <div class="fl">Target</div>
-      <input type="text" id="f-target" placeholder="192.168.1.0/24 or 10.0.0.1"/>
+      <input type="text" id="f-target" placeholder="192.168.1.0/24 or 10.0.0.1" oninput="updateNmapPreview()"/>
     </div>
     <div>
       <div class="fl">Profile</div>
@@ -270,14 +270,14 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
     </div>
     <div class="row2">
       <div><div class="fl">Mode</div>
-        <select id="f-mode">
+        <select id="f-mode" onchange="updateNmapPreview()">
           <option value="normal">Normal</option>
           <option value="evade">Evasion</option>
           <option value="noise">Noise</option>
         </select>
       </div>
       <div><div class="fl">Speed</div>
-        <select id="f-speed">
+        <select id="f-speed" onchange="updateNmapPreview()">
           <option value="1">1 – Paranoid</option>
           <option value="2">2 – Sneaky</option>
           <option value="3" selected>3 – Normal</option>
@@ -293,19 +293,50 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
     <div id="adv-body">
       <div class="row2">
         <div><div class="fl">Scan Type</div>
-          <select id="f-scantype">
+          <select id="f-scantype" onchange="updateNmapPreview()">
             <option value="">Auto</option><option value="arp">ARP</option><option value="ping">Ping</option>
           </select>
         </div>
         <div><div class="fl">Timeout (s)</div>
-          <input type="text" id="f-timeout" placeholder="240"/>
+          <input type="number" id="f-timeout" placeholder="240" oninput="updateNmapPreview()"/>
+        </div>
+      </div>
+      <div class="row2">
+        <div><div class="fl">Scan Technique</div>
+          <select id="f-scantech" onchange="updateNmapPreview()">
+            <option value="">Default (-sS/-sT)</option>
+            <option value="-sS">TCP SYN (-sS)</option>
+            <option value="-sT">TCP Connect (-sT)</option>
+            <option value="-sA">TCP ACK (-sA)</option>
+            <option value="-sW">TCP Window (-sW)</option>
+            <option value="-sM">TCP Maimon (-sM)</option>
+            <option value="-sU">UDP Scan (-sU)</option>
+            <option value="-sN">TCP Null (-sN)</option>
+            <option value="-sF">TCP FIN (-sF)</option>
+            <option value="-sX">TCP Xmas (-sX)</option>
+          </select>
+        </div>
+        <div><div class="fl">Ports</div>
+          <input type="text" id="f-ports" placeholder="e.g. 22,80,1-1000" oninput="updateNmapPreview()"/>
+        </div>
+      </div>
+      <div class="row2">
+        <div><div class="fl">Version Intensity</div>
+          <input type="number" id="f-vint" min="0" max="9" placeholder="0-9" oninput="updateNmapPreview()"/>
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:7px;">
+          <div class="chk-row"><input type="checkbox" id="f-os" onchange="updateNmapPreview()"/><label for="f-os">OS Detection (-O)</label></div>
         </div>
       </div>
       <div><div class="fl">Extra Nmap Flags</div>
-        <input type="text" id="f-nmap" placeholder="-sV -O --script=banner"/>
+        <input type="text" id="f-nmap-custom" placeholder="e.g. --script=banner" oninput="updateNmapPreview()"/>
+        <input type="hidden" id="f-nmap" />
       </div>
       <div class="chk-row"><input type="checkbox" id="f-skipd"/><label for="f-skipd">Skip host discovery</label></div>
       <div class="chk-row"><input type="checkbox" id="f-vulns" checked/><label for="f-vulns">Search vulnerabilities (NIST)</label></div>
+      <div><div class="fl">Nmap Command Preview</div>
+        <textarea id="f-nmap-preview" readonly rows="3" style="background:var(--bg3);color:var(--accent);cursor:not-allowed;resize:vertical;" title="Generated Nmap Command"></textarea>
+      </div>
     </div>
     <button class="btn btn-primary" onclick="startScan()" style="width:100%">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -585,8 +616,52 @@ let schedules= {};
 let selIp    = null;
 let es       = null;
 let pollT    = null;
+let lastScansStr = '';
+let lastHostsStr = '';
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
+function updateNmapPreview() {
+  const target = document.getElementById('f-target').value.trim() || '<target>';
+  const mode = document.getElementById('f-mode').value;
+  const speed = document.getElementById('f-speed').value;
+  const to = document.getElementById('f-timeout').value || 240;
+  
+  let base = '';
+  if (mode === 'evade') {
+    base = `nmap ${target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10`;
+  } else {
+    base = `nmap ${target} -sS -sV --host-timeout ${to} -Pn -O -T ${speed}`;
+  }
+  
+  let flags = [];
+  const tech = document.getElementById('f-scantech');
+  if (tech && tech.value) flags.push(tech.value);
+  const ports = document.getElementById('f-ports');
+  if (ports && ports.value.trim()) flags.push('-p ' + ports.value.trim());
+  const vint = document.getElementById('f-vint');
+  if (vint && vint.value) flags.push('--version-intensity ' + vint.value);
+  const os = document.getElementById('f-os');
+  if (os && os.checked) flags.push('-O');
+  
+  const custom = document.getElementById('f-nmap-custom');
+  if (custom && custom.value.trim()) flags.push(custom.value.trim());
+
+  let combinedFlags = flags.join(' ').trim();
+  let previewCmd = base;
+  if (combinedFlags) {
+    let previewFlags = combinedFlags;
+    if (previewCmd.includes('-O') && previewFlags.includes('-O')) {
+      previewFlags = previewFlags.replace(/(^|\s)-O(\s|$)/g, ' ').trim();
+    }
+    if (previewFlags) previewCmd += ' ' + previewFlags;
+  }
+
+  const previewEl = document.getElementById('f-nmap-preview');
+  if (previewEl) previewEl.value = previewCmd.trim();
+  
+  const hiddenEl = document.getElementById('f-nmap');
+  if (hiddenEl) hiddenEl.value = combinedFlags;
+}
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function shortId(id){ return id ? id.slice(0,8) : ''; }
 function downloadHostJson(ip) {
@@ -664,10 +739,17 @@ function loadProfile(){
   if(c.mode)       document.getElementById('f-mode').value    = c.mode;
   if(c.speed)      document.getElementById('f-speed').value   = String(c.speed);
   if(c.scan_type !== undefined) document.getElementById('f-scantype').value = c.scan_type || '';
-  if(c.nmap_flags !== undefined) document.getElementById('f-nmap').value = c.nmap_flags;
+  if(c.nmap_flags !== undefined) {
+    document.getElementById('f-nmap-custom').value = c.nmap_flags;
+    document.getElementById('f-scantech').value = '';
+    document.getElementById('f-ports').value = '';
+    document.getElementById('f-vint').value = '';
+    document.getElementById('f-os').checked = false;
+  }
   if(c.host_timeout) document.getElementById('f-timeout').value = String(c.host_timeout);
   document.getElementById('f-skipd').checked  = !!c.skip_discovery;
   document.getElementById('f-vulns').checked  = c.scan_vulns !== false;
+  updateNmapPreview();
 }
 
 function refreshProfileSelects(){
@@ -725,6 +807,10 @@ async function poll(){
       fetch('/api/scans').then(r=>r.json()),
       fetch('/api/hosts').then(r=>r.json()),
     ]);
+    const scansStr = JSON.stringify(scansR);
+    const hostsStr = JSON.stringify(hostsR);
+    if(scansStr === lastScansStr && hostsStr === lastHostsStr) return;
+    lastScansStr = scansStr; lastHostsStr = hostsStr;
     scans={}; scansR.forEach(s=>{ scans[s.id]=s; });
     hosts={}; hostsR.forEach(h=>{ hosts[h.ip]=h; });
     renderScans(); renderHosts(); renderVulnTable(); updateBadges();
@@ -745,6 +831,13 @@ function renderScans(){
   container.querySelectorAll('.scan-card').forEach(e=>e.remove());
   jobs.forEach(job=>{
     const running = job.status==='running'||job.status==='stopping';
+    const c = job.config||{};
+    let base = c.mode==='evade'? `nmap ${job.target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10` : `nmap ${job.target} -sS -sV --host-timeout ${c.host_timeout||240} -Pn -O -T ${c.speed||3}`;
+    if(c.nmap_flags){
+      let f = c.nmap_flags;
+      if(base.includes('-O') && f.includes('-O')) f = f.replace(/(^|\s)-O(\s|$)/g, ' ').trim();
+      if(f) base += ' ' + f;
+    }
     const card = document.createElement('div');
     card.className = `scan-card ${job.status}`;
     card.innerHTML = `
@@ -753,6 +846,7 @@ function renderScans(){
         <div class="sc-id">#${shortId(job.id)}</div>
         <div class="sc-pill ${job.status}">${job.status}</div>
       </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:-4px;margin-bottom:2px">${esc(base)}</div>
       <div class="sc-stats">
         <div class="sc-stat"><div class="sv">${job.host_count}</div><div class="sl">Hosts</div></div>
         <div class="sc-stat"><div class="sv">${job.port_count}</div><div class="sl">Ports</div></div>
