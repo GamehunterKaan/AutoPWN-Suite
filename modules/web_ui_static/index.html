@@ -140,6 +140,8 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px}
 /* ── Vuln table ── */
 #tc-vulns{overflow:auto}
 #vtw{padding:16px}
+.filter-bar{padding:14px 16px 0 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.filter-bar > *{flex:1;min-width:140px}
 table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
 thead th{text-align:left;padding:8px 10px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)}
 tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
@@ -355,6 +357,19 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
 
   <!-- Vulnerabilities -->
   <div id="tc-vulns" class="tc">
+    <div class="filter-bar">
+      <input type="text" id="vuln-search" placeholder="Search CVE, desc, keyword..." oninput="renderVulnTable()"/>
+      <select id="vuln-host" onchange="renderVulnTable()"><option value="">All Hosts</option></select>
+      <select id="vuln-scanid" onchange="renderVulnTable()"><option value="">All Scans</option></select>
+      <select id="vuln-sev" onchange="renderVulnTable()">
+        <option value="">All Severities</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+        <option value="unknown">Unknown</option>
+      </select>
+    </div>
     <div id="vtw">
       <table>
         <thead><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Host</th><th>Keyword</th><th>Description</th></tr></thead>
@@ -826,11 +841,38 @@ function renderDetail(h){
 // ── Render: Vuln table ────────────────────────────────────────────────────────
 function renderVulnTable(){
   const all=[];
-  Object.values(hosts).forEach(h=>(h.vulns||[]).forEach(v=>all.push({...v,host:h.ip+(v.port?':'+v.port:'')})));
-  all.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
+  Object.values(hosts).forEach(h=>(h.vulns||[]).forEach(v=>all.push({...v, hostBase:h.ip, scan_id:h.scan_id, host:h.ip+(v.port?':'+v.port:'')})));
+
+  const hVal = document.getElementById('vuln-host').value;
+  const sVal = document.getElementById('vuln-scanid').value;
+  const hostSet = new Set(), scanSet = new Set();
+  all.forEach(v => { hostSet.add(v.hostBase); if(v.scan_id) scanSet.add(v.scan_id); });
+
+  let hHtml = '<option value="">All Hosts</option>';
+  Array.from(hostSet).sort().forEach(ip => hHtml += `<option value="${ip}">${ip}</option>`);
+  if(document.getElementById('vuln-host').innerHTML !== hHtml) {
+    document.getElementById('vuln-host').innerHTML = hHtml;
+    document.getElementById('vuln-host').value = hostSet.has(hVal) ? hVal : '';
+  }
+
+  let sHtml = '<option value="">All Scans</option>';
+  Array.from(scanSet).forEach(id => sHtml += `<option value="${id}">#${shortId(id)} ${scans[id]?('— '+esc(scans[id].target)):''}</option>`);
+  if(document.getElementById('vuln-scanid').innerHTML !== sHtml) {
+    document.getElementById('vuln-scanid').innerHTML = sHtml;
+    document.getElementById('vuln-scanid').value = scanSet.has(sVal) ? sVal : '';
+  }
+
+  const fSearch = document.getElementById('vuln-search').value.toLowerCase();
+  const fHost = document.getElementById('vuln-host').value;
+  const fScan = document.getElementById('vuln-scanid').value;
+  const fSev = document.getElementById('vuln-sev').value;
+
+  const filtered = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || v.severity === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
+
+  filtered.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
   const tb=document.getElementById('vtb');
-  if(!all.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px;font-family:var(--mono);font-size:12px">No vulnerabilities found yet.</td></tr>';return;}
-  tb.innerHTML=all.map(v=>`<tr><td style="font-family:var(--mono)">${esc(v.cve)}</td><td><span class="sev ${v.severity}">${v.severity.toUpperCase()}</span></td><td style="font-family:var(--mono);color:${cvssColor(v.cvss)}">${v.cvss||'—'}</td><td style="font-family:var(--mono)">${esc(v.host)}</td><td style="font-family:var(--mono);color:var(--text2)">${esc(v.keyword||'')}</td><td style="color:var(--text2)">${esc(v.description)}</td></tr>`).join('');
+  if(!filtered.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px;font-family:var(--mono);font-size:12px">No vulnerabilities matched.</td></tr>';return;}
+  tb.innerHTML=filtered.map(v=>`<tr><td style="font-family:var(--mono)">${esc(v.cve)}</td><td><span class="sev ${v.severity}">${v.severity.toUpperCase()}</span></td><td style="font-family:var(--mono);color:${cvssColor(v.cvss)}">${v.cvss||'—'}</td><td style="font-family:var(--mono)">${esc(v.host)}</td><td style="font-family:var(--mono);color:var(--text2)">${esc(v.keyword||'')}</td><td style="color:var(--text2)">${esc(v.description)}</td></tr>`).join('');
 }
 
 // ── Badges ────────────────────────────────────────────────────────────────────
