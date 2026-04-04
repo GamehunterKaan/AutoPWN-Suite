@@ -323,7 +323,8 @@ class ScanJob:
 
 _scans: dict[str, ScanJob] = {}
 _scans_lock   = threading.Lock()
-_broadcast_q: queue.Queue = queue.Queue()
+_sse_subscribers: list = []
+_sse_subscribers_lock = threading.Lock()
 _log_history: list = []
 _log_history_lock = threading.Lock()
 
@@ -331,7 +332,9 @@ _log_history_lock = threading.Lock()
 def _broadcast(event: dict) -> None:
     with _log_history_lock:
         _log_history.append(event)
-    _broadcast_q.put(event)
+    with _sse_subscribers_lock:
+        for q in _sse_subscribers:
+            q.put(event)
 
 
 def _register_scan(job: ScanJob) -> None:
@@ -963,17 +966,24 @@ def _build_app(static_dir: Path) -> "Flask":
 
     @app.route("/api/events")
     def api_events():
+        client_q = queue.Queue()
+        with _sse_subscribers_lock:
+            _sse_subscribers.append(client_q)
         def generate():
-            with _log_history_lock:
-                snapshot = list(_log_history)
-            for entry in snapshot:
-                yield f"data: {json.dumps(entry)}\n\n"
-            while True:
-                try:
-                    entry = _broadcast_q.get(timeout=25)
+            try:
+                with _log_history_lock:
+                    snapshot = list(_log_history)
+                for entry in snapshot:
                     yield f"data: {json.dumps(entry)}\n\n"
-                except queue.Empty:
-                    yield ": ping\n\n"
+                while True:
+                    try:
+                        entry = client_q.get(timeout=25)
+                        yield f"data: {json.dumps(entry)}\n\n"
+                    except queue.Empty:
+                        yield ": ping\n\n"
+            finally:
+                with _sse_subscribers_lock:
+                    _sse_subscribers.remove(client_q)
         return Response(generate(), mimetype="text/event-stream",
                         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
@@ -1057,14 +1067,18 @@ def _build_app(static_dir: Path) -> "Flask":
             "description":body.get("description", ""),
             "created_at": datetime.utcnow().isoformat(),
             "config": {
-                "mode":           body.get("mode", "normal"),
-                "speed":          int(body.get("speed", 3)),
-                "scan_type":      body.get("scan_type") or None,
-                "nmap_flags":     body.get("nmap_flags", ""),
-                "host_timeout":   int(body.get("host_timeout", 240)),
-                "scan_ports":     bool(body.get("scan_ports", True)),
-                "scan_vulns":     bool(body.get("scan_vulns", True)),
-                "skip_discovery": bool(body.get("skip_discovery", False)),
+                "mode":              body.get("mode", "normal"),
+                "speed":             int(body.get("speed", 3)),
+                "scan_type":         body.get("scan_type") or None,
+                "scan_technique":    body.get("scan_technique", ""),
+                "ports":             body.get("ports", ""),
+                "version_intensity": int(body.get("version_intensity", 0)) if body.get("version_intensity") else None,
+                "os_detection":      bool(body.get("os_detection", False)),
+                "nmap_flags":        body.get("nmap_flags", ""),
+                "host_timeout":      int(body.get("host_timeout", 240)),
+                "scan_ports":        bool(body.get("scan_ports", True)),
+                "scan_vulns":        bool(body.get("scan_vulns", True)),
+                "skip_discovery":    bool(body.get("skip_discovery", False)),
             },
         }
         with _profiles_lock:
@@ -1078,11 +1092,25 @@ def _build_app(static_dir: Path) -> "Flask":
             if pid not in _profiles:
                 return jsonify({"error": "Profile not found"}), 404
         body = request.get_json(force=True, silent=True) or {}
+        config_keys = ("mode", "speed", "scan_type", "nmap_flags", "host_timeout",
+                       "scan_ports", "scan_vulns", "skip_discovery",
+                       "scan_technique", "ports", "version_intensity", "os_detection")
+        new_config = {k: body[k] for k in config_keys if k in body}
+        if "speed" in new_config:
+            new_config["speed"] = int(new_config["speed"])
+        if "host_timeout" in new_config:
+            new_config["host_timeout"] = int(new_config["host_timeout"])
+        for bk in ("scan_ports", "scan_vulns", "skip_discovery", "os_detection"):
+            if bk in new_config:
+                new_config[bk] = bool(new_config[bk])
+        if "version_intensity" in new_config and new_config["version_intensity"]:
+            new_config["version_intensity"] = int(new_config["version_intensity"])
         with _profiles_lock:
             p = _profiles[pid]
             if "name"        in body: p["name"]        = body["name"]
             if "description" in body: p["description"] = body["description"]
-            if "config"      in body: p["config"]       = _deep_merge(p.get("config", {}), body["config"])
+            if new_config:
+                p["config"] = _deep_merge(p.get("config", {}), new_config)
         _save_profiles()
         with _profiles_lock:
             return jsonify(_profiles[pid])
