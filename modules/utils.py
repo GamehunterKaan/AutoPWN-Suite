@@ -553,9 +553,11 @@ def InitReport(args, log) -> tuple:
                 ReportMailPort = input(
                     "Enter the email port to send the report from : "
                 )
-                if not isinstance(ReportMailPort, int):
+                try:
+                    int(ReportMailPort)
                     break
-                log.logger("error", "Invalid port number!")
+                except ValueError:
+                    log.logger("error", "Invalid port number!")
 
         EmailObj = ReportMail(
             ReportEmail,
@@ -652,8 +654,16 @@ def GetHostsToScan(hosts, console) -> list[str]:
                     )
                 )
             else:
-                if int(host) < len(hosts) and int(host) >= 0:
-                    Targets = [hosts[int(host)]]
+                try:
+                    index = int(host)
+                except ValueError:
+                    console.print(
+                        "Please enter a valid host number or 'all' " + "or 'exit'",
+                        style="red",
+                    )
+                    continue
+                if 0 <= index < len(hosts):
+                    Targets = [hosts[index]]
                     break
                 else:
                     console.print(
@@ -805,21 +815,18 @@ def install_nmap_linux(log) -> None:
             + "\t1 apt-get\n\t2 dnf\n\t3 yum\n\t4 pacman\n\t5 zypper."
             + "\nSelect option [0-5] >"
         )
-        if _distro_choice_ == "1":
-            distro_ = "ubuntu"
-            install_nmap_linux(log) # Recursive call with the new distro choice
-        elif _distro_choice_ == "2":
-            distro_ = "fedora"
-            install_nmap_linux(log)
-        elif _distro_choice_ == "3":
-            distro_ = "centos"
-            install_nmap_linux(log)
-        elif _distro_choice_ == "4":
-            distro_ = "arch"
-            install_nmap_linux(log)
-        elif _distro_choice_ == "5":
-            distro_ = "opensuse"
-            install_nmap_linux(log)
+        pkg_cmds = {
+            "1": ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"],
+            "2": ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"],
+            "3": ["/usr/bin/sudo", "yum", "install", "nmap", "-y"],
+            "4": ["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"],
+            "5": ["/usr/bin/sudo", "zypper", "install", "nmap", "--non-interactive"],
+        }
+        if _distro_choice_ in pkg_cmds:
+            try:
+                check_call(pkg_cmds[_distro_choice_], stderr=DEVNULL)
+            except CalledProcessError:
+                log.logger("error", "Couldn't install nmap (Linux)")
         else:
             log.logger("error", "Couldn't install nmap (Linux)")
 
