@@ -101,20 +101,19 @@ def SendWebhook(url, log) -> None:
     """
     Send webhook report.
     """
-    file = open("report.log", "r", encoding="utf-8")
-    payload = {"payload": file}
+    with open("report.log", "r", encoding="utf-8") as file:
+        payload = {"payload": file}
 
-    try:
-        req = post(url, files=payload)
-        file.close()
-        if req.status_code == 200:
-            log.logger("success", "Webhook report sent succesfully.")
-        else:
+        try:
+            req = post(url, files=payload)
+            if req.status_code == 200:
+                log.logger("success", "Webhook report sent succesfully.")
+            else:
+                log.logger("error", "Webhook report failed to send.")
+                print(req.text)
+        except Exception as e:
+            log.logger("error", e)
             log.logger("error", "Webhook report failed to send.")
-            print(req.text)
-    except Exception as e:
-        log.logger("error", e)
-        log.logger("error", "Webhook report failed to send.")
 
 
 def InitializeReport(Method, ReportObject, log, console) -> None:
