@@ -51,6 +51,7 @@ import smtplib
 import threading
 import time
 import uuid
+import base64
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -439,36 +440,96 @@ def _send_email(job: ScanJob) -> None:
         return
 
     subject = f"[AutoPWN] Scan {job.status.upper()} — {job.target}"
-    lines   = [
-        f"Target:     {job.target}",
-        f"Status:     {job.status}",
-        f"Hosts:      {len(hosts)}",
-        f"Open ports: {sum(len(h['ports']) for h in hosts)}",
-        f"CVEs found: {vuln_count}",
-        f"Started:    {job.started_at}",
-        f"Finished:   {job.finished_at}",
-    ]
+    
+    c = job.config or {}
+    cmd_base = f"nmap {job.target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10" if c.get("mode") == "evade" else f"nmap {job.target} -sS -sV --host-timeout {c.get('host_timeout', 240)} -Pn -O -T {c.get('speed', 3)}"
+    flags = c.get("nmap_flags", "")
+    if flags:
+        if "-O" in cmd_base and "-O" in flags:
+            flags = flags.replace("-O", "").strip()
+        if flags:
+            cmd_base += " " + flags
+
+    favicon_path = _STATIC_DIR / "favicon.ico"
+    logo_html = ""
+    if favicon_path.exists():
+        try:
+            b64_icon = base64.b64encode(favicon_path.read_bytes()).decode("utf-8")
+            logo_html = f'<img src="data:image/x-icon;base64,{b64_icon}" style="width: 40px; height: 40px; display: block;" alt="Logo">'
+        except Exception:
+            pass
+
+    html = f"""<!DOCTYPE html><html><head><title>Scan Report - {job.target}</title>
+    <style>
+      body{{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}}
+      h1, h2, h3, h4{{color: #111; margin-bottom: 8px;}}
+      table{{width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;}}
+      th, td{{border: 1px solid #ddd; padding: 10px; text-align: left;}}
+      th{{background-color: #f5f5f5;}}
+      .meta{{background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #eee;}}
+      .meta p{{margin: 5px 0;}}
+      .sev-critical{{color: #d32f2f; font-weight: bold;}}
+      .sev-high{{color: #f57c00; font-weight: bold;}}
+      .sev-medium{{color: #fbc02d; font-weight: bold;}}
+      .sev-low{{color: #388e3c; font-weight: bold;}}
+      .sev-unknown{{color: #777;}}
+    </style>
+    </head><body>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+      <tr>
+        <td width="50" valign="middle">
+          {logo_html}
+        </td>
+        <td valign="middle">
+          <h1 style="margin: 0; color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">AutoPWN Suite <span style="color: #777; font-weight: normal;">— Scan Report</span></h1>
+        </td>
+      </tr>
+    </table>
+    <div class="meta">
+      <p><strong>Target:</strong> {job.target}</p>
+      <p><strong>Scan ID:</strong> {job.id}</p>
+      <p><strong>Status:</strong> {job.status}</p>
+      <p><strong>Command:</strong> {cmd_base.strip()}</p>
+      <p><strong>Started:</strong> {job.started_at}</p>
+      <p><strong>Finished:</strong> {job.finished_at or 'N/A'}</p>
+    </div>
+    """
     if job.error:
-        lines.append(f"Error:      {job.error}")
+        html += f'<div class="meta" style="border-color:#ff3f4f;"><p style="color:#ff3f4f;"><strong>Error:</strong> {job.error}</p></div>'
 
-    # Add top CVEs
-    all_vulns = sorted(
-        [v for h in hosts for v in h["vulns"]],
-        key=lambda v: v.get("cvss", 0), reverse=True
-    )[:10]
-    if all_vulns:
-        lines.append("\nTop vulnerabilities:")
-        for v in all_vulns:
-            lines.append(f"  {v['cve']}  [{v['severity'].upper()}]  CVSS:{v.get('cvss','?')}  {v['description'][:80]}")
+    html += f"<h2>Hosts Discovered ({len(hosts)})</h2>\n"
+    
+    if hosts:
+        for h in hosts:
+            html += f"<h3>Host: {h.get('ip', '')}</h3>\n"
+            html += f'<div class="meta"><p><strong>MAC:</strong> {h.get("mac") or "—"} &nbsp;|&nbsp; <strong>OS:</strong> {h.get("os") or "—"} &nbsp;|&nbsp; <strong>Vendor:</strong> {h.get("vendor") or "—"}</p></div>\n'
+            if h.get("ports"):
+                html += "<h4>Open Ports</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>\n"
+                for p in h.get("ports", []):
+                    html += f"<tr><td>{p.get('port','')}</td><td>{p.get('service','')}</td><td>{p.get('product','')}</td><td>{p.get('version','')}</td></tr>\n"
+                html += "</table>\n"
+            else:
+                html += "<p>No open ports found.</p>\n"
+            
+            vulns = h.get("vulns", [])
+            if vulns:
+                html += "<h4>Vulnerabilities</h4><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>\n"
+                for v in vulns:
+                    sev = v.get("severity", "unknown").lower()
+                    html += f"<tr><td>{v.get('cve','')}</td><td class=\"sev-{sev}\">{v.get('severity', '').upper()}</td><td>{v.get('cvss', '—')}</td><td>{v.get('description','')}</td></tr>\n"
+                html += "</table>\n"
+            html += '<hr style="border:0; border-top:2px dashed #eee; margin:30px 0;">\n'
+    else:
+        html += "<p>No hosts were found during this scan.</p>\n"
 
-    body = "\n".join(lines)
+    html += "</body></html>"
 
     try:
-        msg = MIMEMultipart()
+        msg = MIMEMultipart("alternative")
         msg["From"]    = cfg.get("from_addr") or cfg.get("username", "")
         msg["To"]      = cfg["to_addr"]
         msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(html, "html"))
 
         with smtplib.SMTP(cfg["smtp_host"], int(cfg.get("smtp_port", 587))) as srv:
             srv.ehlo()
