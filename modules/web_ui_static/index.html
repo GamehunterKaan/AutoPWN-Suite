@@ -694,7 +694,10 @@ function printScan(scanId) {
     @media print { body { padding: 0; } }
   </style>
   </head><body>
-  <h1>AutoPWN Suite — Scan Report</h1>
+  <div style="display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+    <img src="${window.location.origin}/favicon.ico" style="width: 40px; height: 40px; margin-right: 15px;" alt="Logo">
+    <h1 style="margin: 0; color: #111;">AutoPWN Suite <span style="color: #777; font-weight: normal;">— Scan Report</span></h1>
+  </div>
   <div class="meta">
     <p><strong>Target:</strong> ${esc(job.target)}</p>
     <p><strong>Scan ID:</strong> ${esc(job.id)}</p>
@@ -758,7 +761,10 @@ function printHost(ip) {
     @media print { body { padding: 0; } }
   </style>
   </head><body>
-  <h1>AutoPWN Suite — Host Report</h1>
+  <div style="display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+    <img src="${window.location.origin}/favicon.ico" style="width: 40px; height: 40px; margin-right: 15px;" alt="Logo">
+    <h1 style="margin: 0; color: #111;">AutoPWN Suite <span style="color: #777; font-weight: normal;">— Host Report</span></h1>
+  </div>
   <div class="meta">
     <p><strong>Host IP:</strong> ${h.ip}</p>
     <p><strong>MAC Address:</strong> ${h.mac || '—'}</p>
@@ -824,7 +830,10 @@ function printAllVulns() {
     @media print { body { padding: 0; } }
   </style>
   </head><body>
-  <h1>AutoPWN Suite — Vulnerabilities Report</h1>
+  <div style="display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+    <img src="${window.location.origin}/favicon.ico" style="width: 40px; height: 40px; margin-right: 15px;" alt="Logo">
+    <h1 style="margin: 0; color: #111;">AutoPWN Suite <span style="color: #777; font-weight: normal;">— Vulnerabilities Report</span></h1>
+  </div>
   <div class="meta">
     <p><strong>Total Vulnerabilities:</strong> ${filtered.length}</p>
     <p><strong>Filters Applied:</strong> Host: ${fHost||'All'} &nbsp;|&nbsp; Scan: ${fScan||'All'} &nbsp;|&nbsp; Severity: ${fSev?fSev.toUpperCase():'All'} &nbsp;|&nbsp; Search: ${fSearch||'None'}</p>
@@ -873,7 +882,10 @@ function printAllHosts() {
     @media print { body { padding: 0; } }
   </style>
   </head><body>
-  <h1>AutoPWN Suite — Discovered Hosts Report</h1>
+  <div style="display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+    <img src="${window.location.origin}/favicon.ico" style="width: 40px; height: 40px; margin-right: 15px;" alt="Logo">
+    <h1 style="margin: 0; color: #111;">AutoPWN Suite <span style="color: #777; font-weight: normal;">— Discovered Hosts Report</span></h1>
+  </div>
   <div class="meta">
     <p><strong>Total Hosts:</strong> ${list.length}</p>
     <p><strong>Export Date:</strong> ${new Date().toLocaleString()}</p>
