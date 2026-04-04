@@ -68,8 +68,9 @@ def SendEmail(email, password, email_to, email_from, server, port, log) -> None:
     body = "AutoPWN Report"
     msg.attach(MIMEText(body, "plain"))
 
-    html = open("tmp_report.html", "rb").read()
-    part = MIMEText(html, "text/html")
+    with open("tmp_report.html", "r", encoding="utf-8") as f:
+        html = f.read()
+    part = MIMEText(html, "html")
     msg.attach(part)
 
     mail = SMTP(server, port)
