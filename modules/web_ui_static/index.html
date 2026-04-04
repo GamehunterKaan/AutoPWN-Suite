@@ -379,6 +379,12 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
 
   <!-- Discovered Hosts -->
   <div id="tc-hosts" class="tc">
+    <div class="filter-bar" id="hosts-action-bar" style="display:none; justify-content:flex-end; padding-bottom:14px; border-bottom:1px solid var(--border); background:var(--bg2);">
+      <button class="btn btn-ghost" style="flex:0 0 auto; min-width:auto; padding:7px 14px;" onclick="printAllHosts()" title="Export all hosts to PDF">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Export All PDF
+      </button>
+    </div>
     <div id="hosts-grid"></div>
     <div class="empty-state" id="hosts-empty">
       <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
@@ -400,6 +406,10 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
         <option value="low">Low</option>
         <option value="unknown">Unknown</option>
       </select>
+      <button class="btn btn-ghost" style="flex:0 0 auto; min-width:auto; padding:7px 14px;" onclick="printAllVulns()" title="Export filtered vulnerabilities to PDF">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Export PDF
+      </button>
     </div>
     <div id="vtw">
       <table>
@@ -664,6 +674,234 @@ function updateNmapPreview() {
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function shortId(id){ return id ? id.slice(0,8) : ''; }
+function printScan(scanId) {
+  const job = scans[scanId];
+  if(!job) return;
+  let html = `<!DOCTYPE html><html><head><title>Scan Report - ${job.target}</title>
+  <style>
+    body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}
+    h1, h2, h3, h4{color: #111; margin-bottom: 8px;}
+    table{width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;}
+    th, td{border: 1px solid #ddd; padding: 10px; text-align: left;}
+    th{background-color: #f5f5f5;}
+    .meta{background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #eee;}
+    .meta p{margin: 5px 0;}
+    .sev-critical{color: #d32f2f; font-weight: bold;}
+    .sev-high{color: #f57c00; font-weight: bold;}
+    .sev-medium{color: #fbc02d; font-weight: bold;}
+    .sev-low{color: #388e3c; font-weight: bold;}
+    .sev-unknown{color: #777;}
+    @media print { body { padding: 0; } }
+  </style>
+  </head><body>
+  <h1>AutoPWN Suite — Scan Report</h1>
+  <div class="meta">
+    <p><strong>Target:</strong> ${esc(job.target)}</p>
+    <p><strong>Scan ID:</strong> ${esc(job.id)}</p>
+    <p><strong>Status:</strong> ${job.status}</p>
+    <p><strong>Started:</strong> ${job.started_at}</p>
+    <p><strong>Finished:</strong> ${job.finished_at || 'N/A'}</p>
+  </div>
+  <h2>Hosts Discovered (${job.host_count})</h2>
+  `;
+  const scanHosts = Object.values(hosts).filter(h => h.scan_id === scanId);
+  if(scanHosts.length) {
+    scanHosts.forEach(h => {
+      html += `<h3>Host: ${h.ip}</h3>`;
+      html += `<div class="meta"><p><strong>MAC:</strong> ${h.mac || '—'} &nbsp;|&nbsp; <strong>OS:</strong> ${esc(h.os || '—')} &nbsp;|&nbsp; <strong>Vendor:</strong> ${esc(h.vendor || '—')}</p></div>`;
+      if(h.ports && h.ports.length) {
+        html += `<h4>Open Ports</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>`;
+        h.ports.forEach(p => {
+          html += `<tr><td>${p.port}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`;
+        });
+        html += `</table>`;
+      } else {
+        html += `<p>No open ports found.</p>`;
+      }
+      const vulns = (h.vulns || []);
+      if(vulns.length) {
+        html += `<h4>Vulnerabilities</h4><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>`;
+        vulns.forEach(v => {
+          html += `<tr><td>${esc(v.cve)}</td><td class="sev-${v.severity}">${v.severity.toUpperCase()}</td><td>${v.cvss || '—'}</td><td>${esc(v.description)}</td></tr>`;
+        });
+        html += `</table>`;
+      }
+      html += `<hr style="border:0; border-top:2px dashed #eee; margin:30px 0;">`;
+    });
+  } else {
+    html += `<p>No hosts were found during this scan.</p>`;
+  }
+  html += `</body></html>`;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => { win.print(); }, 500);
+}
+
+function printHost(ip) {
+  const h = hosts[ip];
+  if(!h) return;
+  let html = `<!DOCTYPE html><html><head><title>Host Report - ${h.ip}</title>
+  <style>
+    body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}
+    h1, h2, h3, h4{color: #111; margin-bottom: 8px;}
+    table{width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;}
+    th, td{border: 1px solid #ddd; padding: 10px; text-align: left;}
+    th{background-color: #f5f5f5;}
+    .meta{background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #eee;}
+    .meta p{margin: 5px 0;}
+    .sev-critical{color: #d32f2f; font-weight: bold;}
+    .sev-high{color: #f57c00; font-weight: bold;}
+    .sev-medium{color: #fbc02d; font-weight: bold;}
+    .sev-low{color: #388e3c; font-weight: bold;}
+    .sev-unknown{color: #777;}
+    @media print { body { padding: 0; } }
+  </style>
+  </head><body>
+  <h1>AutoPWN Suite — Host Report</h1>
+  <div class="meta">
+    <p><strong>Host IP:</strong> ${h.ip}</p>
+    <p><strong>MAC Address:</strong> ${h.mac || '—'}</p>
+    <p><strong>Operating System:</strong> ${esc(h.os || '—')}</p>
+    <p><strong>Vendor:</strong> ${esc(h.vendor || '—')}</p>
+  </div>
+  `;
+  if(h.ports && h.ports.length) {
+    html += `<h3>Open Ports (${h.ports.length})</h3><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>`;
+    h.ports.forEach(p => {
+      html += `<tr><td>${p.port}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`;
+    });
+    html += `</table>`;
+  } else {
+    html += `<p>No open ports found.</p>`;
+  }
+  const vulns = (h.vulns || []);
+  if(vulns.length) {
+    html += `<h3>Vulnerabilities (${vulns.length})</h3><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>`;
+    vulns.forEach(v => {
+      html += `<tr><td>${esc(v.cve)}</td><td class="sev-${v.severity}">${v.severity.toUpperCase()}</td><td>${v.cvss || '—'}</td><td>${esc(v.description)}</td></tr>`;
+    });
+    html += `</table>`;
+  }
+  html += `</body></html>`;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => { win.print(); }, 500);
+}
+
+function printAllVulns() {
+  const all=[];
+  Object.values(hosts).forEach(h=>(h.vulns||[]).forEach(v=>all.push({...v, hostBase:h.ip, scan_id:h.scan_id, host:h.ip+(v.port?':'+v.port:'')})));
+
+  const fSearch = document.getElementById('vuln-search').value.toLowerCase();
+  const fHost = document.getElementById('vuln-host').value;
+  const fScan = document.getElementById('vuln-scanid').value;
+  const fSev = document.getElementById('vuln-sev').value;
+
+  const filtered = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || v.severity === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
+  filtered.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
+
+  if(!filtered.length) {
+    toast('No vulnerabilities to export.', false);
+    return;
+  }
+
+  let html = `<!DOCTYPE html><html><head><title>Vulnerabilities Report</title>
+  <style>
+    body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}
+    h1, h2, h3, h4{color: #111; margin-bottom: 8px;}
+    table{width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;}
+    th, td{border: 1px solid #ddd; padding: 10px; text-align: left;}
+    th{background-color: #f5f5f5;}
+    .meta{background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #eee;}
+    .meta p{margin: 5px 0;}
+    .sev-critical{color: #d32f2f; font-weight: bold;}
+    .sev-high{color: #f57c00; font-weight: bold;}
+    .sev-medium{color: #fbc02d; font-weight: bold;}
+    .sev-low{color: #388e3c; font-weight: bold;}
+    .sev-unknown{color: #777;}
+    @media print { body { padding: 0; } }
+  </style>
+  </head><body>
+  <h1>AutoPWN Suite — Vulnerabilities Report</h1>
+  <div class="meta">
+    <p><strong>Total Vulnerabilities:</strong> ${filtered.length}</p>
+    <p><strong>Filters Applied:</strong> Host: ${fHost||'All'} &nbsp;|&nbsp; Scan: ${fScan||'All'} &nbsp;|&nbsp; Severity: ${fSev?fSev.toUpperCase():'All'} &nbsp;|&nbsp; Search: ${fSearch||'None'}</p>
+  </div>
+  <table>
+    <tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Host</th><th>Keyword</th><th>Description</th></tr>
+  `;
+  filtered.forEach(v => {
+    html += `<tr>
+      <td style="white-space:nowrap;">${esc(v.cve)}</td>
+      <td class="sev-${v.severity}">${v.severity.toUpperCase()}</td>
+      <td>${v.cvss || '—'}</td>
+      <td style="white-space:nowrap;">${esc(v.host)}</td>
+      <td>${esc(v.keyword || '')}</td>
+      <td>${esc(v.description)}</td>
+    </tr>`;
+  });
+  html += `</table></body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => { win.print(); }, 500);
+}
+
+function printAllHosts() {
+  const list = Object.values(hosts);
+  if(!list.length) {
+    toast('No hosts to export.', false);
+    return;
+  }
+  let html = `<!DOCTYPE html><html><head><title>All Hosts Report</title>
+  <style>
+    body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}
+    h1, h2, h3, h4{color: #111; margin-bottom: 8px;}
+    table{width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;}
+    th, td{border: 1px solid #ddd; padding: 10px; text-align: left;}
+    th{background-color: #f5f5f5;}
+    .meta{background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #eee;}
+    .meta p{margin: 5px 0;}
+    .sev-critical{color: #d32f2f; font-weight: bold;}
+    .sev-high{color: #f57c00; font-weight: bold;}
+    .sev-medium{color: #fbc02d; font-weight: bold;}
+    .sev-low{color: #388e3c; font-weight: bold;}
+    .sev-unknown{color: #777;}
+    @media print { body { padding: 0; } }
+  </style>
+  </head><body>
+  <h1>AutoPWN Suite — Discovered Hosts Report</h1>
+  <div class="meta">
+    <p><strong>Total Hosts:</strong> ${list.length}</p>
+    <p><strong>Export Date:</strong> ${new Date().toLocaleString()}</p>
+  </div>
+  `;
+  list.forEach(h => {
+    html += `<h2>Host: ${h.ip}</h2>`;
+    html += `<div class="meta"><p><strong>MAC:</strong> ${h.mac || '—'} &nbsp;|&nbsp; <strong>OS:</strong> ${esc(h.os || '—')} &nbsp;|&nbsp; <strong>Vendor:</strong> ${esc(h.vendor || '—')}</p></div>`;
+    if(h.ports && h.ports.length) {
+      html += `<h4>Open Ports (${h.ports.length})</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>`;
+      h.ports.forEach(p => { html += `<tr><td>${p.port}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`; });
+      html += `</table>`;
+    } else { html += `<p>No open ports found.</p>`; }
+    const vulns = (h.vulns || []);
+    if(vulns.length) {
+      html += `<h4>Vulnerabilities (${vulns.length})</h4><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>`;
+      vulns.forEach(v => { html += `<tr><td>${esc(v.cve)}</td><td class="sev-${v.severity}">${v.severity.toUpperCase()}</td><td>${v.cvss || '—'}</td><td>${esc(v.description)}</td></tr>`; });
+      html += `</table>`;
+    }
+    html += `<hr style="border:0; border-top:2px dashed #eee; margin:30px 0;">`;
+  });
+  html += `</body></html>`;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => { win.print(); }, 500);
+}
+
 function downloadHostJson(ip) {
   const h = hosts[ip];
   if(!h) return;
@@ -857,7 +1095,8 @@ function renderScans(){
         <div class="sc-time">${esc(job.finished_at?`Finished ${timeAgo(job.finished_at)}`:`Started ${timeAgo(job.started_at)}`)}</div>
         <div style="display:flex;gap:8px">
           ${running?`<button class="btn btn-danger btn-sm" onclick="stopScan('${job.id}')">Stop</button>`:''}
-          ${!running?`<a class="btn btn-ghost btn-sm" href="/api/scans/${job.id}/download" download style="text-decoration:none">Download JSON</a>`:''}
+          ${!running?`<button class="btn btn-ghost btn-sm" onclick="printScan('${job.id}')">Export PDF</button>`:''}
+          ${!running?`<a class="btn btn-ghost btn-sm" href="/api/scans/${job.id}/download" download style="text-decoration:none">Export JSON</a>`:''}
         </div>
       </div>
       ${job.error?`<div style="font-family:var(--mono);font-size:11px;color:var(--red)">${esc(job.error)}</div>`:''}
@@ -872,9 +1111,11 @@ function renderScans(){
 function renderHosts(){
   const grid  = document.getElementById('hosts-grid');
   const empty = document.getElementById('hosts-empty');
+  const action = document.getElementById('hosts-action-bar');
   const list  = Object.values(hosts);
   empty.style.display = list.length?'none':'flex';
   grid.style.display  = list.length?'':'none';
+  if(action) action.style.display = list.length?'flex':'none';
   grid.innerHTML='';
   list.forEach(h=>{
     const vc=h.vulns?.length||0, scanning=h.scan_status==='scanning';
@@ -923,10 +1164,14 @@ function renderDetail(h){
   el.innerHTML=`
     <div><div class="ds">Host Info</div>${kvs}</div><div><div class="ds">Open Ports (${ports.length})</div>${prs}</div><div><div class="ds">Vulnerabilities (${vulns.length})</div>${vrs}</div>
     ${h.scan_status === 'completed' ? `
-    <div style="margin-top:14px;">
-      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="downloadHostJson('${h.ip}')">
+    <div style="margin-top:14px; display:flex; gap:8px;">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="downloadHostJson('${h.ip}')">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download Host JSON
+        JSON
+      </button>
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="printHost('${h.ip}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        PDF
       </button>
     </div>` : ''}
   `;
