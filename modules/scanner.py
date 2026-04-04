@@ -169,17 +169,20 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) ->
                 P = Process(target=CreateNoise, args=(host,))
                 NoisyProcesses.append(P)
                 P.start()
-                if noisetimeout:
-                    sleep(noisetimeout)
-                else:
-                    while True:
-                        sleep(1)
+
+            if noisetimeout:
+                sleep(noisetimeout)
+            else:
+                while True:
+                    sleep(1)
 
         log.logger("info", "Noise scan complete!")
         for P in NoisyProcesses:
             P.terminate()
         raise SystemExit
     except KeyboardInterrupt:
+        for P in NoisyProcesses:
+            P.terminate()
         log.logger("error", "Noise scan interrupted!")
         raise SystemExit
 
