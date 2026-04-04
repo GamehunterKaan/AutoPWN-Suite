@@ -460,20 +460,44 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
           </div>
           <div class="form-grid">
             <div><div class="fl">Mode</div>
-              <select id="pf-mode"><option value="normal">Normal</option><option value="evade">Evasion</option><option value="noise">Noise</option></select>
+              <select id="pf-mode" onchange="updateProfilePreview()"><option value="normal">Normal</option><option value="evade">Evasion</option><option value="noise">Noise</option></select>
             </div>
             <div><div class="fl">Speed</div>
-              <select id="pf-speed"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select>
+              <select id="pf-speed" onchange="updateProfilePreview()"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select>
             </div>
             <div><div class="fl">Scan Type</div>
               <select id="pf-scantype"><option value="">Auto</option><option value="arp">ARP</option><option value="ping">Ping</option></select>
             </div>
-            <div><div class="fl">Timeout (s)</div><input type="number" id="pf-timeout" value="240"/></div>
+            <div><div class="fl">Timeout (s)</div><input type="number" id="pf-timeout" value="240" oninput="updateProfilePreview()"/></div>
           </div>
-          <div><div class="fl">Extra Nmap Flags</div><input type="text" id="pf-nmap" placeholder="e.g. -O --script=banner"/></div>
+          <div class="form-grid">
+            <div><div class="fl">Scan Technique</div>
+              <select id="pf-scantech" onchange="updateProfilePreview()">
+                <option value="">Default (-sS/-sT)</option>
+                <option value="-sS">TCP SYN (-sS)</option>
+                <option value="-sT">TCP Connect (-sT)</option>
+                <option value="-sA">TCP ACK (-sA)</option>
+                <option value="-sW">TCP Window (-sW)</option>
+                <option value="-sM">TCP Maimon (-sM)</option>
+                <option value="-sU">UDP Scan (-sU)</option>
+                <option value="-sN">TCP Null (-sN)</option>
+                <option value="-sF">TCP FIN (-sF)</option>
+                <option value="-sX">TCP Xmas (-sX)</option>
+              </select>
+            </div>
+            <div><div class="fl">Ports</div><input type="text" id="pf-ports" placeholder="e.g. 22,80,1-1000" oninput="updateProfilePreview()"/></div>
+            <div><div class="fl">Version Intensity</div><input type="number" id="pf-vint" min="0" max="9" placeholder="0-9" oninput="updateProfilePreview()"/></div>
+            <div style="display:flex;align-items:flex-end;padding-bottom:7px;">
+              <div class="chk-row"><input type="checkbox" id="pf-os" onchange="updateProfilePreview()"/><label for="pf-os">OS Detection (-O)</label></div>
+            </div>
+          </div>
+          <div><div class="fl">Extra Nmap Flags</div><input type="text" id="pf-nmap" placeholder="e.g. --script=banner" oninput="updateProfilePreview()"/></div>
           <div class="row2">
             <div class="chk-row"><input type="checkbox" id="pf-skipd"/><label for="pf-skipd">Skip host discovery</label></div>
             <div class="chk-row"><input type="checkbox" id="pf-vulns" checked/><label for="pf-vulns">Search vulnerabilities</label></div>
+          </div>
+          <div><div class="fl">Nmap Command Preview</div>
+            <textarea id="pf-nmap-preview" readonly rows="3" style="background:var(--bg3);color:var(--accent);cursor:not-allowed;resize:vertical;" title="Generated Nmap Command"></textarea>
           </div>
           <div class="inline-form-actions">
             <button class="btn btn-ghost btn-sm" onclick="hideProfileForm()">Cancel</button>
@@ -671,6 +695,44 @@ function updateNmapPreview() {
   
   const hiddenEl = document.getElementById('f-nmap');
   if (hiddenEl) hiddenEl.value = combinedFlags;
+}
+function updateProfilePreview() {
+  const mode = document.getElementById('pf-mode').value;
+  const speed = document.getElementById('pf-speed').value;
+  const to = document.getElementById('pf-timeout').value || 240;
+
+  let base = '';
+  if (mode === 'evade') {
+    base = `nmap <target> -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10`;
+  } else {
+    base = `nmap <target> -sS -sV --host-timeout ${to} -Pn -O -T ${speed}`;
+  }
+
+  let flags = [];
+  const tech = document.getElementById('pf-scantech');
+  if (tech && tech.value) flags.push(tech.value);
+  const ports = document.getElementById('pf-ports');
+  if (ports && ports.value.trim()) flags.push('-p ' + ports.value.trim());
+  const vint = document.getElementById('pf-vint');
+  if (vint && vint.value) flags.push('--version-intensity ' + vint.value);
+  const os = document.getElementById('pf-os');
+  if (os && os.checked) flags.push('-O');
+
+  const custom = document.getElementById('pf-nmap');
+  if (custom && custom.value.trim()) flags.push(custom.value.trim());
+
+  let combinedFlags = flags.join(' ').trim();
+  let previewCmd = base;
+  if (combinedFlags) {
+    let previewFlags = combinedFlags;
+    if (previewCmd.includes('-O') && previewFlags.includes('-O')) {
+      previewFlags = previewFlags.replace(/(^|\s)-O(\s|$)/g, ' ').trim();
+    }
+    if (previewFlags) previewCmd += ' ' + previewFlags;
+  }
+
+  const previewEl = document.getElementById('pf-nmap-preview');
+  if (previewEl) previewEl.value = previewCmd.trim();
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function shortId(id){ return id ? id.slice(0,8) : ''; }
@@ -989,13 +1051,11 @@ function loadProfile(){
   if(c.mode)       document.getElementById('f-mode').value    = c.mode;
   if(c.speed)      document.getElementById('f-speed').value   = String(c.speed);
   if(c.scan_type !== undefined) document.getElementById('f-scantype').value = c.scan_type || '';
-  if(c.nmap_flags !== undefined) {
-    document.getElementById('f-nmap-custom').value = c.nmap_flags;
-    document.getElementById('f-scantech').value = '';
-    document.getElementById('f-ports').value = '';
-    document.getElementById('f-vint').value = '';
-    document.getElementById('f-os').checked = false;
-  }
+  document.getElementById('f-nmap-custom').value = c.nmap_flags || '';
+  document.getElementById('f-scantech').value = c.scan_technique || '';
+  document.getElementById('f-ports').value = c.ports || '';
+  document.getElementById('f-vint').value = c.version_intensity ? String(c.version_intensity) : '';
+  document.getElementById('f-os').checked = !!c.os_detection;
   if(c.host_timeout) document.getElementById('f-timeout').value = String(c.host_timeout);
   document.getElementById('f-skipd').checked  = !!c.skip_discovery;
   document.getElementById('f-vulns').checked  = c.scan_vulns !== false;
@@ -1335,7 +1395,7 @@ function renderProfiles(){
       </div>
     </div>`).join('');
 }
-function showProfileForm(){ document.getElementById('profile-form').style.display='flex'; document.getElementById('pf-id').value=''; document.getElementById('profile-form-title').textContent='New Profile'; document.getElementById('pf-name').value=''; document.getElementById('pf-desc').value=''; }
+function showProfileForm(){ document.getElementById('profile-form').style.display='flex'; document.getElementById('pf-id').value=''; document.getElementById('profile-form-title').textContent='New Profile'; document.getElementById('pf-name').value=''; document.getElementById('pf-desc').value=''; document.getElementById('pf-mode').value='normal'; document.getElementById('pf-speed').value='3'; document.getElementById('pf-scantype').value=''; document.getElementById('pf-timeout').value='240'; document.getElementById('pf-scantech').value=''; document.getElementById('pf-ports').value=''; document.getElementById('pf-vint').value=''; document.getElementById('pf-os').checked=false; document.getElementById('pf-nmap').value=''; document.getElementById('pf-skipd').checked=false; document.getElementById('pf-vulns').checked=true; updateProfilePreview(); }
 function hideProfileForm(){ document.getElementById('profile-form').style.display='none'; }
 function editProfile(pid){
   const p=profiles[pid]; if(!p) return;
@@ -1349,9 +1409,14 @@ function editProfile(pid){
   document.getElementById('pf-speed').value=String(c.speed||3);
   document.getElementById('pf-scantype').value=c.scan_type||'';
   document.getElementById('pf-timeout').value=String(c.host_timeout||240);
+  document.getElementById('pf-scantech').value=c.scan_technique||'';
+  document.getElementById('pf-ports').value=c.ports||'';
+  document.getElementById('pf-vint').value=c.version_intensity?String(c.version_intensity):'';
+  document.getElementById('pf-os').checked=!!c.os_detection;
   document.getElementById('pf-nmap').value=c.nmap_flags||'';
   document.getElementById('pf-skipd').checked=!!c.skip_discovery;
   document.getElementById('pf-vulns').checked=c.scan_vulns!==false;
+  updateProfilePreview();
 }
 async function saveProfile(){
   const pid=document.getElementById('pf-id').value;
@@ -1361,7 +1426,11 @@ async function saveProfile(){
     name, description:document.getElementById('pf-desc').value,
     mode:    document.getElementById('pf-mode').value,
     speed:   parseInt(document.getElementById('pf-speed').value),
-    scan_type:   document.getElementById('pf-scantype').value||null,
+    scan_type:      document.getElementById('pf-scantype').value||null,
+    scan_technique: document.getElementById('pf-scantech').value,
+    ports:          document.getElementById('pf-ports').value,
+    version_intensity: document.getElementById('pf-vint').value?parseInt(document.getElementById('pf-vint').value):null,
+    os_detection:   document.getElementById('pf-os').checked,
     host_timeout:parseInt(document.getElementById('pf-timeout').value)||240,
     nmap_flags:  document.getElementById('pf-nmap').value,
     skip_discovery: document.getElementById('pf-skipd').checked,
