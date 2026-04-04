@@ -78,24 +78,28 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     if keyword in cache:
         return cache[keyword]
 
+    data = None
     for tries in range(3):
         try:
             sleep(sleep_time)
             response = get(url, params=parameters, headers=headers)
             data = response.json()
         except Exception as e:
-            if response.status_code == 403:
-                log.logger(
-                    "error",
-                    "Requests are being rate limited by NIST API,"
-                    + " please get a NIST API key to prevent this.",
-                )
-                sleep(sleep_time)
+            try:
+                if response.status_code == 403:
+                    log.logger(
+                        "error",
+                        "Requests are being rate limited by NIST API,"
+                        + " please get a NIST API key to prevent this.",
+                    )
+            except NameError:
+                pass
+            sleep(sleep_time)
         else:
             break
 
     Vulnerabilities = []
-    if not data or not "vulnerabilities" in data:
+    if not data or "vulnerabilities" not in data:
         return []
 
     for vuln in data.get("vulnerabilities", []):
