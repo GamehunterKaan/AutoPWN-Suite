@@ -73,6 +73,40 @@ except ImportError:
     FLASK_AVAILABLE = False
 
 
+# ── Input validation ──────────────────────────────────────────────────────────
+
+import re as _re
+
+# Characters allowed in nmap targets: IPs, CIDR, hostnames, ranges
+_TARGET_RE = _re.compile(r'^[a-zA-Z0-9\.\-\:\/\, ]+$')
+# Allowed nmap flag patterns: dash-prefixed flags, numbers, commas, equals, colons, slashes
+_NMAP_FLAG_RE = _re.compile(r'^[\sa-zA-Z0-9\.\-\_\=\,\:\/\*\?]+$')
+# Shell metacharacters that must never appear in nmap arguments
+_SHELL_DANGEROUS = set(';|&`$(){}[]<>!\n\r\\\'\"~')
+
+
+def _validate_target(target: str) -> Optional[str]:
+    """Return an error string if the target is invalid, else None."""
+    if not target:
+        return "'target' is required"
+    if any(c in _SHELL_DANGEROUS for c in target):
+        return "target contains invalid characters"
+    if not _TARGET_RE.match(target):
+        return "target contains invalid characters"
+    return None
+
+
+def _validate_nmap_flags(flags: str) -> Optional[str]:
+    """Return an error string if nmap flags are invalid, else None."""
+    if not flags:
+        return None
+    if any(c in _SHELL_DANGEROUS for c in flags):
+        return "nmap_flags contains invalid characters"
+    if not _NMAP_FLAG_RE.match(flags):
+        return "nmap_flags contains invalid characters"
+    return None
+
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 _MODULE_DIR  = Path(__file__).parent
@@ -597,13 +631,32 @@ def _log(job: ScanJob, msg: str, level: str = "info") -> None:
     })
 
 
+def _build_nmap_flags(config: dict) -> str:
+    """Build the full nmap_flags string from both the free-text field and
+    the structured profile fields (scan_technique, ports, version_intensity,
+    os_detection).  This ensures scheduled scans from profiles work correctly."""
+    parts = []
+    if config.get("scan_technique"):
+        parts.append(config["scan_technique"])
+    if config.get("ports"):
+        parts.append(f"-p {config['ports']}")
+    vi = config.get("version_intensity")
+    if vi is not None and vi != "":
+        parts.append(f"--version-intensity {vi}")
+    if config.get("os_detection"):
+        parts.append("-O")
+    if config.get("nmap_flags"):
+        parts.append(config["nmap_flags"])
+    return " ".join(parts)
+
+
 def _run_scan(job: ScanJob) -> None:
     config         = job.config
     target         = config["target"]
     mode           = config.get("mode", "normal")
     speed          = int(config.get("speed", 3))
     scan_type      = config.get("scan_type") or None
-    nmap_flags     = config.get("nmap_flags", "")
+    nmap_flags     = _build_nmap_flags(config)
     api_key        = config.get("api_key") or _get_setting("nist_api_key") or None
     host_timeout   = int(config.get("host_timeout", 240))
     scan_ports     = config.get("scan_ports", True)
@@ -637,8 +690,9 @@ def _run_scan(job: ScanJob) -> None:
             else:
                 _log(job, "[*] Root required for evasion mode, using normal", "warning")
         elif mode == "noise":
-            scanmode = ScanMode.Noise
-            _log(job, "[*] Noise mode enabled", "warning")
+            # NoiseScan requires a dedicated long-running process and is not
+            # supported from the web UI.  Fall back to normal mode.
+            _log(job, "[*] Noise mode is not supported in web UI, using normal mode", "warning")
 
         # Scan type
         scantype = ScanType.ARP if is_root() else ScanType.Ping
@@ -686,6 +740,10 @@ def _run_scan(job: ScanJob) -> None:
 
             try:
                 nm = PortScan(host_ip, log, speed, host_timeout, scanmode, nmap_flags)
+            except SystemExit as e:
+                _log(job, f"[-] Port scan failed for {host_ip}: {e}", "error")
+                job.mark_host_done(host_ip)
+                continue
             except Exception as e:
                 _log(job, f"[-] Port scan failed for {host_ip}: {e}", "error")
                 job.mark_host_done(host_ip)
@@ -774,6 +832,9 @@ def _run_scan(job: ScanJob) -> None:
         _log(job, f"[+] Scan {job.id[:8]} completed.", "success")
         job.mark_done()
 
+    except SystemExit as exc:
+        _log(job, f"[-] Scan aborted: {exc}", "error")
+        job.mark_error(str(exc))
     except Exception as exc:
         _log(job, f"[-] Unexpected error: {exc}", "error")
         job.mark_error(str(exc))
@@ -885,6 +946,27 @@ def _scheduler_loop() -> None:
                 if not config["target"]:
                     continue
 
+                # Validate target and nmap_flags before launching
+                err = _validate_target(config["target"])
+                if err:
+                    _broadcast({
+                        "scan_id": "", "level": "error",
+                        "ts": datetime.utcnow().strftime("%H:%M:%S"),
+                        "msg": f"[!] Scheduled scan skipped ({schedule.get('name', schedule['id'][:8])}): {err}",
+                    })
+                    continue
+
+                raw_flags = config.get("nmap_flags", "")
+                if raw_flags:
+                    err = _validate_nmap_flags(raw_flags)
+                    if err:
+                        _broadcast({
+                            "scan_id": "", "level": "error",
+                            "ts": datetime.utcnow().strftime("%H:%M:%S"),
+                            "msg": f"[!] Scheduled scan skipped ({schedule.get('name', schedule['id'][:8])}): {err}",
+                        })
+                        continue
+
                 job = _launch_scan(config)
                 _broadcast({
                     "scan_id": job.id, "level": "info",
@@ -953,8 +1035,10 @@ def _build_app(static_dir: Path) -> "Flask":
     def api_scan_start():
         body   = request.get_json(force=True, silent=True) or {}
         target = (body.get("target") or "").strip()
-        if not target:
-            return jsonify({"error": "'target' is required"}), 400
+
+        target_err = _validate_target(target)
+        if target_err:
+            return jsonify({"error": target_err}), 400
 
         try:
             speed = int(body.get("speed", 3))
@@ -966,12 +1050,25 @@ def _build_app(static_dir: Path) -> "Flask":
         if host_timeout < 1:
             return jsonify({"error": "'host_timeout' must be positive"}), 400
 
+        mode = body.get("mode", "normal")
+        if mode not in ("normal", "evade", "noise"):
+            return jsonify({"error": "'mode' must be 'normal', 'evade', or 'noise'"}), 400
+
+        scan_type = body.get("scan_type") or None
+        if scan_type is not None and scan_type not in ("arp", "ping"):
+            return jsonify({"error": "'scan_type' must be 'arp', 'ping', or null"}), 400
+
+        nmap_flags = body.get("nmap_flags", "")
+        flags_err = _validate_nmap_flags(nmap_flags)
+        if flags_err:
+            return jsonify({"error": flags_err}), 400
+
         config = {
             "target":         target,
-            "mode":           body.get("mode", "normal"),
+            "mode":           mode,
             "speed":          speed,
-            "scan_type":      body.get("scan_type") or None,
-            "nmap_flags":     body.get("nmap_flags", ""),
+            "scan_type":      scan_type,
+            "nmap_flags":     nmap_flags,
             "api_key":        body.get("api_key", ""),
             "host_timeout":   host_timeout,
             "scan_ports":     bool(body.get("scan_ports", True)),
