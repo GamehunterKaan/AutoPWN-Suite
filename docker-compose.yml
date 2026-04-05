@@ -1,6 +1,6 @@
 services:
   autopwn:
-    build: .
+    image: gamehunterkaan/autopwn-suite
     container_name: autopwn-suite
     environment:
       - AUTOPWN_DATA_DIR=/data

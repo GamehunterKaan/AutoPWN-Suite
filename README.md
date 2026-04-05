@@ -95,11 +95,9 @@ pip install -r requirements.txt
 
 ### Docker
 
-The fastest way to get the web UI running:
+The fastest way to get the web UI running. Download the [docker-compose.yml](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/docker-compose.yml) file and run:
 
 ```bash
-git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
-cd AutoPWN-Suite
 docker compose up -d
 ```
 
@@ -120,8 +118,7 @@ environment:
 
 You can also run the CLI via Docker:
 ```bash
-docker build -t autopwn-suite .
-docker run -it --net=host autopwn-suite -t 192.168.1.0/24 -y
+docker run -it --net=host gamehunterkaan/autopwn-suite -t 192.168.1.0/24 -y
 ```
 
 ### Cloud
