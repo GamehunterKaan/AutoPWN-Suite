@@ -301,16 +301,16 @@ def cli():
     )
     webuiargs.add_argument(
         "--web-host",
-        help="Web UI bind adresi. (Default: 0.0.0.0)",
-        default="0.0.0.0",
+        help="Web UI bind address. (Default: 0.0.0.0, env: AUTOPWN_WEB_HOST)",
+        default=os.environ.get("AUTOPWN_WEB_HOST", "0.0.0.0"),
         type=str,
         required=False,
         metavar="HOST",
     )
     webuiargs.add_argument(
         "--web-port",
-        help="Web UI portu. (Default: 8080)",
-        default=8080,
+        help="Web UI port. (Default: 8080, env: AUTOPWN_WEB_PORT)",
+        default=int(os.environ.get("AUTOPWN_WEB_PORT", "8080")),
         type=int,
         required=False,
         metavar="PORT",

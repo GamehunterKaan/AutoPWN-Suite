@@ -46,6 +46,7 @@ from __future__ import annotations
 import html as _html
 import io
 import json
+import os
 import queue
 import shutil
 import smtplib
@@ -111,7 +112,9 @@ def _validate_nmap_flags(flags: str) -> Optional[str]:
 
 _MODULE_DIR  = Path(__file__).parent
 _STATIC_DIR  = _MODULE_DIR / "web_ui_static"
-_SETTINGS_FILE = _MODULE_DIR / "web_ui_settings.json"
+_DATA_DIR    = Path(os.environ.get("AUTOPWN_DATA_DIR", str(_MODULE_DIR)))
+_DATA_DIR.mkdir(parents=True, exist_ok=True)
+_SETTINGS_FILE = _DATA_DIR / "web_ui_settings.json"
 
 
 # ── Settings persistence ──────────────────────────────────────────────────────
@@ -188,7 +191,7 @@ def _get_setting(*keys):
 
 # ── Profiles persistence ──────────────────────────────────────────────────────
 
-_PROFILES_FILE = _MODULE_DIR / "web_ui_profiles.json"
+_PROFILES_FILE = _DATA_DIR / "web_ui_profiles.json"
 _profiles: dict = {}   # id -> profile dict
 _profiles_lock  = threading.Lock()
 
@@ -215,7 +218,7 @@ def _save_profiles() -> None:
 
 # ── Schedules persistence ─────────────────────────────────────────────────────
 
-_SCHEDULES_FILE = _MODULE_DIR / "web_ui_schedules.json"
+_SCHEDULES_FILE = _DATA_DIR / "web_ui_schedules.json"
 _schedules: dict = {}   # id -> schedule dict
 _schedules_lock  = threading.Lock()
 
