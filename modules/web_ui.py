@@ -59,6 +59,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Optional
+import logging
 
 try:
     import requests as _requests
@@ -1192,8 +1193,9 @@ def _build_app(static_dir: Path) -> "Flask":
                     srv.login(cfg["username"], cfg["password"])
                 srv.sendmail(msg["From"], [cfg["to_addr"]], msg.as_string())
             return jsonify({"ok": True})
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+        except Exception:
+            logging.exception("Failed to send test email")
+            return jsonify({"error": "Failed to send test email"}), 500
 
     @app.route("/api/settings/test_webhook", methods=["POST"])
     def api_test_webhook():
