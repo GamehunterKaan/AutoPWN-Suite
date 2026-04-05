@@ -304,8 +304,7 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
       <div class="row2">
         <div><div class="fl">Scan Technique</div>
           <select id="f-scantech" onchange="updateNmapPreview()">
-            <option value="">Default (-sS/-sT)</option>
-            <option value="-sS">TCP SYN (-sS)</option>
+            <option value="-sS" selected>TCP SYN (-sS)</option>
             <option value="-sT">TCP Connect (-sT)</option>
             <option value="-sA">TCP ACK (-sA)</option>
             <option value="-sW">TCP Window (-sW)</option>
@@ -325,7 +324,7 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
           <input type="number" id="f-vint" min="0" max="9" placeholder="0-9" oninput="updateNmapPreview()"/>
         </div>
         <div style="display:flex;align-items:flex-end;padding-bottom:7px;">
-          <div class="chk-row"><input type="checkbox" id="f-os" onchange="updateNmapPreview()"/><label for="f-os">OS Detection (-O)</label></div>
+          <div class="chk-row"><input type="checkbox" id="f-os" onchange="updateNmapPreview()"/><label for="f-os">OS Detection</label></div>
         </div>
       </div>
       <div><div class="fl">Extra Nmap Flags</div>
@@ -473,8 +472,7 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
           <div class="form-grid">
             <div><div class="fl">Scan Technique</div>
               <select id="pf-scantech" onchange="updateProfilePreview()">
-                <option value="">Default (-sS/-sT)</option>
-                <option value="-sS">TCP SYN (-sS)</option>
+                <option value="-sS" selected>TCP SYN (-sS)</option>
                 <option value="-sT">TCP Connect (-sT)</option>
                 <option value="-sA">TCP ACK (-sA)</option>
                 <option value="-sW">TCP Window (-sW)</option>
@@ -488,7 +486,7 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
             <div><div class="fl">Ports</div><input type="text" id="pf-ports" placeholder="e.g. 22,80,1-1000" oninput="updateProfilePreview()"/></div>
             <div><div class="fl">Version Intensity</div><input type="number" id="pf-vint" min="0" max="9" placeholder="0-9" oninput="updateProfilePreview()"/></div>
             <div style="display:flex;align-items:flex-end;padding-bottom:7px;">
-              <div class="chk-row"><input type="checkbox" id="pf-os" onchange="updateProfilePreview()"/><label for="pf-os">OS Detection (-O)</label></div>
+              <div class="chk-row"><input type="checkbox" id="pf-os" onchange="updateProfilePreview()"/><label for="pf-os">OS Detection</label></div>
             </div>
           </div>
           <div><div class="fl">Extra Nmap Flags</div><input type="text" id="pf-nmap" placeholder="e.g. --script=banner" oninput="updateProfilePreview()"/></div>
@@ -654,29 +652,32 @@ let lastScansStr = '';
 let lastHostsStr = '';
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
+function _buildNmapBase(target, mode, speed, to, technique) {
+  // Pick the scan type flag: user-selected technique replaces default -sS
+  const scanType = technique || '-sS';
+  if (mode === 'evade') {
+    return `nmap ${target} ${scanType} -sV -O -Pn -T 2 -f -g 53 --data-length 10`;
+  }
+  return `nmap ${target} ${scanType} -sV --host-timeout ${to} -Pn -O -T ${speed}`;
+}
 function updateNmapPreview() {
   const target = document.getElementById('f-target').value.trim() || '<target>';
   const mode = document.getElementById('f-mode').value;
   const speed = document.getElementById('f-speed').value;
   const to = document.getElementById('f-timeout').value || 240;
-  
-  let base = '';
-  if (mode === 'evade') {
-    base = `nmap ${target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10`;
-  } else {
-    base = `nmap ${target} -sS -sV --host-timeout ${to} -Pn -O -T ${speed}`;
-  }
-  
-  let flags = [];
   const tech = document.getElementById('f-scantech');
-  if (tech && tech.value) flags.push(tech.value);
+  const technique = (tech && tech.value) ? tech.value : '';
+
+  let base = _buildNmapBase(target, mode, speed, to, technique);
+
+  let flags = [];
   const ports = document.getElementById('f-ports');
   if (ports && ports.value.trim()) flags.push('-p ' + ports.value.trim());
   const vint = document.getElementById('f-vint');
   if (vint && vint.value) flags.push('--version-intensity ' + vint.value);
   const os = document.getElementById('f-os');
   if (os && os.checked) flags.push('-O');
-  
+
   const custom = document.getElementById('f-nmap-custom');
   if (custom && custom.value.trim()) flags.push(custom.value.trim());
 
@@ -692,25 +693,21 @@ function updateNmapPreview() {
 
   const previewEl = document.getElementById('f-nmap-preview');
   if (previewEl) previewEl.value = previewCmd.trim();
-  
+
+  // Store technique separately so _build_nmap_flags on the backend also uses it
   const hiddenEl = document.getElementById('f-nmap');
-  if (hiddenEl) hiddenEl.value = combinedFlags;
+  if (hiddenEl) hiddenEl.value = (technique ? technique + ' ' : '') + flags.join(' ').trim();
 }
 function updateProfilePreview() {
   const mode = document.getElementById('pf-mode').value;
   const speed = document.getElementById('pf-speed').value;
   const to = document.getElementById('pf-timeout').value || 240;
+  const tech = document.getElementById('pf-scantech');
+  const technique = (tech && tech.value) ? tech.value : '';
 
-  let base = '';
-  if (mode === 'evade') {
-    base = `nmap <target> -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10`;
-  } else {
-    base = `nmap <target> -sS -sV --host-timeout ${to} -Pn -O -T ${speed}`;
-  }
+  let base = _buildNmapBase('<target>', mode, speed, to, technique);
 
   let flags = [];
-  const tech = document.getElementById('pf-scantech');
-  if (tech && tech.value) flags.push(tech.value);
   const ports = document.getElementById('pf-ports');
   if (ports && ports.value.trim()) flags.push('-p ' + ports.value.trim());
   const vint = document.getElementById('pf-vint');
@@ -1154,9 +1151,13 @@ function renderScans(){
   jobs.forEach(job=>{
     const running = job.status==='running'||job.status==='stopping';
     const c = job.config||{};
-    let base = c.mode==='evade'? `nmap ${job.target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10` : `nmap ${job.target} -sS -sV --host-timeout ${c.host_timeout||240} -Pn -O -T ${c.speed||3}`;
+    const techMatch = (c.nmap_flags||'').match(/-s[STAUWMNFX]/);
+    const cardTech = techMatch ? techMatch[0] : '';
+    let base = _buildNmapBase(job.target, c.mode||'normal', c.speed||3, c.host_timeout||240, cardTech);
     if(c.nmap_flags){
       let f = c.nmap_flags;
+      // Remove the technique flag since it's already in the base
+      if(cardTech) f = f.replace(cardTech, '').trim();
       if(base.includes('-O') && f.includes('-O')) f = f.replace(/(^|\s)-O(\s|$)/g, ' ').trim();
       if(f) base += ' ' + f;
     }
