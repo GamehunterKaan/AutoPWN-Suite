@@ -36,7 +36,6 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 
 AutoPWN Suite includes a built-in web dashboard for managing scans from your browser.
 
-<!-- TODO: Add screenshot of the dashboard -->
 ![Web UI Dashboard](images/screenshots/dashboard.png)
 
 - **Multiple concurrent scans** - Launch and monitor several scans at the same time
@@ -50,10 +49,8 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 - **Persistent settings** - All settings, profiles and schedules are saved to disk
 - **Configurable via environment variables** - Set host, port and data directory without touching code
 
-<!-- TODO: Add screenshot of scan profiles -->
 ![Scan Profiles](images/screenshots/profiles.png)
 
-<!-- TODO: Add screenshot of scheduled scans -->
 ![Scheduled Scans](images/screenshots/schedules.png)
 
 
@@ -184,7 +181,6 @@ With custom host and port:
 autopwn-suite --web --web-host 0.0.0.0 --web-port 3000
 ```
 
-<!-- TODO: Add screenshot of a running scan with terminal output -->
 ![Scan Running](images/screenshots/scan-running.png)
 
 ### REST API
