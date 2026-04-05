@@ -79,14 +79,18 @@ def PortScan(
     log.logger("info", f"Scanning {target} for open ports ...")
 
     nm = PortScanner()
+    # If customflags already specifies a scan technique (-sS, -sU, -sT, etc.),
+    # don't add the default -sS so the techniques don't conflict.
+    import re as _re
+    _has_scan_type = bool(_re.search(r'-s[STAUWMNFX]', customflags))
+    default_scan = [] if _has_scan_type else ["-sS"]
     try:
         if is_root():
             if mode == ScanMode.Evade:
                 nm.scan(
                     hosts=target,
                     arguments=" ".join(
-                        [
-                            "-sS",
+                        default_scan + [
                             "-sV",
                             "-O",
                             "-Pn",
@@ -105,8 +109,7 @@ def PortScan(
                 nm.scan(
                     hosts=target,
                     arguments=" ".join(
-                        [
-                            "-sS",
+                        default_scan + [
                             "-sV",
                             "--host-timeout",
                             str(host_timeout),
