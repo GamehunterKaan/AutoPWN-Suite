@@ -520,7 +520,7 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
           </div>
           <div class="row2">
             <div><div class="fl">Profile</div>
-              <select id="sf-profile"><option value="">— No profile —</option></select>
+              <select id="sf-profile"><option value="">— Select a profile —</option></select>
             </div>
             <div class="chk-row" style="align-self:flex-end;padding-bottom:7px">
               <input type="checkbox" id="sf-enabled" checked/><label for="sf-enabled">Enabled</label>
@@ -1007,10 +1007,17 @@ function downloadHostJson(ip) {
 }
 function timeAgo(iso){
   if(!iso) return '';
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if(s<60) return `${s}s ago`;
-  if(s<3600) return `${Math.floor(s/60)}m ago`;
-  return `${Math.floor(s/3600)}h ago`;
+  const ms = Date.now() - new Date(iso).getTime();
+  if(isNaN(ms) || ms < 0) return '';
+  const s = Math.floor(ms / 1000);
+  if(s<60) return 'just now';
+  const m = Math.floor(s/60);
+  if(m<60) return `${m}m ago`;
+  const h = Math.floor(m/60);
+  const rm = m % 60;
+  if(h<24) return rm ? `${h}h ${rm}m ago` : `${h}h ago`;
+  const d = Math.floor(h/24);
+  return `${d}d ago`;
 }
 function cvssColor(s){ if(!s) return 'var(--text2)'; if(s>=9)return'var(--red)'; if(s>=7)return'var(--orange)'; if(s>=4)return'var(--yellow)'; return'var(--accent)'; }
 
@@ -1103,6 +1110,7 @@ function connectSSE(){
     const d = JSON.parse(ev.data);
     if(d.level==='__scan_done__') return;
     addLog(d.scan_id, d.msg, d.level, d.ts);
+    if(d.msg && d.msg.includes('Scheduled scan fired')) loadSchedulesFromServer();
   };
   es.onerror = ()=>{};
 }
@@ -1483,7 +1491,7 @@ function renderSchedules(){
       <div class="schedule-enabled-dot ${s.enabled?'on':'off'}"></div>
       <div class="item-card-info">
         <div class="item-card-name">${esc(s.name)}</div>
-        <div class="item-card-meta">${esc(s.target)} · ${when}${s.last_run?` · Last: ${timeAgo(s.last_run)}`:''}</div>
+        <div class="item-card-meta">${esc(s.target)} · ${when}${(()=>{const a=timeAgo(s.last_run);return a?` · Last: ${a}`:'';})()}</div>
       </div>
       <div class="item-card-actions">
         <button class="btn btn-ghost btn-sm" onclick="editSchedule('${s.id}')">Edit</button>
@@ -1519,6 +1527,7 @@ async function saveSchedule(){
   const sid=document.getElementById('sf-id').value;
   const target=document.getElementById('sf-target').value.trim();
   if(!target){ toast('Target is required.',false); return; }
+  if(!document.getElementById('sf-profile').value){ toast('Please select a profile for scan settings.',false); return; }
   const body={
     name:            document.getElementById('sf-name').value,
     target,

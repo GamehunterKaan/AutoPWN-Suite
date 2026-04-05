@@ -14,6 +14,7 @@ modules/web/__pycache__
 venv/*
 modules/web_ui_profiles.json
 modules/web_ui_settings.json
+modules/web_ui_schedules.json
 
 # Testing
 .pytest_cache/

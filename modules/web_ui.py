@@ -240,7 +240,7 @@ def _load_schedules() -> None:
                     lr = sched.get("last_run")
                     if lr:
                         try:
-                            _schedule_last_run[sid] = datetime.fromisoformat(lr)
+                            _schedule_last_run[sid] = datetime.fromisoformat(lr.replace("Z", "+00:00"))
                         except (ValueError, TypeError):
                             pass
             return
@@ -264,7 +264,7 @@ class ScanJob:
         self.target      = target
         self.config      = config
         self.status      = "running"
-        self.started_at  = datetime.utcnow().isoformat()
+        self.started_at  = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         self.finished_at = ""
         self.error       = ""
         self._lock       = threading.Lock()
@@ -283,13 +283,13 @@ class ScanJob:
     def mark_done(self) -> None:
         with self._lock:
             self.status      = "completed"
-            self.finished_at = datetime.utcnow().isoformat()
+            self.finished_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def mark_error(self, msg: str) -> None:
         with self._lock:
             self.status      = "error"
             self.error       = msg
-            self.finished_at = datetime.utcnow().isoformat()
+            self.finished_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def get_or_create_host(self, ip: str) -> dict:
         with self._lock:
@@ -478,7 +478,7 @@ def _send_webhook(job: ScanJob) -> None:
         "started_at": job.started_at,
         "finished_at":job.finished_at,
         "error":      job.error,
-        "timestamp":  datetime.utcnow().isoformat(),
+        "timestamp":  datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     try:
         _requests.post(cfg["url"], json=payload, timeout=10)
@@ -659,7 +659,7 @@ def _run_scan(job: ScanJob) -> None:
     mode           = config.get("mode", "normal")
     speed          = int(config.get("speed", 3))
     scan_type      = config.get("scan_type") or None
-    nmap_flags     = _build_nmap_flags(config)
+    nmap_flags     = config.get("nmap_flags", "")
     api_key        = config.get("api_key") or _get_setting("nist_api_key") or None
     host_timeout   = int(config.get("host_timeout", 240))
     scan_ports     = config.get("scan_ports", True)
@@ -961,6 +961,11 @@ def _scheduler_loop() -> None:
                 if not config["target"]:
                     continue
 
+                # Pre-merge structured profile fields into nmap_flags so
+                # _run_scan sees the complete flags string even if the
+                # config came from an older profile format.
+                config["nmap_flags"] = _build_nmap_flags(config)
+
                 # Validate target and nmap_flags before launching
                 err = _validate_target(config["target"])
                 if err:
@@ -995,7 +1000,7 @@ def _scheduler_loop() -> None:
                 # Update next_run in schedule dict
                 with _schedules_lock:
                     if schedule["id"] in _schedules:
-                        _schedules[schedule["id"]]["last_run"] = datetime.utcnow().isoformat()
+                        _schedules[schedule["id"]]["last_run"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
                 _save_schedules()
 
         except Exception:
@@ -1196,7 +1201,7 @@ def _build_app(static_dir: Path) -> "Flask":
         try:
             r = _requests.post(cfg["url"], json={
                 "event": "test", "message": "AutoPWN Suite webhook test",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             }, timeout=10)
             return jsonify({"ok": True, "status_code": r.status_code})
         except Exception as e:
@@ -1220,7 +1225,7 @@ def _build_app(static_dir: Path) -> "Flask":
             "id":         pid,
             "name":       name,
             "description":body.get("description", ""),
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "config": {
                 "mode":              body.get("mode", "normal"),
                 "speed":             int(body.get("speed", 3)),
@@ -1292,19 +1297,25 @@ def _build_app(static_dir: Path) -> "Flask":
         target = (body.get("target") or "").strip()
         if not target:
             return jsonify({"error": "'target' is required"}), 400
+        profile_id = body.get("profile_id") or None
+        if not profile_id:
+            return jsonify({"error": "A profile is required for scheduled scans"}), 400
+        with _profiles_lock:
+            if profile_id not in _profiles:
+                return jsonify({"error": "Profile not found"}), 400
         sid = str(uuid.uuid4())
         schedule = {
             "id":             sid,
             "name":           body.get("name", f"Schedule {sid[:8]}"),
             "target":         target,
-            "profile_id":     body.get("profile_id") or None,
+            "profile_id":     profile_id,
             "enabled":        bool(body.get("enabled", True)),
             "type":           body.get("type", "interval"),       # interval | daily | weekly
             "interval_value": int(body.get("interval_value", 24)),
             "interval_unit":  body.get("interval_unit", "hours"), # minutes | hours | days
             "time_utc":       body.get("time_utc", "00:00"),      # for daily/weekly
             "weekday":        int(body.get("weekday", 0)),        # 0=Mon, for weekly
-            "created_at":     datetime.utcnow().isoformat(),
+            "created_at":     datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "last_run":       "",
         }
         with _schedules_lock:
