@@ -13,27 +13,50 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 
 
 ## Features
-- Fully [automatic!](#usage)
-- Detect network IP range without any user input. 
-- Vulnerability detection based on version.
-- Web app vulnerability testing. (LFI, XSS, SQLI)
-- Web app dirbusting.
-- Get information about the vulnerability right from your terminal.
-- Automatically download exploit related with vulnerability.
-- Noise mode for creating a noise on the network.
-- Evasion mode for being sneaky.
-- Automatically decide which scan types to use based on privilege.
-- Easy to read output.
-- Specify your arguments using a config file.
-- Send scan results via webhook or email.
-- Works on Windows, MacOS and Linux.
-- Use as a [module!](#module-usage)
-- Use as a [Daemon](#install-daemon) to periodically scan the network.
+
+### CLI
+- Fully [automatic](#usage) scanning and exploitation
+- Detect network IP range without any user input
+- Vulnerability detection based on service versions
+- Web app vulnerability testing (LFI, XSS, SQLI)
+- Web app directory busting
+- Get information about vulnerabilities right from your terminal
+- Automatically download exploits related to discovered vulnerabilities
+- Noise mode for creating traffic on the network
+- Evasion mode for stealthy scanning
+- Automatically select scan types based on privilege level
+- Easy to read output with rich formatting
+- Specify arguments using a config file
+- Send scan results via webhook or email
+- Works on Windows, macOS and Linux
+- Use as a [module](#module-usage)
+- Use as a [daemon](#install-daemon) to periodically scan the network
+
+### Web UI
+
+AutoPWN Suite includes a built-in web dashboard for managing scans from your browser.
+
+![Web UI Dashboard](images/screenshots/dashboard.png)
+
+- **Multiple concurrent scans** - Launch and monitor several scans at the same time
+- **Live terminal output** - Watch nmap commands and results in real time via SSE
+- **Scan profiles** - Save and reuse scan configurations (technique, speed, timeout, ports, evasion, custom flags)
+- **Scheduled scans** - Set up recurring scans on a cron schedule with automatic profile loading
+- **Scan techniques** - Choose between TCP SYN, TCP Connect, UDP, Window, ACK, FIN, Xmas, Null, Maimon and SCTP scans
+- **Evasion mode** - Fragmented packets, spoofed source port and padded data length
+- **Email notifications** - Get notified on scan completion with inline result summaries
+- **Webhook notifications** - Post scan results to any webhook endpoint
+- **Persistent settings** - All settings, profiles and schedules are saved to disk
+- **Configurable via environment variables** - Set host, port and data directory without touching code
+
+![Scan Profiles](images/screenshots/profiles.png)
+
+![Scheduled Scans](images/screenshots/schedules.png)
 
 
-## How does it work?
+## How Does It Work?
 
-AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of softwares running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of "keywords" to search [NIST vulnerability database.](https://www.nist.gov/)
+AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of software running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of keywords to search the [NIST vulnerability database.](https://www.nist.gov/)
 
 
 ## Demo
@@ -70,12 +93,32 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-
 ### Docker
-You can use the [docker image.](https://github.com/GamehunterKaan/AutoPWN-Suite/pull/42)
+
+The fastest way to get the web UI running. Download the [docker-compose.yml](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/docker-compose.yml) file and run:
+
 ```bash
-docker pull gamehunterkaan/autopwn-suite
-docker run -it gamehunterkaan/autopwn-suite
+docker compose up -d
+```
+
+The web UI will be available at `http://localhost:8080`.
+
+#### Configuration
+
+Edit `docker-compose.yml` to change host, port or data directory:
+
+```yaml
+environment:
+  - AUTOPWN_DATA_DIR=/data        # Where settings/profiles/schedules are stored
+  - AUTOPWN_WEB_HOST=0.0.0.0     # Listen address
+  - AUTOPWN_WEB_PORT=8080        # Listen port
+```
+
+> **Note:** Host networking (`network_mode: host`) is required for nmap to discover and scan devices on your local network.
+
+You can also run the CLI via Docker:
+```bash
+docker run -it --net=host gamehunterkaan/autopwn-suite -t 192.168.1.0/24 -y
 ```
 
 ### Cloud
@@ -87,6 +130,8 @@ You can use Google Cloud Shell.
 ## Usage
 
 Running with root privileges (sudo) is always recommended.
+
+### CLI
 
 #### Automatic Mode
 
@@ -119,6 +164,46 @@ For more details about usage and flags use `-h` flag.
 autopwn-suite --daemon-install
 ```
 
+### Web UI
+
+Launch the web dashboard:
+
+```console
+autopwn-suite --web
+```
+
+With custom host and port:
+
+```console
+autopwn-suite --web --web-host 0.0.0.0 --web-port 3000
+```
+
+![Scan Running](images/screenshots/scan-running.png)
+
+### REST API
+
+The web UI exposes a full REST API:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/scans` | List all scan jobs |
+| `POST` | `/api/scan/start` | Start a new scan |
+| `POST` | `/api/scan/stop` | Stop a running scan |
+| `GET` | `/api/hosts` | All discovered hosts (merged) |
+| `GET` | `/api/log` | Log history |
+| `GET` | `/api/events` | SSE event stream |
+| `GET` | `/api/settings` | Get all settings |
+| `PUT` | `/api/settings` | Update settings |
+| `GET` | `/api/profiles` | List scan profiles |
+| `POST` | `/api/profiles` | Create a profile |
+| `PUT` | `/api/profiles/<id>` | Update a profile |
+| `DELETE` | `/api/profiles/<id>` | Delete a profile |
+| `GET` | `/api/schedules` | List scheduled scans |
+| `POST` | `/api/schedules` | Create a schedule |
+| `PUT` | `/api/schedules/<id>` | Update a schedule |
+| `DELETE` | `/api/schedules/<id>` | Delete a schedule |
+
+
 ## Module Usage
 
 ```python
@@ -130,12 +215,11 @@ scanner.save_to_file("autopwn.json")
 ```
 
 
-
 ## Development and Testing
 
 You can use poetry to install dependencies and run tests.
 
-#### Installing dependencies
+#### Installing Dependencies
 ```console
 poetry install
 ```
@@ -157,6 +241,12 @@ poetry run test -m integration
 # Run tests excluding slow tests
 poetry run test -m "not slow"
 ```
+
+#### Running with Docker (Development)
+```bash
+docker compose up --build
+```
+
 
 ## Contributing to AutoPWN Suite
 

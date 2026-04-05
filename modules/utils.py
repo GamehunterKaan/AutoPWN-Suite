@@ -15,7 +15,6 @@ from re import search
 from socket import AF_INET, SOCK_DGRAM, socket
 from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
-from platform import platform
 
 from requests import get
 from rich.text import Text
@@ -28,6 +27,8 @@ class ScanMode(Enum):
     Noise = 1
     Evade = 2
 
+
+DontAskForConfirmation = False
 
 class ScanType(Enum):
     Ping = 0
@@ -290,6 +291,31 @@ def cli():
         metavar="WEBHOOK",
     )
 
+    webuiargs = argparser.add_argument_group("Web UI", "Browser-based dashboard for controlling scans")
+    webuiargs.add_argument(
+        "--web",
+        help="Start the web UI dashboard (scans are launched from the browser).",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    webuiargs.add_argument(
+        "--web-host",
+        help="Web UI bind address. (Default: 0.0.0.0, env: AUTOPWN_WEB_HOST)",
+        default=os.environ.get("AUTOPWN_WEB_HOST", "0.0.0.0"),
+        type=str,
+        required=False,
+        metavar="HOST",
+    )
+    webuiargs.add_argument(
+        "--web-port",
+        help="Web UI port. (Default: 8080, env: AUTOPWN_WEB_PORT)",
+        default=int(os.environ.get("AUTOPWN_WEB_PORT", "8080")),
+        type=int,
+        required=False,
+        metavar="PORT",
+    )
+
     return argparser.parse_args()
 
 
@@ -528,9 +554,11 @@ def InitReport(args, log) -> tuple:
                 ReportMailPort = input(
                     "Enter the email port to send the report from : "
                 )
-                if not isinstance(ReportMailPort, int):
+                try:
+                    int(ReportMailPort)
                     break
-                log.logger("error", "Invalid port number!")
+                except ValueError:
+                    log.logger("error", "Invalid port number!")
 
         EmailObj = ReportMail(
             ReportEmail,
@@ -627,8 +655,16 @@ def GetHostsToScan(hosts, console) -> list[str]:
                     )
                 )
             else:
-                if int(host) < len(hosts) and int(host) >= 0:
-                    Targets = [hosts[int(host)]]
+                try:
+                    index = int(host)
+                except ValueError:
+                    console.print(
+                        "Please enter a valid host number or 'all' " + "or 'exit'",
+                        style="red",
+                    )
+                    continue
+                if 0 <= index < len(hosts):
+                    Targets = [hosts[index]]
                     break
                 else:
                     console.print(
@@ -716,6 +752,16 @@ def InitArgsConf(args, log) -> None:
         if config.has_option("REPORT", "webhook"):
             args.report_webhook = config.get("REPORT", "webhook")
 
+        if config.has_option("WEBUI", "enabled"):
+            args.web = config.get("WEBUI", "enabled").strip().lower() in ("true", "1", "yes")
+        if config.has_option("WEBUI", "host"):
+            args.web_host = config.get("WEBUI", "host").strip()
+        if config.has_option("WEBUI", "port"):
+            try:
+                args.web_port = int(config.get("WEBUI", "port"))
+            except ValueError:
+                pass
+
     except FileNotFoundError:
         log.logger("error", "Config file not found!")
         raise SystemExit
@@ -770,21 +816,18 @@ def install_nmap_linux(log) -> None:
             + "\t1 apt-get\n\t2 dnf\n\t3 yum\n\t4 pacman\n\t5 zypper."
             + "\nSelect option [0-5] >"
         )
-        if _distro_choice_ == "1":
-            distro_ = "ubuntu"
-            install_nmap_linux(log) # Recursive call with the new distro choice
-        elif _distro_choice_ == "2":
-            distro_ = "fedora"
-            install_nmap_linux(log)
-        elif _distro_choice_ == "3":
-            distro_ = "centos"
-            install_nmap_linux(log)
-        elif _distro_choice_ == "4":
-            distro_ = "arch"
-            install_nmap_linux(log)
-        elif _distro_choice_ == "5":
-            distro_ = "opensuse"
-            install_nmap_linux(log)
+        pkg_cmds = {
+            "1": ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"],
+            "2": ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"],
+            "3": ["/usr/bin/sudo", "yum", "install", "nmap", "-y"],
+            "4": ["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"],
+            "5": ["/usr/bin/sudo", "zypper", "install", "nmap", "--non-interactive"],
+        }
+        if _distro_choice_ in pkg_cmds:
+            try:
+                check_call(pkg_cmds[_distro_choice_], stderr=DEVNULL)
+            except CalledProcessError:
+                log.logger("error", "Couldn't install nmap (Linux)")
         else:
             log.logger("error", "Couldn't install nmap (Linux)")
 

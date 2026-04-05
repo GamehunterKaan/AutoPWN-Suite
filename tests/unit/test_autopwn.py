@@ -50,6 +50,7 @@ class TestMainExecution:
         mock_args.daemon_uninstall = False
         mock_args.create_config = False
         mock_args.no_color = True
+        mock_args.web = False
         mock_args.report = None # Explicitly set no report
         mock_args.scan_interval = None # Prevent TypeError on comparison
         mock_cli.return_value = mock_args
@@ -96,6 +97,7 @@ class TestMainExecution:
         mock_args.daemon_uninstall = False
         mock_args.create_config = False
         mock_args.no_color = True
+        mock_args.web = False
         mock_args.report = None
         mock_args.scan_interval = None # Prevent TypeError on comparison
         mock_cli.return_value = mock_args

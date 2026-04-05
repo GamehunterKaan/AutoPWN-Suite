@@ -49,6 +49,16 @@ def FindVars(vuln: dict) -> tuple:
             if severity == "UNKNOWN":
                 severity = metrics[score_type][0].get("cvssData", {}).get("baseSeverity", "UNKNOWN")
 
+        if severity == "UNKNOWN" and severity_score > 0.0:
+            if severity_score >= 9.0:
+                severity = "CRITICAL"
+            elif severity_score >= 7.0:
+                severity = "HIGH"
+            elif severity_score >= 4.0:
+                severity = "MEDIUM"
+            elif severity_score >= 0.1:
+                severity = "LOW"
+
     details_url = "https://nvd.nist.gov/vuln/detail/" + CVE_ID
 
     return CVE_ID, description, severity, severity_score, details_url, exploitability
@@ -68,24 +78,28 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     if keyword in cache:
         return cache[keyword]
 
+    data = None
     for tries in range(3):
         try:
             sleep(sleep_time)
             response = get(url, params=parameters, headers=headers)
             data = response.json()
         except Exception as e:
-            if response.status_code == 403:
-                log.logger(
-                    "error",
-                    "Requests are being rate limited by NIST API,"
-                    + " please get a NIST API key to prevent this.",
-                )
-                sleep(sleep_time)
+            try:
+                if response.status_code == 403:
+                    log.logger(
+                        "error",
+                        "Requests are being rate limited by NIST API,"
+                        + " please get a NIST API key to prevent this.",
+                    )
+            except NameError:
+                pass
+            sleep(sleep_time)
         else:
             break
 
     Vulnerabilities = []
-    if not data or not "vulnerabilities" in data:
+    if not data or "vulnerabilities" not in data:
         return []
 
     for vuln in data.get("vulnerabilities", []):

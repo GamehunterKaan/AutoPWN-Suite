@@ -1,4 +1,3 @@
-from threading import main_thread
 from requests import get
 from requests import packages
 
