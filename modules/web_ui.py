@@ -1211,8 +1211,9 @@ def _build_app(static_dir: Path) -> "Flask":
                 "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             }, timeout=10)
             return jsonify({"ok": True, "status_code": r.status_code})
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+        except Exception:
+            logging.exception("Failed to send test webhook")
+            return jsonify({"error": "Failed to send test webhook"}), 500
 
     # ── Profiles ──
 
