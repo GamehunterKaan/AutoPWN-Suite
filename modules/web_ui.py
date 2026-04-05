@@ -741,6 +741,18 @@ def _run_scan(job: ScanJob) -> None:
                 job.mark_host_done(host_ip)
                 continue
 
+            # Build and display the nmap command that will be executed
+            import re as _re
+            _has_st = bool(_re.search(r'-s[STAUWMNFX]', nmap_flags))
+            if is_root():
+                if scanmode == ScanMode.Evade:
+                    _nmap_args = " ".join(([] if _has_st else ["-sS"]) + ["-sV", "-O", "-Pn", "-T", "2", "-f", "-g", "53", "--data-length", "10", nmap_flags])
+                else:
+                    _nmap_args = " ".join(([] if _has_st else ["-sS"]) + ["-sV", "--host-timeout", str(host_timeout), "-Pn", "-O", "-T", str(speed), nmap_flags])
+            else:
+                _nmap_args = " ".join(["-sV", "--host-timeout", str(host_timeout), "-Pn", "-T", str(speed), nmap_flags])
+            _log(job, f"[>] nmap {host_ip} {_nmap_args}".rstrip())
+
             try:
                 nm = PortScan(host_ip, log, speed, host_timeout, scanmode, nmap_flags)
             except SystemExit as e:
