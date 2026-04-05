@@ -298,7 +298,7 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
           </select>
         </div>
         <div><div class="fl">Timeout (s)</div>
-          <input type="number" id="f-timeout" placeholder="240" oninput="updateNmapPreview()"/>
+          <input type="number" id="f-timeout" placeholder="240" min="1" oninput="updateNmapPreview()"/>
         </div>
       </div>
       <div class="row2">
@@ -467,7 +467,7 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
             <div><div class="fl">Scan Type</div>
               <select id="pf-scantype"><option value="">Auto</option><option value="arp">ARP</option><option value="ping">Ping</option></select>
             </div>
-            <div><div class="fl">Timeout (s)</div><input type="number" id="pf-timeout" value="240" oninput="updateProfilePreview()"/></div>
+            <div><div class="fl">Timeout (s)</div><input type="number" id="pf-timeout" value="240" min="1" oninput="updateProfilePreview()"/></div>
           </div>
           <div class="form-grid">
             <div><div class="fl">Scan Technique</div>
@@ -655,10 +655,9 @@ let lastHostsStr = '';
 function _buildNmapBase(target, mode, speed, to, technique) {
   // Pick the scan type flag: user-selected technique replaces default -sS
   const scanType = technique || '-sS';
-  if (mode === 'evade') {
-    return `nmap ${target} ${scanType} -sV -O -Pn -T 2 -f -g 53 --data-length 10`;
-  }
-  return `nmap ${target} ${scanType} -sV --host-timeout ${to} -Pn -O -T ${speed}`;
+  let cmd = `nmap ${target} ${scanType} -sV --host-timeout ${to} -Pn -O -T ${speed}`;
+  if (mode === 'evade') cmd += ' -f -g 53 --data-length 10';
+  return cmd;
 }
 function updateNmapPreview() {
   const target = document.getElementById('f-target').value.trim() || '<target>';

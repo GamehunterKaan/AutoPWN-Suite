@@ -86,41 +86,21 @@ def PortScan(
     default_scan = [] if _has_scan_type else ["-sS"]
     try:
         if is_root():
+            base_flags = default_scan + [
+                "-sV",
+                "--host-timeout",
+                str(host_timeout),
+                "-Pn",
+                "-O",
+                "-T",
+                str(scanspeed),
+            ]
             if mode == ScanMode.Evade:
-                nm.scan(
-                    hosts=target,
-                    arguments=" ".join(
-                        default_scan + [
-                            "-sV",
-                            "-O",
-                            "-Pn",
-                            "-T",
-                            "2",
-                            "-f",
-                            "-g",
-                            "53",
-                            "--data-length",
-                            "10",
-                            customflags,
-                        ]
-                    ),
-                )
-            else:
-                nm.scan(
-                    hosts=target,
-                    arguments=" ".join(
-                        default_scan + [
-                            "-sV",
-                            "--host-timeout",
-                            str(host_timeout),
-                            "-Pn",
-                            "-O",
-                            "-T",
-                            str(scanspeed),
-                            customflags,
-                        ]
-                    ),
-                )
+                base_flags += ["-f", "-g", "53", "--data-length", "10"]
+            nm.scan(
+                hosts=target,
+                arguments=" ".join(base_flags + [customflags]),
+            )
         else:
             nm.scan(
                 hosts=target,

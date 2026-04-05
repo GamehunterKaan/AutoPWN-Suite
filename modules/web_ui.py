@@ -524,11 +524,12 @@ def _send_email(job: ScanJob) -> None:
             cmd_base += " " + flags
 
     favicon_path = _STATIC_DIR / "favicon.ico"
+    _icon_data = None
     logo_html = ""
     if favicon_path.exists():
         try:
-            b64_icon = base64.b64encode(favicon_path.read_bytes()).decode("utf-8")
-            logo_html = f'<img src="data:image/x-icon;base64,{b64_icon}" style="width: 40px; height: 40px; display: block;" alt="Logo">'
+            _icon_data = favicon_path.read_bytes()
+            logo_html = '<img src="cid:autopwn_icon" style="width: 40px; height: 40px; display: block;" alt="Logo">'
         except Exception:
             pass
 
@@ -598,11 +599,17 @@ def _send_email(job: ScanJob) -> None:
     html += "</body></html>"
 
     try:
-        msg = MIMEMultipart("alternative")
+        from email.mime.image import MIMEImage
+        msg = MIMEMultipart("related")
         msg["From"]    = cfg.get("from_addr") or cfg.get("username", "")
         msg["To"]      = cfg["to_addr"]
         msg["Subject"] = subject
         msg.attach(MIMEText(html, "html"))
+        if _icon_data:
+            icon_part = MIMEImage(_icon_data, _subtype="x-icon")
+            icon_part.add_header("Content-ID", "<autopwn_icon>")
+            icon_part.add_header("Content-Disposition", "inline", filename="favicon.ico")
+            msg.attach(icon_part)
 
         with smtplib.SMTP(cfg["smtp_host"], int(cfg.get("smtp_port", 587))) as srv:
             srv.ehlo()
@@ -744,13 +751,11 @@ def _run_scan(job: ScanJob) -> None:
             # Build and display the nmap command that will be executed
             import re as _re
             _has_st = bool(_re.search(r'-s[STAUWMNFX]', nmap_flags))
-            if is_root():
-                if scanmode == ScanMode.Evade:
-                    _nmap_args = " ".join(([] if _has_st else ["-sS"]) + ["-sV", "-O", "-Pn", "-T", "2", "-f", "-g", "53", "--data-length", "10", nmap_flags])
-                else:
-                    _nmap_args = " ".join(([] if _has_st else ["-sS"]) + ["-sV", "--host-timeout", str(host_timeout), "-Pn", "-O", "-T", str(speed), nmap_flags])
-            else:
-                _nmap_args = " ".join(["-sV", "--host-timeout", str(host_timeout), "-Pn", "-T", str(speed), nmap_flags])
+            _base = ([] if _has_st else ["-sS"]) if is_root() else []
+            _base += ["-sV", "--host-timeout", str(host_timeout), "-Pn", "-O", "-T", str(speed)]
+            if scanmode == ScanMode.Evade and is_root():
+                _base += ["-f", "-g", "53", "--data-length", "10"]
+            _nmap_args = " ".join(_base + [nmap_flags])
             _log(job, f"[>] nmap {host_ip} {_nmap_args}".rstrip())
 
             try:
