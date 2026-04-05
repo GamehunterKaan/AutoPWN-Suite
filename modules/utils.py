@@ -28,6 +28,8 @@ class ScanMode(Enum):
     Evade = 2
 
 
+DontAskForConfirmation = False
+
 class ScanType(Enum):
     Ping = 0
     ARP = 1
