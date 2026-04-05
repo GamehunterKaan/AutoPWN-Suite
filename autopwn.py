@@ -29,6 +29,7 @@ from modules.utils import (
 )
 from modules.web.webvuln import webvuln
 from modules.daemon.daemon_installer import InstallDaemon, UninstallDaemon, CreateConfig
+from modules.web_ui import start_server, FLASK_AVAILABLE
 
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, console, console2, log
@@ -71,7 +72,7 @@ def StartScanning(
 
 def main() -> None:
     __author__ = "GamehunterKaan"
-    __version__ = "2.3.4"
+    __version__ = "2.4.0"
 
     args = cli()
     if args.no_color:
@@ -94,6 +95,22 @@ def main() -> None:
     elif args.create_config:
         CreateConfig(console)
         raise SystemExit
+
+    # ── Web UI mode: server only, scans are launched from the browser ───────────
+    if getattr(args, "web", False):
+        try:
+            if not FLASK_AVAILABLE:
+                console.print("[red]Flask not found. Install it with: pip install flask flask-cors[/red]")
+                raise SystemExit(1)
+            web_host = getattr(args, "web_host", "0.0.0.0")
+            web_port = getattr(args, "web_port", 8080)
+            print_banner(console)
+            # start_server blocks until Ctrl+C
+            start_server(host=web_host, port=web_port, version=__version__)
+        except KeyboardInterrupt:
+            raise SystemExit("\nWeb UI closed.")
+        raise SystemExit
+    # ─────────────────────────────────────────────────────────────────────────
 
     print_banner(console)
 

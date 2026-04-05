@@ -1,0 +1,18 @@
+services:
+  autopwn:
+    image: gamehunterkaan/autopwn-suite
+    container_name: autopwn-suite
+    environment:
+      - AUTOPWN_DATA_DIR=/data
+      - AUTOPWN_WEB_HOST=0.0.0.0
+      - AUTOPWN_WEB_PORT=8080
+    volumes:
+      - autopwn-data:/data
+    restart: unless-stopped
+    # Host networking is required for nmap to discover and scan
+    # devices on your local network. The web UI will be available
+    # at http://localhost:8080
+    network_mode: host
+
+volumes:
+  autopwn-data:

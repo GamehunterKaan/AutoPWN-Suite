@@ -27,8 +27,12 @@ def random_user_agent(log) -> str:
             log.logger("error", "User agent database not found.")
             raise SystemExit
         else:
-            floor_: int = randint(1, 450)
-            top_: int = randint(floor_ + 1, floor_ * 2)
+            if not user_agents:
+                log.logger("error", "User agent database is empty.")
+                raise SystemExit
+
+            floor_: int = randint(0, max(0, len(user_agents) - 2))
+            top_: int = randint(floor_ + 1, len(user_agents))
 
             return user_agents[floor_:top_]
 

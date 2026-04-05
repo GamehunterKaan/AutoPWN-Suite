@@ -46,9 +46,9 @@ def link_finder(target_url, log) -> set[str]:
             continue
         if not url.startswith("http"):
             if url.startswith("./"):
-                url = f"{target_url}{url.lstrip('./')}"
+                url = f"{target_url}{url[2:]}"
             elif url.startswith("/"):
-                url = f"{target_url}{url.lstrip('/')}"
+                url = f"{target_url}{url[1:]}"
             else:
                 url = f"{target_url}{url}"
 

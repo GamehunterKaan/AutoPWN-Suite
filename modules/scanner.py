@@ -79,45 +79,28 @@ def PortScan(
     log.logger("info", f"Scanning {target} for open ports ...")
 
     nm = PortScanner()
+    # If customflags already specifies a scan technique (-sS, -sU, -sT, etc.),
+    # don't add the default -sS so the techniques don't conflict.
+    import re as _re
+    _has_scan_type = bool(_re.search(r'-s[STAUWMNFX]', customflags))
+    default_scan = [] if _has_scan_type else ["-sS"]
     try:
         if is_root():
+            base_flags = default_scan + [
+                "-sV",
+                "--host-timeout",
+                str(host_timeout),
+                "-Pn",
+                "-O",
+                "-T",
+                str(scanspeed),
+            ]
             if mode == ScanMode.Evade:
-                nm.scan(
-                    hosts=target,
-                    arguments=" ".join(
-                        [
-                            "-sS",
-                            "-sV",
-                            "-O",
-                            "-Pn",
-                            "-T",
-                            "2",
-                            "-f",
-                            "-g",
-                            "53",
-                            "--data-length",
-                            "10",
-                            customflags,
-                        ]
-                    ),
-                )
-            else:
-                nm.scan(
-                    hosts=target,
-                    arguments=" ".join(
-                        [
-                            "-sS",
-                            "-sV",
-                            "--host-timeout",
-                            str(host_timeout),
-                            "-Pn",
-                            "-O",
-                            "-T",
-                            str(scanspeed),
-                            customflags,
-                        ]
-                    ),
-                )
+                base_flags += ["-f", "-g", "53", "--data-length", "10"]
+            nm.scan(
+                hosts=target,
+                arguments=" ".join(base_flags + [customflags]),
+            )
         else:
             nm.scan(
                 hosts=target,
@@ -169,17 +152,20 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) ->
                 P = Process(target=CreateNoise, args=(host,))
                 NoisyProcesses.append(P)
                 P.start()
-                if noisetimeout:
-                    sleep(noisetimeout)
-                else:
-                    while True:
-                        sleep(1)
+
+            if noisetimeout:
+                sleep(noisetimeout)
+            else:
+                while True:
+                    sleep(1)
 
         log.logger("info", "Noise scan complete!")
         for P in NoisyProcesses:
             P.terminate()
         raise SystemExit
     except KeyboardInterrupt:
+        for P in NoisyProcesses:
+            P.terminate()
         log.logger("error", "Noise scan interrupted!")
         raise SystemExit
 
