@@ -39,7 +39,7 @@ class TestSendMail:
         mock_server.sendmail.assert_called_once()
         mock_log.logger.assert_called_with("success", "Email report sent successfully.")
         # Verify it tried to open the temp report file
-        mock_file.assert_called_with("tmp_report.html", "rb")
+        mock_file.assert_called_with("tmp_report.html", "r", encoding="utf-8")
 
     @patch("modules.report.SMTP")
     @patch("modules.report.open", new_callable=mock_open, read_data="<h1>Test</h1>")

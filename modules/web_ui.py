@@ -43,6 +43,7 @@ API:
 
 from __future__ import annotations
 
+import html as _html
 import io
 import json
 import queue
@@ -127,8 +128,8 @@ def _load_settings() -> None:
 
 def _save_settings() -> None:
     with _settings_lock:
-        data = dict(_settings)
-    _SETTINGS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        data = json.dumps(_settings, indent=2)
+    _SETTINGS_FILE.write_text(data, encoding="utf-8")
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -174,8 +175,8 @@ def _load_profiles() -> None:
 
 def _save_profiles() -> None:
     with _profiles_lock:
-        data = dict(_profiles)
-    _PROFILES_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        data = json.dumps(_profiles, indent=2)
+    _PROFILES_FILE.write_text(data, encoding="utf-8")
 
 
 # ── Schedules persistence ─────────────────────────────────────────────────────
@@ -196,6 +197,15 @@ def _load_schedules() -> None:
             data = json.loads(_SCHEDULES_FILE.read_text(encoding="utf-8"))
             with _schedules_lock:
                 _schedules = data
+            # Restore last_run times so schedules don't fire immediately on restart
+            with _schedule_last_run_lock:
+                for sid, sched in data.items():
+                    lr = sched.get("last_run")
+                    if lr:
+                        try:
+                            _schedule_last_run[sid] = datetime.fromisoformat(lr)
+                        except (ValueError, TypeError):
+                            pass
             return
         except Exception:
             pass
@@ -205,8 +215,8 @@ def _load_schedules() -> None:
 
 def _save_schedules() -> None:
     with _schedules_lock:
-        data = dict(_schedules)
-    _SCHEDULES_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        data = json.dumps(_schedules, indent=2)
+    _SCHEDULES_FILE.write_text(data, encoding="utf-8")
 
 
 # ── Per-scan job ──────────────────────────────────────────────────────────────
@@ -267,14 +277,17 @@ class ScanJob:
     def to_dict(self) -> dict:
         with self._lock:
             hosts = list(self._hosts.values())
+            status = self.status
+            finished_at = self.finished_at
+            error = self.error
         return {
             "id":          self.id,
             "target":      self.target,
             "config":      self.config,
-            "status":      self.status,
+            "status":      status,
             "started_at":  self.started_at,
-            "finished_at": self.finished_at,
-            "error":       self.error,
+            "finished_at": finished_at,
+            "error":       error,
             "host_count":  len(hosts),
             "port_count":  sum(len(h["ports"]) for h in hosts),
             "vuln_count":  sum(len(h["vulns"])  for h in hosts),
@@ -327,11 +340,15 @@ _sse_subscribers: list = []
 _sse_subscribers_lock = threading.Lock()
 _log_history: list = []
 _log_history_lock = threading.Lock()
+_MAX_LOG_HISTORY = 5000
+_MAX_COMPLETED_SCANS = 100
 
 
 def _broadcast(event: dict) -> None:
     with _log_history_lock:
         _log_history.append(event)
+        if len(_log_history) > _MAX_LOG_HISTORY:
+            del _log_history[:len(_log_history) - _MAX_LOG_HISTORY]
     with _sse_subscribers_lock:
         for q in _sse_subscribers:
             q.put(event)
@@ -340,6 +357,13 @@ def _broadcast(event: dict) -> None:
 def _register_scan(job: ScanJob) -> None:
     with _scans_lock:
         _scans[job.id] = job
+        # Prune oldest completed/error scans if over limit
+        done = [(k, v) for k, v in _scans.items()
+                if v.status in ("completed", "error")]
+        if len(done) > _MAX_COMPLETED_SCANS:
+            done.sort(key=lambda x: x[1].finished_at)
+            for k, _ in done[:len(done) - _MAX_COMPLETED_SCANS]:
+                del _scans[k]
 
 
 def _get_scan(scan_id: str) -> Optional[ScanJob]:
@@ -397,11 +421,15 @@ def _send_webhook(job: ScanJob) -> None:
     hosts = job.hosts_list()
     vuln_count = sum(len(h["vulns"]) for h in hosts)
 
-    if job.status == "completed" and not cfg.get("on_complete"):
-        return
-    if job.status == "error" and not cfg.get("on_error"):
-        return
-    if vuln_count and not cfg.get("on_vuln_found"):
+    # Send if ANY matching condition is enabled
+    should_send = False
+    if job.status == "completed" and cfg.get("on_complete"):
+        should_send = True
+    if job.status == "error" and cfg.get("on_error"):
+        should_send = True
+    if vuln_count and cfg.get("on_vuln_found"):
+        should_send = True
+    if not should_send:
         return
 
     payload = {
@@ -435,15 +463,20 @@ def _send_email(job: ScanJob) -> None:
     hosts     = job.hosts_list()
     vuln_count = sum(len(h["vulns"]) for h in hosts)
 
-    if job.status == "completed" and not cfg.get("on_complete"):
-        return
-    if job.status == "error" and not cfg.get("on_error"):
-        return
-    if vuln_count and not cfg.get("on_vuln_found"):
+    # Send if ANY matching condition is enabled
+    should_send = False
+    if job.status == "completed" and cfg.get("on_complete"):
+        should_send = True
+    if job.status == "error" and cfg.get("on_error"):
+        should_send = True
+    if vuln_count and cfg.get("on_vuln_found"):
+        should_send = True
+    if not should_send:
         return
 
+    _e = _html.escape
     subject = f"[AutoPWN] Scan {job.status.upper()} — {job.target}"
-    
+
     c = job.config or {}
     cmd_base = f"nmap {job.target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10" if c.get("mode") == "evade" else f"nmap {job.target} -sS -sV --host-timeout {c.get('host_timeout', 240)} -Pn -O -T {c.get('speed', 3)}"
     flags = c.get("nmap_flags", "")
@@ -462,7 +495,7 @@ def _send_email(job: ScanJob) -> None:
         except Exception:
             pass
 
-    html = f"""<!DOCTYPE html><html><head><title>Scan Report - {job.target}</title>
+    html = f"""<!DOCTYPE html><html><head><title>Scan Report - {_e(job.target)}</title>
     <style>
       body{{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}}
       h1, h2, h3, h4{{color: #111; margin-bottom: 8px;}}
@@ -489,37 +522,37 @@ def _send_email(job: ScanJob) -> None:
       </tr>
     </table>
     <div class="meta">
-      <p><strong>Target:</strong> {job.target}</p>
-      <p><strong>Scan ID:</strong> {job.id}</p>
-      <p><strong>Status:</strong> {job.status}</p>
-      <p><strong>Command:</strong> {cmd_base.strip()}</p>
-      <p><strong>Started:</strong> {job.started_at}</p>
-      <p><strong>Finished:</strong> {job.finished_at or 'N/A'}</p>
+      <p><strong>Target:</strong> {_e(job.target)}</p>
+      <p><strong>Scan ID:</strong> {_e(job.id)}</p>
+      <p><strong>Status:</strong> {_e(job.status)}</p>
+      <p><strong>Command:</strong> {_e(cmd_base.strip())}</p>
+      <p><strong>Started:</strong> {_e(job.started_at)}</p>
+      <p><strong>Finished:</strong> {_e(job.finished_at or 'N/A')}</p>
     </div>
     """
     if job.error:
-        html += f'<div class="meta" style="border-color:#ff3f4f;"><p style="color:#ff3f4f;"><strong>Error:</strong> {job.error}</p></div>'
+        html += f'<div class="meta" style="border-color:#ff3f4f;"><p style="color:#ff3f4f;"><strong>Error:</strong> {_e(job.error)}</p></div>'
 
     html += f"<h2>Hosts Discovered ({len(hosts)})</h2>\n"
-    
+
     if hosts:
         for h in hosts:
-            html += f"<h3>Host: {h.get('ip', '')}</h3>\n"
-            html += f'<div class="meta"><p><strong>MAC:</strong> {h.get("mac") or "—"} &nbsp;|&nbsp; <strong>OS:</strong> {h.get("os") or "—"} &nbsp;|&nbsp; <strong>Vendor:</strong> {h.get("vendor") or "—"}</p></div>\n'
+            html += f"<h3>Host: {_e(h.get('ip', ''))}</h3>\n"
+            html += f'<div class="meta"><p><strong>MAC:</strong> {_e(h.get("mac") or "—")} &nbsp;|&nbsp; <strong>OS:</strong> {_e(h.get("os") or "—")} &nbsp;|&nbsp; <strong>Vendor:</strong> {_e(h.get("vendor") or "—")}</p></div>\n'
             if h.get("ports"):
                 html += "<h4>Open Ports</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>\n"
                 for p in h.get("ports", []):
-                    html += f"<tr><td>{p.get('port','')}</td><td>{p.get('service','')}</td><td>{p.get('product','')}</td><td>{p.get('version','')}</td></tr>\n"
+                    html += f"<tr><td>{_e(str(p.get('port','')))}</td><td>{_e(p.get('service',''))}</td><td>{_e(p.get('product',''))}</td><td>{_e(p.get('version',''))}</td></tr>\n"
                 html += "</table>\n"
             else:
                 html += "<p>No open ports found.</p>\n"
-            
+
             vulns = h.get("vulns", [])
             if vulns:
                 html += "<h4>Vulnerabilities</h4><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>\n"
                 for v in vulns:
-                    sev = v.get("severity", "unknown").lower()
-                    html += f"<tr><td>{v.get('cve','')}</td><td class=\"sev-{sev}\">{v.get('severity', '').upper()}</td><td>{v.get('cvss', '—')}</td><td>{v.get('description','')}</td></tr>\n"
+                    sev = _e(v.get("severity", "unknown").lower())
+                    html += f"<tr><td>{_e(v.get('cve',''))}</td><td class=\"sev-{sev}\">{_e(v.get('severity', '').upper())}</td><td>{_e(str(v.get('cvss', '—')))}</td><td>{_e(v.get('description',''))}</td></tr>\n"
                 html += "</table>\n"
             html += '<hr style="border:0; border-top:2px dashed #eee; margin:30px 0;">\n'
     else:
@@ -923,14 +956,24 @@ def _build_app(static_dir: Path) -> "Flask":
         if not target:
             return jsonify({"error": "'target' is required"}), 400
 
+        try:
+            speed = int(body.get("speed", 3))
+            host_timeout = int(body.get("host_timeout", 240))
+        except (ValueError, TypeError):
+            return jsonify({"error": "'speed' and 'host_timeout' must be integers"}), 400
+        if speed not in range(0, 6):
+            return jsonify({"error": "'speed' must be 0-5"}), 400
+        if host_timeout < 1:
+            return jsonify({"error": "'host_timeout' must be positive"}), 400
+
         config = {
             "target":         target,
             "mode":           body.get("mode", "normal"),
-            "speed":          int(body.get("speed", 3)),
+            "speed":          speed,
             "scan_type":      body.get("scan_type") or None,
             "nmap_flags":     body.get("nmap_flags", ""),
             "api_key":        body.get("api_key", ""),
-            "host_timeout":   int(body.get("host_timeout", 240)),
+            "host_timeout":   host_timeout,
             "scan_ports":     bool(body.get("scan_ports", True)),
             "scan_vulns":     bool(body.get("scan_vulns", True)),
             "skip_discovery": bool(body.get("skip_discovery", False)),

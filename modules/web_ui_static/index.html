@@ -1122,7 +1122,19 @@ async function poll(){
     if(scansStr === lastScansStr && hostsStr === lastHostsStr) return;
     lastScansStr = scansStr; lastHostsStr = hostsStr;
     scans={}; scansR.forEach(s=>{ scans[s.id]=s; });
-    hosts={}; hostsR.forEach(h=>{ hosts[h.ip]=h; });
+    hosts={}; hostsR.forEach(h=>{
+      if(hosts[h.ip]){
+        // Merge: keep longer ports/vulns lists, prefer completed status
+        const prev=hosts[h.ip];
+        if((h.ports||[]).length>=(prev.ports||[]).length) hosts[h.ip]=h;
+        // Merge vulns from both scans (dedupe by cve+port)
+        const seen=new Set((hosts[h.ip].vulns||[]).map(v=>v.cve+':'+v.port));
+        (h===hosts[h.ip]?prev:h).vulns?.forEach(v=>{
+          const key=v.cve+':'+v.port;
+          if(!seen.has(key)){ hosts[h.ip].vulns.push(v); seen.add(key); }
+        });
+      } else { hosts[h.ip]=h; }
+    });
     renderScans(); renderHosts(); renderVulnTable(); updateBadges();
     if(selIp && hosts[selIp]) renderDetail(hosts[selIp]);
   }catch(_){}
