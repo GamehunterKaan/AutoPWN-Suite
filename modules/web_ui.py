@@ -54,7 +54,7 @@ import threading
 import time
 import uuid
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -265,7 +265,7 @@ class ScanJob:
         self.target      = target
         self.config      = config
         self.status      = "running"
-        self.started_at  = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.started_at  = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.finished_at = ""
         self.error       = ""
         self._lock       = threading.Lock()
@@ -284,13 +284,13 @@ class ScanJob:
     def mark_done(self) -> None:
         with self._lock:
             self.status      = "completed"
-            self.finished_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            self.finished_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def mark_error(self, msg: str) -> None:
         with self._lock:
             self.status      = "error"
             self.error       = msg
-            self.finished_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            self.finished_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def get_or_create_host(self, ip: str) -> dict:
         with self._lock:
@@ -426,7 +426,7 @@ class WebLogger:
         level = self._LEVEL_MAP.get(exception_, "info")
         _broadcast({
             "scan_id": self.scan_id,
-            "ts":      datetime.utcnow().strftime("%H:%M:%S"),
+            "ts":      datetime.now(timezone.utc).strftime("%H:%M:%S"),
             "level":   level,
             "msg":     str(message),
         })
@@ -479,14 +479,14 @@ def _send_webhook(job: ScanJob) -> None:
         "started_at": job.started_at,
         "finished_at":job.finished_at,
         "error":      job.error,
-        "timestamp":  datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp":  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     try:
         _requests.post(cfg["url"], json=payload, timeout=10)
     except Exception as e:
         _broadcast({
             "scan_id": job.id, "level": "warning",
-            "ts": datetime.utcnow().strftime("%H:%M:%S"),
+            "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
             "msg": f"[*] Webhook delivery failed: {e}",
         })
 
@@ -621,7 +621,7 @@ def _send_email(job: ScanJob) -> None:
     except Exception as e:
         _broadcast({
             "scan_id": job.id, "level": "warning",
-            "ts": datetime.utcnow().strftime("%H:%M:%S"),
+            "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
             "msg": f"[*] Email notification failed: {e}",
         })
 
@@ -636,7 +636,7 @@ def _notify(job: ScanJob) -> None:
 def _log(job: ScanJob, msg: str, level: str = "info") -> None:
     _broadcast({
         "scan_id": job.id,
-        "ts":      datetime.utcnow().strftime("%H:%M:%S"),
+        "ts":      datetime.now(timezone.utc).strftime("%H:%M:%S"),
         "level":   level,
         "msg":     msg,
     })
@@ -900,7 +900,7 @@ def _should_fire(schedule: dict) -> bool:
     if not schedule.get("enabled", True):
         return False
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     sid = schedule["id"]
 
     with _schedule_last_run_lock:
@@ -977,7 +977,7 @@ def _scheduler_loop() -> None:
                 if err:
                     _broadcast({
                         "scan_id": "", "level": "error",
-                        "ts": datetime.utcnow().strftime("%H:%M:%S"),
+                        "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
                         "msg": f"[!] Scheduled scan skipped ({schedule.get('name', schedule['id'][:8])}): {err}",
                     })
                     continue
@@ -988,7 +988,7 @@ def _scheduler_loop() -> None:
                     if err:
                         _broadcast({
                             "scan_id": "", "level": "error",
-                            "ts": datetime.utcnow().strftime("%H:%M:%S"),
+                            "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
                             "msg": f"[!] Scheduled scan skipped ({schedule.get('name', schedule['id'][:8])}): {err}",
                         })
                         continue
@@ -996,17 +996,17 @@ def _scheduler_loop() -> None:
                 job = _launch_scan(config)
                 _broadcast({
                     "scan_id": job.id, "level": "info",
-                    "ts": datetime.utcnow().strftime("%H:%M:%S"),
+                    "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
                     "msg": f"[*] Scheduled scan fired: {schedule.get('name', schedule['id'][:8])} → {config['target']}",
                 })
 
                 with _schedule_last_run_lock:
-                    _schedule_last_run[schedule["id"]] = datetime.utcnow()
+                    _schedule_last_run[schedule["id"]] = datetime.now(timezone.utc)
 
                 # Update next_run in schedule dict
                 with _schedules_lock:
                     if schedule["id"] in _schedules:
-                        _schedules[schedule["id"]]["last_run"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                        _schedules[schedule["id"]]["last_run"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                 _save_schedules()
 
         except Exception:
@@ -1208,7 +1208,7 @@ def _build_app(static_dir: Path) -> "Flask":
         try:
             r = _requests.post(cfg["url"], json={
                 "event": "test", "message": "AutoPWN Suite webhook test",
-                "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             }, timeout=10)
             return jsonify({"ok": True, "status_code": r.status_code})
         except Exception:
@@ -1233,7 +1233,7 @@ def _build_app(static_dir: Path) -> "Flask":
             "id":         pid,
             "name":       name,
             "description":body.get("description", ""),
-            "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "config": {
                 "mode":              body.get("mode", "normal"),
                 "speed":             int(body.get("speed", 3)),
@@ -1323,7 +1323,7 @@ def _build_app(static_dir: Path) -> "Flask":
             "interval_unit":  body.get("interval_unit", "hours"), # minutes | hours | days
             "time_utc":       body.get("time_utc", "00:00"),      # for daily/weekly
             "weekday":        int(body.get("weekday", 0)),        # 0=Mon, for weekly
-            "created_at":     datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "created_at":     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "last_run":       "",
         }
         with _schedules_lock:
