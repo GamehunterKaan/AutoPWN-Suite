@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -476,25 +476,25 @@ class TestShouldFire:
         sched = {"id": "s1", "enabled": True, "type": "interval",
                  "interval_unit": "hours", "interval_value": 1}
         with wu._schedule_last_run_lock:
-            wu._schedule_last_run["s1"] = datetime.utcnow()
+            wu._schedule_last_run["s1"] = datetime.now(timezone.utc)
         assert not wu._should_fire(sched)
 
     def test_interval_elapsed(self, wu):
         sched = {"id": "s1", "enabled": True, "type": "interval",
                  "interval_unit": "minutes", "interval_value": 5}
         with wu._schedule_last_run_lock:
-            wu._schedule_last_run["s1"] = datetime.utcnow() - timedelta(minutes=10)
+            wu._schedule_last_run["s1"] = datetime.now(timezone.utc) - timedelta(minutes=10)
         assert wu._should_fire(sched)
 
     def test_daily_wrong_time(self, wu):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         wrong_hour = (now.hour + 2) % 24
         sched = {"id": "s1", "enabled": True, "type": "daily",
                  "time_utc": f"{wrong_hour:02d}:00"}
         assert not wu._should_fire(sched)
 
     def test_daily_already_ran_today(self, wu):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         sched = {"id": "s1", "enabled": True, "type": "daily",
                  "time_utc": f"{now.hour:02d}:{now.minute:02d}"}
         with wu._schedule_last_run_lock:
@@ -507,7 +507,7 @@ class TestShouldFire:
         assert not wu._should_fire(sched)
 
     def test_weekly_wrong_day(self, wu):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         wrong_day = (now.weekday() + 3) % 7
         sched = {"id": "s1", "enabled": True, "type": "weekly",
                  "weekday": wrong_day, "time_utc": f"{now.hour:02d}:{now.minute:02d}"}
