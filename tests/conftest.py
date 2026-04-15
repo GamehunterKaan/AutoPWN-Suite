@@ -62,17 +62,6 @@ def mock_scanner():
 
 
 @pytest.fixture
-def mock_requests(monkeypatch):
-    """Mock the requests library."""
-    mock = Mock()
-    mock.get = Mock()
-    mock.post = Mock()
-    mock.Session = Mock()
-    monkeypatch.setattr("requests", mock)
-    return mock
-
-
-@pytest.fixture
 def sample_vulnerability_data():
     """Provide sample vulnerability data for testing."""
     return {
@@ -91,29 +80,6 @@ def sample_vulnerability_data():
             "references": ["https://nvd.nist.gov/vuln/detail/CVE-2014-0160"]
         }
     }
-
-
-@pytest.fixture
-def sample_exploit_data():
-    """Provide sample exploit data for testing."""
-    return [
-        {
-            "id": "12345",
-            "name": "Apache Log4j2 RCE",
-            "cve": ["CVE-2021-44228"],
-            "platform": "java",
-            "verified": True,
-            "published": "2021-12-10"
-        },
-        {
-            "id": "67890",
-            "name": "OpenSSL Heartbleed Memory Disclosure",
-            "cve": ["CVE-2014-0160"],
-            "platform": "linux",
-            "verified": True,
-            "published": "2014-04-07"
-        }
-    ]
 
 
 @pytest.fixture
@@ -170,22 +136,6 @@ def mock_http_response():
     return _create_response
 
 
-@pytest.fixture
-def captured_output(monkeypatch):
-    """Capture stdout and stderr for testing console output."""
-    import io
-    stdout_capture = io.StringIO()
-    stderr_capture = io.StringIO()
-    
-    monkeypatch.setattr("sys.stdout", stdout_capture)
-    monkeypatch.setattr("sys.stderr", stderr_capture)
-    
-    yield {
-        "stdout": stdout_capture,
-        "stderr": stderr_capture
-    }
-
-
 @pytest.fixture(autouse=True)
 def reset_sys_modules():
     """Reset sys.modules to prevent module caching issues between tests."""
@@ -207,30 +157,6 @@ def mock_logger(monkeypatch):
     logger.debug = Mock()
     logger.critical = Mock()
     return logger
-
-
-@pytest.fixture
-def sample_html_content():
-    """Provide sample HTML content for web testing."""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Test Page</title>
-    </head>
-    <body>
-        <h1>Welcome to Test Page</h1>
-        <form action="/login" method="post">
-            <input type="text" name="username" />
-            <input type="password" name="password" />
-            <input type="submit" value="Login" />
-        </form>
-        <a href="/admin">Admin Panel</a>
-        <a href="/user/profile">User Profile</a>
-        <script>var apiKey = "test123";</script>
-    </body>
-    </html>
-    """
 
 
 @pytest.fixture
