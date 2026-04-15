@@ -40,7 +40,7 @@ distro = "*"
 urllib3 = "^2.6.3"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.4.0"
+pytest = "^9.0.3"
 pytest-cov = "^4.1.0"
 pytest-mock = "^3.11.0"
 flask = "^3.1.3"
