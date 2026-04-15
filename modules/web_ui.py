@@ -1016,7 +1016,7 @@ def _scheduler_loop() -> None:
 # ── Flask application ─────────────────────────────────────────────────────────
 
 def _build_app(static_dir: Path) -> "Flask":
-    app = Flask(__name__, static_folder=str(static_dir))
+    app = Flask(__name__, static_folder=str(static_dir), static_url_path="")
     CORS(app)
 
     # ── Static ──
