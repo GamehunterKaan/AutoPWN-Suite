@@ -88,12 +88,12 @@ function updateProfilePreview() {
   const previewEl = document.getElementById('pf-nmap-preview');
   if (previewEl) previewEl.value = previewCmd.trim();
 }
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function shortId(id){ return id ? id.slice(0,8) : ''; }
 function printScan(scanId) {
   const job = scans[scanId];
   if(!job) return;
-  let html = `<!DOCTYPE html><html><head><title>Scan Report - ${job.target}</title>
+  let html = `<!DOCTYPE html><html><head><title>Scan Report - ${esc(job.target)}</title>
   <style>
     body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}
     h1, h2, h3, h4{color: #111; margin-bottom: 8px;}
@@ -126,8 +126,8 @@ function printScan(scanId) {
   const scanHosts = Object.values(hosts).filter(h => h.scan_id === scanId);
   if(scanHosts.length) {
     scanHosts.forEach(h => {
-      html += `<h3>Host: ${h.ip}</h3>`;
-      html += `<div class="meta"><p><strong>MAC:</strong> ${h.mac || '—'} &nbsp;|&nbsp; <strong>OS:</strong> ${esc(h.os || '—')} &nbsp;|&nbsp; <strong>Vendor:</strong> ${esc(h.vendor || '—')}</p></div>`;
+      html += `<h3>Host: ${esc(h.ip)}</h3>`;
+      html += `<div class="meta"><p><strong>MAC:</strong> ${esc(h.mac || '—')} &nbsp;|&nbsp; <strong>OS:</strong> ${esc(h.os || '—')} &nbsp;|&nbsp; <strong>Vendor:</strong> ${esc(h.vendor || '—')}</p></div>`;
       if(h.ports && h.ports.length) {
         html += `<h4>Open Ports</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>`;
         h.ports.forEach(p => {
@@ -160,7 +160,7 @@ function printScan(scanId) {
 function printHost(ip) {
   const h = hosts[ip];
   if(!h) return;
-  let html = `<!DOCTYPE html><html><head><title>Host Report - ${h.ip}</title>
+  let html = `<!DOCTYPE html><html><head><title>Host Report - ${esc(h.ip)}</title>
   <style>
     body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}
     h1, h2, h3, h4{color: #111; margin-bottom: 8px;}
@@ -182,8 +182,8 @@ function printHost(ip) {
     <h1 style="margin: 0; color: #111;">AutoPWN Suite <span style="color: #777; font-weight: normal;">— Host Report</span></h1>
   </div>
   <div class="meta">
-    <p><strong>Host IP:</strong> ${h.ip}</p>
-    <p><strong>MAC Address:</strong> ${h.mac || '—'}</p>
+    <p><strong>Host IP:</strong> ${esc(h.ip)}</p>
+    <p><strong>MAC Address:</strong> ${esc(h.mac || '—')}</p>
     <p><strong>Operating System:</strong> ${esc(h.os || '—')}</p>
     <p><strong>Vendor:</strong> ${esc(h.vendor || '—')}</p>
   </div>
@@ -252,7 +252,7 @@ function printAllVulns() {
   </div>
   <div class="meta">
     <p><strong>Total Vulnerabilities:</strong> ${filtered.length}</p>
-    <p><strong>Filters Applied:</strong> Host: ${fHost||'All'} &nbsp;|&nbsp; Scan: ${fScan||'All'} &nbsp;|&nbsp; Severity: ${fSev?fSev.toUpperCase():'All'} &nbsp;|&nbsp; Search: ${fSearch||'None'}</p>
+    <p><strong>Filters Applied:</strong> Host: ${esc(fHost||'All')} &nbsp;|&nbsp; Scan: ${esc(fScan||'All')} &nbsp;|&nbsp; Severity: ${esc(fSev?fSev.toUpperCase():'All')} &nbsp;|&nbsp; Search: ${esc(fSearch||'None')}</p>
   </div>
   <table>
     <tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Host</th><th>Keyword</th><th>Description</th></tr>
@@ -308,8 +308,8 @@ function printAllHosts() {
   </div>
   `;
   list.forEach(h => {
-    html += `<h2>Host: ${h.ip}</h2>`;
-    html += `<div class="meta"><p><strong>MAC:</strong> ${h.mac || '—'} &nbsp;|&nbsp; <strong>OS:</strong> ${esc(h.os || '—')} &nbsp;|&nbsp; <strong>Vendor:</strong> ${esc(h.vendor || '—')}</p></div>`;
+    html += `<h2>Host: ${esc(h.ip)}</h2>`;
+    html += `<div class="meta"><p><strong>MAC:</strong> ${esc(h.mac || '—')} &nbsp;|&nbsp; <strong>OS:</strong> ${esc(h.os || '—')} &nbsp;|&nbsp; <strong>Vendor:</strong> ${esc(h.vendor || '—')}</p></div>`;
     if(h.ports && h.ports.length) {
       html += `<h4>Open Ports (${h.ports.length})</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>`;
       h.ports.forEach(p => { html += `<tr><td>${p.port}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`; });
@@ -544,9 +544,9 @@ function renderScans(){
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div class="sc-time">${esc(job.finished_at?`Finished ${timeAgo(job.finished_at)}`:`Started ${timeAgo(job.started_at)}`)}</div>
         <div style="display:flex;gap:8px">
-          ${running?`<button class="btn btn-danger btn-sm" onclick="stopScan('${job.id}')">Stop</button>`:''}
-          ${!running?`<button class="btn btn-ghost btn-sm" onclick="printScan('${job.id}')">Export PDF</button>`:''}
-          ${!running?`<a class="btn btn-ghost btn-sm" href="/api/scans/${job.id}/download" download style="text-decoration:none">Export JSON</a>`:''}
+          ${running?`<button class="btn btn-danger btn-sm" data-action="stop-scan" data-id="${esc(job.id)}">Stop</button>`:''}
+          ${!running?`<button class="btn btn-ghost btn-sm" data-action="print-scan" data-id="${esc(job.id)}">Export PDF</button>`:''}
+          ${!running?`<a class="btn btn-ghost btn-sm" href="/api/scans/${encodeURIComponent(job.id)}/download" download style="text-decoration:none">Export JSON</a>`:''}
         </div>
       </div>
       ${job.error?`<div style="font-family:var(--mono);font-size:11px;color:var(--red)">${esc(job.error)}</div>`:''}
@@ -615,11 +615,11 @@ function renderDetail(h){
     <div><div class="ds">Host Info</div>${kvs}</div><div><div class="ds">Open Ports (${ports.length})</div>${prs}</div><div><div class="ds">Vulnerabilities (${vulns.length})</div>${vrs}</div>
     ${h.scan_status === 'completed' ? `
     <div style="margin-top:14px; display:flex; gap:8px;">
-      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="downloadHostJson('${h.ip}')">
+      <button class="btn btn-ghost btn-sm" style="flex:1" data-action="download-host" data-id="${esc(h.ip)}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         JSON
       </button>
-      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="printHost('${h.ip}')">
+      <button class="btn btn-ghost btn-sm" style="flex:1" data-action="print-host" data-id="${esc(h.ip)}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         PDF
       </button>
@@ -638,14 +638,14 @@ function renderVulnTable(){
   all.forEach(v => { hostSet.add(v.hostBase); if(v.scan_id) scanSet.add(v.scan_id); });
 
   let hHtml = '<option value="">All Hosts</option>';
-  Array.from(hostSet).sort().forEach(ip => hHtml += `<option value="${ip}">${ip}</option>`);
+  Array.from(hostSet).sort().forEach(ip => hHtml += `<option value="${esc(ip)}">${esc(ip)}</option>`);
   if(document.getElementById('vuln-host').innerHTML !== hHtml) {
     document.getElementById('vuln-host').innerHTML = hHtml;
     document.getElementById('vuln-host').value = hostSet.has(hVal) ? hVal : '';
   }
 
   let sHtml = '<option value="">All Scans</option>';
-  Array.from(scanSet).forEach(id => sHtml += `<option value="${id}">#${shortId(id)} ${scans[id]?('— '+esc(scans[id].target)):''}</option>`);
+  Array.from(scanSet).forEach(id => sHtml += `<option value="${esc(id)}">#${esc(shortId(id))} ${scans[id]?('— '+esc(scans[id].target)):''}</option>`);
   if(document.getElementById('vuln-scanid').innerHTML !== sHtml) {
     document.getElementById('vuln-scanid').innerHTML = sHtml;
     document.getElementById('vuln-scanid').value = scanSet.has(sVal) ? sVal : '';
@@ -768,8 +768,8 @@ function renderProfiles(){
         <div class="item-card-meta">Mode: ${p.config?.mode||'normal'} · Speed: ${p.config?.speed||3} · ${p.description||'No description'}</div>
       </div>
       <div class="item-card-actions">
-        <button class="btn btn-ghost btn-sm" onclick="editProfile('${p.id}')">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteProfile('${p.id}')">Delete</button>
+        <button class="btn btn-ghost btn-sm" data-action="edit-profile" data-id="${esc(p.id)}">Edit</button>
+        <button class="btn btn-danger btn-sm" data-action="delete-profile" data-id="${esc(p.id)}">Delete</button>
       </div>
     </div>`).join('');
 }
@@ -851,8 +851,8 @@ function renderSchedules(){
         <div class="item-card-meta">${esc(s.target)} · ${when}${(()=>{const a=timeAgo(s.last_run);return a?` · Last: ${a}`:'';})()}</div>
       </div>
       <div class="item-card-actions">
-        <button class="btn btn-ghost btn-sm" onclick="editSchedule('${s.id}')">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteSchedule('${s.id}')">Delete</button>
+        <button class="btn btn-ghost btn-sm" data-action="edit-schedule" data-id="${esc(s.id)}">Edit</button>
+        <button class="btn btn-danger btn-sm" data-action="delete-schedule" data-id="${esc(s.id)}">Delete</button>
       </div>
     </div>`}).join('');
 }
@@ -934,6 +934,22 @@ async function loadSettingsIntoForm(){
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-action]');
+  if(!t) return;
+  const id = t.dataset.id;
+  switch(t.dataset.action){
+    case 'stop-scan':       stopScan(id); break;
+    case 'print-scan':      printScan(id); break;
+    case 'download-host':   downloadHostJson(id); break;
+    case 'print-host':      printHost(id); break;
+    case 'edit-profile':    editProfile(id); break;
+    case 'delete-profile':  deleteProfile(id); break;
+    case 'edit-schedule':   editSchedule(id); break;
+    case 'delete-schedule': deleteSchedule(id); break;
+  }
+});
+
 (async()=>{
   try{
     const [scansR,hostsR,logR,verR]=await Promise.all([
