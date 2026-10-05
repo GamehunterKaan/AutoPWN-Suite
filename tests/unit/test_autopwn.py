@@ -179,8 +179,8 @@ class TestStartScanning:
         from modules.utils import ScanMode
         
         # Mock return values to allow the chain to complete
-        mock_port_scan.return_value = "port_scan_results"
-        mock_analyse.return_value = ["port_array"]
+        mock_port_scan.return_value = MagicMock()
+        mock_analyse.return_value = [["192.168.1.1", 80, "http", "Apache", "2.4"]]
         mock_search_vulns.return_value = ["vulns_array"]
 
         StartScanning(args, "target", "scantype", ScanMode.Normal, "apiKey", MagicMock(), MagicMock(), MagicMock())

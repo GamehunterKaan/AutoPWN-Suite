@@ -6,7 +6,7 @@ except ImportError:
     from ctypes import windll
 import os
 from argparse import ArgumentParser
-from configparser import ConfigParser
+from configparser import ConfigParser, Error as ConfigError
 from datetime import datetime
 from enum import Enum
 from os import get_terminal_size
@@ -461,8 +461,9 @@ def InitArgsTarget(args, log):
         if args.host_file:
             # read targets from host file and insert all of them into an array
             try:
-                with open(args.host_file, "r", encoding="utf-8") as target_file:
-                    target = target_file.read().splitlines()
+                with open(args.host_file, "r", encoding="utf-8-sig") as target_file:
+                    target = [line.strip() for line in target_file.read().splitlines()
+                              if line.strip() and not line.lstrip().startswith("#")]
             except FileNotFoundError:
                 log.logger("error", "Host file not found!")
             except PermissionError:
@@ -470,9 +471,14 @@ def InitArgsTarget(args, log):
             except Exception:
                 log.logger("error", "Unknown error while trying to read host file!")
             else:
+                if not target:
+                    log.logger("error", "Host file contains no targets!")
+                    raise SystemExit(1)
                 return target
 
-            target = DetectIPRange()
+            # An explicitly requested host list must not silently turn into a
+            # scan of an automatically detected network after a read failure.
+            raise SystemExit(1)
         else:
             if DontAskForConfirmation:
                 try:
@@ -645,6 +651,7 @@ def GetHostsToScan(hosts, console) -> list[str]:
 
         if host in hosts:
             Targets = [host]
+            break
         else:
             if host == "all" or host == "":
                 break
@@ -680,87 +687,79 @@ def InitArgsConf(args, log) -> None:
         return
 
     try:
-        config = ConfigParser()
-        config.read(args.config)
+        # Secrets, paths, Nmap flags and webhook URLs are case sensitive and may
+        # contain literal percent signs. Only enum values should be normalized.
+        config = ConfigParser(interpolation=None)
+        if not config.read(args.config, encoding="utf-8-sig"):
+            raise FileNotFoundError(args.config)
 
-        if config.has_option("AUTOPWN", "scan_interval"):
-            args.scan_interval = int(config.get("AUTOPWN", "scan_interval").lower())
-
-        if config.has_option("AUTOPWN", "target"):
-            args.target = config.get("AUTOPWN", "target").lower()
-
-        if config.has_option("AUTOPWN", "hostfile"):
-            args.host_file = config.get("AUTOPWN", "hostfile").lower()
-
-        if config.has_option("AUTOPWN", "scantype"):
-            args.scan_type = config.get("AUTOPWN", "scantype").lower()
-
-        if config.has_option("AUTOPWN", "nmapflags"):
-            args.nmap_flags = config.get("AUTOPWN", "nmapflags").lower()
-
-        if config.has_option("AUTOPWN", "speed"):
-            try:
-                args.speed = int(config.get("AUTOPWN", "speed"))
-            except ValueError:
-                log.logger("error", "Invalid speed value in config file. (Default : 3)")
-
-        if config.has_option("AUTOPWN", "apikey"):
-            args.api = config.get("AUTOPWN", "apikey").lower()
-
-        if config.has_option("AUTOPWN", "auto"):
-            args.yes_please = True
-
-        if config.has_option("AUTOPWN", "skip_exploit_download"):
-            args.skip_exploit_download = config.get("AUTOPWN", "skip_exploit_download")
-
-        if config.has_option("AUTOPWN", "mode"):
-            args.mode = config.get("AUTOPWN", "mode").lower()
-
-        if config.has_option("AUTOPWN", "noisetimeout"):
-            args.noise_timeout = config.get("AUTOPWN", "noisetimeout").lower()
-
-        if config.has_option("REPORT", "output"):
-            args.output = config.get("REPORT", "output").lower()
-
-        if config.has_option("REPORT", "outputtype"):
-            args.output_type = config.get("REPORT", "outputtype").lower()
-        
-        if config.has_option("REPORT", "outputfolder"):
-            args.output_folder = config.get("REPORT", "outputfolder").lower()
-
-        if config.has_option("REPORT", "method"):
-            args.report = config.get("REPORT", "method").lower()
-
-        if config.has_option("REPORT", "email"):
-            args.report_email = config.get("REPORT", "email").lower()
-
-        if config.has_option("REPORT", "email_password"):
-            args.report_email_password = config.get("REPORT", "email_password").lower()
-
-        if config.has_option("REPORT", "email_to"):
-            args.report_email_to = config.get("REPORT", "email_to").lower()
-
-        if config.has_option("REPORT", "email_from"):
-            args.report_email_from = config.get("REPORT", "email_from").lower()
-
-        if config.has_option("REPORT", "email_server"):
-            args.report_email_server = config.get("REPORT", "email_server").lower()
-
-        if config.has_option("REPORT", "email_port"):
-            args.report_email_server_port = config.get("REPORT", "email_port").lower()
-
-        if config.has_option("REPORT", "webhook"):
-            args.report_webhook = config.get("REPORT", "webhook")
-
-        if config.has_option("WEBUI", "enabled"):
-            args.web = config.get("WEBUI", "enabled").strip().lower() in ("true", "1", "yes")
-        if config.has_option("WEBUI", "host"):
-            args.web_host = config.get("WEBUI", "host").strip()
-        if config.has_option("WEBUI", "port"):
-            try:
-                args.web_port = int(config.get("WEBUI", "port"))
-            except ValueError:
-                pass
+        options = {
+            "AUTOPWN": [
+                ("scan_interval", "scan_interval", "int"),
+                ("target", "target", "text"),
+                ("hostfile", "host_file", "text"),
+                ("scantype", "scan_type", "lower"),
+                ("scan_type", "scan_type", "lower"),
+                ("nmapflags", "nmap_flags", "text"),
+                ("speed", "speed", "int"),
+                ("apikey", "api", "text"),
+                ("auto", "yes_please", "bool"),
+                ("skip_exploit_download", "skip_exploit_download", "bool"),
+                ("skip_discovery", "skip_discovery", "bool"),
+                ("mode", "mode", "lower"),
+                ("noisetimeout", "noise_timeout", "int"),
+                ("host_timeout", "host_timeout", "int"),
+                ("output_folder", "output_folder", "text"),
+                ("output_type", "output_type", "lower"),
+            ],
+            "REPORT": [
+                ("output", "output", "text"),
+                ("outputtype", "output_type", "lower"),
+                ("outputfolder", "output_folder", "text"),
+                ("method", "report", "lower"),
+                ("email", "report_email", "text"),
+                ("email_password", "report_email_password", "text"),
+                ("email_to", "report_email_to", "text"),
+                ("email_from", "report_email_from", "text"),
+                ("email_server", "report_email_server", "text"),
+                ("email_port", "report_email_server_port", "int"),
+                ("webhook", "report_webhook", "text"),
+            ],
+            "WEBUI": [
+                ("enabled", "web", "bool"),
+                ("host", "web_host", "text"),
+                ("port", "web_port", "int"),
+            ],
+        }
+        for section, entries in options.items():
+            for option, attribute, kind in entries:
+                if not config.has_option(section, option):
+                    continue
+                if kind == "bool":
+                    value = config.getboolean(section, option)
+                elif kind == "int":
+                    value = config.getint(section, option)
+                else:
+                    value = config.get(section, option)
+                    if kind == "lower":
+                        value = value.strip().lower()
+                if attribute == "speed" and value not in range(6):
+                    raise ValueError("speed must be between 0 and 5")
+                if attribute in ("scan_interval", "host_timeout", "noise_timeout") and value < 0:
+                    raise ValueError(f"{option} must not be negative")
+                if attribute in ("report_email_server_port", "web_port") and not 1 <= value <= 65535:
+                    raise ValueError(f"{option} must be between 1 and 65535")
+                choices = {
+                    "scan_type": ("", "arp", "ping"),
+                    "mode": ("normal", "noise", "evade"),
+                    "output_type": ("html", "txt", "svg"),
+                    "report": ("", "none", "email", "webhook"),
+                }
+                if attribute in choices and value not in choices[attribute]:
+                    raise ValueError(f"Invalid value for {section}.{option}")
+                if attribute == "report" and value in ("", "none"):
+                    value = None
+                setattr(args, attribute, value)
 
     except FileNotFoundError:
         log.logger("error", "Config file not found!")
@@ -768,6 +767,9 @@ def InitArgsConf(args, log) -> None:
     except PermissionError:
         log.logger("error", "Permission denied while trying to read config file!")
         raise SystemExit
+    except (ConfigError, ValueError) as error:
+        log.logger("error", f"Invalid config file: {error}")
+        raise SystemExit(1)
 
 
 def install_nmap_linux(log) -> None:
@@ -950,7 +952,7 @@ def ParamPrint(
 
 def CheckConnection(log) -> bool:
     try:
-        get("https://google.com")
+        get("https://google.com", timeout=10)
     except Exception as e:
         log.logger("error", "Connection failed.")
         log.logger("error", e)

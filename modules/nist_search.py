@@ -30,7 +30,10 @@ class Vulnerability:
 
 def FindVars(vuln: dict) -> tuple:
     CVE_ID = vuln["cve"]["id"]
-    description = vuln["cve"]["descriptions"][0]["value"]
+    descriptions = vuln["cve"].get("descriptions", [])
+    description = next((entry["value"] for entry in descriptions
+                        if entry.get("lang") == "en" and entry.get("value")),
+                       next((entry["value"] for entry in descriptions if entry.get("value")), ""))
     exploitability = 0.0
     severity_score = 0.0
     severity = "UNKNOWN"
@@ -42,12 +45,20 @@ def FindVars(vuln: dict) -> tuple:
         metrics_types = list(metrics.keys())
         metrics_types.sort(reverse=True)
         for score_type in metrics_types:
-            if exploitability == 0.0:
-                exploitability = metrics[score_type][0].get("exploitabilityScore", 0.0)
-            if severity_score == 0.0:
-                severity_score = metrics[score_type][0].get("cvssData", {}).get("baseScore", 0.0)
-            if severity == "UNKNOWN":
-                severity = metrics[score_type][0].get("cvssData", {}).get("baseSeverity", "UNKNOWN")
+            entries = metrics[score_type]
+            if not entries:
+                continue
+            entries = sorted(entries, key=lambda entry: entry.get("type") != "Primary")
+            metric = next((entry for entry in entries
+                           if isinstance(entry.get("cvssData", {}).get("baseScore"), (int, float))), None)
+            if metric is None:
+                continue
+            # Take severity and score from the same preferred metric. A valid
+            # zero score must not be overwritten by an older CVSS version.
+            exploitability = metric.get("exploitabilityScore", 0.0)
+            severity_score = metric["cvssData"]["baseScore"]
+            severity = metric["cvssData"].get("baseSeverity", metric.get("baseSeverity", "UNKNOWN"))
+            break
 
         if severity == "UNKNOWN" and severity_score > 0.0:
             if severity_score >= 9.0:
@@ -64,7 +75,7 @@ def FindVars(vuln: dict) -> tuple:
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
 
-def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
+def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=False) -> list[Vulnerability]:
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     # https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=OpenSSH+8.8
     if apiKey:
@@ -75,54 +86,59 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
         headers = {}
     parameters = {"keywordSearch": keyword}
 
-    if keyword in cache:
+    if keyword in cache and not force_refresh:
         return cache[keyword]
 
-    data = None
-    for tries in range(3):
-        try:
-            sleep(sleep_time)
-            response = get(url, params=parameters, headers=headers)
-            data = response.json()
-        except Exception as e:
+    Vulnerabilities = []
+    start_index = 0
+    while True:
+        page = None
+        last_error = None
+        for tries in range(3):
+            response = None
             try:
-                if response.status_code == 403:
+                sleep(sleep_time)
+                response = get(url, params=dict(parameters), headers=headers, timeout=20)
+                response.raise_for_status()
+                data = response.json()
+                if not isinstance(data, dict) or not isinstance(data.get("vulnerabilities"), list):
+                    raise ValueError("NVD response has no vulnerabilities array")
+                total = data.get("totalResults", start_index + len(data["vulnerabilities"]))
+                if not isinstance(total, int) or total < 0:
+                    raise ValueError("NVD response has invalid totalResults")
+                if data.get("startIndex", start_index) != start_index:
+                    raise ValueError("NVD returned the wrong result page")
+                if not data["vulnerabilities"] and start_index < total:
+                    raise ValueError("NVD returned an empty page before all results")
+                parsed = []
+                for vuln in data["vulnerabilities"]:
+                    (CVE_ID, description, severity, severity_score,
+                     details_url, exploitability) = FindVars(vuln)
+                    parsed.append(Vulnerability(keyword, CVE_ID, description, severity,
+                                                severity_score, details_url, exploitability))
+                page = parsed
+            except Exception as error:
+                last_error = error
+                if response is not None and response.status_code in (403, 429):
                     log.logger(
                         "error",
                         "Requests are being rate limited by NIST API,"
                         + " please get a NIST API key to prevent this.",
                     )
-            except NameError:
-                pass
-            sleep(sleep_time)
-        else:
+                if tries < 2:
+                    sleep(sleep_time)
+            else:
+                break
+        if page is None:
+            if strict:
+                raise RuntimeError(f"NVD lookup failed for {keyword}") from last_error
+            log.logger("warning", f"NVD lookup failed for {keyword}; vulnerability coverage is incomplete.")
+            return []
+        Vulnerabilities.extend(page)
+        start_index += len(page)
+        if start_index >= total:
             break
-
-    Vulnerabilities = []
-    if not data or "vulnerabilities" not in data:
-        return []
-
-    for vuln in data.get("vulnerabilities", []):
-        title = keyword
-        (
-            CVE_ID,
-            description,
-            severity,
-            severity_score,
-            details_url,
-            exploitability,
-        ) = FindVars(vuln)
-        VulnObject = Vulnerability(
-            title=title,
-            CVEID=CVE_ID,
-            description=description,
-            severity=severity,
-            severity_score=severity_score,
-            details_url=details_url,
-            exploitability=exploitability,
-        )
-
-        Vulnerabilities.append(VulnObject)
+        parameters["startIndex"] = start_index
 
     cache[keyword] = Vulnerabilities
     return Vulnerabilities

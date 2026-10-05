@@ -102,7 +102,7 @@ class TestAutoScanner:
 
         mock_gen_keyword.assert_called_once_with("apache", "2.4")
         # Use ANY to match the fake_logger object created internally
-        mock_search_cve.assert_called_once_with("apache 2.4", ANY, "test-key")
+        mock_search_cve.assert_called_once_with("apache 2.4", ANY, "test-key", strict=True)
         assert "CVE-2023-1234" in results
         assert results["CVE-2023-1234"]["description"] == "Test vulnerability"
 

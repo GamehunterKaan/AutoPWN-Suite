@@ -58,7 +58,7 @@ def GenerateKeywords(HostArray: list) -> list:
 def SearchKeyword(keyword: str, log, apiKey=None) -> list:
 
     try:
-        ApiResponseCVE = searchCVE(keyword, log, apiKey)
+        ApiResponseCVE = searchCVE(keyword, log, apiKey, strict=True)
     except KeyboardInterrupt:
         log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
@@ -70,6 +70,8 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
 
 
 def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
+    if not HostArray:
+        return []
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
@@ -113,7 +115,7 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
                 CVEs.append(CVE.CVEID)
                 console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
 
-                wrapped_description = wrap(CVE.description, term_width - 50)
+                wrapped_description = wrap(CVE.description, max(1, term_width - 50))
                 console.print(f"│\t\t[cyan]Description: [/cyan]")
                 for line in wrapped_description:
                     console.print(f"│\t\t\t{line}")

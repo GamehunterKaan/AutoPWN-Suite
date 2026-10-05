@@ -119,7 +119,7 @@ class TestSearchKeyword:
         result = SearchKeyword("test keyword", mock_log)
 
         assert result == [mock_vulnerability]
-        mock_search_cve.assert_called_once_with("test keyword", mock_log, None)
+        mock_search_cve.assert_called_once_with("test keyword", mock_log, None, strict=True)
 
     @patch("modules.searchvuln.searchCVE", side_effect=KeyboardInterrupt)
     def test_search_keyword_keyboard_interrupt(self, mock_search_cve):

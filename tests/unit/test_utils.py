@@ -209,11 +209,10 @@ class TestInitArgsTarget:
         args = argparse.Namespace(target=None, host_file="nonexistent.txt")
         mock_log = MagicMock()
 
-        # This will log an error and then fall back to auto-detection,
-        # which we can ignore for this unit test's purpose.
-        # We just want to check the log call.
-        with patch("modules.utils.DetectIPRange", return_value="192.168.1.1/24"):
-            InitArgsTarget(args, mock_log)
+        with patch("modules.utils.DetectIPRange") as detect:
+            with pytest.raises(SystemExit):
+                InitArgsTarget(args, mock_log)
+            detect.assert_not_called()
 
         mock_log.logger.assert_called_with("error", "Host file not found!")
 
@@ -223,8 +222,10 @@ class TestInitArgsTarget:
         args = argparse.Namespace(target=None, host_file="unreadable.txt")
         mock_log = MagicMock()
 
-        with patch("modules.utils.DetectIPRange", return_value="192.168.1.1/24"):
-            InitArgsTarget(args, mock_log)
+        with patch("modules.utils.DetectIPRange") as detect:
+            with pytest.raises(SystemExit):
+                InitArgsTarget(args, mock_log)
+            detect.assert_not_called()
 
         mock_log.logger.assert_called_with("error", "Permission denied while trying to read host file!")
 
@@ -234,8 +235,10 @@ class TestInitArgsTarget:
         args = argparse.Namespace(target=None, host_file="badfile.txt")
         mock_log = MagicMock()
 
-        with patch("modules.utils.DetectIPRange", return_value="192.168.1.1/24"):
-            InitArgsTarget(args, mock_log)
+        with patch("modules.utils.DetectIPRange") as detect:
+            with pytest.raises(SystemExit):
+                InitArgsTarget(args, mock_log)
+            detect.assert_not_called()
 
         mock_log.logger.assert_called_with("error", "Unknown error while trying to read host file!")
 

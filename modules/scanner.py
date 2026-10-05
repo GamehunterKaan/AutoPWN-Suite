@@ -144,14 +144,18 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) ->
         if is_root():
             Uphosts = TestArp(target)
 
+    if not Uphosts:
+        log.logger("warning", "No hosts found for noise scan.")
+        raise SystemExit(1)
+
+    NoisyProcesses = []
     try:
         with console.status("Creating noise ...", spinner="line"):
-            NoisyProcesses = []
             for host in Uphosts:
                 log.logger("info", f"Started creating noise on {host}...")
                 P = Process(target=CreateNoise, args=(host,))
-                NoisyProcesses.append(P)
                 P.start()
+                NoisyProcesses.append(P)
 
             if noisetimeout:
                 sleep(noisetimeout)
@@ -160,14 +164,16 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) ->
                     sleep(1)
 
         log.logger("info", "Noise scan complete!")
-        for P in NoisyProcesses:
-            P.terminate()
         raise SystemExit
     except KeyboardInterrupt:
-        for P in NoisyProcesses:
-            P.terminate()
         log.logger("error", "Noise scan interrupted!")
         raise SystemExit
+    finally:
+        for P in NoisyProcesses:
+            if P.is_alive():
+                P.terminate()
+        for P in NoisyProcesses:
+            P.join(timeout=2)
 
 
 def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal) -> list:
@@ -195,8 +201,12 @@ def InitHostInfo(target_key) -> TargetInfo:
         mac = "Unknown"
 
     try:
-        vendor = target_key["vendor"][0]
-    except (KeyError, IndexError):
+        vendors = target_key["vendor"]
+        if isinstance(vendors, dict):
+            vendor = vendors.get(mac) or next(iter(vendors.values()), "Unknown")
+        else:
+            vendor = vendors[0]
+    except (KeyError, IndexError, TypeError):
         vendor = "Unknown"
 
     try:
@@ -224,24 +234,19 @@ def InitHostInfo(target_key) -> TargetInfo:
 
 
 def InitPortInfo(port) -> tuple[str, str, str, str]:
-    state = "Unknown"
-    service = "Unknown"
-    product = "Unknown"
-    version = "Unknown"
+    return tuple(port.get(key) or "Unknown" for key in ("state", "name", "product", "version"))
 
-    if not len(port["state"]) == 0:
-        state = port["state"]
 
-    if not len(port["name"]) == 0:
-        service = port["name"]
-
-    if not len(port["product"]) == 0:
-        product = port["product"]
-
-    if not len(port["version"]) == 0:
-        version = port["version"]
-
-    return state, service, product, version
+def ResolveScanHosts(nm, target=None) -> list[str]:
+    """Resolve a requested hostname/range to the host keys Nmap returned."""
+    if target is not None:
+        try:
+            nm[target]
+        except KeyError:
+            pass
+        else:
+            return [target]
+    return list(nm.all_hosts())
 
 
 def AnalyseScanResults(nm, log, console, target=None) -> list:
@@ -249,24 +254,41 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     Analyse and print scan results.
     """
     HostArray = []
-    if target is None:
-        target = nm.all_hosts()[0]
-
-    try:
-        nm[target]
-    except KeyError:
-        log.logger("warning", f"Target {target} seems to be offline.")
+    hosts = ResolveScanHosts(nm, target)
+    if not hosts:
+        log.logger("warning", f"Target {target or 'scan'} seems to be offline.")
         return []
+    if target is None or hosts != [target]:
+        for host in hosts:
+            HostArray.extend(AnalyseScanResults(nm, log, console, host))
+        return HostArray
 
     CurrentTargetInfo = InitHostInfo(nm[target])
 
     if is_root():
-        if nm[target]["status"]["reason"] in ["localhost-response", "user-set"]:
+        try:
+            reason = nm[target]["status"]["reason"]
+        except (KeyError, TypeError):
+            reason = ""
+        if reason in ["localhost-response", "user-set"]:
             log.logger("info", f"Target {target} seems to be us.")
-    elif GetIpAdress() == target:
-        log.logger("info", f"Target {target} seems to be us.")
+    else:
+        try:
+            if GetIpAdress() == target:
+                log.logger("info", f"Target {target} seems to be us.")
+        except OSError:
+            pass
 
-    if len(nm[target].all_tcp()) == 0:
+    try:
+        tcp_ports = nm[target]["tcp"]
+    except KeyError:
+        tcp_ports = {}
+    try:
+        udp_ports = nm[target]["udp"]
+    except KeyError:
+        udp_ports = {}
+
+    if len(tcp_ports) == 0 and len(udp_ports) == 0:
         log.logger("warning", f"Target {target} seems to have no open ports.")
         return HostArray
 
@@ -283,12 +305,18 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     table.add_column("Product", style="red")
     table.add_column("Version", style="purple")
 
-    for port in nm[target]["tcp"].keys():
-        state, service, product, version = InitPortInfo(nm[target]["tcp"][port])
+    for port, data in tcp_ports.items():
+        state, service, product, version = InitPortInfo(data)
         table.add_row(str(port), state, service, product, version)
 
         if state == "open":
             HostArray.insert(len(HostArray), [target, port, service, product, version])
+
+    for port, data in udp_ports.items():
+        state, service, product, version = InitPortInfo(data)
+        table.add_row(f"{port}/udp", state, service, product, version)
+        if state == "open":
+            HostArray.append([target, port, service, product, version, "udp"])
 
     console.print(table, justify="center")
 

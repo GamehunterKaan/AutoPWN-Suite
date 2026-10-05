@@ -7,7 +7,7 @@ from modules.banners import print_banner
 from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
 from modules.report import InitializeReport
-from modules.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan
+from modules.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, ResolveScanHosts
 from modules.searchvuln import SearchSploits
 from modules.utils import (
     GetHostsToScan,
@@ -44,24 +44,31 @@ def StartScanning(
         hosts = DiscoverHosts(targetarg, console, scantype, scanmode)
         Targets = GetHostsToScan(hosts, console)
     else:
-        Targets = [targetarg]
+        Targets = targetarg if isinstance(targetarg, list) else [targetarg]
 
     ScanPorts, ScanVulns, DownloadExploits = UserConfirmation(args)
     ScanWeb = WebScan()
 
     for host in Targets:
+        web_targets = [host]
         if ScanPorts:
             PortScanResults = PortScan(
                 host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags
             )
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
-            if ScanVulns and len(PortArray) > 0:
-                VulnsArray = SearchSploits(PortArray, log, console, console2, apiKey)
-                if DownloadExploits and len(VulnsArray) > 0:
-                    GetExploitsFromArray(VulnsArray, log, console, console2, host)
+            web_targets = ResolveScanHosts(PortScanResults, host)
+            if ScanVulns:
+                for resolved_host in web_targets:
+                    host_ports = [row for row in PortArray if row[0] == resolved_host]
+                    if not host_ports:
+                        continue
+                    VulnsArray = SearchSploits(host_ports, log, console, console2, apiKey)
+                    if DownloadExploits and VulnsArray:
+                        GetExploitsFromArray(VulnsArray, log, console, console2, resolved_host)
 
         if ScanWeb:
-            webvuln(host, log, console)
+            for resolved_host in web_targets:
+                webvuln(resolved_host, log, console)
 
     console.print(
         "{time} - Scan completed.".format(
@@ -96,6 +103,9 @@ def main() -> None:
         CreateConfig(console)
         raise SystemExit
 
+    if args.config:
+        InitArgsConf(args, log)
+
     # ── Web UI mode: server only, scans are launched from the browser ───────────
     if getattr(args, "web", False):
         try:
@@ -115,9 +125,6 @@ def main() -> None:
     print_banner(console)
 
     CheckConnection(log)
-
-    if args.config:
-        InitArgsConf(args, log)
 
     InitAutomation(args)
     targetarg = InitArgsTarget(args, log)

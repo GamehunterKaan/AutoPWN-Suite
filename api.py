@@ -5,6 +5,7 @@ from nmap import PortScanner
 
 from modules.nist_search import searchCVE
 from modules.searchvuln import GenerateKeyword
+from modules.scanner import InitHostInfo, ResolveScanHosts
 from modules.utils import fake_logger, is_root
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
@@ -18,39 +19,9 @@ class AutoScanner:
         return str(self.scan_results)
 
     def InitHostInfo(self, target_key: JSON) -> JSON:
-        os_info = {}
-        try:
-            mac = target_key["addresses"]["mac"]
-        except (KeyError, IndexError):
-            mac = "Unknown"
-
-        try:
-            vendor = target_key["vendor"][0]
-        except (KeyError, IndexError):
-            vendor = "Unknown"
-
-        try:
-            os_name = target_key["osmatch"][0]["name"]
-        except (KeyError, IndexError):
-            os_name = "Unknown"
-
-        try:
-            os_accuracy = target_key["osmatch"][0]["accuracy"]
-        except (KeyError, IndexError):
-            os_accuracy = "Unknown"
-
-        try:
-            os_type = target_key["osmatch"][0]["osclass"][0]["type"]
-        except (KeyError, IndexError):
-            os_type = "Unknown"
-
-        os_info["mac"] = mac
-        os_info["vendor"] = vendor
-        os_info["os_name"] = os_name
-        os_info["os_accuracy"] = os_accuracy
-        os_info["os_type"] = os_type
-
-        return os_info
+        info = InitHostInfo(target_key)
+        return {"mac": info.mac, "vendor": info.vendor, "os_name": info.os,
+                "os_accuracy": info.os_accuracy, "os_type": info.os_type}
 
     def ParseVulnInfo(self, vuln):
         vuln_info = {}
@@ -76,10 +47,10 @@ class AutoScanner:
             scan_args.append("--host-timeout")
             scan_args.append(str(host_timeout))
 
-        if scan_speed and scan_speed in range(0, 6):
+        if scan_speed is not None and scan_speed in range(0, 6):
             scan_args.append("-T")
             scan_args.append(str(scan_speed))
-        elif scan_speed and not scan_speed in range(0, 6):
+        elif scan_speed is not None:
             raise Exception("Scanspeed must be in range of 0, 5.")
 
         if is_root() and os_scan:
@@ -100,8 +71,8 @@ class AutoScanner:
     def SearchVuln(
         self, port_key: JSON, apiKey: str = None, debug: bool = False
     ) -> JSON:
-        product = port_key["product"]
-        version = port_key["version"]
+        product = port_key.get("product", "")
+        version = port_key.get("version", "")
         log = fake_logger()
 
         keyword = GenerateKeyword(product, version)
@@ -111,7 +82,7 @@ class AutoScanner:
         if debug:
             print(f"Searching for keyword {keyword} ...")
 
-        Vulnerablities = searchCVE(keyword, log, apiKey)
+        Vulnerablities = searchCVE(keyword, log, apiKey, strict=True)
         if len(Vulnerablities) == 0:
             return
 
@@ -135,7 +106,7 @@ class AutoScanner:
         if type(target) == str:
             target = [target]
 
-        log = fake_logger()
+        self.scan_results = {}
         nm = PortScanner()
         scan_arguments = self.CreateScanArgs(
             host_timeout, scan_speed, os_scan, nmap_args
@@ -145,29 +116,32 @@ class AutoScanner:
                 print(f"Scanning {host} ...")
 
             nm.scan(hosts=host, arguments=scan_arguments)
-            try:
-                port_scan = nm[host]["tcp"]
-            except KeyError:
-                pass
-            else:
-                self.scan_results[host] = {}
-                self.scan_results[host]["ports"] = port_scan
+            for resolved_host in ResolveScanHosts(nm, host):
+                host_data = nm[resolved_host]
+                port_scan = host_data.get("tcp", {})
+                udp_scan = host_data.get("udp", {})
+                result = {"ports": port_scan}
+                # Keep the existing TCP ports mapping; UDP uses a separate key so
+                # equal TCP/UDP port numbers cannot overwrite one another.
+                if "udp" in host_data:
+                    result["udp_ports"] = udp_scan
+                self.scan_results[resolved_host] = result
 
-            if os_scan and is_root():
-                os_info = self.InitHostInfo(nm[host])
-                self.scan_results[host]["os"] = os_info
+                if os_scan:
+                    result["os"] = self.InitHostInfo(host_data)
+                if not scan_vulns:
+                    continue
 
-            if not scan_vulns:
-                continue
-
-            vulns = {}
-            for port in nm[host]["tcp"]:
-                product = nm[host]["tcp"][port]["product"]
-                Vulnerablities = self.SearchVuln(nm[host]["tcp"][port], apiKey, debug)
-                if Vulnerablities:
-                    vulns[product] = Vulnerablities
-
-            self.scan_results[host]["vulns"] = vulns
+                vulns = {}
+                for ports in (port_scan, udp_scan):
+                    for port_data in ports.values():
+                        if port_data.get("state") != "open":
+                            continue
+                        product = port_data.get("product", "")
+                        vulnerabilities = self.SearchVuln(port_data, apiKey, debug)
+                        if vulnerabilities:
+                            vulns.setdefault(product, {}).update(vulnerabilities)
+                result["vulns"] = vulns
 
         return self.scan_results
 
