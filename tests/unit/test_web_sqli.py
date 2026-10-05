@@ -33,7 +33,7 @@ class TestSQLIScanner:
 
         # Verify that a vulnerability was printed to the console
         mock_console.print.assert_called()
-        assert "[white]SQLI :[/white] http://example.com/page?id='1" in mock_console.print.call_args[0][0]
+        assert "[white]SQLI :[/white] http://example.com/page?id=%271&user=test" in mock_console.print.call_args[0][0]
 
     @patch("modules.web.sqli.get")
     def test_sqli_no_vulnerability(self, mock_get, mock_log_console):

@@ -65,3 +65,20 @@ class TestLFIScanner:
         # Verify that the error was logged
         mock_log.logger.assert_called()
         assert "Connection error raised on" in mock_log.logger.call_args[0][1]
+
+    @patch("modules.web.lfi.get")
+    def test_second_payload_is_tested_without_losing_other_parameters(self, mock_get, mock_log_console):
+        log, console = mock_log_console
+        scanner = LFIScanner(log, console)
+        scanner.lfi_tests = ["/first", "/second"]
+        mock_get.side_effect = [MagicMock(text="safe"), MagicMock(text="root:x:0:0:root:/root"),
+                               MagicMock(text="safe"), MagicMock(text="safe")]
+        scanner.test_lfi("http://example.com/page?file=test&language=en")
+        assert "/second" in mock_get.call_args_list[1].args[0]
+        assert "language=en" in mock_get.call_args_list[1].args[0]
+        console.print.assert_called()
+
+    @patch("modules.web.lfi.get")
+    def test_url_without_query_is_ignored(self, mock_get, mock_log_console):
+        LFIScanner(*mock_log_console).test_lfi("http://example.com/page")
+        mock_get.assert_not_called()

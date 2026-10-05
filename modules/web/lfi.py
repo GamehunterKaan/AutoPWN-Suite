@@ -1,5 +1,7 @@
 from requests import get
 from requests import packages
+from requests.exceptions import ConnectionError, RequestException
+from modules.web.query import probe_url
 
 
 packages.urllib3.disable_warnings()
@@ -64,24 +66,22 @@ class LFIScanner:
         ]
 
     def exploit_lfi(self, base_url, url_params) -> None:
-        for param in url_params:
+        for index, param in enumerate(url_params):
+            param_no_value = param.split("=", 1)[0]
+            main_url = f"{base_url}?{param_no_value}"
+            if main_url in self.tested_urls:
+                continue
+            self.tested_urls.append(main_url)
             for test in self.lfi_tests:
-                param_no_value = param.split("=")[0]
-                main_url = f"{base_url}?{param_no_value}"
-
-                if not main_url in self.tested_urls:
-                    self.tested_urls.append(main_url)
-                    test_url = f"{main_url}={test}"
-                else:
-                    continue
+                test_url = probe_url(base_url, url_params, index, test)
 
                 try:
-                    response = get(test_url, verify=False)
-                except ConnectionError:
+                    response = get(test_url, verify=False, timeout=10)
+                except RequestException:
                     self.log.logger(
                         "error", f"Connection error raised on: {test_url}, skipping"
                     )
-                    continue
+                    break
                 else:
                     if response.text.find("root:x:0:0:root:/root") != -1:
                         self.console.print(
@@ -94,6 +94,8 @@ class LFIScanner:
         """
         Test for LFI
         """
-        base_url, params = url.split("?")[0], url.split("?")[1]
+        base_url, separator, params = url.partition("?")
+        if not separator or not params:
+            return
         params_dict = params.split("&")
         self.exploit_lfi(base_url, params_dict)

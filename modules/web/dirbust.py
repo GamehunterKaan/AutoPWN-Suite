@@ -31,11 +31,11 @@ def dirbust(target_url, console, log) -> None:
         headers = {"User-Agent": next(random_user_agent(log))}
 
         try:
-            req = get(test_url, headers=headers, verify=False)
+            req = get(test_url, headers=headers, verify=False, timeout=10, allow_redirects=False)
         except Exception as e:
             log.logger("error", e)
         else:
-            if req.status_code == 404:
+            if not (200 <= req.status_code < 400 or req.status_code in (401, 403)):
                 continue
 
             found_dirs.append(test_url)
@@ -43,7 +43,7 @@ def dirbust(target_url, console, log) -> None:
             if req.is_redirect:
                 console.print(
                     f"[red][[/red][green]+[/green][red]][/red]"
-                    + f" [white]DIR :[/white] {test_url} -> {req.url}"
+                    + f" [white]DIR :[/white] {test_url} -> {req.headers.get('Location', req.url)}"
                 )
             else:
                 console.print(

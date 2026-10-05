@@ -65,6 +65,7 @@ class TestDirbust:
         mock_response.status_code = 301
         mock_response.is_redirect = True
         mock_response.url = "http://example.com/admin/"
+        mock_response.headers = {"Location": "http://example.com/admin/"}
         mock_get.return_value = mock_response
 
         dirbust("http://example.com", mock_console, mock_log)
@@ -113,3 +114,12 @@ class TestDirbust:
         assert call_args[0] == "error"
         assert isinstance(call_args[1], Exception)
         assert str(call_args[1]) == "Generic test error"
+
+    @patch("modules.web.dirbust.get", return_value=MagicMock(status_code=503))
+    @patch("modules.web.dirbust.open", new_callable=mock_open, read_data="admin")
+    def test_server_error_is_not_directory_evidence(self, mock_file, mock_get, mock_log_console):
+        log, console = mock_log_console
+        dirbust("http://example.com", console, log)
+        console.print.assert_not_called()
+        assert mock_get.call_args.kwargs["timeout"] == 10
+        assert mock_get.call_args.kwargs["allow_redirects"] is False

@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from enum import Enum
-from os import remove
-from smtplib import SMTP
+from pathlib import Path
+from smtplib import SMTP, SMTP_SSL
+from tempfile import TemporaryDirectory
 
 from requests import post
 
@@ -43,16 +44,14 @@ def InitializeEmailReport(EmailObj, log, console) -> None:
     server = EmailObj.server
     port = EmailObj.port
 
-    console.save_html("tmp_report.html")
-
-    log.logger("info", "Sending email report...")
-
-    SendEmail(email, password, email_to, email_from, server, port, log)
-
-    remove("tmp_report.html")
+    with TemporaryDirectory(prefix="autopwn-report-") as directory:
+        report_path = str(Path(directory) / "report.html")
+        console.save_html(report_path, clear=False)
+        log.logger("info", "Sending email report...")
+        SendEmail(email, password, email_to, email_from, server, port, log, report_path)
 
 
-def SendEmail(email, password, email_to, email_from, server, port, log) -> None:
+def SendEmail(email, password, email_to, email_from, server, port, log, report_path="tmp_report.html") -> None:
     """
     Send email report.
     """
@@ -68,15 +67,19 @@ def SendEmail(email, password, email_to, email_from, server, port, log) -> None:
     body = "AutoPWN Report"
     msg.attach(MIMEText(body, "plain"))
 
-    with open("tmp_report.html", "r", encoding="utf-8") as f:
+    with open(report_path, "r", encoding="utf-8") as f:
         html = f.read()
     part = MIMEText(html, "html")
     msg.attach(part)
 
-    mail = SMTP(server, port)
-    mail.starttls()
-    mail.login(email, password)
+    mail = None
     try:
+        if int(port) == 465:
+            mail = SMTP_SSL(server, port, timeout=30)
+        else:
+            mail = SMTP(server, port, timeout=30)
+            mail.starttls()
+        mail.login(email, password)
         text = msg.as_string()
         mail.sendmail(email, email_to, text)
     except Exception:
@@ -84,7 +87,14 @@ def SendEmail(email, password, email_to, email_from, server, port, log) -> None:
     else:
         log.logger("success", "Email report sent successfully.")
     finally:
-        mail.quit()
+        if mail is not None:
+            try:
+                mail.quit()
+            except Exception:
+                try:
+                    mail.close()
+                except Exception:
+                    pass
 
 
 def InitializeWebhookReport(Webhook, log, console) -> None:
@@ -92,21 +102,22 @@ def InitializeWebhookReport(Webhook, log, console) -> None:
     Initialize webhook report.
     """
     log.logger("info", "Sending webhook report...")
-    console.save_text("report.log")
-    SendWebhook(Webhook, log)
-    remove("report.log")
+    with TemporaryDirectory(prefix="autopwn-report-") as directory:
+        report_path = str(Path(directory) / "report.log")
+        console.save_text(report_path, clear=False)
+        SendWebhook(Webhook, log, report_path)
 
 
-def SendWebhook(url, log) -> None:
+def SendWebhook(url, log, report_path="report.log") -> None:
     """
     Send webhook report.
     """
-    with open("report.log", "r", encoding="utf-8") as file:
+    with open(report_path, "r", encoding="utf-8") as file:
         payload = {"payload": file}
 
         try:
-            req = post(url, files=payload)
-            if req.status_code == 200:
+            req = post(url, files=payload, timeout=30)
+            if 200 <= req.status_code < 300:
                 log.logger("success", "Webhook report sent succesfully.")
             else:
                 log.logger("error", "Webhook report failed to send.")

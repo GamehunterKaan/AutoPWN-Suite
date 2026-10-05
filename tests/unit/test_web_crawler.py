@@ -93,3 +93,27 @@ class TestCrawler:
         # Assert that it returns an empty set and logs the error
         assert found_urls == set()
         mock_log.logger.assert_called_with("error", "Connection error raised.")
+
+    @patch("modules.web.crawler.get")
+    def test_nested_page_resolves_root_parent_query_and_fragments(self, mock_get, mock_log):
+        page = "https://example.com/app/page?view=one"
+        mock_get.return_value = MagicMock(url=page, text='''
+          <a href="/root">root</a><a href="../other">parent</a>
+          <a href="?view=two#details">query</a><a href="//other.com/x">external</a>
+          <a href="javascript:alert(1)">script</a><a href="mailto:a@example.com">mail</a>''')
+        assert link_finder(page, mock_log) == {
+            "https://example.com/root", "https://example.com/other", "https://example.com/app/page?view=two"
+        }
+        assert mock_get.call_args.args[0] == page
+        assert mock_get.call_args.kwargs["timeout"] == 10
+
+    @patch("modules.web.crawler.get", side_effect=ConnectionError("Actual requests error"))
+    def test_link_failure_is_logged_and_skipped(self, mock_get, mock_log):
+        assert link_finder("https://example.com/app/page", mock_log) == set()
+        mock_log.logger.assert_called()
+
+    @patch("modules.web.crawler.link_finder", return_value=set())
+    @patch("modules.web.crawler.get")
+    def test_root_query_value_is_not_changed(self, mock_get, mock_links, mock_log):
+        crawl("https://example.com?view=one", mock_log)
+        assert mock_get.call_args.args[0] == "https://example.com/?view=one"

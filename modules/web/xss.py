@@ -3,6 +3,8 @@ from string import ascii_letters
 
 from requests import get
 from requests import packages
+from requests.exceptions import ConnectionError, RequestException
+from modules.web.query import probe_url
 
 
 packages.urllib3.disable_warnings()
@@ -41,32 +43,30 @@ class XSSScanner:
         ]
 
     def exploit_xss(self, base_url, url_params) -> None:
-        for param in url_params:
+        for index, param in enumerate(url_params):
+            param_no_value = param.split("=", 1)[0]
+            main_url = f"{base_url}?{param_no_value}"
+            if main_url in self.tested_urls:
+                continue
+            self.tested_urls.append(main_url)
             for test in self.xss_test:
-                param_no_value = param.split("=")[0]
                 payload_length = randint(5, 15)
                 payload_text = "".join(choices(ascii_letters, k=payload_length))
                 payload = test.replace("PAYLOAD", payload_text)
-                main_url = f"{base_url}?{param_no_value}"
-
-                if not main_url in self.tested_urls:
-                    self.tested_urls.append(main_url)
-                    test_url = f"{main_url}={payload}"
-                else:
-                    continue
+                test_url = probe_url(base_url, url_params, index, payload)
 
                 try:
-                    response = get(test_url, verify=False)
-                except ConnectionError:
+                    response = get(test_url, verify=False, timeout=10)
+                except RequestException:
                     self.log.logger(
                         "error", f"Connection error raised on: {test_url}, skipping"
                     )
-                    continue
+                    break
                 else:
-                    if response.text.find(payload_text) != -1:
+                    if payload in response.text:
                         self.console.print(
                             f"[red][[/red][green]+[/green][red]][/red]"
-                            + f" [white]XSS :[/white] {test_url}"
+                            + f" [white]XSS candidate (unescaped reflection) :[/white] {test_url}"
                         )
                         break
 
@@ -74,6 +74,8 @@ class XSSScanner:
         """
         Tets for XSS
         """
-        base_url, params = url.split("?")[0], url.split("?")[1]
+        base_url, separator, params = url.partition("?")
+        if not separator or not params:
+            return
         params_dict = params.split("&")
         self.exploit_xss(base_url, params_dict)

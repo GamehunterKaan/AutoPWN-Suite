@@ -1,5 +1,7 @@
 from requests import get
 from requests import packages
+from requests.exceptions import ConnectionError, RequestException
+from modules.web.query import probe_url
 
 
 packages.urllib3.disable_warnings()
@@ -25,19 +27,19 @@ class SQLIScanner:
         ]
 
     def exploit_sqli(self, base_url, url_params) -> None:
-        for param in url_params:
+        for index, param in enumerate(url_params):
             param_no_value = param.split("=")[0]
             main_url = f"{base_url}?{param_no_value}"
 
             if not main_url in self.tested_urls:
                 self.tested_urls.append(main_url)
-                test_url = f"{main_url}={self.sqli_test}"
+                test_url = probe_url(base_url, url_params, index, self.sqli_test)
             else:
                 continue
 
             try:
-                response = get(test_url, verify=False)
-            except ConnectionError:
+                response = get(test_url, verify=False, timeout=10)
+            except RequestException:
                 self.log.logger("error", f"Connection error raised on: {test_url}, skipping")
                 return  # Exit if we can't connect
 
@@ -54,9 +56,6 @@ class SQLIScanner:
         """
         Test for SQLI
         """
-        try:
-            base_url, params = url.split("?")[0], url.split("?")[1]
-            params_dict = params.split("&")
-            self.exploit_sqli(base_url, params_dict)
-        except ConnectionError:
-            pass
+        base_url, separator, params = url.partition("?")
+        if separator and params:
+            self.exploit_sqli(base_url, params.split("&"))

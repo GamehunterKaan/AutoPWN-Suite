@@ -180,7 +180,7 @@ def CreateConfig(console, config_filename=""):
         overwrite_config = console.input(f"[yellow]Config file '{config_file}' already exists. Would you like to overwrite it?[/yellow] (y/n): ")
         if overwrite_config.lower() != 'y':
             console.print(f"[red]Config file '{config_file}' not overwritten.[/red]")
-            return
+            return False
         else:
             os.remove(config_file)
             with open(config_file, 'w', encoding='utf-8') as configfile:
@@ -192,6 +192,7 @@ def CreateConfig(console, config_filename=""):
         
 
     console.print(f"[green]Config file '{config_file}' created successfully![/green]")
+    return True
 
 def CopyFiles(console):
     DAEMON_INSTALL_PATH = Path("/opt/autopwn-suite")
@@ -299,7 +300,7 @@ WorkingDirectory={DAEMON_INSTALL_PATH}
 ExecStart={venv_dir}/bin/python {DAEMON_INSTALL_PATH}/autopwn.py -c {DAEMON_INSTALL_PATH}/autopwn-daemon.conf
 Restart=always
 RestartSec=5
-KillMode=process
+KillMode=control-group
 LimitNOFILE=65536
 StandardOutput=append:{LOG_PATH}
 StandardError=append:{LOG_PATH}
@@ -343,7 +344,8 @@ def InstallDaemon(console):
         console.print("Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!")
         return
     print_banner(console)
-    CreateConfig(console, "autopwn-daemon.conf")
+    if CreateConfig(console, "autopwn-daemon.conf") is False:
+        return
     CopyFiles(console)
 
 

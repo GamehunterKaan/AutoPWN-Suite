@@ -254,6 +254,16 @@ class TestInstallDaemon:
             "Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"
         )
 
+    @patch("modules.daemon.daemon_installer.CopyFiles")
+    @patch("modules.daemon.daemon_installer.CreateConfig", return_value=False)
+    @patch("modules.daemon.daemon_installer.print_banner")
+    @patch("modules.daemon.daemon_installer.system", return_value="Linux")
+    @patch("modules.daemon.daemon_installer.is_root", return_value=True)
+    def test_install_cancellation_does_not_use_old_configuration(self, mock_root, mock_system,
+            mock_banner, mock_config, mock_copy, mock_console):
+        InstallDaemon(mock_console)
+        mock_copy.assert_not_called()
+
     @patch("modules.daemon.daemon_installer.system", return_value="Linux")
     @patch("modules.daemon.daemon_installer.is_root", return_value=False)
     def test_install_daemon_not_root(self, mock_is_root, mock_system, mock_console):
@@ -332,6 +342,8 @@ class TestCopyFiles:
             ]
         )
         assert mock_open.call_count > 0  # For service file
+        unit = mock_open.return_value.__enter__.return_value.write.call_args.args[0]
+        assert "KillMode=control-group" in unit
 
     @patch("modules.daemon.daemon_installer.subprocess")
     @patch("modules.daemon.daemon_installer.venv")

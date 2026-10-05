@@ -32,7 +32,7 @@ class TestSendMail:
         mock_log = MagicMock()
 
         SendEmail(
-            "user@example.com", "password", "to@example.com", "from@example.com", "smtp.example.com", 465, mock_log
+            "user@example.com", "password", "to@example.com", "from@example.com", "smtp.example.com", 587, mock_log
         )
 
         mock_server.login.assert_called_once_with("user@example.com", "password")
@@ -52,8 +52,9 @@ class TestSendMail:
         report_obj = ReportMail("user", "wrongpass", "to", "from", "server", 465)
         mock_log = MagicMock()
 
-        with pytest.raises(smtplib.SMTPAuthenticationError):
-            SendEmail(report_obj.email, report_obj.password, report_obj.email_to, report_obj.email_from, report_obj.server, report_obj.port, mock_log)
+        SendEmail(report_obj.email, report_obj.password, report_obj.email_to, report_obj.email_from, report_obj.server, 587, mock_log)
+        mock_log.logger.assert_called_with("error", "An error occured while trying to send email report.")
+        mock_server.quit.assert_called_once()
 
     @patch("modules.report.SMTP")
     @patch("modules.report.open", new_callable=mock_open, read_data="<h1>Test</h1>")
@@ -66,10 +67,25 @@ class TestSendMail:
 
         mock_log = MagicMock()
 
-        SendEmail("user", "pass", "to", "from", "server", 465, mock_log)
+        SendEmail("user", "pass", "to", "from", "server", 587, mock_log)
 
         # Verify the error was logged
         mock_log.logger.assert_called_with("error", "An error occured while trying to send email report.")
+
+    @patch("modules.report.SMTP_SSL")
+    @patch("modules.report.open", new_callable=mock_open, read_data="<h1>Test</h1>")
+    def test_implicit_tls_uses_ssl_without_starttls(self, mock_file, mock_smtp_ssl):
+        SendEmail("user", "pass", "to", "from", "server", 465, MagicMock())
+        mock_smtp_ssl.assert_called_once_with("server", 465, timeout=30)
+        mock_smtp_ssl.return_value.starttls.assert_not_called()
+        mock_smtp_ssl.return_value.sendmail.assert_called_once()
+
+    @patch("modules.report.SMTP", side_effect=OSError("Connection refused"))
+    @patch("modules.report.open", new_callable=mock_open, read_data="<h1>Test</h1>")
+    def test_smtp_connection_failure_does_not_abort_scan(self, mock_file, mock_smtp):
+        log = MagicMock()
+        SendEmail("user", "pass", "to", "from", "server", 587, log)
+        log.logger.assert_called_with("error", "An error occured while trying to send email report.")
 
 
 @pytest.mark.unit
@@ -122,6 +138,16 @@ class TestSendWebhook:
         exception_logged = any(isinstance(call.args[1], ConnectionError) for call in mock_log.logger.call_args_list)
         assert exception_logged, "ConnectionError was not logged"
 
+    @pytest.mark.parametrize("status", [201, 202, 204])
+    @patch("modules.report.post")
+    @patch("modules.report.open", new_callable=mock_open, read_data="report content")
+    def test_all_success_codes_are_accepted(self, mock_file, mock_post, status):
+        mock_post.return_value.status_code = status
+        log = MagicMock()
+        SendWebhook("url", log)
+        assert mock_post.call_args.kwargs["timeout"] == 30
+        log.logger.assert_called_with("success", "Webhook report sent succesfully.")
+
 
 @pytest.mark.unit
 class TestInitializeReport:
@@ -154,21 +180,26 @@ class TestInitializeReport:
             mock_init_webhook.assert_not_called()
 
     @patch("modules.report.SendEmail")
-    @patch("modules.report.remove")
-    def test_initialize_email_report(self, mock_remove, mock_send_email, mock_rich_console):
+    @patch("modules.report.TemporaryDirectory")
+    def test_initialize_email_report(self, mock_temp_directory, mock_send_email, mock_rich_console):
         """Verify InitializeEmailReport saves HTML and calls SendEmail."""
         report_obj = ReportMail("user", "pass", "to", "from", "server", 123)
         mock_log = MagicMock()
         InitializeEmailReport(report_obj, mock_log, mock_rich_console)
-        mock_rich_console.save_html.assert_called_once_with("tmp_report.html")
+        mock_rich_console.save_html.assert_called_once()
+        assert mock_rich_console.save_html.call_args.kwargs["clear"] is False
         mock_send_email.assert_called_once()
+        assert mock_send_email.call_args.args[-1] == mock_rich_console.save_html.call_args.args[0]
+        mock_temp_directory.return_value.__exit__.assert_called_once()
 
     @patch("modules.report.SendWebhook")
-    @patch("modules.report.remove")
-    def test_initialize_webhook_report(self, mock_remove, mock_send_webhook, mock_rich_console):
+    @patch("modules.report.TemporaryDirectory")
+    def test_initialize_webhook_report(self, mock_temp_directory, mock_send_webhook, mock_rich_console):
         """Verify InitializeWebhookReport saves text and calls SendWebhook."""
         webhook_url = "https://example.com/webhook"
         mock_log = MagicMock()
         InitializeWebhookReport(webhook_url, mock_log, mock_rich_console)
-        mock_rich_console.save_text.assert_called_once_with("report.log")
-        mock_send_webhook.assert_called_once_with(webhook_url, mock_log)
+        mock_rich_console.save_text.assert_called_once()
+        assert mock_rich_console.save_text.call_args.kwargs["clear"] is False
+        mock_send_webhook.assert_called_once_with(webhook_url, mock_log, mock_rich_console.save_text.call_args.args[0])
+        mock_temp_directory.return_value.__exit__.assert_called_once()

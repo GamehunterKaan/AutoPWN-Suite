@@ -30,7 +30,7 @@ class TestXSSScanner:
 
         mock_response = MagicMock()
         # Simulate a response that reflects the payload
-        mock_response.text = f"<html><body>Search results for {fixed_payload_text}</body></html>"
+        mock_response.text = f"<html><body><script>alert('{fixed_payload_text}')</script></body></html>"
         mock_get.return_value = mock_response
 
         xss_tester = XSSScanner(mock_log, mock_console)
@@ -39,7 +39,7 @@ class TestXSSScanner:
 
         # Verify that a vulnerability was printed to the console
         mock_console.print.assert_called()
-        assert "[white]XSS :[/white]" in mock_console.print.call_args[0][0]
+        assert "XSS candidate (unescaped reflection)" in mock_console.print.call_args[0][0]
         assert fixed_payload_text in mock_console.print.call_args[0][0]
 
     @patch("modules.web.xss.get")
@@ -71,3 +71,27 @@ class TestXSSScanner:
         # Verify that the error was logged
         mock_log.logger.assert_called()
         assert "Connection error raised on" in mock_log.logger.call_args[0][1]
+
+    @patch("modules.web.xss.choices", return_value=list("fixedpayload"))
+    @patch("modules.web.xss.get")
+    def test_escaped_reflection_is_not_reported_as_xss(self, mock_get, mock_choices, mock_log_console):
+        import html
+        log, console = mock_log_console
+        scanner = XSSScanner(log, console)
+        scanner.xss_test = ["<script>alert('PAYLOAD')</script>"]
+        mock_get.return_value.text = html.escape("<script>alert('fixedpayload')</script>")
+        scanner.test_xss("http://example.com/search?q=test")
+        console.print.assert_not_called()
+
+    @patch("modules.web.xss.choices", return_value=list("fixedpayload"))
+    @patch("modules.web.xss.get")
+    def test_second_payload_is_tested(self, mock_get, mock_choices, mock_log_console):
+        log, console = mock_log_console
+        scanner = XSSScanner(log, console)
+        scanner.xss_test = ["<script>PAYLOAD</script>", "<img onerror='PAYLOAD'>"]
+        mock_get.side_effect = [MagicMock(text="safe"), MagicMock(text="<img onerror='fixedpayload'>"),
+                               MagicMock(text="safe"), MagicMock(text="safe")]
+        scanner.test_xss("http://example.com/search?q=test&category=news")
+        assert mock_get.call_count >= 2
+        assert "category=news" in mock_get.call_args_list[1].args[0]
+        console.print.assert_called()
