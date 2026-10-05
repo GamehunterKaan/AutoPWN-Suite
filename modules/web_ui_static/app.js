@@ -8,6 +8,7 @@ let es       = null;
 let pollT    = null;
 let lastScansStr = '';
 let lastHostsStr = '';
+let pollBusy = false;
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
 function _buildNmapBase(target, mode, speed, to, technique) {
@@ -90,9 +91,51 @@ function updateProfilePreview() {
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function shortId(id){ return id ? id.slice(0,8) : ''; }
-function printScan(scanId) {
+function openReportWindow(){
+  const win = window.open('', '_blank');
+  if(!win) toast('Allow popups to export a PDF report.', false);
+  return win;
+}
+async function fetchJson(url){
+  const response = await fetch(url);
+  if(!response.ok) throw new Error(`Request failed (${response.status}).`);
+  return response.json();
+}
+function latestHostObservations(rows){
+  const latest = {};
+  rows.forEach(h=>{
+    const prev = latest[h.ip];
+    const observed = Date.parse(h.observed_at || scans[h.scan_id]?.started_at || '') || 0;
+    const previous = Date.parse(prev?.observed_at || scans[prev?.scan_id]?.started_at || '') || 0;
+    if(!prev || observed >= previous) latest[h.ip] = h;
+  });
+  return latest;
+}
+function hostScanLabel(h){
+  if(h.latest_attempt) return 'Latest scan: ' + hostScanLabel({...h.latest_attempt, latest_attempt:null});
+  if(h.scan_status === 'scanning') return 'Scanning…';
+  if(h.scan_status === 'failed' || h.scan_status === 'error') return 'Scan failed';
+  if(h.scan_status === 'stopped') return 'Stopped';
+  if(h.scan_status === 'not_observed') return 'Host not observed';
+  if(h.scan_status === 'partial' || h.lookup_status === 'partial') return 'Incomplete';
+  if(h.lookup_status === 'skipped' || h.lookup_status === 'not_run') return 'CVEs not checked';
+  return h.scan_status === 'completed' ? 'Done' : 'Status unknown';
+}
+async function printScan(scanId) {
   const job = scans[scanId];
   if(!job) return;
+  // Open while the click still has user activation, before the download awaits.
+  const win = openReportWindow();
+  if(!win) return;
+  let saved;
+  try {
+    saved = await fetchJson(`/api/scans/${encodeURIComponent(scanId)}/download`);
+  } catch(e){
+    win.close();
+    toast('Could not load the scan report: ' + e.message, false);
+    return;
+  }
+  if(win.closed) return;
   let html = `<!DOCTYPE html><html><head><title>Scan Report - ${esc(job.target)}</title>
   <style>
     body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}
@@ -123,7 +166,7 @@ function printScan(scanId) {
   </div>
   <h2>Hosts Discovered (${job.host_count})</h2>
   `;
-  const scanHosts = Object.values(hosts).filter(h => h.scan_id === scanId);
+  const scanHosts = (saved.hosts||[]).map(h=>({...h, vulns:h.vulns || (h.ports||[]).flatMap(p=>p.vulnerabilities||[]).concat(h.unmapped_vulnerabilities||[])}));
   if(scanHosts.length) {
     scanHosts.forEach(h => {
       html += `<h3>Host: ${esc(h.ip)}</h3>`;
@@ -131,7 +174,7 @@ function printScan(scanId) {
       if(h.ports && h.ports.length) {
         html += `<h4>Open Ports</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>`;
         h.ports.forEach(p => {
-          html += `<tr><td>${p.port}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`;
+          html += `<tr><td>${esc(p.protocol||'tcp')}/${esc(p.port)}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`;
         });
         html += `</table>`;
       } else {
@@ -151,7 +194,6 @@ function printScan(scanId) {
     html += `<p>No hosts were found during this scan.</p>`;
   }
   html += `</body></html>`;
-  const win = window.open('', '_blank');
   win.document.write(html);
   win.document.close();
   setTimeout(() => { win.print(); }, 500);
@@ -191,7 +233,7 @@ function printHost(ip) {
   if(h.ports && h.ports.length) {
     html += `<h3>Open Ports (${h.ports.length})</h3><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>`;
     h.ports.forEach(p => {
-      html += `<tr><td>${p.port}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`;
+      html += `<tr><td>${esc(p.protocol||'tcp')}/${esc(p.port)}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`;
     });
     html += `</table>`;
   } else {
@@ -206,7 +248,8 @@ function printHost(ip) {
     html += `</table>`;
   }
   html += `</body></html>`;
-  const win = window.open('', '_blank');
+  const win = openReportWindow();
+  if(!win) return;
   win.document.write(html);
   win.document.close();
   setTimeout(() => { win.print(); }, 500);
@@ -269,7 +312,8 @@ function printAllVulns() {
   });
   html += `</table></body></html>`;
 
-  const win = window.open('', '_blank');
+  const win = openReportWindow();
+  if(!win) return;
   win.document.write(html);
   win.document.close();
   setTimeout(() => { win.print(); }, 500);
@@ -312,7 +356,7 @@ function printAllHosts() {
     html += `<div class="meta"><p><strong>MAC:</strong> ${esc(h.mac || '—')} &nbsp;|&nbsp; <strong>OS:</strong> ${esc(h.os || '—')} &nbsp;|&nbsp; <strong>Vendor:</strong> ${esc(h.vendor || '—')}</p></div>`;
     if(h.ports && h.ports.length) {
       html += `<h4>Open Ports (${h.ports.length})</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>`;
-      h.ports.forEach(p => { html += `<tr><td>${p.port}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`; });
+      h.ports.forEach(p => { html += `<tr><td>${esc(p.protocol||'tcp')}/${esc(p.port)}</td><td>${esc(p.service || '')}</td><td>${esc(p.product || '')}</td><td>${esc(p.version || '')}</td></tr>`; });
       html += `</table>`;
     } else { html += `<p>No open ports found.</p>`; }
     const vulns = (h.vulns || []);
@@ -324,7 +368,8 @@ function printAllHosts() {
     html += `<hr style="border:0; border-top:2px dashed #eee; margin:30px 0;">`;
   });
   html += `</body></html>`;
-  const win = window.open('', '_blank');
+  const win = openReportWindow();
+  if(!win) return;
   win.document.write(html);
   win.document.close();
   setTimeout(() => { win.print(); }, 500);
@@ -334,9 +379,10 @@ function downloadHostJson(ip) {
   const h = hosts[ip];
   if(!h) return;
   const portList = (h.ports||[]).map(p => {
-    const portVulns = (h.vulns||[]).filter(v => v.port == p.port);
+    const portVulns = (h.vulns||[]).filter(v => v.port == p.port && (v.protocol||'tcp') === (p.protocol||'tcp'));
     return {
       port: p.port,
+      protocol: p.protocol||'tcp',
       service: p.service,
       product: p.product,
       version: p.version,
@@ -345,6 +391,10 @@ function downloadHostJson(ip) {
   });
   const data = {
     ip: h.ip,
+    scan_status: h.scan_status,
+    lookup_status: h.lookup_status,
+    observed_at: h.observed_at,
+    latest_attempt: h.latest_attempt,
     mac: h.mac,
     vendor: h.vendor,
     os: h.os,
@@ -410,12 +460,12 @@ function loadProfile(){
   if(!pid || !profiles[pid]) return;
   const c = profiles[pid].config || {};
   if(c.mode)       document.getElementById('f-mode').value    = c.mode;
-  if(c.speed)      document.getElementById('f-speed').value   = String(c.speed);
+  if(c.speed != null) document.getElementById('f-speed').value = String(c.speed);
   if(c.scan_type !== undefined) document.getElementById('f-scantype').value = c.scan_type || '';
   document.getElementById('f-nmap-custom').value = c.nmap_flags || '';
   document.getElementById('f-scantech').value = c.scan_technique || '';
   document.getElementById('f-ports').value = c.ports || '';
-  document.getElementById('f-vint').value = c.version_intensity ? String(c.version_intensity) : '';
+  document.getElementById('f-vint').value = c.version_intensity != null ? String(c.version_intensity) : '';
   document.getElementById('f-os').checked = !!c.os_detection;
   if(c.host_timeout) document.getElementById('f-timeout').value = String(c.host_timeout);
   document.getElementById('f-skipd').checked  = !!c.skip_discovery;
@@ -474,32 +524,30 @@ function connectSSE(){
 
 // ── Poll ───────────────────────────────────────────────────────────────────────
 async function poll(){
+  if(pollBusy) return;
+  pollBusy = true;
   try{
     const [scansR, hostsR] = await Promise.all([
-      fetch('/api/scans').then(r=>r.json()),
-      fetch('/api/hosts').then(r=>r.json()),
+      fetchJson('/api/scans'),
+      fetchJson('/api/hosts'),
     ]);
     const scansStr = JSON.stringify(scansR);
     const hostsStr = JSON.stringify(hostsR);
     if(scansStr === lastScansStr && hostsStr === lastHostsStr) return;
     lastScansStr = scansStr; lastHostsStr = hostsStr;
+    const previousSelection = selIp && JSON.stringify(hosts[selIp]);
     scans={}; scansR.forEach(s=>{ scans[s.id]=s; });
-    hosts={}; hostsR.forEach(h=>{
-      if(hosts[h.ip]){
-        // Merge: keep longer ports/vulns lists, prefer completed status
-        const prev=hosts[h.ip];
-        if((h.ports||[]).length>=(prev.ports||[]).length) hosts[h.ip]=h;
-        // Merge vulns from both scans (dedupe by cve+port)
-        const seen=new Set((hosts[h.ip].vulns||[]).map(v=>v.cve+':'+v.port));
-        (h===hosts[h.ip]?prev:h).vulns?.forEach(v=>{
-          const key=v.cve+':'+v.port;
-          if(!seen.has(key)){ hosts[h.ip].vulns.push(v); seen.add(key); }
-        });
-      } else { hosts[h.ip]=h; }
-    });
+    hosts = latestHostObservations(hostsR);
     renderScans(); renderHosts(); renderVulnTable(); updateBadges();
-    if(selIp && hosts[selIp]) renderDetail(hosts[selIp]);
+    if(selIp && hosts[selIp]) {
+      if(previousSelection !== JSON.stringify(hosts[selIp])) renderDetail(hosts[selIp]);
+    } else if(selIp){
+      selIp = null;
+      document.getElementById('no-sel').style.display = '';
+      document.getElementById('det-content').style.display = 'none';
+    }
   }catch(_){}
+  finally{ pollBusy = false; }
 }
 
 // ── Render: Active Scans ──────────────────────────────────────────────────────
@@ -507,8 +555,8 @@ function renderScans(){
   const container = document.getElementById('tc-scans');
   const empty     = document.getElementById('scans-empty');
   const jobs      = Object.values(scans).sort((a,b)=>{
-    const o={running:0,stopping:1,completed:2,error:3};
-    const d=(o[a.status]||9)-(o[b.status]||9);
+    const o={running:0,stopping:1,partial:2,error:3,stopped:4,completed:5};
+    const d=(o[a.status]??9)-(o[b.status]??9);
     return d||new Date(b.started_at)-new Date(a.started_at);
   });
   empty.style.display = jobs.length?'none':'flex';
@@ -518,7 +566,7 @@ function renderScans(){
     const c = job.config||{};
     const techMatch = (c.nmap_flags||'').match(/-s[STAUWMNFX]/);
     const cardTech = techMatch ? techMatch[0] : '';
-    let base = _buildNmapBase(job.target, c.mode||'normal', c.speed||3, c.host_timeout||240, cardTech);
+    let base = _buildNmapBase(job.target, c.mode||'normal', c.speed??3, c.host_timeout||240, cardTech);
     if(c.nmap_flags){
       let f = c.nmap_flags;
       // Remove the technique flag since it's already in the base
@@ -572,6 +620,7 @@ function renderHosts(){
     const hasCrit=(h.vulns||[]).some(v=>v.severity==='critical');
     let bc,bt;
     if(scanning){bc='scanning';bt='scanning…';}
+    else if(hostScanLabel(h) !== 'Done'){bc='warn';bt=hostScanLabel(h);}
     else if(vc===0){bc='clean';bt='clean';}
     else if(hasCrit){bc='vulns';bt=vc+' CVE'+(vc>1?'s':'');}
     else{bc='warn';bt=vc+' CVE'+(vc>1?'s':'');}
@@ -601,15 +650,17 @@ function renderDetail(h){
   const el=document.getElementById('det-content'); el.style.display='block';
   const ports=h.ports||[], vulns=h.vulns||[];
   const info=[['IP',h.ip],['OS',h.os||'Unknown'],['MAC',h.mac||'—'],['Vendor',h.vendor||'—'],
-              ['Status',h.scan_status==='scanning'?'Scanning…':'Done'],['Ports',ports.length],['CVEs',vulns.length]];
+              ['Status',hostScanLabel(h)],['Observed',h.observed_at||'—'],['Ports',ports.length],['CVEs',vulns.length]];
   const kvs=info.map(([k,v])=>`<div class="kv"><span class="kk">${k}</span><span class="kv2">${esc(String(v))}</span></div>`).join('');
   const prs=ports.length
-    ?ports.map(p=>`<div class="pr"><span class="pn">${p.port}</span><span class="ps">${esc(p.service||'')}</span><span style="color:var(--text2);font-size:11px">${esc(p.product||'')} ${esc(p.version||'')}</span></div>`).join('')
+    ?ports.map(p=>`<div class="pr"><span class="pn">${esc(p.protocol||'tcp')}/${esc(p.port)}</span><span class="ps">${esc(p.service||'')}</span><span style="color:var(--text2);font-size:11px">${esc(p.product||'')} ${esc(p.version||'')}</span></div>`).join('')
     :'<div style="color:var(--text3);font-family:var(--mono);font-size:11px;padding:4px 0">No open ports found.</div>';
   const vrs=vulns.length
     ?vulns.map(v=>`<div class="vr ${v.severity}"><div class="vc"><span class="sev ${v.severity}">${v.severity.toUpperCase()}</span>${esc(v.cve)}${v.cvss?`<span class="cvb ${v.severity}">${v.cvss}</span>`:''}</div><div class="vdesc">${esc(v.description)}</div></div>`).join('')
     :h.scan_status==='scanning'
       ?'<div style="color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 0">Scanning in progress…</div>'
+      :hostScanLabel(h) !== 'Done'
+        ?`<div style="color:var(--orange);font-family:var(--mono);font-size:11px;padding:4px 0">${esc(hostScanLabel(h))}. Vulnerability results are unavailable or incomplete.</div>`
       :'<div style="color:var(--green2);font-family:var(--mono);font-size:11px;padding:4px 0">No vulnerabilities found.</div>';
   el.innerHTML=`
     <div><div class="ds">Host Info</div>${kvs}</div><div><div class="ds">Open Ports (${ports.length})</div>${prs}</div><div><div class="ds">Vulnerabilities (${vulns.length})</div>${vrs}</div>
@@ -784,12 +835,12 @@ function editProfile(pid){
   document.getElementById('pf-desc').value=p.description||'';
   const c=p.config||{};
   document.getElementById('pf-mode').value=c.mode||'normal';
-  document.getElementById('pf-speed').value=String(c.speed||3);
+  document.getElementById('pf-speed').value=String(c.speed??3);
   document.getElementById('pf-scantype').value=c.scan_type||'';
   document.getElementById('pf-timeout').value=String(c.host_timeout||240);
   document.getElementById('pf-scantech').value=c.scan_technique||'';
   document.getElementById('pf-ports').value=c.ports||'';
-  document.getElementById('pf-vint').value=c.version_intensity?String(c.version_intensity):'';
+  document.getElementById('pf-vint').value=c.version_intensity!=null?String(c.version_intensity):'';
   document.getElementById('pf-os').checked=!!c.os_detection;
   document.getElementById('pf-nmap').value=c.nmap_flags||'';
   document.getElementById('pf-skipd').checked=!!c.skip_discovery;
@@ -823,7 +874,7 @@ async function saveProfile(){
 async function deleteProfile(pid){
   if(!confirm('Delete this profile?')) return;
   const r=await fetch(`/api/profiles/${pid}`,{method:'DELETE'});
-  if(r.ok){ await loadProfilesFromServer(); toast('Profile deleted.'); }
+  if(r.ok){ await loadProfilesFromServer(); await loadSchedulesFromServer(); toast('Profile deleted.'); }
 }
 
 // ── Schedules ─────────────────────────────────────────────────────────────────
@@ -960,7 +1011,7 @@ document.addEventListener('click', (e) => {
     ]);
     if(verR.version) document.getElementById('app-version').textContent = 'v' + verR.version;
     scansR.forEach(s=>{ scans[s.id]=s; scansR.length && addTermFilterOption(s.id,s.target); });
-    hostsR.forEach(h=>{ hosts[h.ip]=h; });
+    hosts = latestHostObservations(hostsR);
     logR.forEach(e=>addLog(e.scan_id,e.msg,e.level,e.ts));
     renderScans(); renderHosts(); renderVulnTable(); updateBadges();
     await loadSettingsIntoForm();

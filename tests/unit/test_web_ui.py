@@ -1263,7 +1263,7 @@ class TestRunScan:
         job.request_stop()  # Pre-stop
         with patch("shutil.which", return_value="/usr/bin/nmap"):
             wu._run_scan(job)
-        assert job.status in ("completed", "stopping")
+        assert job.status == "stopped"
 
     def test_run_scan_noise_mode_fallback(self, wu):
         job = wu.ScanJob("id1", "target", {"target": "192.168.1.1", "mode": "noise", "speed": 3, "host_timeout": 240, "skip_discovery": True, "scan_ports": False})
@@ -1304,7 +1304,8 @@ class TestRunScan:
         with patch("shutil.which", return_value="/usr/bin/nmap"), \
              patch("modules.scanner.PortScan", side_effect=Exception("nmap error")):
             wu._run_scan(job)
-        assert job.status == "completed"
+        assert job.status == "partial"
+        assert job.hosts_list()[0]["scan_status"] == "error"
         assert any("Port scan failed" in e.get("msg", "") for e in wu._log_history)
 
     def test_run_scan_system_exit(self, wu):
@@ -1317,7 +1318,7 @@ class TestRunScan:
         with patch("shutil.which", return_value="/usr/bin/nmap"), \
              patch("modules.scanner.PortScan", side_effect=SystemExit("nmap not installed")):
             wu._run_scan(job)
-        assert job.status == "completed"
+        assert job.status == "partial"
 
     def test_run_scan_with_ports_and_vulns(self, wu):
         mock_nm = MagicMock()
@@ -1375,7 +1376,7 @@ class TestRunScan:
              patch("modules.scanner.DiscoverHosts", side_effect=Exception("fail")):
             wu._run_scan(job)
         # Should fall back to scanning target directly
-        assert job.status == "completed"
+        assert job.status == "partial"
 
 
 class TestStartServer:
@@ -1420,6 +1421,186 @@ class TestLaunchScan:
             assert wu._get_scan(job.id) is job
             assert job.target == "192.168.1.1"
             assert job.status == "running"
+
+
+def test_scan_snapshot_is_detached_and_redacts_api_key(wu):
+    job = wu.ScanJob("snapshot", "10.0.0.1", {"api_key": "secret", "speed": 3})
+    host = job.get_or_create_host("10.0.0.1")
+    host["ports"] = [{"port": 80, "protocol": "tcp"}]
+    snapshot = job.hosts_list()
+    host["ports"][0]["port"] = 443
+    assert snapshot[0]["ports"][0]["port"] == 80
+    assert "api_key" not in job.to_full_dict()["config"]
+    assert job.config["api_key"] == "secret"
+
+
+def test_export_separates_same_port_tcp_and_udp_findings(wu):
+    job = wu.ScanJob("protocols", "10.0.0.1", {})
+    host = job.get_or_create_host("10.0.0.1")
+    host["ports"] = [{"port": 53, "protocol": p} for p in ("tcp", "udp")]
+    host["vulns"] = [{"port": 53, "protocol": p, "cve": f"CVE-{p}"} for p in ("tcp", "udp")]
+    ports = job.to_full_dict()["hosts"][0]["ports"]
+    assert [p["vulnerabilities"][0]["cve"] for p in ports] == ["CVE-tcp", "CVE-udp"]
+
+
+def test_latest_host_replaces_old_ports_instead_of_merging(client, wu):
+    old = wu.ScanJob("old", "10.0.0.1", {})
+    old.started_at = "2026-01-01T00:00:00Z"
+    old.get_or_create_host("10.0.0.1")["ports"] = [{"port": 80}, {"port": 443}]
+    new = wu.ScanJob("new", "10.0.0.1", {})
+    new.started_at = "2026-01-02T00:00:00Z"
+    new.get_or_create_host("10.0.0.1")["ports"] = [{"port": 443}]
+    wu._register_scan(new)
+    wu._register_scan(old)
+    hosts = client.get("/api/hosts").get_json()
+    assert len(hosts) == 1
+    assert hosts[0]["scan_id"] == "new"
+    assert hosts[0]["ports"] == [{"port": 443}]
+
+
+def test_failed_attempt_keeps_last_actual_observation(client, wu):
+    observed = wu.ScanJob("observed", "10.0.0.1", {})
+    observed.started_at = "2026-01-01T00:00:00Z"
+    host = observed.get_or_create_host("10.0.0.1")
+    host.update(ports=[{"port": 443}], observed_at=observed.started_at, scan_status="completed")
+    failed = wu.ScanJob("failed", "10.0.0.1", {})
+    failed.started_at = "2026-01-02T00:00:00Z"
+    failed.get_or_create_host("10.0.0.1")["scan_status"] = "error"
+    wu._register_scan(observed)
+    wu._register_scan(failed)
+    hosts = client.get("/api/hosts").get_json()
+    assert hosts[0]["ports"] == [{"port": 443}]
+    assert hosts[0]["scan_id"] == "observed"
+    assert hosts[0]["latest_attempt"]["scan_status"] == "error"
+
+
+def test_hostname_or_range_scan_records_actual_ips(wu):
+    nm = Mock()
+    nm.all_hosts.return_value = ["10.0.0.1", "10.0.0.2"]
+    data = {ip: {"addresses": {"ipv4": ip}, "tcp": {80: {"state": "open", "name": "http", "product": "", "version": ""}}}
+            for ip in nm.all_hosts.return_value}
+    nm.__getitem__ = Mock(side_effect=lambda ip: data[ip])
+    job = wu.ScanJob("range", "10.0.0.0/24", {"target": "10.0.0.0/24", "skip_discovery": True, "scan_vulns": False})
+    with patch("shutil.which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm), patch.object(wu, "_notify"):
+        wu._run_scan(job)
+    assert job.status == "completed"
+    assert {h["ip"] for h in job.hosts_list()} == set(data)
+    assert all(h["ports"][0]["port"] == 80 for h in job.hosts_list())
+
+
+def test_vulnerability_lookup_failure_is_partial_not_clean(wu):
+    nm = Mock()
+    nm.all_hosts.return_value = ["10.0.0.1"]
+    nm.__getitem__ = Mock(return_value={"addresses": {}, "tcp": {80: {"state": "open", "name": "http", "product": "nginx", "version": "1.0"}}})
+    job = wu.ScanJob("lookup", "10.0.0.1", {"target": "10.0.0.1", "skip_discovery": True})
+    with patch("shutil.which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm), \
+         patch("modules.nist_search.searchCVE", side_effect=RuntimeError("NVD unavailable")), patch.object(wu, "_notify"):
+        wu._run_scan(job)
+    assert job.status == "partial"
+    assert job.hosts_list()[0]["lookup_status"] == "partial"
+
+
+def test_no_observation_is_partial(wu):
+    nm = Mock()
+    nm.all_hosts.return_value = []
+    nm.__getitem__ = Mock(side_effect=KeyError)
+    job = wu.ScanJob("empty", "10.0.0.1", {"target": "10.0.0.1", "skip_discovery": True})
+    with patch("shutil.which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm), patch.object(wu, "_notify"):
+        wu._run_scan(job)
+    assert job.status == "partial"
+    assert job.hosts_list()[0]["scan_status"] == "not_observed"
+
+
+def test_early_exit_notifies_exactly_once(wu):
+    job = wu.ScanJob("missing", "10.0.0.1", {"target": "10.0.0.1"})
+    with patch("shutil.which", return_value=None), patch.object(wu, "_notify") as notify:
+        wu._run_scan(job)
+    notify.assert_called_once_with(job)
+
+
+def test_bad_job_config_reaches_terminal_error(wu):
+    job = wu.ScanJob("bad", "10.0.0.1", {"target": "10.0.0.1", "speed": "invalid"})
+    with patch.object(wu, "_notify"):
+        wu._run_scan(job)
+    assert job.status == "error"
+    assert job.finished_at
+
+
+def test_interrupted_save_preserves_existing_document(wu):
+    wu._SETTINGS_FILE.write_text('{"nist_api_key": "previous"}', encoding="utf-8")
+    wu._settings = {"nist_api_key": "next"}
+    with patch.object(wu.os, "replace", side_effect=OSError("interrupted")):
+        with pytest.raises(OSError):
+            wu._save_settings()
+    assert json.loads(wu._SETTINGS_FILE.read_text(encoding="utf-8")) == {"nist_api_key": "previous"}
+    assert not list(wu._DATA_DIR.glob("*.tmp"))
+
+
+def test_corrupt_settings_are_preserved_for_recovery(wu):
+    wu._SETTINGS_FILE.write_text('{"email":', encoding="utf-8")
+    wu._load_settings()
+    assert wu._settings["email"]["enabled"] is False
+    assert wu._SETTINGS_FILE.read_text(encoding="utf-8") == '{"email":'
+
+
+def test_loaded_settings_do_not_mutate_defaults(wu):
+    wu._load_settings()
+    wu._settings["email"]["smtp_host"] = "custom"
+    assert wu._DEFAULT_SETTINGS["email"]["smtp_host"] == ""
+
+
+@pytest.mark.parametrize("body", [["bad"], "bad", 7])
+def test_nonobject_requests_return_client_error(client, body):
+    assert client.post("/api/scan/start", json=body).status_code == 400
+
+
+@pytest.mark.parametrize("body", [{"target": 7}, {"target": "10.0.0.1", "nmap_flags": ["-sU"]},
+                                  {"target": "10.0.0.1", "scan_vulns": "false"},
+                                  {"target": "10.0.0.1", "speed": 2.5}])
+def test_scan_field_type_errors_return_400(client, body):
+    assert client.post("/api/scan/start", json=body).status_code == 400
+
+
+def test_settings_object_shape_errors_return_400(client):
+    assert client.put("/api/settings", json={"email": []}).status_code == 400
+
+
+def test_slow_event_subscriber_does_not_block_scan_logging(wu):
+    import queue
+    subscriber = queue.Queue(maxsize=2)
+    wu._sse_subscribers.append(subscriber)
+    for i in range(4):
+        wu._broadcast({"msg": str(i)})
+    assert [subscriber.get_nowait()["msg"] for _ in range(2)] == ["2", "3"]
+    assert [event["msg"] for event in wu._log_history] == ["0", "1", "2", "3"]
+
+
+def test_webhook_http_failure_is_reported(client, wu):
+    from requests.exceptions import HTTPError
+    wu._settings["webhook"] = {"enabled": True, "url": "https://example.invalid/hook", "on_complete": True}
+    job = wu.ScanJob("hook", "10.0.0.1", {})
+    job.mark_done()
+    response = Mock(status_code=500)
+    response.raise_for_status.side_effect = HTTPError("500")
+    with patch.object(wu._requests, "post", return_value=response):
+        wu._send_webhook(job)
+        assert client.post("/api/settings/test_webhook").status_code == 500
+    assert any("Webhook delivery failed" in entry["msg"] for entry in wu._log_history)
+
+
+def test_ssl_email_uses_bounded_connection_for_notification_and_test(client, wu):
+    wu._settings["email"] = {"enabled": True, "smtp_host": "mail.example.invalid", "smtp_port": 465,
+                             "to_addr": "to@example.invalid", "from_addr": "from@example.invalid", "on_complete": True}
+    job = wu.ScanJob("mail", "10.0.0.1", {})
+    job.mark_done()
+    with patch.object(wu.smtplib, "SMTP_SSL") as ssl, patch.object(wu.smtplib, "SMTP") as plain:
+        wu._send_email(job)
+        assert client.post("/api/settings/test_email").status_code == 200
+        assert ssl.call_count == 2
+        assert ssl.call_args.kwargs["timeout"] == 30
+        assert ssl.return_value.__enter__.return_value.sendmail.call_count == 2
+        ssl.return_value.__enter__.return_value.starttls.assert_not_called()
+        plain.assert_not_called()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

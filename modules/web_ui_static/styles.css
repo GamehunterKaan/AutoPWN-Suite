@@ -94,6 +94,7 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px}
 .scan-card.running{border-left:3px solid var(--accent)}
 .scan-card.stopping{border-left:3px solid var(--orange)}
 .scan-card.completed{border-left:3px solid var(--green2)}
+.scan-card.partial,.scan-card.stopped{border-left:3px solid var(--orange)}
 .scan-card.error{border-left:3px solid var(--red)}
 .sc-header{display:flex;align-items:center;gap:10px}
 .sc-target{font-family:var(--mono);font-size:14px;color:var(--text);flex:1;word-break:break-all}
@@ -102,6 +103,7 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px}
 .sc-pill.running{border-color:var(--accent2);color:var(--accent);animation:pb 1.5s infinite}
 .sc-pill.stopping{border-color:var(--orange);color:var(--orange)}
 .sc-pill.completed{border-color:var(--green2);color:var(--green)}
+.sc-pill.partial,.sc-pill.stopped{border-color:var(--orange);color:var(--orange)}
 .sc-pill.error{border-color:var(--red);color:var(--red)}
 @keyframes pb{0%,100%{opacity:1}50%{opacity:.5}}
 .sc-stats{display:flex;gap:20px}
