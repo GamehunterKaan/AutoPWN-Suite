@@ -37,7 +37,7 @@ rich = "*"
 python-nmap = "*"
 beautifulsoup4 = "*"
 distro = "*"
-urllib3 = "^2.7.0"
+urllib3 = "^2.8.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.3"
