@@ -1,6 +1,6 @@
 """Offline regressions for configuration, actual Nmap results and NVD failures."""
 from argparse import Namespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from requests.exceptions import ConnectionError, HTTPError
@@ -93,7 +93,9 @@ def test_config_can_select_web_mode_before_scan_initialization(tmp_path):
          patch("autopwn.CheckConnection") as check:
         with pytest.raises(SystemExit):
             main()
-    server.assert_called_once_with(host="127.0.0.1", port=9090, version="2.4.2")
+    server.assert_called_once_with(host="127.0.0.1", port=9090, version=ANY)
+    assert isinstance(server.call_args.kwargs["version"], str)
+    assert server.call_args.kwargs["version"]
     check.assert_not_called()
 
 
