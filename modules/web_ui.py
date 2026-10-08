@@ -1183,8 +1183,8 @@ def _build_app(static_dir: Path) -> "Flask":
 
         try:
             config = _profile_config(body)
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
+        except ValueError:
+            return jsonify({"error": "Invalid scan configuration"}), 400
         api_key = body.get("api_key", "")
         if api_key is not None and not isinstance(api_key, str):
             return jsonify({"error": "api_key must be a string"}), 400
@@ -1345,8 +1345,8 @@ def _build_app(static_dir: Path) -> "Flask":
             return jsonify({"error": "'description' must be a string"}), 400
         try:
             config = _profile_config(body)
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
+        except ValueError:
+            return jsonify({"error": "Invalid scan configuration"}), 400
         pid = str(uuid.uuid4())
         profile = {
             "id":         pid,
@@ -1379,8 +1379,8 @@ def _build_app(static_dir: Path) -> "Flask":
                 p["description"] = body["description"]
             try:
                 p["config"] = _profile_config(body, p.get("config", {}))
-            except ValueError as exc:
-                return jsonify({"error": str(exc)}), 400
+            except ValueError:
+                return jsonify({"error": "Invalid scan configuration"}), 400
             _profiles[pid] = p
         _save_profiles()
         return jsonify(p)
@@ -1414,8 +1414,8 @@ def _build_app(static_dir: Path) -> "Flask":
         body = request.get_json(force=True, silent=True)
         try:
             schedule = _schedule_data(body)
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
+        except ValueError:
+            return jsonify({"error": "Invalid schedule configuration"}), 400
         sid = str(uuid.uuid4())
         schedule.update({
             "id": sid, "name": body.get("name", f"Schedule {sid[:8]}"),
@@ -1439,8 +1439,8 @@ def _build_app(static_dir: Path) -> "Flask":
                     return jsonify({"error": "Schedule not found"}), 404
                 try:
                     s = _schedule_data(body, _schedules[sid])
-                except ValueError as exc:
-                    return jsonify({"error": str(exc)}), 400
+                except ValueError:
+                    return jsonify({"error": "Invalid schedule configuration"}), 400
                 if s["profile_id"] not in _profiles:
                     return jsonify({"error": "Profile not found"}), 400
                 _schedules[sid] = s

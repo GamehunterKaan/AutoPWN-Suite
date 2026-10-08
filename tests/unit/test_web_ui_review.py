@@ -45,6 +45,48 @@ def _schedule(client, profile_id):
     return response.get_json()["id"]
 
 
+@pytest.mark.parametrize("endpoint", [
+    "scan", "profile_create", "profile_update", "schedule_create", "schedule_update",
+])
+@pytest.mark.parametrize("failure", ["internal_details", "oversized_integer"])
+def test_validation_errors_do_not_expose_exception_details(
+    client_review, wu_review, monkeypatch, endpoint, failure,
+):
+    profile_id = _profile(client_review)
+    schedule_id = _schedule(client_review, profile_id)
+    routes = {
+        "scan": ("POST", "/api/scan/start", {"target": "192.0.2.10"}),
+        "profile_create": ("POST", "/api/profiles", {"name": "Invalid"}),
+        "profile_update": ("PUT", f"/api/profiles/{profile_id}", {}),
+        "schedule_create": ("POST", "/api/schedules",
+                            {"target": "192.0.2.10", "profile_id": profile_id}),
+        "schedule_update": ("PUT", f"/api/schedules/{schedule_id}", {}),
+    }
+    method, path, body = routes[endpoint]
+    profiles_before = json.loads(json.dumps(wu_review._profiles))
+    schedules_before = json.loads(json.dumps(wu_review._schedules))
+    is_schedule = endpoint.startswith("schedule")
+    if failure == "internal_details":
+        monkeypatch.setattr(
+            wu_review, "_schedule_data" if is_schedule else "_profile_config",
+            Mock(side_effect=ValueError("/private/config: secret-token-123")),
+        )
+    else:
+        # Exercise an incidental int() exception through the real validators.
+        import sys
+        limit = sys.get_int_max_str_digits()
+        if not limit:
+            pytest.skip("Python integer conversion limit is disabled")
+        body["interval_value" if is_schedule else "speed"] = "9" * (limit + 1)
+    response = client_review.open(path, method=method, json=body)
+    assert response.status_code == 400
+    expected = "Invalid schedule configuration" if is_schedule else "Invalid scan configuration"
+    assert response.get_json() == {"error": expected}
+    assert wu_review._profiles == profiles_before
+    assert wu_review._schedules == schedules_before
+    wu_review._launch_scan.assert_not_called()
+
+
 class _EndScheduler(BaseException):
     pass
 
