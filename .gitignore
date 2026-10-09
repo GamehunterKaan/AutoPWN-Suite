@@ -15,6 +15,9 @@ venv/*
 modules/web_ui_profiles.json
 modules/web_ui_settings.json
 modules/web_ui_schedules.json
+vulnerabilities.sqlite3
+vulnerabilities.sqlite3.update-lock
+.nvd-*.sqlite3*
 
 # Testing
 .pytest_cache/

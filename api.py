@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Type, Union
 
 from nmap import PortScanner
 
-from modules.nist_search import searchCVE
+from modules.nist_search import searchCVE, VulnerabilityLookup
 from modules.searchvuln import GenerateKeyword
 from modules.scanner import InitHostInfo, ResolveScanHosts
 from modules.utils import fake_logger, is_root
@@ -30,6 +30,8 @@ class AutoScanner:
         vuln_info["severity_score"] = vuln.severity_score
         vuln_info["details_url"] = vuln.details_url
         vuln_info["exploitability"] = vuln.exploitability
+        vuln_info["data_source"] = vuln.data_source
+        vuln_info["database_updated_at"] = vuln.database_updated_at
 
         return vuln_info
 
@@ -69,7 +71,7 @@ class AutoScanner:
         return scan_arguments
 
     def SearchVuln(
-        self, port_key: JSON, apiKey: str = None, debug: bool = False
+        self, port_key: JSON, apiKey: str = None, debug: bool = False, *, lookup=None
     ) -> JSON:
         product = port_key.get("product", "")
         version = port_key.get("version", "")
@@ -82,7 +84,8 @@ class AutoScanner:
         if debug:
             print(f"Searching for keyword {keyword} ...")
 
-        Vulnerablities = searchCVE(keyword, log, apiKey, strict=True)
+        Vulnerablities = (lookup.search(keyword, log, apiKey) if lookup is not None
+                          else searchCVE(keyword, log, apiKey, strict=True))
         if len(Vulnerablities) == 0:
             return
 
@@ -93,6 +96,24 @@ class AutoScanner:
         return vulns
 
     def scan(
+        self, target, host_timeout=None, scan_speed=None, apiKey=None,
+        os_scan=False, scan_vulns=True, nmap_args=None, debug=False, *,
+        offline=False, vulnerability_source="auto", vuln_db=None,
+    ) -> JSON:
+        lookup = VulnerabilityLookup("offline" if offline else vulnerability_source, vuln_db) if scan_vulns else None
+        try:
+            if offline or vulnerability_source == "offline":
+                if isinstance(nmap_args, list):
+                    nmap_args = [*nmap_args, "-n"]
+                else:
+                    nmap_args = ((nmap_args or "") + " -n").strip()
+            return self._scan(target, host_timeout, scan_speed, apiKey, os_scan,
+                              scan_vulns, nmap_args, debug, lookup=lookup)
+        finally:
+            if lookup is not None:
+                lookup.close()
+
+    def _scan(
         self,
         target,
         host_timeout: int = None,
@@ -102,6 +123,7 @@ class AutoScanner:
         scan_vulns: bool = True,
         nmap_args=None,
         debug: bool = False,
+        *, lookup=None,
     ) -> JSON:
         if type(target) == str:
             target = [target]
@@ -138,7 +160,7 @@ class AutoScanner:
                         if port_data.get("state") != "open":
                             continue
                         product = port_data.get("product", "")
-                        vulnerabilities = self.SearchVuln(port_data, apiKey, debug)
+                        vulnerabilities = self.SearchVuln(port_data, apiKey, debug, lookup=lookup)
                         if vulnerabilities:
                             vulns.setdefault(product, {}).update(vulnerabilities)
                 result["vulns"] = vulns

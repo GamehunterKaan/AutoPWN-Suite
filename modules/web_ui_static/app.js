@@ -161,6 +161,7 @@ async function printScan(scanId) {
     <p><strong>Target:</strong> ${esc(job.target)}</p>
     <p><strong>Scan ID:</strong> ${esc(job.id)}</p>
     <p><strong>Status:</strong> ${job.status}</p>
+    <p><strong>Vulnerability data:</strong> ${esc(job.config?.vulnerability_source_used || job.config?.vulnerability_source || 'online')}${job.config?.vulnerability_database_updated_at ? ' · Database updated ' + esc(job.config.vulnerability_database_updated_at) : ''}</p>
     <p><strong>Started:</strong> ${job.started_at}</p>
     <p><strong>Finished:</strong> ${job.finished_at || 'N/A'}</p>
   </div>
@@ -470,6 +471,7 @@ function loadProfile(){
   if(c.host_timeout) document.getElementById('f-timeout').value = String(c.host_timeout);
   document.getElementById('f-skipd').checked  = !!c.skip_discovery;
   document.getElementById('f-vulns').checked  = c.scan_vulns !== false;
+  document.getElementById('f-vuln-source').value = offlineServer ? 'offline' : (c.vulnerability_source || 'auto');
   updateNmapPreview();
 }
 
@@ -493,6 +495,7 @@ async function startScan(){
     nmap_flags:     document.getElementById('f-nmap').value,
     host_timeout:   parseInt(document.getElementById('f-timeout').value)||240,
     scan_vulns:     document.getElementById('f-vulns').checked,
+    vulnerability_source: document.getElementById('f-vuln-source').value,
     skip_discovery: document.getElementById('f-skipd').checked,
   };
   try{
@@ -515,7 +518,17 @@ function connectSSE(){
   es = new EventSource('/api/events');
   es.onmessage = ev => {
     const d = JSON.parse(ev.data);
-    if(d.level==='__scan_done__') return;
+    if(d.level==='__scan_progress__'){
+      const job = scans[d.scan_id];
+      if(job && (d.progress?.revision ?? 0) > (job.progress?.revision ?? -1)){
+        job.progress = d.progress;
+        job.status = d.status;
+        job.finished_at = d.finished_at;
+        renderScans();
+      }
+      return;
+    }
+    if(d.level==='__scan_done__'){ poll(); return; }
     addLog(d.scan_id, d.msg, d.level, d.ts);
     if(d.msg && d.msg.includes('Scheduled scan fired')) loadSchedulesFromServer();
   };
@@ -536,7 +549,16 @@ async function poll(){
     if(scansStr === lastScansStr && hostsStr === lastHostsStr) return;
     lastScansStr = scansStr; lastHostsStr = hostsStr;
     const previousSelection = selIp && JSON.stringify(hosts[selIp]);
-    scans={}; scansR.forEach(s=>{ scans[s.id]=s; });
+    const previousScans = scans;
+    scans={}; scansR.forEach(s=>{
+      const previous = previousScans[s.id];
+      if((previous?.progress?.revision ?? -1) > (s.progress?.revision ?? -1)){
+        s.progress = previous.progress;
+        s.status = previous.status;
+        s.finished_at = previous.finished_at;
+      }
+      scans[s.id]=s;
+    });
     hosts = latestHostObservations(hostsR);
     renderScans(); renderHosts(); renderVulnTable(); updateBadges();
     if(selIp && hosts[selIp]) {
@@ -551,6 +573,31 @@ async function poll(){
 }
 
 // ── Render: Active Scans ──────────────────────────────────────────────────────
+function scanProgressMarkup(job){
+  const progress = job.progress || {};
+  const active = job.status === 'running' || job.status === 'stopping';
+  let percent = typeof progress.percent === 'number' && Number.isFinite(progress.percent)
+    ? Math.max(0, Math.min(100, progress.percent)) : null;
+  if(job.status === 'completed') percent = 100;
+  const labels = {preparing:'Preparing scan', discovery:'Host discovery', port_scan:'Port and service scan',
+    vulnerabilities:'CVE lookups', completed:'Scan completed', partial:'Incomplete coverage',
+    stopped:'Scan stopped', error:'Scan failed'};
+  const phase = progress.phase || job.status;
+  let label = labels[phase] || (active ? 'Scanning' : 'Scan finished');
+  if(phase === 'vulnerabilities' && progress.total != null) label += ` ${progress.completed || 0}/${progress.total}`;
+  if(progress.detail && progress.detail !== label && active) label += ' · ' + progress.detail;
+  if(job.status === 'stopping') label = 'Stopping · ' + label;
+  const indeterminate = active && percent === null;
+  const percentText = percent === null ? (active ? 'Working…' : '') : `${Math.floor(percent)}%`;
+  const targetText = progress.targets_total != null
+    ? `${progress.targets_completed || 0}/${progress.targets_total} targets finished${progress.host ? ' · ' + progress.host : ''}`
+    : (progress.host || '');
+  return `<div class="sc-progress-label"><span>${esc(label)}</span><span>${esc(percentText)}</span></div>
+    <div class="sc-bar" role="progressbar" aria-label="Current scan stage" aria-valuemin="0" aria-valuemax="100"
+      ${percent === null ? '' : `aria-valuenow="${percent}"`} aria-valuetext="${esc(label + (percentText ? ' · ' + percentText : ''))}">
+      <div class="sc-bar-fill ${indeterminate ? 'indeterminate' : esc(job.status)}" style="width:${indeterminate ? 30 : percent || 0}%"></div>
+    </div>${targetText ? `<div class="sc-time">${esc(targetText)}</div>` : ''}`;
+}
 function renderScans(){
   const container = document.getElementById('tc-scans');
   const empty     = document.getElementById('scans-empty');
@@ -588,7 +635,7 @@ function renderScans(){
         <div class="sc-stat"><div class="sv">${job.port_count}</div><div class="sl">Ports</div></div>
         <div class="sc-stat"><div class="sv" style="color:${job.vuln_count?'var(--red)':'var(--accent)'}">${job.vuln_count}</div><div class="sl">CVEs</div></div>
       </div>
-      <div class="sc-bar"><div class="sc-bar-fill${running?'':' done'}"></div></div>
+      ${scanProgressMarkup(job)}
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div class="sc-time">${esc(job.finished_at?`Finished ${timeAgo(job.finished_at)}`:`Started ${timeAgo(job.started_at)}`)}</div>
         <div style="display:flex;gap:8px">
@@ -598,6 +645,7 @@ function renderScans(){
         </div>
       </div>
       ${job.error?`<div style="font-family:var(--mono);font-size:11px;color:var(--red)">${esc(job.error)}</div>`:''}
+      <div class="sc-time">Vulnerability data: ${esc(c.vulnerability_source_used || c.vulnerability_source || 'online')}${c.vulnerability_database_updated_at ? ' · Updated ' + esc(c.vulnerability_database_updated_at) : ''}</div>
     `;
     container.appendChild(card);
   });
@@ -747,6 +795,70 @@ document.getElementById('term-filter').addEventListener('change',function(){
 });
 
 // ── Settings: NIST key ────────────────────────────────────────────────────────
+let offlineServer = false;
+let savingOfflineMode = false;
+let sourceBeforeOffline = 'auto';
+let databaseStatusRequest = 0;
+async function loadDatabaseStatus(){
+  const request = ++databaseStatusRequest;
+  const status = await fetchJson('/api/vulnerability-database');
+  if(request !== databaseStatusRequest) return;
+  const wasOffline = offlineServer;
+  offlineServer = !!status.offline_only;
+  const source = document.getElementById('f-vuln-source');
+  if(offlineServer && !wasOffline) sourceBeforeOffline = source.value || 'auto';
+  if(!offlineServer && wasOffline) source.value = sourceBeforeOffline;
+  source.disabled = offlineServer;
+  const toggle = document.getElementById('s-offline-mode');
+  if(!savingOfflineMode) toggle.checked = offlineServer;
+  toggle.disabled = savingOfflineMode || !!status.offline_locked;
+  toggle.title = status.offline_locked ? 'Restart without --offline to change this setting.' : '';
+  const update = status.update || {};
+  let message = status.ready
+    ? `${status.count.toLocaleString()} CVEs · Updated ${new Date(status.updated_at).toLocaleString()} · ${(status.size_bytes / 1048576).toFixed(1)} MB`
+    : (status.error || 'No local database. Download it while connected or copy vulnerabilities.sqlite3 from another system.');
+  if(update.running) message += ` · ${update.message} (${update.current}/${update.total || '?'})`;
+  if(update.error) message += ` · ${update.error}`;
+  if(offlineServer) message += ' · Server is in offline mode.';
+  document.getElementById('database-status').textContent = message;
+  const button = document.getElementById('database-update');
+  button.disabled = !!update.running || offlineServer;
+  button.textContent = update.running ? 'Updating…' : status.ready ? 'Update database' : 'Download database';
+  document.getElementById('database-export').hidden = !status.ready;
+  if(offlineServer){
+    document.getElementById('f-vuln-source').value = 'offline';
+  }
+}
+async function saveOfflineMode(){
+  const toggle = document.getElementById('s-offline-mode');
+  const enabled = toggle.checked;
+  savingOfflineMode = true;
+  toggle.disabled = true;
+  try{
+    const response = await fetch('/api/settings', {method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({offline_mode:enabled})});
+    const result = await response.json();
+    if(!response.ok) throw new Error(result.error || 'Could not save offline mode.');
+    toast(enabled ? 'Offline mode enabled for the whole dashboard.' : 'Offline mode disabled.');
+  }catch(error){
+    toggle.checked = offlineServer;
+    toast(error.message, false);
+  }finally{
+    savingOfflineMode = false;
+    await loadDatabaseStatus().catch(()=>{ toggle.disabled = false; });
+  }
+}
+async function updateVulnerabilityDatabase(){
+  const button = document.getElementById('database-update');
+  button.disabled = true;
+  try{
+    const response = await fetch('/api/vulnerability-database/update', {method:'POST'});
+    const result = await response.json();
+    if(!response.ok) throw new Error(result.error || 'Could not start download.');
+    toast('Database download started. Progress appears here.');
+  }catch(error){ toast(error.message, false); }
+  await loadDatabaseStatus().catch(()=>{ button.disabled = false; });
+}
 async function saveNistKey(){
   const key=document.getElementById('s-nist-key').value.trim();
   const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({nist_api_key:key})});
@@ -824,7 +936,26 @@ function renderProfiles(){
       </div>
     </div>`).join('');
 }
-function showProfileForm(){ document.getElementById('profile-form').style.display='flex'; document.getElementById('pf-id').value=''; document.getElementById('profile-form-title').textContent='New Profile'; document.getElementById('pf-name').value=''; document.getElementById('pf-desc').value=''; document.getElementById('pf-mode').value='normal'; document.getElementById('pf-speed').value='3'; document.getElementById('pf-scantype').value=''; document.getElementById('pf-timeout').value='240'; document.getElementById('pf-scantech').value=''; document.getElementById('pf-ports').value=''; document.getElementById('pf-vint').value=''; document.getElementById('pf-os').checked=false; document.getElementById('pf-nmap').value=''; document.getElementById('pf-skipd').checked=false; document.getElementById('pf-vulns').checked=true; updateProfilePreview(); }
+function showProfileForm(){
+  document.getElementById('profile-form').style.display='flex';
+  document.getElementById('pf-id').value='';
+  document.getElementById('profile-form-title').textContent='New Profile';
+  document.getElementById('pf-name').value='';
+  document.getElementById('pf-desc').value='';
+  document.getElementById('pf-mode').value='normal';
+  document.getElementById('pf-speed').value='3';
+  document.getElementById('pf-scantype').value='';
+  document.getElementById('pf-timeout').value='240';
+  document.getElementById('pf-scantech').value='';
+  document.getElementById('pf-ports').value='';
+  document.getElementById('pf-vint').value='';
+  document.getElementById('pf-os').checked=false;
+  document.getElementById('pf-nmap').value='';
+  document.getElementById('pf-skipd').checked=false;
+  document.getElementById('pf-vulns').checked=true;
+  document.getElementById('pf-vuln-source').value='auto';
+  updateProfilePreview();
+}
 function hideProfileForm(){ document.getElementById('profile-form').style.display='none'; }
 function editProfile(pid){
   const p=profiles[pid]; if(!p) return;
@@ -845,6 +976,7 @@ function editProfile(pid){
   document.getElementById('pf-nmap').value=c.nmap_flags||'';
   document.getElementById('pf-skipd').checked=!!c.skip_discovery;
   document.getElementById('pf-vulns').checked=c.scan_vulns!==false;
+  document.getElementById('pf-vuln-source').value=c.vulnerability_source||'auto';
   updateProfilePreview();
 }
 async function saveProfile(){
@@ -864,6 +996,7 @@ async function saveProfile(){
     nmap_flags:  document.getElementById('pf-nmap').value,
     skip_discovery: document.getElementById('pf-skipd').checked,
     scan_vulns:     document.getElementById('pf-vulns').checked,
+    vulnerability_source: document.getElementById('pf-vuln-source').value,
   };
   const url=pid?`/api/profiles/${pid}`:'/api/profiles';
   const method=pid?'PUT':'POST';
@@ -1012,12 +1145,14 @@ document.addEventListener('click', (e) => {
     if(verR.version) document.getElementById('app-version').textContent = 'v' + verR.version;
     scansR.forEach(s=>{ scans[s.id]=s; scansR.length && addTermFilterOption(s.id,s.target); });
     hosts = latestHostObservations(hostsR);
-    logR.forEach(e=>addLog(e.scan_id,e.msg,e.level,e.ts));
+    logR.filter(e=>!e.level?.startsWith('__')).forEach(e=>addLog(e.scan_id,e.msg,e.level,e.ts));
     renderScans(); renderHosts(); renderVulnTable(); updateBadges();
     await loadSettingsIntoForm();
+    await loadDatabaseStatus();
     await loadProfilesFromServer();
     await loadSchedulesFromServer();
   }catch(e){ addLog(null,'Cannot connect to server. Refresh to retry.','error'); }
   connectSSE();
   pollT=setInterval(poll,1500);
+  setInterval(()=>loadDatabaseStatus().catch(()=>{}), 5000);
 })();

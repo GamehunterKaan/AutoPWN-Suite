@@ -1,0 +1,129 @@
+{
+  "source": "Public CVE descriptions from the supplied offline and online scan exports; network and device data omitted.",
+  "queries": {
+    "Samba smbd 3.X": {
+      "candidates": [
+        {
+          "id": "CVE-2009-1888",
+          "description": "The acl_group_override function in smbd/posix_acls.c in smbd in Samba 3.0.x before 3.0.35, 3.1.x and 3.2.x before 3.2.13, and 3.3.x before 3.3.6, when dos filemode is enabled, allows remote attackers to modify access control lists for files via vectors related to read access to uninitialized memory."
+        },
+        {
+          "id": "CVE-2011-0719",
+          "description": "Samba 3.x before 3.3.15, 3.4.x before 3.4.12, and 3.5.x before 3.5.7 does not perform range checks for file descriptors before use of the FD_SET macro, which allows remote attackers to cause a denial of service (stack memory corruption, and infinite loop or daemon crash) by opening a large number of files, related to (1) Winbind or (2) smbd."
+        },
+        {
+          "id": "CVE-2013-4124",
+          "description": "Integer overflow in the read_nttrans_ea_list function in nttrans.c in smbd in Samba 3.x before 3.5.22, 3.6.x before 3.6.17, and 4.x before 4.0.8 allows remote attackers to cause a denial of service (memory consumption) via a malformed packet."
+        },
+        {
+          "id": "CVE-2015-5252",
+          "description": "vfs.c in smbd in Samba 3.x and 4.x before 4.1.22, 4.2.x before 4.2.7, and 4.3.x before 4.3.3, when share names with certain substring relationships exist, allows remote attackers to bypass intended file-access restrictions via a symlink that points outside of a share."
+        },
+        {
+          "id": "CVE-2015-7560",
+          "description": "The SMB1 implementation in smbd in Samba 3.x and 4.x before 4.1.23, 4.2.x before 4.2.9, 4.3.x before 4.3.6, and 4.4.x before 4.4.0rc4 allows remote authenticated users to modify arbitrary ACLs by using a UNIX SMB1 call to create a symlink, and then using a non-UNIX SMB1 call to write to the ACL content."
+        }
+      ],
+      "expected_cves": [
+        "CVE-2011-0719",
+        "CVE-2013-4124",
+        "CVE-2015-5252",
+        "CVE-2015-7560"
+      ]
+    },
+    "Apache Tomcat 1.1": {
+      "candidates": [
+        {
+          "id": "CVE-2002-1148",
+          "description": "The default servlet (org.apache.catalina.servlets.DefaultServlet) in Tomcat 4.0.4 and 4.1.10 and earlier allows remote attackers to read source code for server files via a direct request to the servlet."
+        },
+        {
+          "id": "CVE-2002-2272",
+          "description": "Tomcat 4.0 through 4.1.12, using mod_jk 1.2.1 module on Apache 1.3 through 1.3.27, allows remote attackers to cause a denial of service (desynchronized communications) via an HTTP GET request with a Transfer-Encoding chunked field with invalid values."
+        },
+        {
+          "id": "CVE-2005-1753",
+          "description": "ReadMessage.jsp in JavaMail API 1.1.3 through 1.3, as used by Apache Tomcat 5.0.16, allows remote attackers to view other users' e-mail attachments via a direct request to /mailboxesdir/username@domainname. NOTE: Sun and Apache dispute this issue.  Sun states: \"The report makes references to source code and files that do not exist in the mentioned products."
+        },
+        {
+          "id": "CVE-2005-1754",
+          "description": "JavaMail API 1.1.3 through 1.3, as used by Apache Tomcat 5.0.16, allows remote attackers to read arbitrary files via a full pathname in the argument to the Download parameter.  NOTE: Sun and Apache dispute this issue.  Sun states: \"The report makes references to source code and files that do not exist in the mentioned products."
+        },
+        {
+          "id": "CVE-2005-4836",
+          "description": "The HTTP/1.1 connector in Apache Tomcat 4.1.15 through 4.1.40 does not reject NULL bytes in a URL when allowLinking is configured, which allows remote attackers to read JSP source files and obtain sensitive information."
+        },
+        {
+          "id": "CVE-2012-3908",
+          "description": "Multiple cross-site request forgery (CSRF) vulnerabilities in the ISE Administrator user interface (aka the Apache Tomcat interface) on Cisco Identity Services Engine (ISE) 3300 series appliances before 1.1.0.665 Cumulative Patch 1 allow remote attackers to hijack the authentication of administrators, aka Bug ID CSCty46684."
+        },
+        {
+          "id": "CVE-2016-5388",
+          "description": "Apache Tomcat 7.x through 7.0.70 and 8.x through 8.5.4, when the CGI Servlet is enabled, follows RFC 3875 section 4.1.18 and therefore does not protect applications from the presence of untrusted client data in the HTTP_PROXY environment variable, which might allow remote attackers to redirect an application's outbound HTTP traffic to an arbitrary proxy server via a crafted Proxy header in an HTTP request, aka an \"httpoxy\" issue. NOTE: the vendor states \"A mitigation is planned for future releases of Tomcat, tracked as CVE-2016-5388\"; in other words, this is not a CVE ID for a vulnerability."
+        },
+        {
+          "id": "CVE-2017-15698",
+          "description": "When parsing the AIA-Extension field of a client certificate, Apache Tomcat Native Connector 1.2.0 to 1.2.14 and 1.1.23 to 1.1.34 did not correctly handle fields longer than 127 bytes. The result of the parsing error was to skip the OCSP check. It was therefore possible for client certificates that should have been rejected (if the OCSP check had been made) to be accepted. Users not using OCSP checks are not affected by this vulnerability."
+        },
+        {
+          "id": "CVE-2018-8019",
+          "description": "When using an OCSP responder Apache Tomcat Native 1.2.0 to 1.2.16 and 1.1.23 to 1.1.34 did not correctly handle invalid responses. This allowed for revoked client certificates to be incorrectly identified. It was therefore possible for users to authenticate with revoked certificates when using mutual TLS. Users not using OCSP checks are not affected by this vulnerability."
+        },
+        {
+          "id": "CVE-2018-8020",
+          "description": "Apache Tomcat Native 1.2.0 to 1.2.16 and 1.1.23 to 1.1.34 has a flaw that does not properly check OCSP pre-produced responses, which are lists (multiple entries) of certificate statuses. Subsequently, revoked client certificates may not be properly identified, allowing for users to authenticate with revoked certificates to connections that require mutual TLS. Users not using OCSP checks are not affected by this vulnerability."
+        },
+        {
+          "id": "CVE-2020-13934",
+          "description": "An h2c direct connection to Apache Tomcat 10.0.0-M1 to 10.0.0-M6, 9.0.0.M5 to 9.0.36 and 8.5.1 to 8.5.56 did not release the HTTP/1.1 processor after the upgrade to HTTP/2. If a sufficient number of such requests were made, an OutOfMemoryException could occur leading to a denial of service."
+        },
+        {
+          "id": "CVE-2022-45143",
+          "description": "The JsonErrorReportValve in Apache Tomcat 8.5.83, 9.0.40 to 9.0.68 and 10.1.0-M1 to 10.1.1 did not escape the type, message or description values. In some circumstances these are constructed from user provided data and it was therefore possible for users to supply values that invalidated or manipulated the JSON output."
+        },
+        {
+          "id": "CVE-2023-42795",
+          "description": "Incomplete Cleanup vulnerability in Apache Tomcat.When recycling various internal objects in Apache Tomcat from 11.0.0-M1 through 11.0.0-M11, from 10.1.0-M1 through 10.1.13, from 9.0.0-M1 through 9.0.80 and from 8.5.0 through 8.5.93, an error could \ncause Tomcat to skip some parts of the recycling process leading to \ninformation leaking from the current request/response to the next.\nOlder, EOL versions may also be affected.\n\n\nUsers are recommended to upgrade to version 11.0.0-M12 onwards, 10.1.14 onwards, 9.0.81 onwards or 8.5.94 onwards, which fixes the issue."
+        },
+        {
+          "id": "CVE-2023-45648",
+          "description": "Improper Input Validation vulnerability in Apache Tomcat.Tomcat from 11.0.0-M1 through 11.0.0-M11, from 10.1.0-M1 through 10.1.13, from 9.0.0-M1 through 9.0.81 and from 8.5.0 through 8.5.93 did not correctly parse HTTP trailer headers. A specially \ncrafted, invalid trailer header could cause Tomcat to treat a single \nrequest as multiple requests leading to the possibility of request \nsmuggling when behind a reverse proxy.\n\nOlder, EOL versions may also be affected.\n\n\nUsers are recommended to upgrade to version 11.0.0-M12 onwards, 10.1.14 onwards, 9.0.81 onwards or 8.5.94 onwards, which fix the issue."
+        },
+        {
+          "id": "CVE-2023-46589",
+          "description": "Improper Input Validation vulnerability in Apache Tomcat.Tomcat from 11.0.0-M1 through 11.0.0-M10, from 10.1.0-M1 through 10.1.15, from 9.0.0-M1 through 9.0.82 and from 8.5.0 through 8.5.95 did not correctly parse HTTP trailer headers. A trailer header that exceeded the header size limit could cause Tomcat to treat a single \nrequest as multiple requests leading to the possibility of request \nsmuggling when behind a reverse proxy.\n\n\nOlder, EOL versions may also be affected.\n\n\nUsers are recommended to upgrade to version 11.0.0-M11 onwards, 10.1.16 onwards, 9.0.83 onwards or 8.5.96 onwards, which fix the issue."
+        },
+        {
+          "id": "CVE-2024-23672",
+          "description": "Denial of Service via incomplete cleanup vulnerability in Apache Tomcat. It was possible for WebSocket clients to keep WebSocket connections open leading to increased resource consumption.This issue affects Apache Tomcat: from 11.0.0-M1 through 11.0.0-M16, from 10.1.0-M1 through 10.1.18, from 9.0.0-M1 through 9.0.85, from 8.5.0 through 8.5.98.\n\nOlder, EOL versions may also be affected.\n\n\nUsers are recommended to upgrade to version 11.0.0-M17, 10.1.19, 9.0.86 or 8.5.99 which fix the issue."
+        },
+        {
+          "id": "CVE-2024-24549",
+          "description": "Denial of Service due to improper input validation vulnerability for HTTP/2 requests in Apache Tomcat. When processing an HTTP/2 request, if the request exceeded any of the configured limits for headers, the associated HTTP/2 stream was not reset until after all of the headers had been processed.This issue affects Apache Tomcat: from 11.0.0-M1 through 11.0.0-M16, from 10.1.0-M1 through 10.1.18, from 9.0.0-M1 through 9.0.85, from 8.5.0 through 8.5.98. Other, older, EOL versions may also be affected.\n\nUsers are recommended to upgrade to version 11.0.0-M17, 10.1.19, 9.0.86 or 8.5.99 which fix the issue."
+        },
+        {
+          "id": "CVE-2025-31650",
+          "description": "Improper Input Validation vulnerability in Apache Tomcat. Incorrect error handling for some invalid HTTP priority headers resulted in incomplete clean-up of the failed request which created a memory leak. A large number of such requests could trigger an OutOfMemoryException resulting in a denial of service.\n\nThis issue affects Apache Tomcat: from 9.0.76 through 9.0.102, from 10.1.10 through 10.1.39, from 11.0.0-M2 through 11.0.5.\nThe following versions were EOL at the time the CVE was created but are \nknown to be affected: 8.5.90 though 8.5.100.\n\n\nUsers are recommended to upgrade to version 9.0.104, 10.1.40 or 11.0.6 which fix the issue."
+        },
+        {
+          "id": "CVE-2026-24734",
+          "description": "Improper Input Validation vulnerability in Apache Tomcat Native, Apache Tomcat.\n\nWhen using an OCSP responder, Tomcat Native (and Tomcat's FFM port of the Tomcat Native code) did not complete verification or freshness checks on the OCSP response which could allow certificate revocation to be bypassed.\n\nThis issue affects Apache Tomcat Native:  from 1.3.0 through 1.3.4, from 2.0.0 through 2.0.11; Apache Tomcat: from 11.0.0-M1 through 11.0.17, from 10.1.0-M7 through 10.1.51, from 9.0.83 through 9.0.114.\n\n\nThe following versions were EOL at the time the CVE was created but are \nknown to be affected: from 1.1.23 through 1.1.34, from 1.2.0 through 1.2.39. Older EOL versions are not affected.\n\nApache Tomcat Native users are recommended to upgrade to versions 1.3.5 or later or 2.0.12 or later, which fix the issue.\n\nApache Tomcat users are recommended to upgrade to versions 11.0.18 or later, 10.1.52 or later or 9.0.115 or later which fix the issue."
+        },
+        {
+          "id": "CVE-2026-29145",
+          "description": "CLIENT_CERT authentication does not fail as expected for some scenarios when soft fail is disabled vulnerability in Apache Tomcat, Apache Tomcat Native.\n\nThis issue affects Apache Tomcat: from 11.0.0-M1 through 11.0.18, from 10.1.0-M7 through 10.1.52, from 9.0.83 through 9.0.115; Apache Tomcat Native: from 1.1.23 through 1.1.34, from 1.2.0 through 1.2.39, from 1.3.0 through 1.3.6, from 2.0.0 through 2.0.13.\n\nUsers are recommended to upgrade to version Tomcat Native 1.3.7 or 2.0.14 and Tomcat 11.0.20, 10.1.53 and 9.0.116, which fix the issue."
+        }
+      ],
+      "expected_cves": [
+        "CVE-2005-1753",
+        "CVE-2005-1754",
+        "CVE-2012-3908",
+        "CVE-2017-15698",
+        "CVE-2018-8019",
+        "CVE-2018-8020",
+        "CVE-2026-24734",
+        "CVE-2026-29145"
+      ]
+    }
+  }
+}

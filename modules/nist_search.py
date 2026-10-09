@@ -16,6 +16,8 @@ class Vulnerability:
     severity_score: float
     details_url: str
     exploitability: float
+    data_source: str = "online"
+    database_updated_at: str = None
 
     def __str__(self) -> str:
         return (
@@ -73,6 +75,46 @@ def FindVars(vuln: dict) -> tuple:
     details_url = "https://nvd.nist.gov/vuln/detail/" + CVE_ID
 
     return CVE_ID, description, severity, severity_score, details_url, exploitability
+
+
+class VulnerabilityLookup:
+    """One scan's provider selection; auto falls back once, never silently updates."""
+
+    def __init__(self, source="auto", database=None, *, lazy=False):
+        if source not in ("auto", "online", "offline"):
+            raise ValueError("Vulnerability source must be auto, online, or offline")
+        self.source = source
+        self.database = database
+        self.local = None
+        if source == "offline" and not lazy:
+            self._open_local()
+
+    def _open_local(self):
+        from modules.vulnerability_db import OfflineDatabase
+        if self.local is None:
+            self.local = OfflineDatabase(self.database)
+        self.source = "offline"
+
+    def search(self, keyword, log, api_key=None):
+        if self.source == "offline":
+            if self.local is None:
+                self._open_local()
+                log.logger("info", f"Using local NVD database: {self.local.metadata['count']} CVEs; "
+                           f"updated {self.local.metadata['updated_at']}.")
+            return self.local.search(keyword)
+        try:
+            return searchCVE(keyword, log, api_key, strict=True)
+        except Exception:
+            if self.source != "auto":
+                raise
+            self._open_local()
+            log.logger("warning", "NVD unavailable; using the local vulnerability database "
+                       f"updated {self.local.metadata['updated_at']} for this scan.")
+            return self.local.search(keyword)
+
+    def close(self):
+        if self.local is not None:
+            self.local.close()
 
 
 def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=False) -> list[Vulnerability]:

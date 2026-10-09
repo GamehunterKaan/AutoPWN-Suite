@@ -40,6 +40,7 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 
 - **Multiple concurrent scans** - Launch and monitor several scans at the same time
 - **Live terminal output** - Watch nmap commands and results in real time via SSE
+- **Scan progress** - Live Nmap stage percentages, completed CVE lookup counts and target completion counters. The bar follows the current stage; stages without a reported percentage show ongoing activity. Stopped and failed scans retain their last measured progress.
 - **Scan profiles** - Save and reuse scan configurations (technique, speed, timeout, ports, evasion, custom flags)
 - **Scheduled scans** - Set up recurring scans on a cron schedule with automatic profile loading
 - **Scan techniques** - Choose between TCP SYN, TCP Connect, UDP, Window, ACK, FIN, Xmas, Null, Maimon and SCTP scans
@@ -58,6 +59,75 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of software running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of keywords to search the [NIST vulnerability database.](https://www.nist.gov/)
 
+
+## Offline vulnerability database
+
+AutoPWN can keep a portable local mirror of the [NIST NVD JSON 2.0 feeds](https://nvd.nist.gov/vuln/data-feeds).
+These are CVE records (descriptions, CVSS scores, affected-product configurations and references),
+not exploit programs. The small NIST `.meta` files describe feed freshness, size and checksums;
+downloading only those files is insufficient for vulnerability detection.
+
+On a connected machine, explicitly download the database:
+
+```bash
+python autopwn.py --update-vuln-db
+python autopwn.py --vuln-db-status
+```
+
+The first download covers all yearly feeds from 2002 through the current year, including
+older CVEs contained in the 2002 feed. Allow several minutes and several GB of free disk space
+for the database, feed processing and a temporary update copy. No NIST API key is required for
+feed downloads. Repeat `--update-vuln-db` whenever you want fresh data. Each update checks every
+year's metadata and downloads only changed yearly feeds, so updates also cover long periods
+without internet. Checksums and record counts are verified before publishing the new database;
+a failed or interrupted update preserves the previous database. Concurrent updates are rejected.
+An update may need to be retried after active scans finish if the operating system locks the database file.
+
+Run an airgapped scan with an explicit target:
+
+```bash
+python autopwn.py --offline -t 192.168.1.0/24 -y
+python autopwn.py --web --offline
+```
+
+Offline mode uses local CVE lookups, skips internet connectivity checks, exploit downloads,
+web application probes, automatic Nmap installation and email/webhook delivery, and disables
+Nmap reverse DNS. Nmap still communicates with the requested scan targets. Use IP addresses
+and locally installed Nmap scripts; user-supplied hostnames or scripts may have their own network
+requirements. Install Python dependencies and Nmap before disconnecting, or transfer installation
+packages from a connected machine. The dashboard uses local assets and system fonts.
+
+The default `--vuln-source auto` tries online NVD lookups and falls back to a ready local database
+if NVD is unavailable, staying local for the rest of that scan. `--vuln-source online` requires
+online lookups. Use `--offline` (or `--vuln-source offline`) to avoid trying NVD at all.
+Missing or invalid local data fails explicitly rather than reporting a clean vulnerability scan.
+Stored data remains usable without an expiry; its update time is shown in scan logs and dashboard
+results. Offline matching uses description keyword prefixes, with all query terms required,
+and keeps versions such as `10.1.18` distinct from a query for `1.1`. As with online keyword scans,
+findings are possible vulnerabilities, not proof of exploitability or exact version applicability.
+
+In the dashboard, **Settings → Offline vulnerability database** provides manual Download/Update,
+progress, CVE count, update time and an **Export for airgapped system** link. Select the vulnerability
+data source in **New Scan** or save it in a scan profile for scheduled scans. Starting the server
+with `--offline` forces every scan to use local data and blocks downloads and test notifications.
+The **Offline mode — whole dashboard** toggle in Settings saves this preference across restarts
+and overrides the source for all new and scheduled scans. It also blocks downloads and notifications.
+Turn it off when you want to download updates. Finish or stop active online scans and let any database
+update or pending notification finish before turning it on. A server started with `--offline` keeps offline mode enforced.
+
+The default file is `modules/vulnerabilities.sqlite3`, or `AUTOPWN_DATA_DIR/vulnerabilities.sqlite3`
+when that environment variable is set. Copy this single file to the airgapped machine's data
+directory, or select its location explicitly:
+
+```bash
+python autopwn.py --offline --vuln-db /media/transfer/vulnerabilities.sqlite3 -t 192.168.1.10
+python autopwn.py --web --offline --vuln-db /media/transfer/vulnerabilities.sqlite3
+```
+
+The database contains public vulnerability data, without scan targets, credentials or exploit files.
+It is portable between platforms. Configuration files also support `offline`, `vulnerability_source`
+and `vuln_db` in `[AUTOPWN]`. Python callers can use
+`AutoScanner().scan("192.168.1.10", offline=True, vuln_db="/path/vulnerabilities.sqlite3")`.
 
 ## Demo
 

@@ -52,6 +52,8 @@ class TestMainExecution:
         mock_args.no_color = True
         mock_args.web = False
         mock_args.report = None # Explicitly set no report
+        mock_args.vulnerability_source = "auto"
+        mock_args.vuln_db = None
         mock_args.scan_interval = None # Prevent TypeError on comparison
         mock_cli.return_value = mock_args
 
@@ -69,6 +71,9 @@ class TestMainExecution:
         # Verify that all the main setup and execution functions are called
         # Note: InitArgsConf is not called in this path because args.config is None
         for func in all_mocks:
+            if func is mock_check_connection:
+                func.assert_not_called()
+                continue
             if func is mock_init_conf:
                 func.assert_not_called()
                 continue
@@ -99,6 +104,8 @@ class TestMainExecution:
         mock_args.no_color = True
         mock_args.web = False
         mock_args.report = None
+        mock_args.vulnerability_source = "auto"
+        mock_args.vuln_db = None
         mock_args.scan_interval = None # Prevent TypeError on comparison
         mock_cli.return_value = mock_args
 
