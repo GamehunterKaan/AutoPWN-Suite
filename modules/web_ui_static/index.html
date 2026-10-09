@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>AutoPWN Suite</title>
 <link rel="icon" type="image/x-icon" href="/favicon.ico"/>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -39,6 +37,14 @@
       <div class="fl">Profile</div>
       <select id="f-profile" onchange="loadProfile()">
         <option value="">— No profile —</option>
+      </select>
+    </div>
+    <div>
+      <div class="fl">Vulnerability data</div>
+      <select id="f-vuln-source">
+        <option value="auto">Online, with local fallback</option>
+        <option value="online">Online NIST only</option>
+        <option value="offline">Offline local database</option>
       </select>
     </div>
     <div class="row2">
@@ -206,6 +212,20 @@
 
       <!-- NIST API Key -->
       <div class="s-section">
+        <div class="s-section-title">Offline vulnerability database</div>
+        <div class="toggle-row">
+          <label class="toggle-label" for="s-offline-mode">Offline mode — whole dashboard</label>
+          <label class="toggle"><input type="checkbox" id="s-offline-mode" role="switch" onchange="saveOfflineMode()"/><span class="toggle-slider"></span></label>
+        </div>
+        <div class="s-row-hint">Saved for all new and scheduled scans. Uses local vulnerability data and disables downloads and notifications. Finish or stop active online scans and let pending notifications finish before enabling.</div>
+        <div class="s-row-hint">Download NIST CVE records while connected, then scan without internet. Updates run only when requested. The first download covers every year since 2002 and needs time and disk space. Exploit files are separate.</div>
+        <div id="database-status" role="status" aria-live="polite">Checking local database…</div>
+        <div class="s-actions">
+          <button id="database-update" class="btn btn-primary btn-sm" onclick="updateVulnerabilityDatabase()">Download database</button>
+          <a id="database-export" class="btn btn-ghost btn-sm" href="/api/vulnerability-database/download" hidden>Export for airgapped system</a>
+        </div>
+      </div>
+      <div class="s-section">
         <div class="s-section-title">NIST API Key</div>
         <div class="s-row">
           <div class="s-row-label">API Key</div>
@@ -241,6 +261,9 @@
               <select id="pf-scantype"><option value="">Auto</option><option value="arp">ARP</option><option value="ping">Ping</option></select>
             </div>
             <div><div class="fl">Timeout (s)</div><input type="number" id="pf-timeout" value="240" min="1" oninput="updateProfilePreview()"/></div>
+            <div><div class="fl">Vulnerability data</div>
+              <select id="pf-vuln-source"><option value="auto">Online, with local fallback</option><option value="online">Online NIST only</option><option value="offline">Offline local database</option></select>
+            </div>
           </div>
           <div class="form-grid">
             <div><div class="fl">Scan Technique</div>

@@ -56,12 +56,17 @@ import uuid
 import base64
 from copy import deepcopy
 from contextlib import contextmanager
+from functools import wraps
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Optional
 import logging
+import math
+from modules.nmap_progress import ScanCancelled
+from modules.nist_search import VulnerabilityLookup
+from modules.vulnerability_db import database_status, database_path, update_database
 
 try:
     import requests as _requests
@@ -122,12 +127,37 @@ _STATIC_DIR  = _MODULE_DIR / "web_ui_static"
 _DATA_DIR    = Path(os.environ.get("AUTOPWN_DATA_DIR", str(_MODULE_DIR)))
 _DATA_DIR.mkdir(parents=True, exist_ok=True)
 _SETTINGS_FILE = _DATA_DIR / "web_ui_settings.json"
+_OFFLINE_ONLY = False
+_mode_lock = threading.RLock()
+_notification_operations = 0
+_VULNERABILITY_DB = None
+_database_update_lock = threading.Lock()
+_database_update = {"running": False, "message": "", "current": 0, "total": 0, "error": None}
+
+
+def _database_progress(message, current, total):
+    with _database_update_lock:
+        _database_update.update(message=message, current=current, total=total)
+
+
+def _update_vulnerability_database():
+    try:
+        update_database(_VULNERABILITY_DB, _database_progress)
+    except Exception:
+        logging.exception("Vulnerability database update failed; retaining the previous database")
+        with _database_update_lock:
+            _database_update.update(error="Download failed. Check your connection and available disk space; "
+                                    "the previous database is preserved.", message="Update failed")
+    finally:
+        with _database_update_lock:
+            _database_update["running"] = False
 
 
 # ── Settings persistence ──────────────────────────────────────────────────────
 
 _DEFAULT_SETTINGS = {
     "nist_api_key": "",
+    "offline_mode": False,
     "email": {
         "enabled":  False,
         "smtp_host": "",
@@ -160,6 +190,8 @@ def _load_settings() -> None:
             data = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
             if not isinstance(data, dict) or any(k in data and not isinstance(data[k], dict) for k in ("email", "webhook")):
                 raise ValueError("Settings must contain objects")
+            if "offline_mode" in data and not isinstance(data["offline_mode"], bool):
+                raise ValueError("offline_mode must be a boolean")
             # Deep merge with defaults so new keys are always present
             merged = _deep_merge(_DEFAULT_SETTINGS, data)
             with _settings_lock:
@@ -209,6 +241,42 @@ def _get_setting(*keys):
         if d is None:
             return None
     return d
+
+
+def _offline_enabled():
+    """The CLI restriction takes precedence over the persisted dashboard toggle."""
+    return _OFFLINE_ONLY or _get_setting("offline_mode") is True
+
+
+def _notifications_offline(job):
+    return (_offline_enabled() or job.config.get("vulnerability_source") == "offline"
+            or job.config.get("vulnerability_source_used") == "offline")
+
+
+@contextmanager
+def _notification_operation(job=None):
+    """Reserve outbound notification work against an offline-mode transition."""
+    global _notification_operations
+    with _mode_lock:
+        allowed = not (_notifications_offline(job) if job is not None else _offline_enabled())
+        if allowed:
+            _notification_operations += 1
+    try:
+        yield allowed
+    finally:
+        if allowed:
+            with _mode_lock:
+                _notification_operations -= 1
+
+
+def _online_notification_route(handler):
+    @wraps(handler)
+    def guarded(*args, **kwargs):
+        with _notification_operation() as allowed:
+            if not allowed:
+                return jsonify({"error": "Notifications are disabled in offline mode."}), 409
+            return handler(*args, **kwargs)
+    return guarded
 
 
 # ── Profiles persistence ──────────────────────────────────────────────────────
@@ -302,6 +370,42 @@ class ScanJob:
         self._lock       = threading.RLock()
         self._stop_flag  = threading.Event()
         self._hosts: dict[str, dict] = {}
+        self._progress = {"phase": "preparing", "detail": "Preparing scan", "percent": None,
+                          "completed": None, "total": None, "host": "",
+                          "target_index": 0, "targets_completed": 0, "targets_total": None,
+                          "revision": 0}
+
+    def _publish_progress(self):
+        with self._lock:
+            event = {"scan_id": self.id, "level": "__scan_progress__", "msg": "", "ts": "",
+                     "progress": deepcopy(self._progress), "status": self.status,
+                     "finished_at": self.finished_at}
+        _broadcast(event)
+
+    def set_progress(self, phase, detail, *, percent=None, completed=None, total=None,
+                     host=None, target_index=None, targets_completed=None, targets_total=None):
+        if percent is not None:
+            percent = float(percent)
+            percent = max(0.0, min(100.0, percent)) if math.isfinite(percent) else None
+        with self._lock:
+            if self.status not in ("running", "stopping"):
+                return
+            self._progress.update(phase=phase, detail=detail, percent=percent,
+                                  completed=completed, total=total)
+            for key, value in (("host", host), ("target_index", target_index),
+                               ("targets_completed", targets_completed), ("targets_total", targets_total)):
+                if value is not None:
+                    self._progress[key] = value
+            self._progress["revision"] += 1
+        self._publish_progress()
+
+    def complete_target(self):
+        with self._lock:
+            if self.status not in ("running", "stopping"):
+                return
+            self._progress["targets_completed"] += 1
+            self._progress["revision"] += 1
+        self._publish_progress()
 
     def should_stop(self) -> bool:
         return self._stop_flag.is_set()
@@ -311,17 +415,29 @@ class ScanJob:
         with self._lock:
             if self.status == "running":
                 self.status = "stopping"
+            self._progress["revision"] += 1
+        self._publish_progress()
 
     def mark_done(self, status: str = "completed") -> None:
         with self._lock:
             self.status      = status
             self.finished_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            self._progress.update(phase=status, detail={"completed": "Scan completed",
+                                                       "partial": "Finished with incomplete coverage",
+                                                       "stopped": "Scan stopped"}.get(status, status))
+            if status == "completed":
+                self._progress["percent"] = 100.0
+            self._progress["revision"] += 1
+        self._publish_progress()
 
     def mark_error(self, msg: str) -> None:
         with self._lock:
             self.status      = "error"
             self.error       = msg
             self.finished_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            self._progress.update(phase="error", detail="Scan failed")
+            self._progress["revision"] += 1
+        self._publish_progress()
 
     def get_or_create_host(self, ip: str) -> dict:
         with self._lock:
@@ -349,6 +465,7 @@ class ScanJob:
             status = self.status
             finished_at = self.finished_at
             error = self.error
+            progress = deepcopy(self._progress)
         return {
             "id":          self.id,
             "target":      self.target,
@@ -360,6 +477,7 @@ class ScanJob:
             "host_count":  len(hosts),
             "port_count":  sum(len(h["ports"]) for h in hosts),
             "vuln_count":  sum(len(h["vulns"])  for h in hosts),
+            "progress":    progress,
         }
 
     def to_full_dict(self) -> dict:
@@ -418,9 +536,10 @@ _MAX_COMPLETED_SCANS = 100
 
 def _broadcast(event: dict) -> None:
     with _log_history_lock:
-        _log_history.append(event)
-        if len(_log_history) > _MAX_LOG_HISTORY:
-            del _log_history[:len(_log_history) - _MAX_LOG_HISTORY]
+        if event.get("level") != "__scan_progress__":
+            _log_history.append(event)
+            if len(_log_history) > _MAX_LOG_HISTORY:
+                del _log_history[:len(_log_history) - _MAX_LOG_HISTORY]
         with _sse_subscribers_lock:
             for q in _sse_subscribers:
                 try:
@@ -492,6 +611,12 @@ class NullConsole:
 # ── Notifications ─────────────────────────────────────────────────────────────
 
 def _send_webhook(job: ScanJob) -> None:
+    with _notification_operation(job) as allowed:
+        if allowed:
+            _deliver_webhook(job)
+
+
+def _deliver_webhook(job: ScanJob) -> None:
     cfg = _get_setting("webhook")
     if not cfg or not cfg.get("enabled") or not cfg.get("url"):
         return
@@ -549,6 +674,12 @@ def _smtp_connection(cfg):
 
 
 def _send_email(job: ScanJob) -> None:
+    with _notification_operation(job) as allowed:
+        if allowed:
+            _deliver_email(job)
+
+
+def _deliver_email(job: ScanJob) -> None:
     cfg = _get_setting("email")
     if not cfg or not cfg.get("enabled"):
         return
@@ -680,6 +811,8 @@ def _send_email(job: ScanJob) -> None:
 
 
 def _notify(job: ScanJob) -> None:
+    if _notifications_offline(job):
+        return
     threading.Thread(target=_send_webhook, args=(job,), daemon=True).start()
     threading.Thread(target=_send_email,   args=(job,), daemon=True).start()
 
@@ -717,8 +850,10 @@ def _build_nmap_flags(config: dict) -> str:
 def _run_scan(job: ScanJob) -> None:
     log  = WebLogger(job.id)
     had_failures = False
+    lookup = None
 
     try:
+        job.set_progress("preparing", "Preparing scan")
         config = job.config
         target = config["target"]
         mode = config.get("mode", "normal")
@@ -730,6 +865,17 @@ def _run_scan(job: ScanJob) -> None:
         scan_ports = config.get("scan_ports", True)
         scan_vulns = config.get("scan_vulns", True)
         skip_discovery = config.get("skip_discovery", False)
+        source = "offline" if _offline_enabled() else config.get("vulnerability_source", "auto")
+        if source == "offline":
+            nmap_flags = (nmap_flags + " -n").strip()
+            with job._lock:
+                config["vulnerability_source"] = "offline"
+                config["nmap_flags"] = nmap_flags
+        if scan_vulns:
+            lookup = VulnerabilityLookup(source, _VULNERABILITY_DB)
+            if lookup.local:
+                config["vulnerability_database_updated_at"] = lookup.local.metadata["updated_at"]
+                _log(job, f"[*] Using local NVD database updated {lookup.local.metadata['updated_at']}; findings are possible vulnerabilities.")
         from rich.console import Console
         silent = Console(file=io.StringIO(), color_system=None)
 
@@ -765,12 +911,17 @@ def _run_scan(job: ScanJob) -> None:
 
         # Host discovery
         if not skip_discovery:
+            job.set_progress("discovery", "Discovering hosts", host=target)
             _log(job, f"[*] Discovering hosts on {target}")
             if job.should_stop():
                 job.mark_done("stopped")
                 return
             try:
-                hosts_found = DiscoverHosts(target, silent, scantype, scanmode)
+                hosts_found = DiscoverHosts(target, silent, scantype, scanmode, offline=source == "offline",
+                                            progress=lambda task, percent: job.set_progress("discovery", task, percent=percent),
+                                            should_stop=job.should_stop)
+            except ScanCancelled:
+                raise
             except Exception as e:
                 _log(job, f"[-] Host discovery failed: {e}", "error")
                 had_failures = True
@@ -787,30 +938,39 @@ def _run_scan(job: ScanJob) -> None:
             targets = [target] if isinstance(target, str) else list(target)
 
         # Per-host
-        for host_ip in targets:
+        for target_index, host_ip in enumerate(targets):
             if job.should_stop():
                 _log(job, "[*] Scan stopped by user.", "warning")
                 break
 
             _log(job, f"[*] Scanning {host_ip}")
+            job.set_progress("port_scan", "Port and service scan", host=host_ip,
+                             target_index=target_index + 1, targets_total=len(targets))
             if not scan_ports:
                 job.get_or_create_host(host_ip)
                 job.mark_host_done(host_ip)
+                job.complete_target()
                 continue
 
             try:
-                nm = PortScan(host_ip, log, speed, host_timeout, scanmode, nmap_flags)
+                nm = PortScan(host_ip, log, speed, host_timeout, scanmode, nmap_flags,
+                              progress=lambda task, percent: job.set_progress("port_scan", task, percent=percent),
+                              should_stop=job.should_stop)
+            except ScanCancelled:
+                raise
             except SystemExit as e:
                 _log(job, f"[-] Port scan failed for {host_ip}: {e}", "error")
                 had_failures = True
                 job.get_or_create_host(host_ip)
                 job.mark_host_done(host_ip, "error")
+                job.complete_target()
                 continue
             except Exception as e:
                 _log(job, f"[-] Port scan failed for {host_ip}: {e}", "error")
                 had_failures = True
                 job.get_or_create_host(host_ip)
                 job.mark_host_done(host_ip, "error")
+                job.complete_target()
                 continue
             # Nmap returns IP keys even when the request is a hostname or range.
             resolved = ResolveScanHosts(nm, host_ip)
@@ -819,17 +979,22 @@ def _run_scan(job: ScanJob) -> None:
                 job.get_or_create_host(host_ip)
                 job.mark_host_done(host_ip, "not_observed")
                 _log(job, f"[-] No scan observation returned for {host_ip}", "warning")
+                job.complete_target()
                 continue
             for observed_ip in resolved:
                 if job.should_stop():
                     break
-                if _collect_host_results(job, nm, observed_ip, log, silent, scan_vulns, api_key):
+                if _collect_host_results(job, nm, observed_ip, log, silent, scan_vulns, api_key, lookup=lookup):
                     had_failures = True
+            if not job.should_stop():
+                job.complete_target()
 
         outcome = "stopped" if job.should_stop() else "partial" if had_failures else "completed"
         _log(job, f"[+] Scan {job.id[:8]} {outcome}.", "success" if outcome == "completed" else "warning")
         job.mark_done(outcome)
 
+    except ScanCancelled:
+        job.mark_done("stopped")
     except SystemExit as exc:
         _log(job, f"[-] Scan aborted: {exc}", "error")
         job.mark_error(str(exc))
@@ -838,11 +1003,17 @@ def _run_scan(job: ScanJob) -> None:
         job.mark_error(str(exc))
 
     finally:
+        if lookup is not None:
+            with job._lock:
+                job.config["vulnerability_source_used"] = "online" if lookup.source == "auto" else lookup.source
+                if lookup.local:
+                    job.config["vulnerability_database_updated_at"] = lookup.local.metadata["updated_at"]
+            lookup.close()
         _broadcast({"scan_id": job.id, "level": "__scan_done__", "msg": "", "ts": ""})
         _notify(job)
 
 
-def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key) -> bool:
+def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, lookup=None) -> bool:
     """Record one actual host. Return whether its vulnerability lookup failed."""
     from modules.scanner import AnalyseScanResults
     from modules.searchvuln import GenerateKeyword
@@ -871,25 +1042,37 @@ def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key) -> bool
 
     findings = []
     failed = False
-    for port in ports:
+    tasks = [(port, GenerateKeyword(str(port["product"]), str(port["version"]))) for port in ports]
+    tasks = [(port, keyword) for port, keyword in tasks if keyword]
+    job.set_progress("vulnerabilities", "Searching service vulnerabilities" if tasks else "No searchable service versions",
+                     percent=0 if tasks else 100, completed=0, total=len(tasks), host=ip)
+    for lookup_index, (port, keyword) in enumerate(tasks):
         if job.should_stop():
             break
-        keyword = GenerateKeyword(str(port["product"]), str(port["version"]))
-        if not keyword:
-            continue
-        _log(job, f"[*] Querying NIST for {port['port']}/{port['protocol']}: {keyword}")
+        provider = "local NVD database" if lookup is not None and lookup.source == "offline" else "NIST"
+        _log(job, f"[*] Querying {provider} for {port['port']}/{port['protocol']}: {keyword}")
+        job.set_progress("vulnerabilities", f"Querying {keyword}", percent=100 * lookup_index / len(tasks),
+                         completed=lookup_index, total=len(tasks))
         try:
-            cves = searchCVE(keyword, log, api_key, strict=True)
+            cves = (lookup.search(keyword, log, api_key) if lookup is not None
+                    else searchCVE(keyword, log, api_key, strict=True))
         except Exception as exc:
             failed = True
             _log(job, f"[-] CVE search error ({keyword}): {exc}", "error")
+            job.set_progress("vulnerabilities", f"Lookup failed: {keyword}", percent=100 * (lookup_index + 1) / len(tasks),
+                             completed=lookup_index + 1, total=len(tasks))
             continue
         for cve in cves:
             severity = (cve.severity or "unknown").lower()
             findings.append({"cve": cve.CVEID, "description": cve.description,
                              "severity": severity, "cvss": cve.severity_score or 0,
-                             "keyword": keyword, "port": port["port"], "protocol": port["protocol"]})
+                             "keyword": keyword, "port": port["port"], "protocol": port["protocol"],
+                             "data_source": cve.data_source, "database_updated_at": cve.database_updated_at})
             _log(job, f"    └─ {cve.CVEID} [{severity.upper()}] CVSS:{cve.severity_score}", "warning")
+        with job._lock:
+            h["vulns"] = list(findings)
+        job.set_progress("vulnerabilities", f"Checked {keyword}", percent=100 * (lookup_index + 1) / len(tasks),
+                         completed=lookup_index + 1, total=len(tasks))
     with job._lock:
         h["vulns"] = findings
         h["lookup_status"] = "partial" if failed or job.should_stop() else "completed"
@@ -899,11 +1082,14 @@ def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key) -> bool
 
 def _launch_scan(config: dict) -> ScanJob:
     """Create, register, and start a scan job. Returns the job."""
-    scan_id = str(uuid.uuid4())
-    job     = ScanJob(scan_id, config["target"], config)
-    _register_scan(job)
-    threading.Thread(target=_run_scan, args=(job,), daemon=True).start()
-    return job
+    with _mode_lock:
+        if _offline_enabled():
+            config = dict(config, vulnerability_source="offline")
+        scan_id = str(uuid.uuid4())
+        job     = ScanJob(scan_id, config["target"], config)
+        _register_scan(job)
+        threading.Thread(target=_run_scan, args=(job,), daemon=True).start()
+        return job
 
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
@@ -927,11 +1113,14 @@ def _profile_config(body, existing=None):
                 "scan_technique": "", "ports": "", "version_intensity": None,
                 "os_detection": False, "nmap_flags": "", "host_timeout": 240,
                 "scan_ports": True, "scan_vulns": True, "skip_discovery": False}
+    defaults["vulnerability_source"] = "auto"
     if not isinstance(body, dict) or (existing is not None and not isinstance(existing, dict)):
         raise ValueError("Profile configuration must be an object")
     config = dict(defaults)
     for source in (existing or {}, body):
         config.update({key: source[key] for key in defaults if key in source})
+    if config["vulnerability_source"] not in ("auto", "online", "offline"):
+        raise ValueError("'vulnerability_source' must be auto, online, or offline")
     if config["mode"] not in ("normal", "evade", "noise"):
         raise ValueError("'mode' must be 'normal', 'evade', or 'noise'")
     config["speed"] = _integer_option(config["speed"], "speed", 0, 5)
@@ -1190,6 +1379,11 @@ def _build_app(static_dir: Path) -> "Flask":
             return jsonify({"error": "api_key must be a string"}), 400
         config.update(target=target, api_key=api_key,
                       nmap_flags=_build_nmap_flags(config))
+        if _offline_enabled():
+            config["vulnerability_source"] = "offline"
+        if config["scan_vulns"] and config["vulnerability_source"] == "offline" and not database_status(_VULNERABILITY_DB)["ready"]:
+            return jsonify({"error": "Offline database unavailable. Download it in Settings while connected, "
+                            "or copy vulnerabilities.sqlite3 from a connected system."}), 409
         job = _launch_scan(config)
         return jsonify({"ok": True, "scan_id": job.id, "message": f"Scan started for {target}"})
 
@@ -1207,6 +1401,45 @@ def _build_app(static_dir: Path) -> "Flask":
             return jsonify({"ok": False, "message": "Scan is not running"}), 400
         job.request_stop()
         return jsonify({"ok": True})
+
+    # ── Local vulnerability database (updates are explicit, never scheduled) ──
+
+    @app.route("/api/vulnerability-database")
+    def api_vulnerability_database():
+        status = database_status(_VULNERABILITY_DB)
+        with _database_update_lock:
+            status["update"] = dict(_database_update)
+        status["offline_only"] = _offline_enabled()
+        status["offline_locked"] = _OFFLINE_ONLY
+        return jsonify(status)
+
+    @app.route("/api/vulnerability-database/update", methods=["POST"])
+    def api_update_vulnerability_database():
+        with _mode_lock:
+            if _offline_enabled():
+                message = ("Restart without --offline to download updates." if _OFFLINE_ONLY
+                           else "Turn off Offline mode in Settings to download updates.")
+                return jsonify({"error": "This server is in offline mode. " + message}), 409
+            with _database_update_lock:
+                if _database_update["running"]:
+                    return jsonify({"error": "A database update is already running."}), 409
+                _database_update.update(running=True, message="Starting download", current=0, total=0, error=None)
+            try:
+                threading.Thread(target=_update_vulnerability_database, daemon=True).start()
+            except Exception:
+                with _database_update_lock:
+                    _database_update["running"] = False
+                logging.exception("Could not start vulnerability database update")
+                return jsonify({"error": "Could not start database update."}), 500
+        return jsonify({"ok": True}), 202
+
+    @app.route("/api/vulnerability-database/download")
+    def api_download_vulnerability_database():
+        if not database_status(_VULNERABILITY_DB)["ready"]:
+            return jsonify({"error": "Download the vulnerability database first."}), 409
+        path = database_path(_VULNERABILITY_DB)
+        return send_from_directory(path.parent, path.name, as_attachment=True,
+                                   download_name="vulnerabilities.sqlite3")
 
     # ── Hosts / log / events ──
 
@@ -1277,19 +1510,38 @@ def _build_app(static_dir: Path) -> "Flask":
     @app.route("/api/settings", methods=["PUT"])
     def api_settings_put():
         body = request.get_json(force=True, silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"error": "Settings must be an object"}), 400
         if any(k in body and not isinstance(body[k], dict) for k in ("email", "webhook")):
             return jsonify({"error": "email and webhook must be objects"}), 400
-        with _settings_lock:
-            # If the client sends back the masked password placeholder, keep the real one
-            if body.get("email", {}).get("password") == "••••••••":
-                body["email"]["password"] = _settings.get("email", {}).get("password", "")
-            _settings.update(_deep_merge(_settings, body))
-        _save_settings()
+        if "offline_mode" in body and not isinstance(body["offline_mode"], bool):
+            return jsonify({"error": "offline_mode must be a boolean"}), 400
+        with _mode_lock:
+            if body.get("offline_mode") is True and not _offline_enabled():
+                if _notification_operations:
+                    return jsonify({"error": "Wait for active notifications to finish before enabling offline mode."}), 409
+                with _database_update_lock:
+                    if _database_update["running"]:
+                        return jsonify({"error": "Wait for the database update to finish before enabling offline mode."}), 409
+                if any(job.status in ("running", "stopping") and job.config.get("vulnerability_source") != "offline"
+                       for job in _all_scans()):
+                    return jsonify({"error": "Stop or finish active online scans before enabling offline mode."}), 409
+            with _settings_lock:
+                # Persist before publishing the new setting to running requests.
+                if body.get("email", {}).get("password") == "••••••••":
+                    body["email"]["password"] = _settings.get("email", {}).get("password", "")
+                updated = _deep_merge(_settings, body)
+                _write_json(_SETTINGS_FILE, updated)
+                _settings.clear()
+                _settings.update(updated)
         return jsonify({"ok": True})
 
     @app.route("/api/settings/test_email", methods=["POST"])
+    @_online_notification_route
     def api_test_email():
         """Send a test email using current settings."""
+        if _offline_enabled():
+            return jsonify({"error": "Notifications are disabled in offline mode."}), 409
         cfg = _get_setting("email")
         if not cfg or not cfg.get("enabled"):
             return jsonify({"error": "Email notifications are disabled"}), 400
@@ -1307,8 +1559,11 @@ def _build_app(static_dir: Path) -> "Flask":
             return jsonify({"error": "Failed to send test email"}), 500
 
     @app.route("/api/settings/test_webhook", methods=["POST"])
+    @_online_notification_route
     def api_test_webhook():
         """Send a test webhook ping."""
+        if _offline_enabled():
+            return jsonify({"error": "Notifications are disabled in offline mode."}), 409
         cfg = _get_setting("webhook")
         if not cfg or not cfg.get("enabled") or not cfg.get("url"):
             return jsonify({"error": "Webhook is disabled or URL not set"}), 400
@@ -1463,10 +1718,12 @@ def _build_app(static_dir: Path) -> "Flask":
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-def start_server(host: str = "0.0.0.0", port: int = 8080, version: str = "Unkown") -> None:
+def start_server(host: str = "0.0.0.0", port: int = 8080, version: str = "Unkown", *, offline=False, database=None) -> None:
     """Start the web UI server and block until Ctrl+C."""
-    global __version__
+    global __version__, _OFFLINE_ONLY, _VULNERABILITY_DB
     __version__ = version
+    _OFFLINE_ONLY = offline
+    _VULNERABILITY_DB = database
     if not FLASK_AVAILABLE:
         raise RuntimeError("Flask is not installed. Run:  pip install flask flask-cors")
 

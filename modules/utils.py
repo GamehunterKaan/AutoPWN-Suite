@@ -90,6 +90,18 @@ def cli():
         action="store_true",
     )
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
+    scanargs.add_argument("--offline", action="store_true",
+                         help="Use only the local vulnerability database; disable internet integrations.")
+    scanargs.add_argument("--vuln-source", dest="vulnerability_source", default="auto",
+                         choices=["auto", "online", "offline"],
+                         help="CVE lookup source (auto falls back to the local database on failure).")
+    scanargs.add_argument("--vuln-db", default=None, metavar="PATH",
+                         help="Path to a portable vulnerabilities.sqlite3 database.")
+    databaseargs = argparser.add_argument_group("Vulnerability database")
+    databaseargs.add_argument("--update-vuln-db", action="store_true",
+                             help="Download/update the complete NVD database, then exit. Requires internet.")
+    databaseargs.add_argument("--vuln-db-status", action="store_true",
+                             help="Show local vulnerability database status, then exit.")
     scanargs.add_argument(
         "-t",
         "--target",
@@ -604,7 +616,7 @@ def UserConfirmation(args) -> tuple[bool, bool, bool]:
     if not vulnscan:
         return True, False, False
 
-    if args.skip_exploit_download:
+    if args.skip_exploit_download or getattr(args, "offline", False) is True or getattr(args, "vulnerability_source", None) == "offline":
         return True, True, False
     else:
         downloadexploits = Confirmation("Do you want to download exploits? [Y/n] : ")
@@ -706,6 +718,9 @@ def InitArgsConf(args, log) -> None:
                 ("auto", "yes_please", "bool"),
                 ("skip_exploit_download", "skip_exploit_download", "bool"),
                 ("skip_discovery", "skip_discovery", "bool"),
+                ("offline", "offline", "bool"),
+                ("vulnerability_source", "vulnerability_source", "lower"),
+                ("vuln_db", "vuln_db", "text"),
                 ("mode", "mode", "lower"),
                 ("noisetimeout", "noise_timeout", "int"),
                 ("host_timeout", "host_timeout", "int"),
@@ -754,6 +769,7 @@ def InitArgsConf(args, log) -> None:
                     "mode": ("normal", "noise", "evade"),
                     "output_type": ("html", "txt", "svg"),
                     "report": ("", "none", "email", "webhook"),
+                    "vulnerability_source": ("auto", "online", "offline"),
                 }
                 if attribute in choices and value not in choices[attribute]:
                     raise ValueError(f"Invalid value for {section}.{option}")
@@ -860,11 +876,13 @@ def install_nmap_mac(log) -> None:
         log.logger("error", "Couldn't install nmap! (Mac)")
 
 
-def check_nmap(log) -> None:
+def check_nmap(log, *, offline=False) -> None:
     try:
         check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
     except (CalledProcessError, FileNotFoundError):
         log.logger("warning", "Nmap is not installed.")
+        if offline:
+            raise SystemExit("Nmap must be installed before using offline mode.")
         if DontAskForConfirmation:
             auto_install = True
         else:

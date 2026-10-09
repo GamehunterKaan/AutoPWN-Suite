@@ -93,7 +93,7 @@ def test_config_can_select_web_mode_before_scan_initialization(tmp_path):
          patch("autopwn.CheckConnection") as check:
         with pytest.raises(SystemExit):
             main()
-    server.assert_called_once_with(host="127.0.0.1", port=9090, version=ANY)
+    server.assert_called_once_with(host="127.0.0.1", port=9090, version=ANY, offline=False, database=None)
     assert isinstance(server.call_args.kwargs["version"], str)
     assert server.call_args.kwargs["version"]
     check.assert_not_called()

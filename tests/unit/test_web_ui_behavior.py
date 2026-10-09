@@ -38,6 +38,111 @@ vm.runInContext(source.slice(0, source.lastIndexOf('\n(async()=>{')), context);
     assert result.returncode == 0, result.stderr
 
 
+def test_database_controls_show_status_without_starting_a_download():
+    run_js("""
+const calls=[];
+fetch=async url=>{calls.push(url);return {ok:true,json:async()=>({ready:true,count:123,
+  size_bytes:1048576,updated_at:'2026-10-09T08:00:00Z',offline_only:true,offline_locked:true,update:{running:false}})}};
+await loadDatabaseStatus();
+assert.equal(calls.length,1);
+assert.equal(calls[0],'/api/vulnerability-database');
+assert.equal(nodes.get('database-update').disabled,true);
+assert.equal(nodes.get('database-export').hidden,false);
+assert.equal(nodes.get('f-vuln-source').value,'offline');
+assert.equal(nodes.get('f-vuln-source').disabled,true);
+assert.equal(nodes.get('s-offline-mode').checked,true);
+assert.equal(nodes.get('s-offline-mode').disabled,true);
+assert.match(nodes.get('database-status').textContent,/123 CVEs/);
+""")
+
+
+def test_dashboard_toggle_saves_global_setting_and_restores_online_controls():
+    run_js("""
+let enabled=false;
+const calls=[];
+document.getElementById('f-vuln-source').value='online';
+fetch=async (url,opts)=>{
+  calls.push([url,opts]);
+  if(opts){enabled=JSON.parse(opts.body).offline_mode;return {ok:true,json:async()=>({ok:true})}}
+  return {ok:true,json:async()=>({ready:true,count:2,size_bytes:1024,updated_at:'2026-10-10T00:00:00Z',
+    offline_only:enabled,offline_locked:false,update:{running:false}})};
+};
+document.getElementById('s-offline-mode').checked=true;
+await saveOfflineMode();
+assert.equal(enabled,true);
+assert.equal(calls[0][0],'/api/settings');
+assert.equal(calls[0][1].method,'PUT');
+assert.equal(nodes.get('database-update').disabled,true);
+assert.equal(nodes.get('f-vuln-source').value,'offline');
+assert.equal(nodes.get('s-offline-mode').disabled,false);
+document.getElementById('s-offline-mode').checked=false;
+await saveOfflineMode();
+assert.equal(nodes.get('database-update').disabled,false);
+assert.equal(nodes.get('f-vuln-source').disabled,false);
+assert.equal(nodes.get('f-vuln-source').value,'online');
+assert.equal(nodes.get('s-offline-mode').checked,false);
+assert.equal(calls.length,4);
+""")
+
+
+def test_dashboard_toggle_reverts_after_active_scan_rejection():
+    run_js("""
+fetch=async (url,opts)=>opts
+  ? {ok:false,json:async()=>({error:'Stop active online scans first'})}
+  : {ok:true,json:async()=>({ready:false,offline_only:false,offline_locked:false,update:{}})};
+document.getElementById('s-offline-mode').checked=true;
+await saveOfflineMode();
+assert.equal(nodes.get('s-offline-mode').checked,false);
+assert.equal(nodes.get('s-offline-mode').disabled,false);
+assert.equal(nodes.get('f-vuln-source').disabled,false);
+""")
+
+
+def test_database_status_responses_cannot_revert_a_newer_offline_setting():
+    run_js("""
+const pending=[];
+fetch=()=>new Promise(resolve=>pending.push(resolve));
+document.getElementById('f-vuln-source').value='online';
+const old=loadDatabaseStatus();
+const current=loadDatabaseStatus();
+const status=enabled=>({ready:false,offline_only:enabled,offline_locked:false,update:{}});
+pending[1]({ok:true,json:async()=>status(true)});
+await current;
+pending[0]({ok:true,json:async()=>status(false)});
+await old;
+assert.equal(nodes.get('s-offline-mode').checked,true);
+assert.equal(nodes.get('f-vuln-source').disabled,true);
+assert.equal(nodes.get('database-update').disabled,true);
+""")
+
+
+def test_scan_form_sends_selected_offline_source():
+    run_js("""
+document.getElementById('f-target').value='192.168.1.10';
+document.getElementById('f-vuln-source').value='offline';
+addLog=()=>{};
+let sent;
+fetch=async (url,opts)=>{sent=JSON.parse(opts.body);return {ok:false,json:async()=>({error:'missing database'})}};
+await startScan();
+assert.equal(sent.vulnerability_source,'offline');
+assert.equal(sent.target,'192.168.1.10');
+""")
+
+
+def test_profile_source_is_loaded_and_new_profile_resets_it():
+    run_js("""
+profiles={airgap:{id:'airgap',name:'Airgap',config:{vulnerability_source:'offline'}}};
+editProfile('airgap');
+assert.equal(nodes.get('pf-vuln-source').value,'offline');
+document.getElementById('f-profile').value='airgap';
+loadProfile();
+assert.equal(nodes.get('f-vuln-source').value,'offline');
+showProfileForm();
+assert.equal(nodes.get('pf-vuln-source').value,'auto');
+assert.equal(nodes.get('pf-timeout').value,'240');
+""")
+
+
 def test_poll_replaces_old_findings_with_latest_observation():
     run_js("""
 renderScans=renderHosts=renderVulnTable=updateBadges=()=>{};
@@ -99,6 +204,80 @@ renderScans();
 const cards=nodes.get('tc-scans').children;
 assert.match(cards[0].innerHTML,/running target/);
 assert.match(cards[0].innerHTML,/-T 0/);
+""")
+
+
+def test_scan_bar_uses_backend_percentage_and_lookup_count():
+    run_js(r"""
+const markup=scanProgressMarkup({status:'running',progress:{phase:'vulnerabilities',
+  detail:'Querying OpenSSH',percent:25,completed:2,total:8,host:'192.0.2.1',targets_total:4,targets_completed:1}});
+assert.match(markup,/width:25%/);
+assert.match(markup,/aria-valuenow="25"/);
+assert.match(markup,/CVE lookups 2\/8/);
+assert.match(markup,/1\/4 targets finished/);
+assert.doesNotMatch(markup,/indeterminate/);
+""")
+
+
+def test_stopped_and_failed_bars_do_not_become_completed():
+    run_js("""
+for(const status of ['stopped','error','partial']){
+  const markup=scanProgressMarkup({status,progress:{phase:status,percent:37.5}});
+  assert.match(markup,/width:37.5%/);
+  assert.doesNotMatch(markup,/sc-bar-fill completed/);
+  assert.doesNotMatch(markup,/indeterminate/);
+}
+const completed=scanProgressMarkup({status:'completed',progress:{phase:'completed',percent:100}});
+assert.match(completed,/width:100%/);
+assert.match(completed,/sc-bar-fill completed/);
+""")
+
+
+def test_unknown_nmap_percentage_is_indeterminate_and_details_are_escaped():
+    run_js("""
+const markup=scanProgressMarkup({status:'running',progress:{phase:'port_scan',percent:null,
+  detail:'<script>bad</script>',host:'192.0.2.1',targets_total:1,targets_completed:0}});
+assert.match(markup,/indeterminate/);
+assert.match(markup,/Working…/);
+assert.doesNotMatch(markup,/aria-valuenow=/);
+assert.doesNotMatch(markup,/<script>/);
+assert.match(markup,/&lt;script&gt;/);
+""")
+
+
+def test_live_progress_updates_ignore_older_events():
+    run_js("""
+EventSource=function(){globalThis.eventSource=this};
+let rendered=0;
+renderScans=()=>{rendered++};
+scans={live:{id:'live',status:'running',progress:{revision:4,percent:40}}};
+connectSSE();
+eventSource.onmessage({data:JSON.stringify({level:'__scan_progress__',scan_id:'live',status:'running',
+  finished_at:'',progress:{revision:5,phase:'port_scan',percent:50}})});
+eventSource.onmessage({data:JSON.stringify({level:'__scan_progress__',scan_id:'live',status:'running',
+  finished_at:'',progress:{revision:3,phase:'port_scan',percent:20}})});
+assert.equal(scans.live.progress.percent,50);
+assert.equal(rendered,1);
+""")
+
+
+def test_slow_poll_cannot_overwrite_newer_live_completion():
+    run_js("""
+renderScans=renderHosts=renderVulnTable=updateBadges=()=>{};
+EventSource=function(){globalThis.eventSource=this};
+const pending=[];
+fetch=()=>new Promise(resolve=>pending.push(resolve));
+scans={live:{id:'live',status:'running',progress:{revision:4,percent:40}}};
+connectSSE();
+const polling=poll();
+eventSource.onmessage({data:JSON.stringify({level:'__scan_progress__',scan_id:'live',status:'completed',
+  finished_at:'2026-10-10T00:00:00Z',progress:{revision:5,phase:'completed',percent:100}})});
+pending[0]({ok:true,json:async()=>[{id:'live',status:'running',progress:{revision:4,percent:40}}]});
+pending[1]({ok:true,json:async()=>[]});
+await polling;
+assert.equal(scans.live.progress.percent,100);
+assert.equal(scans.live.status,'completed');
+assert.equal(scans.live.finished_at,'2026-10-10T00:00:00Z');
 """)
 
 

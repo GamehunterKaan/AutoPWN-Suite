@@ -55,28 +55,31 @@ def GenerateKeywords(HostArray: list) -> list:
     return keywords
 
 
-def SearchKeyword(keyword: str, log, apiKey=None) -> list:
+def SearchKeyword(keyword: str, log, apiKey=None, *, lookup=None) -> list:
 
     try:
-        ApiResponseCVE = searchCVE(keyword, log, apiKey, strict=True)
+        ApiResponseCVE = (lookup.search(keyword, log, apiKey) if lookup is not None
+                          else searchCVE(keyword, log, apiKey, strict=True))
     except KeyboardInterrupt:
         log.logger("warning", f"Skipped vulnerability detection for {keyword}")
     except Exception as e:
         log.logger("error", e)
+        if lookup is not None:
+            raise
     else:
         return ApiResponseCVE
 
     return []
 
 
-def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
+def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, lookup=None) -> list:
     if not HostArray:
         return []
     VulnsArray = []
     target = str(HostArray[0][0])
     term_width = get_terminal_width()
 
-    if not CheckConnection(log):
+    if lookup is None and not CheckConnection(log):
         return []
 
     keywords = GenerateKeywords(HostArray)
@@ -99,7 +102,8 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
                 "[white]Searching vulnerability database for[/white] "
                 + f"[red]{keyword}[/red] [white]...[/white]"
             )
-            ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+            ApiResponseCVE = (SearchKeyword(keyword, log, apiKey, lookup=lookup) if lookup is not None
+                              else SearchKeyword(keyword, log, apiKey))
             status.stop()
             if len(ApiResponseCVE) == 0:
                 continue

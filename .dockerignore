@@ -12,3 +12,5 @@ coverage.xml
 venv
 .env
 tests
+**/vulnerabilities.sqlite3*
+**/.nvd-*.sqlite3*

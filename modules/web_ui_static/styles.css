@@ -5,9 +5,10 @@
   --green:#00ff88; --green2:#00aa5a;
   --red:#ff3f4f; --orange:#ff8c00; --yellow:#ffd000;
   --text:#c8dde8; --text2:#7a9db5; --text3:#3d6070;
-  --mono:'Share Tech Mono',monospace; --ui:'Rajdhani',sans-serif;
+  --mono:'Consolas','Liberation Mono',monospace; --ui:'Segoe UI',Arial,sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--ui);font-size:14px;overflow:hidden}
 
 /* ── Layout ── */
@@ -110,9 +111,16 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px}
 .sc-stat .sv{font-family:var(--mono);color:var(--accent);font-size:16px}
 .sc-stat .sl{font-family:var(--mono);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:1px}
 .sc-time{font-family:var(--mono);font-size:10px;color:var(--text3)}
-.sc-bar{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
-.sc-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent),var(--green));width:30%;animation:slide 1.2s ease-in-out infinite alternate}
-.sc-bar-fill.done{animation:none;width:100%;background:var(--green2)}
+.sc-progress-label{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:11px;color:var(--text2)}
+.sc-progress-label span:first-child{min-width:0;overflow-wrap:anywhere}
+.sc-progress-label span:last-child{flex-shrink:0;color:var(--accent)}
+.sc-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.sc-bar-fill{height:100%;background:var(--accent);transition:width .2s ease}
+.sc-bar-fill.indeterminate{animation:slide 1.2s ease-in-out infinite alternate}
+.sc-bar-fill.completed{background:var(--green2)}
+.sc-bar-fill.partial{background:var(--orange)}
+.sc-bar-fill.error{background:var(--red)}
+.sc-bar-fill.stopped{background:var(--text2)}
 @keyframes slide{from{margin-left:0}to{margin-left:70%}}
 
 /* ── Hosts grid ── */

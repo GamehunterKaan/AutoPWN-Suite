@@ -9,6 +9,7 @@ from rich.table import Table
 
 from modules.logger import banner
 from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
+from modules.nmap_progress import scan_with_progress, ScanCancelled
 
 
 @dataclass()
@@ -41,27 +42,37 @@ class TargetInfo:
 
 
 # do a ping scan using nmap
-def TestPing(target, mode=ScanMode.Normal) -> list:
+def TestPing(target, mode=ScanMode.Normal, *, offline=False, progress=None, should_stop=None) -> list:
     nm = PortScanner()
     if isinstance(target, list):
         target = " ".join(target)
     if mode == ScanMode.Evade and is_root():
-        nm.scan(hosts=target, arguments="-sn -T 2 -f -g 53 --data-length 10")
+        arguments = "-sn -T 2 -f -g 53 --data-length 10"
     else:
-        nm.scan(hosts=target, arguments="-sn")
+        arguments = "-sn"
+    arguments += " -n" if offline else ""
+    if progress is not None:
+        scan_with_progress(nm, target, arguments, progress, should_stop)
+    else:
+        nm.scan(hosts=target, arguments=arguments)
 
     return nm.all_hosts()
 
 
 # do a arp scan using nmap
-def TestArp(target, mode=ScanMode.Normal) -> list:
+def TestArp(target, mode=ScanMode.Normal, *, offline=False, progress=None, should_stop=None) -> list:
     nm = PortScanner()
     if isinstance(target, list):
         target = " ".join(target)
     if mode == ScanMode.Evade:
-        nm.scan(hosts=target, arguments="-sn -PR -T 2 -f -g 53 --data-length 10")
+        arguments = "-sn -PR -T 2 -f -g 53 --data-length 10"
     else:
-        nm.scan(hosts=target, arguments="-sn -PR")
+        arguments = "-sn -PR"
+    arguments += " -n" if offline else ""
+    if progress is not None:
+        scan_with_progress(nm, target, arguments, progress, should_stop)
+    else:
+        nm.scan(hosts=target, arguments=arguments)
 
     return nm.all_hosts()
 
@@ -74,6 +85,7 @@ def PortScan(
     host_timeout=240,
     mode=ScanMode.Normal,
     customflags="",
+    *, progress=None, should_stop=None,
 ) -> PortScanner:
 
     log.logger("info", f"Scanning {target} for open ports ...")
@@ -97,52 +109,52 @@ def PortScan(
             ]
             if mode == ScanMode.Evade:
                 base_flags += ["-f", "-g", "53", "--data-length", "10"]
-            nm.scan(
-                hosts=target,
-                arguments=" ".join(base_flags + [customflags]),
-            )
+            arguments = " ".join(base_flags + [customflags])
         else:
-            nm.scan(
-                hosts=target,
-                arguments=" ".join(
-                    [
-                        "-sV",
-                        "--host-timeout",
-                        str(host_timeout),
-                        "-Pn",
-                        "-T",
-                        str(scanspeed),
-                        customflags,
-                    ]
-                ),
+            arguments = " ".join(
+                [
+                    "-sV",
+                    "--host-timeout",
+                    str(host_timeout),
+                    "-Pn",
+                    "-T",
+                    str(scanspeed),
+                    customflags,
+                ]
             )
+        if progress is not None:
+            scan_with_progress(nm, target, arguments, progress, should_stop)
+        else:
+            nm.scan(hosts=target, arguments=arguments)
+    except ScanCancelled:
+        raise
     except Exception as e:
         raise SystemExit(f"Error: {e}")
     else:
         return nm
 
 
-def CreateNoise(target) -> None:
+def CreateNoise(target, offline=False) -> None:
     nm = PortScanner()
     while True:
         try:
             if is_root():
-                nm.scan(hosts=target, arguments="-A -T 5 -D RND:10")
+                nm.scan(hosts=target, arguments="-A -T 5 -D RND:10" + (" -n" if offline else ""))
             else:
-                nm.scan(hosts=target, arguments="-A -T 5")
+                nm.scan(hosts=target, arguments="-A -T 5" + (" -n" if offline else ""))
         except KeyboardInterrupt:
             raise SystemExit("Ctr+C, aborting.")
         else:
             break
 
 
-def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) -> None:
+def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *, offline=False) -> None:
     banner("Creating noise...", "green", console)
 
-    Uphosts = TestPing(target)
+    Uphosts = TestPing(target, offline=True) if offline else TestPing(target)
     if scantype == ScanType.ARP:
         if is_root():
-            Uphosts = TestArp(target)
+            Uphosts = TestArp(target, offline=True) if offline else TestArp(target)
 
     if not Uphosts:
         log.logger("warning", "No hosts found for noise scan.")
@@ -153,7 +165,7 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) ->
         with console.status("Creating noise ...", spinner="line"):
             for host in Uphosts:
                 log.logger("info", f"Started creating noise on {host}...")
-                P = Process(target=CreateNoise, args=(host,))
+                P = Process(target=CreateNoise, args=(host, True) if offline else (host,))
                 P.start()
                 NoisyProcesses.append(P)
 
@@ -176,7 +188,7 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) ->
             P.join(timeout=2)
 
 
-def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal) -> list:
+def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal, *, offline=False, progress=None, should_stop=None) -> list:
     if isinstance(target, list):
         banner(
             f"Scanning {len(target)} target(s) using {scantype.name} scan ...",
@@ -186,10 +198,13 @@ def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal) 
     else:
         banner(f"Scanning {target} using {scantype.name} scan ...", "green", console)
 
+    if progress is not None:
+        scan = TestArp if scantype == ScanType.ARP else TestPing
+        return scan(target, mode, offline=offline, progress=progress, should_stop=should_stop)
     if scantype == ScanType.ARP:
-        OnlineHosts = TestArp(target, mode)
+        OnlineHosts = TestArp(target, mode, offline=True) if offline else TestArp(target, mode)
     else:
-        OnlineHosts = TestPing(target, mode)
+        OnlineHosts = TestPing(target, mode, offline=True) if offline else TestPing(target, mode)
 
     return OnlineHosts
 
