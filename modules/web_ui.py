@@ -501,6 +501,16 @@ class ScanJob:
         with self._lock:
             return deepcopy(self._web_findings.get(finding_id))
 
+    def set_web_verification(self, finding_id, result):
+        with self._lock:
+            if finding_id in self._web_findings:
+                self._web_findings[finding_id]["verification"] = deepcopy(result)
+                if result.get("status") != "running":
+                    history = self._web_findings[finding_id].setdefault("verification_history", [])
+                    history.append(deepcopy(result))
+                    del history[:-10]
+        _broadcast({"scan_id": self.id, "level": "__web_finding__", "msg": "", "finding_id": finding_id})
+
     def add_web_coverage(self, ip, endpoint, summary):
         with self._lock:
             self._web_coverage.append({"host": ip, "endpoint": redact_url(endpoint), **deepcopy(summary)})
@@ -584,6 +594,7 @@ _log_history: list = []
 _log_history_lock = threading.Lock()
 _MAX_LOG_HISTORY = 5000
 _MAX_COMPLETED_SCANS = 100
+_web_verifications_running = 0
 
 
 def _broadcast(event: dict) -> None:
@@ -1522,6 +1533,76 @@ def _build_app(static_dir: Path) -> "Flask":
             return jsonify({"error": "Web finding not found"}), 404
         return jsonify(result)
 
+    @app.route("/api/web/findings/<scan_id>/<finding_id>/poc")
+    def api_web_poc(scan_id, finding_id):
+        from modules.web.poc import browser_poc, build_plan, curl_poc, python_poc
+        job = _get_scan(scan_id)
+        result = job.web_finding(finding_id) if job else None
+        if not result:
+            return jsonify({"error": "Web finding not found"}), 404
+        form = request.args.get("format", "python")
+        formats = {"python": (python_poc, "py"), "curl": (curl_poc, "sh"), "html": (browser_poc, "html"),
+                   "json": (lambda row: json.dumps(build_plan(row), indent=2), "json")}
+        if form not in formats:
+            return jsonify({"error": "Unknown PoC format"}), 400
+        generate, extension = formats[form]
+        code = generate(result)
+        if code is None:
+            return jsonify({"error": "Browser PoCs are available for XSS and CORS findings."}), 400
+        safe_id = _re.sub(r"[^A-Za-z0-9_-]", "", finding_id)[:40]
+        response = Response(code, mimetype="application/octet-stream")
+        response.headers["Content-Disposition"] = f'attachment; filename="autopwn-poc-{safe_id}.{extension}"'
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @app.route("/api/web/findings/<scan_id>/<finding_id>/verify", methods=["POST"])
+    def api_web_verify(scan_id, finding_id):
+        global _web_verifications_running
+        from modules.web.poc import build_plan
+        from modules.web.poc_runtime import validate_plan, verify_plan
+        job = _get_scan(scan_id)
+        result = job.web_finding(finding_id) if job else None
+        if not result:
+            return jsonify({"error": "Web finding not found"}), 404
+        body = request.get_json(silent=True)
+        if body is None:
+            body = {}
+        if not isinstance(body, dict) or body:
+            return jsonify({"error": "Verification uses the stored request plan; custom requests are not accepted."}), 400
+        plan = build_plan(result)
+        try:
+            validate_plan(plan)
+        except (ValueError, KeyError):
+            return jsonify({"error": "This finding needs local inputs or cannot be replayed automatically. Download its PoC to review."}), 409
+        with _mode_lock:
+            if _notifications_offline(job):
+                return jsonify({"error": "Verification is disabled in offline mode."}), 409
+            with job._lock:
+                if job._web_findings[finding_id].get("verification", {}).get("status") == "running":
+                    return jsonify({"error": "Verification is already running."}), 409
+                if _web_verifications_running >= 4:
+                    return jsonify({"error": "Four verifications are already running. Wait for one to finish."}), 409
+                _web_verifications_running += 1
+                job.set_web_verification(finding_id, {"status": "running", "summary": "Replaying recorded evidence"})
+            def run():
+                global _web_verifications_running
+                try:
+                    verified = verify_plan(plan)
+                    job.set_web_verification(finding_id, verified)
+                except Exception:
+                    logging.exception("Web evidence verification failed")
+                    job.set_web_verification(finding_id, {"status": "inconclusive", "summary": "Verification failed; see server logs."})
+                finally:
+                    with _mode_lock:
+                        _web_verifications_running -= 1
+            try:
+                threading.Thread(target=run, daemon=True).start()
+            except Exception:
+                _web_verifications_running -= 1
+                job.set_web_verification(finding_id, {"status": "inconclusive", "summary": "Could not start verification."})
+                return jsonify({"error": "Could not start verification."}), 500
+        return jsonify({"ok": True, "status": "running"}), 202
+
     @app.route("/api/scan/stop", methods=["POST"])
     def api_scan_stop():
         body    = request.get_json(force=True, silent=True) or {}
@@ -1653,6 +1734,8 @@ def _build_app(static_dir: Path) -> "Flask":
             return jsonify({"error": "offline_mode must be a boolean"}), 400
         with _mode_lock:
             if body.get("offline_mode") is True and not _offline_enabled():
+                if _web_verifications_running:
+                    return jsonify({"error": "Wait for active web verifications to finish before enabling offline mode."}), 409
                 if _notification_operations:
                     return jsonify({"error": "Wait for active notifications to finish before enabling offline mode."}), 409
                 with _database_update_lock:

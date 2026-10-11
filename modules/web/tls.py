@@ -8,6 +8,7 @@ import warnings
 from urllib.parse import urlsplit
 
 from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 
 from modules.web.findings import emit, finding
 
@@ -60,12 +61,16 @@ def inspect_certificate(url, der, *, now=None):
     hostname = urlsplit(url).hostname
     now = now or datetime.now(timezone.utc)
     results = []
+    certificate_data = {"subject": certificate.subject.rfc4514_string(), "issuer": certificate.issuer.rfc4514_string(),
+                        "not_before": certificate.not_valid_before_utc.isoformat(), "not_after": certificate.not_valid_after_utc.isoformat(),
+                        "fingerprint_sha256": certificate.fingerprint(hashes.SHA256()).hex(), "serial_number": str(certificate.serial_number)}
+    reproduction = {"strategy": "tls", "target": url, "requests": [], "certificate": certificate_data}
     if now > certificate.not_valid_after_utc:
-        results.append(finding("TLS_CERTIFICATE", url, f"Certificate expired at {certificate.not_valid_after_utc.isoformat()}", severity="medium", confidence="observation"))
+        results.append(finding("TLS_CERTIFICATE", url, f"Certificate expired at {certificate.not_valid_after_utc.isoformat()}", severity="medium", confidence="observation", reproduction=reproduction))
     if now < certificate.not_valid_before_utc:
-        results.append(finding("TLS_CERTIFICATE", url, f"Certificate is not valid before {certificate.not_valid_before_utc.isoformat()}", severity="medium", confidence="observation"))
+        results.append(finding("TLS_CERTIFICATE", url, f"Certificate is not valid before {certificate.not_valid_before_utc.isoformat()}", severity="medium", confidence="observation", reproduction=reproduction))
     if not _certificate_matches(certificate, hostname):
-        results.append(finding("TLS_CERTIFICATE", url, "No certificate subject alternative name matches the target hostname/IP", severity="medium", confidence="observation"))
+        results.append(finding("TLS_CERTIFICATE", url, "No certificate subject alternative name matches the target hostname/IP", severity="medium", confidence="observation", reproduction=reproduction))
     return results
 
 

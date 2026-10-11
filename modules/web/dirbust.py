@@ -79,7 +79,8 @@ def dirbust(target_url, console, log):
         evidence = f"HTTP {response.status_code}; differs from missing-path controls"
         if response.status_code in (301, 302, 303, 307, 308):
             evidence += f"; redirect to {response.headers.get('Location', '')}"
-        result = finding("DIR", test_url, evidence, severity="info", confidence="observation")
+        result = finding("DIR", test_url, evidence, severity="info", confidence="observation",
+                         reproduction={"strategy": "directory", "requests": [{"url": url, "role": "missing-path control"} for url, _ in controls] + [{"url": test_url, "role": "probe"}]})
         if enabled("directories"):
             found.append(result)
             emit(console, result)

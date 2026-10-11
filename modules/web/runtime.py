@@ -111,7 +111,7 @@ class ScanContext:
                                 "access-control-allow-origin", "access-control-allow-credentials", "content-security-policy",
                                 "strict-transport-security", "x-frame-options", "x-content-type-options", "referrer-policy"):
                 response_headers[name] = redact_url(value)[:2048] if name.lower() == "location" else str(value)[:2048]
-        captured = {"request": request, "response": {"status": response.status_code, "headers": response_headers,
+        captured = {"request": request, "phase": self.phase, "response": {"status": response.status_code, "headers": response_headers,
                     "bytes_captured": len(response.content), "sha256": hashlib.sha256(response.content).hexdigest(),
                     "truncated": response.autopwn_truncated,
                     "duration_ms": round(1000 * (time.monotonic() - started), 1)}}
@@ -132,11 +132,18 @@ class ScanContext:
         reproduction["target"] = redact_url(reproduction.get("target", self.target))
         result["reproduction"] = reproduction
         result["observations"] = []
+        used = set()
         for planned in reproduction["requests"]:
-            match = next((record for record in reversed(self.records) if record["request"]["method"] == planned["method"]
+            matches = [(index, record) for index, record in enumerate(self.records) if index not in used and record["request"]["method"] == planned["method"]
                           and record["request"]["url"] == planned["url"]
-                          and all(record["request"]["headers"].get(name) == value for name, value in planned["headers"].items())), None)
-            if match:
+                          and all(record["request"]["headers"].get(name) == value for name, value in planned["headers"].items())
+                          and not any(name in record["request"]["headers"] and name not in planned["headers"] for name in ("Origin", "Host", "X-Forwarded-Host", "X-Autopwn-Trace"))]
+            phased = [match for match in matches if match[1].get("phase") == self.phase]
+            matches = phased or matches
+            if matches:
+                index, match = matches[-1] if planned["role"] == "baseline" else matches[0]
+                used.add(index)
+                planned["headers"] = deepcopy(match["request"]["headers"])
                 record = deepcopy(match)
                 record["request"]["role"] = planned["role"]
                 result["observations"].append(record)

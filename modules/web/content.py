@@ -55,6 +55,8 @@ def inspect_content(url, response, console):
             if 'id="summary"' in text and "Django" in text and ("You're seeing this error because" in text or "DEBUG = True" in text):
                 add("DEBUG_DISCLOSURE", "Framework debug error page; settings omitted")
     if response.status_code >= 500:
+        if is_html(response) and 'id="summary"' in text and "Django" in text and ("You're seeing this error because" in text or "DEBUG = True" in text):
+            add("DEBUG_DISCLOSURE", "Framework debug error page; settings omitted")
         signatures = [
             ("Python traceback", r"Traceback \(most recent call last\):[\s\S]{0,4000}File [\"']"),
             ("PHP stack trace", r"(?:Fatal error|Uncaught \w+(?:Exception|Error))[\s\S]{0,2000}Stack trace:"),
