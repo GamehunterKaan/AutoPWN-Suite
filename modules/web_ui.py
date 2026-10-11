@@ -67,6 +67,8 @@ import math
 from modules.nmap_progress import ScanCancelled
 from modules.nist_search import VulnerabilityLookup
 from modules.vulnerability_db import database_status, database_path, update_database
+from modules.web.options import CHECKS as WEB_CHECKS, normalize_options
+from modules.web.runtime import redact_url
 
 try:
     import requests as _requests
@@ -118,6 +120,23 @@ def _validate_nmap_flags(flags: str) -> Optional[str]:
     if not _NMAP_FLAG_RE.match(flags):
         return "nmap_flags contains invalid characters"
     return None
+
+
+def _validate_job_target(target, config):
+    if config.get("scan_web") and not config.get("scan_ports", True):
+        from modules.web.webvuln import target_urls
+        if not isinstance(target, str) or not target.strip() or len(target) > 8192:
+            return "A web target is required (hostname or HTTP(S) URL)"
+        if any(character in target for character in "\r\n\t ") or ("://" not in target and any(character in target for character in "/,")):
+            return "Web-only scans require one hostname or HTTP(S) URL"
+        try:
+            target_urls(target)
+        except ValueError:
+            return "Invalid HTTP(S) target"
+        return None
+    if isinstance(target, str) and "://" in target:
+        return "Use Web only for an HTTP(S) URL"
+    return _validate_target(target)
 
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
@@ -370,6 +389,8 @@ class ScanJob:
         self._lock       = threading.RLock()
         self._stop_flag  = threading.Event()
         self._hosts: dict[str, dict] = {}
+        self._web_findings = {}
+        self._web_coverage = []
         self._progress = {"phase": "preparing", "detail": "Preparing scan", "percent": None,
                           "completed": None, "total": None, "host": "",
                           "target_index": 0, "targets_completed": 0, "targets_total": None,
@@ -459,6 +480,42 @@ class ScanJob:
         with self._lock:
             return deepcopy(list(self._hosts.values()))
 
+    def add_web_finding(self, ip, endpoint, result):
+        result = deepcopy(result)
+        result.update(scan_id=self.id, host=ip, endpoint=redact_url(endpoint))
+        with self._lock:
+            self._web_findings[result["id"]] = result
+            host = self.get_or_create_host(ip)
+            host["web_finding_count"] = sum(row["host"] == ip for row in self._web_findings.values())
+        _broadcast({"scan_id": self.id, "level": "__web_finding__", "msg": "", "finding_id": result["id"]})
+
+    def web_findings(self, full=False):
+        with self._lock:
+            rows = deepcopy(list(self._web_findings.values()))
+        if full:
+            return rows
+        return [{key: row.get(key) for key in ("id", "scan_id", "host", "endpoint", "type", "url", "parameter", "severity", "confidence", "evidence", "observed_at", "verification")}
+                | {"title": row.get("details", {}).get("title", row["type"])} for row in rows]
+
+    def web_finding(self, finding_id):
+        with self._lock:
+            return deepcopy(self._web_findings.get(finding_id))
+
+    def set_web_verification(self, finding_id, result):
+        with self._lock:
+            if finding_id in self._web_findings:
+                self._web_findings[finding_id]["verification"] = deepcopy(result)
+                if result.get("status") != "running":
+                    history = self._web_findings[finding_id].setdefault("verification_history", [])
+                    history.append(deepcopy(result))
+                    del history[:-10]
+        _broadcast({"scan_id": self.id, "level": "__web_finding__", "msg": "", "finding_id": finding_id})
+
+    def add_web_coverage(self, ip, endpoint, summary):
+        with self._lock:
+            self._web_coverage.append({"host": ip, "endpoint": redact_url(endpoint), **deepcopy(summary)})
+            self._hosts[ip]["web_status"] = summary["status"]
+
     def to_dict(self) -> dict:
         with self._lock:
             hosts = deepcopy(list(self._hosts.values()))
@@ -466,6 +523,8 @@ class ScanJob:
             finished_at = self.finished_at
             error = self.error
             progress = deepcopy(self._progress)
+            web_count = len(self._web_findings)
+            web_coverage = deepcopy(self._web_coverage)
         return {
             "id":          self.id,
             "target":      self.target,
@@ -478,6 +537,8 @@ class ScanJob:
             "port_count":  sum(len(h["ports"]) for h in hosts),
             "vuln_count":  sum(len(h["vulns"])  for h in hosts),
             "progress":    progress,
+            "web_finding_count": web_count,
+            "web_coverage": web_coverage,
         }
 
     def to_full_dict(self) -> dict:
@@ -520,6 +581,7 @@ class ScanJob:
             structured_hosts.append(sh)
             
         base_dict["hosts"] = structured_hosts
+        base_dict["web_findings"] = self.web_findings(full=True)
         return base_dict
 
 # ── Global scan registry + SSE ────────────────────────────────────────────────
@@ -532,6 +594,7 @@ _log_history: list = []
 _log_history_lock = threading.Lock()
 _MAX_LOG_HISTORY = 5000
 _MAX_COMPLETED_SCANS = 100
+_web_verifications_running = 0
 
 
 def _broadcast(event: dict) -> None:
@@ -871,6 +934,17 @@ def _run_scan(job: ScanJob) -> None:
             with job._lock:
                 config["vulnerability_source"] = "offline"
                 config["nmap_flags"] = nmap_flags
+        if config.get("scan_web") and not scan_ports:
+            from urllib.parse import urlsplit
+            from rich.console import Console
+            from modules.web.webvuln import target_urls
+            endpoint = target_urls(target)[0]
+            ip = urlsplit(endpoint).hostname
+            job.get_or_create_host(ip)
+            failed = _run_host_web(job, ip, [target], log, Console(file=io.StringIO()))
+            job.complete_target()
+            job.mark_done("stopped" if job.should_stop() else "partial" if failed else "completed")
+            return
         if scan_vulns:
             lookup = VulnerabilityLookup(source, _VULNERABILITY_DB)
             if lookup.local:
@@ -984,8 +1058,17 @@ def _run_scan(job: ScanJob) -> None:
             for observed_ip in resolved:
                 if job.should_stop():
                     break
-                if _collect_host_results(job, nm, observed_ip, log, silent, scan_vulns, api_key, lookup=lookup):
+                host_failed = _collect_host_results(job, nm, observed_ip, log, silent, scan_vulns, api_key, lookup=lookup)
+                if config.get("scan_web"):
+                    from modules.web.webvuln import web_endpoints
+                    host_data = job.get_or_create_host(observed_ip)
+                    web_rows = [[observed_ip, port["port"], port["service"], port["product"], port["version"], port["protocol"]] for port in host_data["ports"]]
+                    scan_data = {"scan": {observed_ip: {"tcp": nm[observed_ip].get("tcp", {})}}}
+                    host_failed = _run_host_web(job, observed_ip, web_endpoints(observed_ip, web_rows, scan_data), log, silent,
+                                                offline=lookup is not None and lookup.source == "offline") or host_failed
+                if host_failed:
                     had_failures = True
+                    job.mark_host_done(observed_ip, "partial")
             if not job.should_stop():
                 job.complete_target()
 
@@ -1011,6 +1094,42 @@ def _run_scan(job: ScanJob) -> None:
             lookup.close()
         _broadcast({"scan_id": job.id, "level": "__scan_done__", "msg": "", "ts": ""})
         _notify(job)
+
+
+def _run_host_web(job, ip, endpoints, log, console, *, offline=False):
+    from modules.web.webvuln import webvuln
+    host = job.get_or_create_host(ip)
+    if offline or _offline_enabled() or job.config.get("vulnerability_source") == "offline":
+        with job._lock:
+            host["web_status"] = "skipped_offline"
+        _log(job, "Web application checks are disabled in offline mode.", "warning")
+        return False
+    failed = False
+    for endpoint in dict.fromkeys(endpoints):
+        if job.should_stop():
+            raise ScanCancelled("Web scan stopped")
+        summary = {}
+        with job._lock:
+            host["web_status"] = "scanning"
+        try:
+            webvuln(endpoint, log, console, controls=job.config.get("web_options"), should_stop=job.should_stop,
+                    progress=lambda stage, used, budget: job.set_progress("web_checks", f"{stage} · {used}/{budget} requests", host=ip),
+                    on_finding=lambda result: job.add_web_finding(ip, endpoint, result), on_complete=summary.update)
+        except ScanCancelled:
+            if summary:
+                job.add_web_coverage(ip, endpoint, summary)
+            raise
+        except Exception:
+            logging.exception("Web application check failed")
+            summary = {"status": "partial", "requests": 0, "issues": ["Web checks failed; see server logs."], "target": redact_url(endpoint)}
+        summary.setdefault("status", "completed")
+        summary["target"] = redact_url(summary.get("target", endpoint))
+        job.add_web_coverage(ip, endpoint, summary)
+        failed = failed or summary["status"] != "completed"
+        with job._lock:
+            host["observed_at"] = datetime.now(timezone.utc).isoformat()
+    job.mark_host_done(ip, "partial" if failed else "completed")
+    return failed
 
 
 def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, lookup=None) -> bool:
@@ -1112,13 +1231,14 @@ def _profile_config(body, existing=None):
     defaults = {"mode": "normal", "speed": 3, "scan_type": None,
                 "scan_technique": "", "ports": "", "version_intensity": None,
                 "os_detection": False, "nmap_flags": "", "host_timeout": 240,
-                "scan_ports": True, "scan_vulns": True, "skip_discovery": False}
+                "scan_ports": True, "scan_vulns": True, "skip_discovery": False, "scan_web": False, "web_options": {}}
     defaults["vulnerability_source"] = "auto"
     if not isinstance(body, dict) or (existing is not None and not isinstance(existing, dict)):
         raise ValueError("Profile configuration must be an object")
     config = dict(defaults)
     for source in (existing or {}, body):
         config.update({key: source[key] for key in defaults if key in source})
+    config["web_options"] = normalize_options(body.get("web_options", {}), (existing or {}).get("web_options", {}))
     if config["vulnerability_source"] not in ("auto", "online", "offline"):
         raise ValueError("'vulnerability_source' must be auto, online, or offline")
     if config["mode"] not in ("normal", "evade", "noise"):
@@ -1130,9 +1250,13 @@ def _profile_config(body, existing=None):
     config["scan_type"] = config["scan_type"] or None
     if config["scan_type"] not in (None, "arp", "ping"):
         raise ValueError("'scan_type' must be 'arp', 'ping', or null")
-    for key in ("scan_ports", "scan_vulns", "skip_discovery", "os_detection"):
+    for key in ("scan_ports", "scan_vulns", "skip_discovery", "os_detection", "scan_web"):
         if not isinstance(config[key], bool):
             raise ValueError(f"'{key}' must be a boolean")
+    if config["scan_web"] and not any(config["web_options"]["checks"].values()):
+        raise ValueError("Select at least one web check")
+    if config["scan_web"] and not config["scan_ports"]:
+        config.update(scan_vulns=False, skip_discovery=True)
     for key in ("scan_technique", "ports", "nmap_flags"):
         if not isinstance(config[key], str):
             raise ValueError(f"'{key}' must be a string")
@@ -1159,7 +1283,9 @@ def _schedule_data(body, existing=None):
     if not isinstance(result["target"], str):
         raise ValueError("'target' must be a string")
     result["target"] = result["target"].strip()
-    target_error = _validate_target(result["target"])
+    profile_id = result.get("profile_id")
+    profile = _profiles.get(profile_id, {}) if isinstance(profile_id, str) else {}
+    target_error = _validate_job_target(result["target"], profile.get("config", {}))
     if target_error:
         raise ValueError(target_error)
     if not isinstance(result["profile_id"], str) or not result["profile_id"]:
@@ -1363,17 +1489,18 @@ def _build_app(static_dir: Path) -> "Flask":
     @app.route("/api/scan/start", methods=["POST"])
     def api_scan_start():
         body   = request.get_json(force=True, silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"error": "Scan configuration must be an object"}), 400
         target = body.get("target", "")
-
-        target_err = _validate_target(target)
-        if target_err:
-            return jsonify({"error": target_err}), 400
-        target = target.strip()
 
         try:
             config = _profile_config(body)
         except ValueError:
             return jsonify({"error": "Invalid scan configuration"}), 400
+        target_err = _validate_job_target(target, config)
+        if target_err:
+            return jsonify({"error": target_err}), 400
+        target = target.strip()
         api_key = body.get("api_key", "")
         if api_key is not None and not isinstance(api_key, str):
             return jsonify({"error": "api_key must be a string"}), 400
@@ -1381,11 +1508,101 @@ def _build_app(static_dir: Path) -> "Flask":
                       nmap_flags=_build_nmap_flags(config))
         if _offline_enabled():
             config["vulnerability_source"] = "offline"
+        if config["scan_web"] and config["vulnerability_source"] == "offline":
+            return jsonify({"error": "Web checks are disabled in offline mode."}), 409
         if config["scan_vulns"] and config["vulnerability_source"] == "offline" and not database_status(_VULNERABILITY_DB)["ready"]:
             return jsonify({"error": "Offline database unavailable. Download it in Settings while connected, "
                             "or copy vulnerabilities.sqlite3 from a connected system."}), 409
         job = _launch_scan(config)
         return jsonify({"ok": True, "scan_id": job.id, "message": f"Scan started for {target}"})
+
+    @app.route("/api/web/catalog")
+    def api_web_catalog():
+        from modules.web.options import LIMITS
+        return jsonify({"checks": WEB_CHECKS, "defaults": normalize_options(), "limits": LIMITS,
+                        "offline": _offline_enabled()})
+
+    @app.route("/api/web/findings")
+    def api_web_findings():
+        return jsonify([row for job in _all_scans() for row in job.web_findings()])
+
+    @app.route("/api/web/findings/<scan_id>/<finding_id>")
+    def api_web_finding(scan_id, finding_id):
+        job = _get_scan(scan_id)
+        result = job.web_finding(finding_id) if job else None
+        if not result:
+            return jsonify({"error": "Web finding not found"}), 404
+        return jsonify(result)
+
+    @app.route("/api/web/findings/<scan_id>/<finding_id>/poc")
+    def api_web_poc(scan_id, finding_id):
+        from modules.web.poc import browser_poc, build_plan, curl_poc, python_poc
+        job = _get_scan(scan_id)
+        result = job.web_finding(finding_id) if job else None
+        if not result:
+            return jsonify({"error": "Web finding not found"}), 404
+        form = request.args.get("format", "python")
+        formats = {"python": (python_poc, "py"), "curl": (curl_poc, "sh"), "html": (browser_poc, "html"),
+                   "json": (lambda row: json.dumps(build_plan(row), indent=2), "json")}
+        if form not in formats:
+            return jsonify({"error": "Unknown PoC format"}), 400
+        generate, extension = formats[form]
+        code = generate(result)
+        if code is None:
+            return jsonify({"error": "Browser PoCs are available for XSS and CORS findings."}), 400
+        safe_id = _re.sub(r"[^A-Za-z0-9_-]", "", finding_id)[:40]
+        response = Response(code, mimetype="application/octet-stream")
+        response.headers["Content-Disposition"] = f'attachment; filename="autopwn-poc-{safe_id}.{extension}"'
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @app.route("/api/web/findings/<scan_id>/<finding_id>/verify", methods=["POST"])
+    def api_web_verify(scan_id, finding_id):
+        global _web_verifications_running
+        from modules.web.poc import build_plan
+        from modules.web.poc_runtime import validate_plan, verify_plan
+        job = _get_scan(scan_id)
+        result = job.web_finding(finding_id) if job else None
+        if not result:
+            return jsonify({"error": "Web finding not found"}), 404
+        body = request.get_json(silent=True)
+        if body is None:
+            body = {}
+        if not isinstance(body, dict) or body:
+            return jsonify({"error": "Verification uses the stored request plan; custom requests are not accepted."}), 400
+        plan = build_plan(result)
+        try:
+            validate_plan(plan)
+        except (ValueError, KeyError):
+            return jsonify({"error": "This finding needs local inputs or cannot be replayed automatically. Download its PoC to review."}), 409
+        with _mode_lock:
+            if _notifications_offline(job):
+                return jsonify({"error": "Verification is disabled in offline mode."}), 409
+            with job._lock:
+                if job._web_findings[finding_id].get("verification", {}).get("status") == "running":
+                    return jsonify({"error": "Verification is already running."}), 409
+                if _web_verifications_running >= 4:
+                    return jsonify({"error": "Four verifications are already running. Wait for one to finish."}), 409
+                _web_verifications_running += 1
+                job.set_web_verification(finding_id, {"status": "running", "summary": "Replaying recorded evidence"})
+            def run():
+                global _web_verifications_running
+                try:
+                    verified = verify_plan(plan)
+                    job.set_web_verification(finding_id, verified)
+                except Exception:
+                    logging.exception("Web evidence verification failed")
+                    job.set_web_verification(finding_id, {"status": "inconclusive", "summary": "Verification failed; see server logs."})
+                finally:
+                    with _mode_lock:
+                        _web_verifications_running -= 1
+            try:
+                threading.Thread(target=run, daemon=True).start()
+            except Exception:
+                _web_verifications_running -= 1
+                job.set_web_verification(finding_id, {"status": "inconclusive", "summary": "Could not start verification."})
+                return jsonify({"error": "Could not start verification."}), 500
+        return jsonify({"ok": True, "status": "running"}), 202
 
     @app.route("/api/scan/stop", methods=["POST"])
     def api_scan_stop():
@@ -1518,6 +1735,8 @@ def _build_app(static_dir: Path) -> "Flask":
             return jsonify({"error": "offline_mode must be a boolean"}), 400
         with _mode_lock:
             if body.get("offline_mode") is True and not _offline_enabled():
+                if _web_verifications_running:
+                    return jsonify({"error": "Wait for active web verifications to finish before enabling offline mode."}), 409
                 if _notification_operations:
                     return jsonify({"error": "Wait for active notifications to finish before enabling offline mode."}), 409
                 with _database_update_lock:
