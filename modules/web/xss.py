@@ -60,7 +60,9 @@ class XSSScanner:
                     break
                 if context:
                     result = finding("XSS", test_url, f"Unescaped reflection in {context}; browser execution not verified",
-                                     parameter=url_params[index].split("=", 1)[0], severity="medium")
+                                     parameter=url_params[index].split("=", 1)[0], severity="medium",
+                                     reproduction={"strategy": "xss_reflection", "marker": marker, "payload": payload,
+                                                   "requests": [{"url": test_url, "role": "probe"}]})
                     found.append(result)
                     emit(self.console, result)
                     break

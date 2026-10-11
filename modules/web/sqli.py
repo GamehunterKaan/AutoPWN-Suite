@@ -54,7 +54,9 @@ class SQLIScanner:
                     break
                 if new_errors & repeated:
                     result = finding("SQLI", test_url, "Repeatable database error absent from the baseline",
-                                     parameter=url_params[index].split("=", 1)[0], severity="high")
+                                     parameter=url_params[index].split("=", 1)[0], severity="high",
+                                     reproduction={"strategy": "sqli_error", "requests": [
+                                         {"url": original, "role": "baseline"}, {"url": test_url, "role": "probe"}, {"url": test_url, "role": "repeat"}]})
                     found.append(result)
                     emit(self.console, result)
                     break

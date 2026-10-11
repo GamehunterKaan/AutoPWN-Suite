@@ -70,6 +70,7 @@ class BooleanSQLIScanner:
             original = parse_qsl(params[index], keep_blank_values=True)[0][1]
             for suffix in ("", "'", '"'):
                 false_texts, true_urls = [], []
+                comparison_requests = [{"url": url, "role": "baseline"}, {"url": url, "role": "baseline_repeat"}]
                 try:
                     nonce = 10000 + randbelow(90000)
                     for number in (nonce, nonce + 100000):
@@ -80,6 +81,7 @@ class BooleanSQLIScanner:
                         false_url = probe_url(base, params, index, false)
                         true_response = self.client.send(true_url)
                         false_response = self.client.send(false_url)
+                        comparison_requests.extend([{ "url": true_url, "role": "true"}, {"url": false_url, "role": "false"}])
                         if any(_kind(response) != _kind(baseline) or getattr(response, "autopwn_truncated", False)
                                or self.errors._errors(response.text) for response in (true_response, false_response)):
                             break
@@ -95,7 +97,8 @@ class BooleanSQLIScanner:
                     break
                 if len(false_texts) == 2 and _similar(*false_texts) >= .98:
                     result = finding("SQLI_BOOLEAN", true_urls[0], "Two distinct true/false pairs changed results consistently against a stable baseline; no data was extracted",
-                                     parameter=params[index].split("=", 1)[0], severity="high")
+                                     parameter=params[index].split("=", 1)[0], severity="high",
+                                     reproduction={"strategy": "boolean_sqli", "requests": comparison_requests})
                     found.append(result)
                     emit(self.console, result)
                     break

@@ -19,4 +19,10 @@ def query_parts(url):
 
 def parameter_indexes(params):
     # A repeated name is a separate input; preserve its position and context.
-    return (index for index, param in enumerate(params) if param.split("=", 1)[0])
+    from modules.web.runtime import ACTIVE
+    current = ACTIVE.get()
+    indexes = [index for index, param in enumerate(params) if param.split("=", 1)[0]]
+    if current and len(indexes) > current.options["max_parameters"]:
+        current.issue("Query parameter limit reached; coverage is limited.")
+        indexes = indexes[:current.options["max_parameters"]]
+    return iter(indexes)

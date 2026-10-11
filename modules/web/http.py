@@ -18,7 +18,18 @@ class AnonymousAuth(AuthBase):
 
 def bounded_request(call, *args, max_bytes=1_048_576, **kwargs):
     """Keep only a bounded response prefix and release the connection."""
-    response = call(*args, stream=True, **kwargs)
+    from modules.web.runtime import ACTIVE
+    current = ACTIVE.get()
+    started = current.before() if current else None
+    if current:
+        kwargs["timeout"] = current.options["timeout"]
+        max_bytes = current.options["max_response_kb"] * 1024
+    try:
+        response = call(*args, stream=True, **kwargs)
+    except RequestException:
+        if current and not current.discovery:
+            current.issue("A web request failed; coverage is incomplete.")
+        raise
     body = bytearray()
     response.autopwn_truncated = False
     try:
@@ -34,6 +45,9 @@ def bounded_request(call, *args, max_bytes=1_048_576, **kwargs):
         response.close()
     response._content = bytes(body)
     response._content_consumed = True
+    if current:
+        method, url = (args[0], args[1]) if len(args) > 1 else ("GET", args[0])
+        current.capture(response, method, url, kwargs.get("headers", {}), started)
     return response
 
 

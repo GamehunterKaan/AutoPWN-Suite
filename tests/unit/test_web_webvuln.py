@@ -21,7 +21,7 @@ def test_no_endpoint_is_logged_and_stops_before_other_checks():
     assert all(call.kwargs["allow_redirects"] is False for call in get.call_args_list)
     crawl.assert_not_called()
     dirs.assert_not_called()
-    log.logger.assert_called_once()
+    log.logger.assert_any_call("warning", "No reachable in-scope web endpoint on 127.0.0.1.")
 
 
 @pytest.mark.unit
@@ -30,7 +30,7 @@ def test_static_site_still_runs_passive_checks_and_directory_discovery(web_respo
     log, console = MagicMock(), MagicMock()
     with patch("modules.web.webvuln.get", return_value=web_response("<html>Home</html>", url=url)), patch("modules.web.webvuln.crawl", return_value={url}), patch("modules.web.webvuln.dirbust", return_value=[]) as dirs:
         findings = webvuln("example.com", log, console)
-    dirs.assert_called_once_with(url, console, log)
+    assert dirs.call_args.args[:2] == (url, console)
     assert findings and all(item["type"] == "WEB_CONFIG" for item in findings)
     log.logger.assert_any_call("info", "Found 0 testable urls.")
 

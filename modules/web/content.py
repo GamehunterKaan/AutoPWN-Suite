@@ -15,6 +15,9 @@ def inspect_content(url, response, console):
     path = unquote(urlsplit(url).path).lower()
 
     def add(kind, evidence, severity="medium", confidence="candidate"):
+        from modules.web.runtime import allowed
+        if not allowed(kind):
+            return
         results.append(finding(kind, url, evidence, severity=severity, confidence=confidence))
 
     if 200 <= response.status_code < 300:

@@ -12,6 +12,7 @@ from modules.random_user_agent import random_user_agent
 from modules.web.findings import emit, finding
 from modules.web.content import inspect_content
 from modules.web.http import bounded_request, resolve_url, same_origin
+from modules.web.runtime import enabled
 
 
 def _normalized(value, url):
@@ -42,6 +43,10 @@ def dirbust(target_url, console, log):
     try:
         with open(f"{dirname(__file__)}/../data/web_discovery.txt", "r", encoding="utf-8") as file:
             dirs = list(dict.fromkeys(line.strip() for line in file if line.strip() and not line.startswith("#")))
+            if not enabled("directories"):
+                sensitive = (".env", ".git", ".bak", ".old", ".sql", "backup", "web.config", "phpinfo", "debug")
+                dirs = [path for path in dirs if (enabled("exposed_files") and any(part in path for part in sensitive[:7]))
+                        or (enabled("errors") and any(part in path for part in sensitive[7:]))]
     except OSError:
         log.logger("error", "Web discovery database not found.")
         return []
@@ -75,8 +80,9 @@ def dirbust(target_url, console, log):
         if response.status_code in (301, 302, 303, 307, 308):
             evidence += f"; redirect to {response.headers.get('Location', '')}"
         result = finding("DIR", test_url, evidence, severity="info", confidence="observation")
-        found.append(result)
-        emit(console, result)
+        if enabled("directories"):
+            found.append(result)
+            emit(console, result)
         found.extend(inspect_content(test_url, response, console))
         if response.status_code in (301, 302, 307, 308):
             try:

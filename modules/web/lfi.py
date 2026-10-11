@@ -63,7 +63,9 @@ class LFIScanner:
                 evidence = new_signatures & repeated
                 if evidence:
                     result = finding("LFI", test_url, "Repeatable file content absent from the baseline: " + ", ".join(sorted(evidence)),
-                                     parameter=url_params[index].split("=", 1)[0], severity="high")
+                                     parameter=url_params[index].split("=", 1)[0], severity="high",
+                                     reproduction={"strategy": "file_inclusion", "requests": [
+                                         {"url": original, "role": "baseline"}, {"url": test_url, "role": "probe"}, {"url": test_url, "role": "repeat"}]})
                     found.append(result)
                     emit(self.console, result)
                     break
