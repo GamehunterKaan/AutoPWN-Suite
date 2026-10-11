@@ -18,8 +18,9 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Fully [automatic](#usage) scanning and exploitation
 - Detect network IP range without any user input
 - Vulnerability detection based on service versions
-- Web app vulnerability testing (LFI, XSS, SQLI)
-- Web app directory busting
+- Web app vulnerability candidates (Unix/Windows LFI, reflected XSS, error-based SQLI)
+- Web response header and cookie configuration advisories
+- Web app directory discovery with catch-all page filtering
 - Get information about vulnerabilities right from your terminal
 - Automatically download exploits related to discovered vulnerabilities
 - Noise mode for creating traffic on the network
@@ -58,6 +59,88 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 ## How Does It Work?
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of software running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of keywords to search the [NIST vulnerability database.](https://www.nist.gov/)
+
+
+## Web application checks
+
+The CLI's existing web vulnerability prompt runs directory discovery and passive header/cookie
+checks even on sites with no query inputs. When port results are available it checks each detected
+TCP HTTP(S) service, including nonstandard ports; otherwise it tries the host's default web ports.
+The crawler follows same-origin links and discovers
+GET forms, preserving blank inputs, repeated parameter names and other query values. It skips
+POST forms, password forms and uploads. The crawl is limited to 25 pages, 50 discovered URLs
+and two levels of links; reaching a budget is reported as limited coverage.
+
+SQLi and LFI checks compare against the original response and repeat promising probes before
+reporting new database errors or Unix/Windows file signatures. Reflected XSS checks require an
+unescaped payload in a script element or HTML event handler in an HTML response; JSON, plain
+text, comments and inactive HTML contexts are excluded. Browser execution and CSP bypass are
+not verified, so injection findings remain **candidates** requiring review. Directory hits are
+**observations**, with random missing-path controls suppressing soft 404 pages and blanket
+login redirects. A protected path is not itself a vulnerability.
+
+Configuration checks report **advisories** for missing/invalid `nosniff`, HTML CSP and framing
+protection, HTTPS hostname HSTS, and cookie Secure/HttpOnly/SameSite flags. Cookie values are
+excluded from these advisories. Recommendations follow the
+[OWASP HTTP Headers Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html).
+They describe the response observed, not a complete configuration audit.
+
+Additional application checks include:
+
+- **Exposed files and directory indexes:** signature checks for environment files, Git metadata,
+  PHP source backups, database dumps, server configuration and backup archives. Directory listings
+  require an index heading and multiple child-file links. Sensitive contents are omitted from
+  findings; archives are not extracted. Known diagnostic pages and HTTP error stack traces are
+  reported without printing their settings or trace details.
+- **CORS:** two arbitrary origins and repeated `null` origins test credential permission. Public
+  wildcard access alone is not reported as a vulnerability. Wildcard-plus-credentials produces a
+  configuration advisory because browsers reject credentialed reads. Actual authenticated data
+  exposure is not verified.
+- **Open redirects:** redirect-like query parameters are tested with distinct controlled hosts.
+  A finding requires repeatable external `Location` destinations; those destinations are never
+  visited.
+- **Boolean SQLi:** two distinct true/false comparisons must agree against a stable original
+  response. Different content types, HTTP errors, SQL errors, unstable pages and truncated bodies
+  are excluded. These remain candidates; no timing probes or database extraction are performed.
+- **HTTP methods:** OPTIONS advertises capabilities; TRACE requires a repeatable request-line and
+  marker-header echo. These are observations. PUT, DELETE, PATCH and CONNECT are not sent, and
+  method probes carry no cookies or authorization headers. Automatic `.netrc` authentication is
+  suppressed for the additional diagnostic probes.
+- **Host headers:** two controlled values for each of Host and X-Forwarded-Host must influence
+  redirect hosts or generated absolute URLs. Plain text reflection is ignored. These remain
+  candidates, and password reset poisoning or cache poisoning impact is not verified. Requests
+  use unique query markers and request cache-control directives.
+- **TLS:** certificate expiry, future validity, SAN hostname/IP matching and local trust validation
+  are checked independently. Exact-version handshakes test TLS 1.0 and 1.1 support. A finding requires
+  successful negotiation; unsupported client capabilities and failed connections are reported as
+  incomplete checks. Private CA trust failures are advisories. This is not a complete cipher,
+  revocation or certificate-chain audit. Certificate parsing uses `cryptography`.
+
+The additional HTTP probes share a budget of 300 requests per web endpoint and sample at most
+10 discovered URLs. Redirect and boolean SQLi checks inspect at most five relevant parameters
+per URL. HTTP method checks run on the starting endpoint. Reaching these limits is logged as
+limited coverage. Response bodies are read as prefixes capped at 1 MiB and connections are closed;
+file contents are not written to disk. Testing guidance follows the
+[OWASP Web Security Testing Guide](https://wstg.owasp.org/v4.2/4-Web_Application_Security_Testing/).
+
+Requests have a 10-second timeout and at most three followed redirects. Redirects are checked
+before following them; injection probes cannot leave the target origin. Initial endpoint
+discovery also permits the same hostname's HTTP port 80 to upgrade to HTTPS port 443.
+Self-signed HTTPS targets remain supported for application probes; TLS findings report certificate
+and trust problems separately.
+Offline mode continues to disable web probes.
+
+Module callers can supply a host, `host:port`, IPv6 address or explicit application URL:
+
+```python
+from modules.web.webvuln import webvuln
+
+findings = webvuln("https://example.com:8443/app/", log, console)
+```
+
+Each returned finding contains `type`, `url`, `parameter`, `severity`, `confidence` and `evidence`.
+The CLI prints these results through its existing console/export flow. The web dashboard's
+service-version/CVE scan does not run these application probes.
 
 
 ## Offline vulnerability database

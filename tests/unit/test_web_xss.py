@@ -1,7 +1,6 @@
-"""
-Unit tests for the xss module.
-"""
+import html
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from requests.exceptions import ConnectionError
@@ -10,88 +9,71 @@ from modules.web.xss import XSSScanner
 
 
 @pytest.mark.unit
-class TestXSSScanner:
-    """Tests for the XSSScanner class."""
+@pytest.mark.parametrize("context", ["<body>{}</body>", '<input value="{}">'])
+def test_active_reflection_is_candidate(web_response, context):
+    scanner = XSSScanner(MagicMock(), MagicMock())
 
-    @pytest.fixture
-    def mock_log_console(self):
-        """Fixture for a mocked logger and console."""
-        return MagicMock(), MagicMock()
+    def respond(url, **kwargs):
+        value = parse_qs(urlsplit(url).query)["q"][0]
+        return web_response(context.format(value), url=url, headers={"Content-Type": "text/html"})
 
-    @patch("modules.web.xss.get")
-    @patch("modules.web.xss.choices")
-    def test_xss_vulnerability_found(self, mock_choices, mock_get, mock_log_console):
-        """Verify that an XSS vulnerability is detected and printed."""
-        mock_log, mock_console = mock_log_console
+    with patch("modules.web.xss.get", side_effect=respond):
+        found = scanner.test_xss("http://example.com/search?q=hello")
+    assert len(found) == 1
+    assert found[0]["confidence"] == "candidate"
+    assert "browser execution not verified" in found[0]["evidence"]
 
-        # Make the random payload predictable for the test
-        fixed_payload_text = "fixedpayload"
-        mock_choices.return_value = list(fixed_payload_text)
 
-        mock_response = MagicMock()
-        # Simulate a response that reflects the payload
-        mock_response.text = f"<html><body><script>alert('{fixed_payload_text}')</script></body></html>"
-        mock_get.return_value = mock_response
+@pytest.mark.unit
+@pytest.mark.parametrize("context,mime", [
+    ("{}", "application/json"), ("{}", "text/plain"),
+    ("<!-- {} -->", "text/html"), ("<textarea>{}</textarea>", "text/html"),
+    ("<template>{}</template>", "text/html"), ("<title>{}</title>", "text/html"),
+    ('<script type="application/json">{}</script>', "text/html"),
+])
+def test_raw_reflection_in_inactive_context_is_not_xss(web_response, context, mime):
+    scanner = XSSScanner(MagicMock(), MagicMock())
+    scanner.xss_test = ["<script>alert('PAYLOAD')</script>"]
 
-        xss_tester = XSSScanner(mock_log, mock_console)
-        test_url = "http://example.com/search?q=test"
-        xss_tester.test_xss(test_url)
+    def respond(url, **kwargs):
+        value = parse_qs(urlsplit(url).query)["q"][0]
+        return web_response(context.format(value), url=url, headers={"Content-Type": mime})
 
-        # Verify that a vulnerability was printed to the console
-        mock_console.print.assert_called()
-        assert "XSS candidate (unescaped reflection)" in mock_console.print.call_args[0][0]
-        assert fixed_payload_text in mock_console.print.call_args[0][0]
+    with patch("modules.web.xss.get", side_effect=respond):
+        assert scanner.test_xss("http://example.com/search?q=hello") == []
+    scanner.console.print.assert_not_called()
 
-    @patch("modules.web.xss.get")
-    def test_xss_no_vulnerability(self, mock_get, mock_log_console):
-        """Verify that no vulnerability is reported for a clean response."""
-        mock_log, mock_console = mock_log_console
-        mock_response = MagicMock()
-        # Simulate a normal response that does not reflect the payload
-        mock_response.text = "<html><body>Search results</body></html>"
-        mock_get.return_value = mock_response
 
-        xss_tester = XSSScanner(mock_log, mock_console)
-        test_url = "http://example.com/search?q=test"
-        xss_tester.test_xss(test_url)
+@pytest.mark.unit
+def test_html_escaped_reflection_is_not_xss(web_response):
+    scanner = XSSScanner(MagicMock(), MagicMock())
+    with patch("modules.web.xss.get", side_effect=lambda url, **kwargs: web_response(html.escape(parse_qs(urlsplit(url).query)["q"][0]))):
+        assert scanner.test_xss("http://example.com/search?q=hello") == []
 
-        # Verify that nothing was printed to the console
-        mock_console.print.assert_not_called()
 
-    @patch("modules.web.xss.ConnectionError", new=ConnectionError)
-    @patch("modules.web.xss.get", side_effect=ConnectionError)
-    def test_xss_connection_error(self, mock_get, mock_log_console):
-        """Verify that a connection error is handled gracefully."""
-        mock_log, mock_console = mock_log_console
+@pytest.mark.unit
+def test_second_payload_and_query_context_are_preserved(web_response):
+    scanner = XSSScanner(MagicMock(), MagicMock())
+    scanner.xss_test = ["<script>PAYLOAD</script>", "<img onerror='PAYLOAD'>"]
 
-        xss_tester = XSSScanner(mock_log, mock_console)
-        test_url = "http://example.com/search?q=test"
-        xss_tester.test_xss(test_url)
+    def respond(url, **kwargs):
+        params = parse_qs(urlsplit(url).query)
+        assert params["token"] == ["a&b"] or params["q"] == ["original"]
+        value = params["q"][0]
+        return web_response(value if value.startswith("<img") else "safe", url=url)
 
-        # Verify that the error was logged
-        mock_log.logger.assert_called()
-        assert "Connection error raised on" in mock_log.logger.call_args[0][1]
+    with patch("modules.web.xss.get", side_effect=respond) as get:
+        found = scanner.test_xss("http://example.com/search?q=original&token=a%26b#fragment")
+    assert len(found) == 1
+    assert "HTML event handler" in found[0]["evidence"]
+    assert all(not urlsplit(call.args[0]).fragment for call in get.call_args_list)
 
-    @patch("modules.web.xss.choices", return_value=list("fixedpayload"))
-    @patch("modules.web.xss.get")
-    def test_escaped_reflection_is_not_reported_as_xss(self, mock_get, mock_choices, mock_log_console):
-        import html
-        log, console = mock_log_console
-        scanner = XSSScanner(log, console)
-        scanner.xss_test = ["<script>alert('PAYLOAD')</script>"]
-        mock_get.return_value.text = html.escape("<script>alert('fixedpayload')</script>")
-        scanner.test_xss("http://example.com/search?q=test")
-        console.print.assert_not_called()
 
-    @patch("modules.web.xss.choices", return_value=list("fixedpayload"))
-    @patch("modules.web.xss.get")
-    def test_second_payload_is_tested(self, mock_get, mock_choices, mock_log_console):
-        log, console = mock_log_console
-        scanner = XSSScanner(log, console)
-        scanner.xss_test = ["<script>PAYLOAD</script>", "<img onerror='PAYLOAD'>"]
-        mock_get.side_effect = [MagicMock(text="safe"), MagicMock(text="<img onerror='fixedpayload'>"),
-                               MagicMock(text="safe"), MagicMock(text="safe")]
-        scanner.test_xss("http://example.com/search?q=test&category=news")
-        assert mock_get.call_count >= 2
-        assert "category=news" in mock_get.call_args_list[1].args[0]
-        console.print.assert_called()
+@pytest.mark.unit
+def test_connection_error_and_no_query():
+    scanner = XSSScanner(MagicMock(), MagicMock())
+    with patch("modules.web.xss.get", side_effect=ConnectionError) as get:
+        assert scanner.test_xss("http://example.com/page") == []
+        get.assert_not_called()
+        assert scanner.test_xss("http://example.com/page?q=test") == []
+    scanner.log.logger.assert_called_once()
