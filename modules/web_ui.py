@@ -1068,6 +1068,7 @@ def _run_scan(job: ScanJob) -> None:
                                                 offline=lookup is not None and lookup.source == "offline") or host_failed
                 if host_failed:
                     had_failures = True
+                    job.mark_host_done(observed_ip, "partial")
             if not job.should_stop():
                 job.complete_target()
 

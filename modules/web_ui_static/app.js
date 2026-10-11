@@ -446,6 +446,8 @@ function switchTab(name, el){
   document.querySelectorAll('.tc').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('tc-'+name).classList.add('active');
+  document.getElementById('app').classList.toggle('web-focus', name === 'web');
+  if(name === 'web') window.webSecurity?.refresh();
 }
 
 // ── Advanced toggle ────────────────────────────────────────────────────────────
@@ -472,6 +474,7 @@ function loadProfile(){
   document.getElementById('f-skipd').checked  = !!c.skip_discovery;
   document.getElementById('f-vulns').checked  = c.scan_vulns !== false;
   document.getElementById('f-vuln-source').value = offlineServer ? 'offline' : (c.vulnerability_source || 'auto');
+  window.webSecurity?.setControls('f', c);
   updateNmapPreview();
 }
 
@@ -486,6 +489,8 @@ function refreshProfileSelects(){
 async function startScan(){
   const target = document.getElementById('f-target').value.trim();
   if(!target){ addLog(null,'Please enter a target.','error'); return; }
+  const webError = window.webSecurity?.validateControls('f');
+  if(webError){ toast(webError, false); return; }
 
   const body = {
     target,
@@ -497,6 +502,7 @@ async function startScan(){
     scan_vulns:     document.getElementById('f-vulns').checked,
     vulnerability_source: document.getElementById('f-vuln-source').value,
     skip_discovery: document.getElementById('f-skipd').checked,
+    ...(window.webSecurity?.readControls('f') || {}),
   };
   try{
     const r = await fetch('/api/scan/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -504,7 +510,8 @@ async function startScan(){
     if(!r.ok){ addLog(null,d.error||'Failed to start scan.','error'); return; }
     document.getElementById('f-target').value='';
     addTermFilterOption(d.scan_id, target);
-    switchTab('scans', document.querySelector('.tab'));
+    if(body.scan_web && body.scan_ports === false) switchTab('web', document.getElementById('web-tab-button'));
+    else switchTab('scans', document.querySelector('.tab'));
   }catch(e){ addLog(null,'Cannot reach server: '+e.message,'error'); }
 }
 
@@ -528,7 +535,8 @@ function connectSSE(){
       }
       return;
     }
-    if(d.level==='__scan_done__'){ poll(); return; }
+    if(d.level==='__scan_done__'){ poll(); window.webSecurity?.refresh(); return; }
+    if(d.level==='__web_finding__'){ window.webSecurity?.refresh(); return; }
     addLog(d.scan_id, d.msg, d.level, d.ts);
     if(d.msg && d.msg.includes('Scheduled scan fired')) loadSchedulesFromServer();
   };
@@ -580,7 +588,7 @@ function scanProgressMarkup(job){
     ? Math.max(0, Math.min(100, progress.percent)) : null;
   if(job.status === 'completed') percent = 100;
   const labels = {preparing:'Preparing scan', discovery:'Host discovery', port_scan:'Port and service scan',
-    vulnerabilities:'CVE lookups', completed:'Scan completed', partial:'Incomplete coverage',
+    vulnerabilities:'CVE lookups', web_checks:'Web checks', completed:'Scan completed', partial:'Incomplete coverage',
     stopped:'Scan stopped', error:'Scan failed'};
   const phase = progress.phase || job.status;
   let label = labels[phase] || (active ? 'Scanning' : 'Scan finished');
@@ -621,6 +629,7 @@ function renderScans(){
       if(base.includes('-O') && f.includes('-O')) f = f.replace(/(^|\s)-O(\s|$)/g, ' ').trim();
       if(f) base += ' ' + f;
     }
+    if(c.scan_ports === false && c.scan_web) base = 'Website scan · ' + Object.values(c.web_options?.checks || {}).filter(Boolean).length + ' checks enabled';
     const card = document.createElement('div');
     card.className = `scan-card ${job.status}`;
     card.innerHTML = `
@@ -634,6 +643,7 @@ function renderScans(){
         <div class="sc-stat"><div class="sv">${job.host_count}</div><div class="sl">Hosts</div></div>
         <div class="sc-stat"><div class="sv">${job.port_count}</div><div class="sl">Ports</div></div>
         <div class="sc-stat"><div class="sv" style="color:${job.vuln_count?'var(--red)':'var(--accent)'}">${job.vuln_count}</div><div class="sl">CVEs</div></div>
+        ${c.scan_web ? `<div class="sc-stat"><div class="sv">${job.web_finding_count || 0}</div><div class="sl">Web findings</div></div>` : ''}
       </div>
       ${scanProgressMarkup(job)}
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -828,6 +838,7 @@ async function loadDatabaseStatus(){
   if(offlineServer){
     document.getElementById('f-vuln-source').value = 'offline';
   }
+  window.webSecurity?.setOffline(offlineServer);
 }
 async function saveOfflineMode(){
   const toggle = document.getElementById('s-offline-mode');
@@ -954,6 +965,7 @@ function showProfileForm(){
   document.getElementById('pf-skipd').checked=false;
   document.getElementById('pf-vulns').checked=true;
   document.getElementById('pf-vuln-source').value='auto';
+  window.webSecurity?.setControls('pf', {});
   updateProfilePreview();
 }
 function hideProfileForm(){ document.getElementById('profile-form').style.display='none'; }
@@ -977,12 +989,15 @@ function editProfile(pid){
   document.getElementById('pf-skipd').checked=!!c.skip_discovery;
   document.getElementById('pf-vulns').checked=c.scan_vulns!==false;
   document.getElementById('pf-vuln-source').value=c.vulnerability_source||'auto';
+  window.webSecurity?.setControls('pf', c);
   updateProfilePreview();
 }
 async function saveProfile(){
   const pid=document.getElementById('pf-id').value;
   const name=document.getElementById('pf-name').value.trim();
   if(!name){ toast('Profile name is required','',false); return; }
+  const webError = window.webSecurity?.validateControls('pf');
+  if(webError){ toast(webError, false); return; }
   const body={
     name, description:document.getElementById('pf-desc').value,
     mode:    document.getElementById('pf-mode').value,
@@ -997,6 +1012,7 @@ async function saveProfile(){
     skip_discovery: document.getElementById('pf-skipd').checked,
     scan_vulns:     document.getElementById('pf-vulns').checked,
     vulnerability_source: document.getElementById('pf-vuln-source').value,
+    ...(window.webSecurity?.readControls('pf') || {}),
   };
   const url=pid?`/api/profiles/${pid}`:'/api/profiles';
   const method=pid?'PUT':'POST';
