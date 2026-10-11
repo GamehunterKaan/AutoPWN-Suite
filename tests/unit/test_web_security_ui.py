@@ -87,8 +87,9 @@ assert.match(window.webSecurity.validateControls('f'),/at least one/);
 await emit('click','', {webAction:'preset',prefix:'f',preset:'light'});
 const saved=window.webSecurity.readControls('f');assert.equal(Object.values(saved.web_options.checks).filter(Boolean).length,2);
 assert.equal(saved.web_options.checks.headers,true);assert.equal(saved.web_options.checks.tls,true);
-nodes.get('f-web-limit-request_budget').value='2001';assert.match(window.webSecurity.validateControls('f'),/20–2000/);
-nodes.get('f-web-limit-request_budget').value='20.5';assert.match(window.webSecurity.validateControls('f'),/20–2000/);
+const [,minimum,maximum]=catalog.limits.request_budget;
+nodes.get('f-web-limit-request_budget').value=String(maximum+1);assert.ok(window.webSecurity.validateControls('f').includes(`${minimum}–${maximum}`));
+nodes.get('f-web-limit-request_budget').value='20.5';assert.ok(window.webSecurity.validateControls('f').includes(`${minimum}–${maximum}`));
 """)
 
 

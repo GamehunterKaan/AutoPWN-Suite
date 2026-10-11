@@ -5,6 +5,7 @@ from urllib.parse import urldefrag, urljoin, urlsplit
 from requests.exceptions import RequestException, TooManyRedirects
 from requests import request
 from requests.auth import AuthBase
+from modules.web.options import LIMITS
 
 
 class AnonymousAuth(AuthBase):
@@ -58,7 +59,7 @@ class ProbeLimitReached(RequestException):
 class ProbeClient:
     """One origin, no followed redirects, no authenticated or write requests."""
 
-    def __init__(self, url, log, headers=None, *, max_requests=300):
+    def __init__(self, url, log, headers=None, *, max_requests=LIMITS["request_budget"][0]):
         self.origin = origin(url)
         self.log = log
         self.headers = {key: value for key, value in (headers or {}).items() if key.lower() not in ("authorization", "cookie")}

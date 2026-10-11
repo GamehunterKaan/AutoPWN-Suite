@@ -69,8 +69,8 @@ checks even on sites with no query inputs. When port results are available it ch
 TCP HTTP(S) service, including nonstandard ports; otherwise it tries the host's default web ports.
 The crawler follows same-origin links and discovers
 GET forms, preserving blank inputs, repeated parameter names and other query values. It skips
-POST forms, password forms and uploads. The crawl is limited to 25 pages, 50 discovered URLs
-and two levels of links; reaching a budget is reported as limited coverage.
+POST forms, password forms and uploads. The default crawl limits are 250 pages, 1,000 discovered
+URLs and five levels of links; reaching a limit is reported as limited coverage.
 
 SQLi and LFI checks compare against the original response and repeat promising probes before
 reporting new database errors or Unix/Windows file signatures. Reflected XSS checks require an
@@ -117,8 +117,8 @@ Additional application checks include:
   incomplete checks. Private CA trust failures are advisories. This is not a complete cipher,
   revocation or certificate-chain audit. Certificate parsing uses `cryptography`.
 
-All HTTP checks share a default budget of 600 requests per web endpoint, including discovery,
-crawling and injection probes. Injection and additional checks sample at most 10 discovered URLs
+All HTTP checks share a default budget of 10,000 requests per web endpoint, including discovery,
+crawling and injection probes. Injection and additional checks sample at most 100 discovered URLs
 per check family, with at most five parameters per URL. HTTP method checks run on the starting
 endpoint. TLS handshakes run separately. Reaching these limits is logged as
 limited coverage. Response bodies are read as prefixes capped at 1 MiB and connections are closed;
@@ -154,6 +154,9 @@ Expand **Select checks** to choose among all 13 check groups. The **Light** pres
 and TLS; **All** selects every group. Expand **Limits & crawl** to control the HTTP request budget,
 timeout, crawl pages/URLs/depth, endpoints per injection/check family, parameters and response size cap.
 Save the same controls in a profile and use that profile for scheduled scans.
+Saved profiles retain their explicit limits when defaults change. Adjustable upper bounds are
+50,000 requests, 2,000 pages, 10,000 URLs, depth 10 and 1,000 probe endpoints. Larger scans take
+longer and send more requests; reaching any configured limit still reports incomplete coverage.
 
 The **Web Security** tab prioritizes severity and supports search and confidence/severity/scan filters.
 Coverage cards show enabled checks, request counts and incomplete-check reasons. Select a finding for:

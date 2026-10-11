@@ -3,20 +3,23 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.web.additional import additional_checks
+from modules.web.options import normalize_options
 
 
 @pytest.mark.unit
 def test_checks_run_on_static_sites_with_bounded_endpoint_scope(web_response):
     log = MagicMock()
-    urls = {f"http://example.com/page{i}" for i in range(20)} | {"http://external.com/x"}
+    controls = normalize_options()
+    limit = controls["max_endpoints"]
+    urls = {f"http://example.com/page{i}" for i in range(limit + 10)} | {"http://external.com/x"}
     with patch("modules.web.http.request", return_value=web_response("<html>Home</html>")) as request, patch("modules.web.additional.check_tls", return_value=[]):
         results = additional_checks("http://example.com/", urls, web_response("<html>Home</html>"), log, MagicMock())
     assert results == []
-    assert request.call_count <= 300
+    assert request.call_count <= controls["request_budget"]
     assert all(call.args[1].startswith("http://example.com/") for call in request.call_args_list)
     baselines = {call.args[1] for call in request.call_args_list if "__autopwn_probe" not in call.args[1]}
-    assert len(baselines) <= 10
-    assert any("10 discovered endpoints" in call.args[1] for call in log.logger.call_args_list)
+    assert len(baselines) == limit
+    assert any(f"{limit} discovered endpoints" in call.args[1] for call in log.logger.call_args_list)
 
 
 @pytest.mark.unit

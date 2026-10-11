@@ -1,4 +1,4 @@
-"""Discover same-origin links and GET forms within a small crawl budget."""
+"""Discover same-origin links and GET forms within configured crawl limits."""
 
 from collections import deque
 from urllib.parse import urldefrag, urlencode, urlsplit, urlunsplit
@@ -9,9 +9,10 @@ from requests.exceptions import RequestException
 
 from modules.random_user_agent import random_user_agent
 from modules.web.http import is_html, resolve_url, same_origin, scoped_get
+from modules.web.options import LIMITS
 
 
-def crawl(target_url, log, *, max_pages=25, max_urls=50, max_depth=2) -> set[str]:
+def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS["max_urls"][0], max_depth=LIMITS["max_depth"][0]) -> set[str]:
     parts = urlsplit(urldefrag(target_url)[0])
     target_url = urlunsplit(parts._replace(path=parts.path or "/"))
     if not same_origin(target_url, target_url) or max_pages <= 0 or max_urls <= 0:
