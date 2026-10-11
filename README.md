@@ -43,6 +43,7 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 - **Live terminal output** - Watch nmap commands and results in real time via SSE
 - **Scan progress** - Live Nmap stage percentages, completed CVE lookup counts and target completion counters. The bar follows the current stage; stages without a reported percentage show ongoing activity. Stopped and failed scans retain their last measured progress.
 - **Scan profiles** - Save and reuse scan configurations (technique, speed, timeout, ports, evasion, custom flags)
+- **Web security dashboard** - Select application checks, inspect captured evidence and remediation, download PoCs, and explicitly replay recorded checks
 - **Scheduled scans** - Set up recurring scans on a cron schedule with automatic profile loading
 - **Scan techniques** - Choose between TCP SYN, TCP Connect, UDP, Window, ACK, FIN, Xmas, Null, Maimon and SCTP scans
 - **Evasion mode** - Fragmented packets, spoofed source port and padded data length
@@ -116,9 +117,10 @@ Additional application checks include:
   incomplete checks. Private CA trust failures are advisories. This is not a complete cipher,
   revocation or certificate-chain audit. Certificate parsing uses `cryptography`.
 
-The additional HTTP probes share a budget of 300 requests per web endpoint and sample at most
-10 discovered URLs. Redirect and boolean SQLi checks inspect at most five relevant parameters
-per URL. HTTP method checks run on the starting endpoint. Reaching these limits is logged as
+All HTTP checks share a default budget of 600 requests per web endpoint, including discovery,
+crawling and injection probes. Injection and additional checks sample at most 10 discovered URLs
+per check family, with at most five parameters per URL. HTTP method checks run on the starting
+endpoint. TLS handshakes run separately. Reaching these limits is logged as
 limited coverage. Response bodies are read as prefixes capped at 1 MiB and connections are closed;
 file contents are not written to disk. Testing guidance follows the
 [OWASP Web Security Testing Guide](https://wstg.owasp.org/v4.2/4-Web_Application_Security_Testing/).
@@ -138,9 +140,43 @@ from modules.web.webvuln import webvuln
 findings = webvuln("https://example.com:8443/app/", log, console)
 ```
 
-Each returned finding contains `type`, `url`, `parameter`, `severity`, `confidence` and `evidence`.
-The CLI prints these results through its existing console/export flow. The web dashboard's
-service-version/CVE scan does not run these application probes.
+Each returned finding contains `type`, `url`, `parameter`, `severity`, `confidence`, `evidence`,
+an ID, timestamp, detection/impact/remediation context, captured exchanges and a reproduction plan.
+Sensitive query values and URL credentials are redacted. Captured exchanges include request roles,
+diagnostic headers, status, response-prefix hash/size, latency and truncation state; response bodies
+and cookie values are omitted. The CLI prints these results through its existing console/export flow.
+
+### Dashboard controls and verification
+
+Enable **Web checks** in the scan form. Use **Network + selected web checks** to check detected HTTP(S)
+services after Nmap, or **Website only** to enter an application URL without requiring Nmap or CVE lookup.
+Expand **Select checks** to choose among all 13 check groups. The **Light** preset selects headers/cookies
+and TLS; **All** selects every group. Expand **Limits & crawl** to control the HTTP request budget,
+timeout, crawl pages/URLs/depth, endpoints per injection/check family, parameters and response size cap.
+Save the same controls in a profile and use that profile for scheduled scans.
+
+The **Web Security** tab prioritizes severity and supports search and confidence/severity/scan filters.
+Coverage cards show enabled checks, request counts and incomplete-check reasons. Select a finding for:
+
+- **Overview:** observed evidence, detection method, potential impact, remediation, limitations, steps and CWE/OWASP references.
+- **Evidence:** baseline/probe/repeat requests, response metadata, available certificate metadata and the complete finding with verification history.
+- **PoC & Verify:** preview, copy or download a standalone Python reproducer, POSIX curl commands or a JSON request plan. XSS and credentialed CORS findings also provide a browser PoC.
+
+Downloading or viewing a PoC does not contact the target. **Verify evidence** explicitly replays only
+the stored same-origin plan, without authentication cookies, redirects or arbitrary supplied code.
+Python verification compares baseline/probe evidence and returns reproduced, not reproduced or
+inconclusive, with redacted response metadata. Run a downloaded Python PoC after installing
+`requests` and `cryptography`; restore any `REDACTED` query inputs locally first. The dashboard refuses
+server replay when local input is required. Browser PoCs require an explicit test click; use a
+controlled separate origin and an appropriate browser session to assess CORS or XSS behavior.
+Evidence reproduction does not establish database access, browser execution, authenticated data
+exposure or other full exploit impact.
+
+The dashboard keeps scan findings in memory for the current process. **Export report** saves filtered
+findings with their full evidence and verification history as JSON. Scan JSON exports include web
+findings/coverage, and scan PDF exports include their evidence/remediation summaries. Export results
+before restarting the dashboard. Offline mode disables web scans and verification while allowing
+existing findings and PoCs to be viewed or exported.
 
 
 ## Offline vulnerability database
@@ -345,6 +381,11 @@ The web UI exposes a full REST API:
 | `GET` | `/api/hosts` | All discovered hosts (merged) |
 | `GET` | `/api/log` | Log history |
 | `GET` | `/api/events` | SSE event stream |
+| `GET` | `/api/web/catalog` | Web check names, default controls, bounds and offline state |
+| `GET` | `/api/web/findings` | Web finding summaries across current scans |
+| `GET` | `/api/web/findings/<scan_id>/<finding_id>` | Complete finding, evidence and verification history |
+| `GET` | `/api/web/findings/<scan_id>/<finding_id>/poc?format=python` | Download a PoC; formats: python, curl, html, json |
+| `POST` | `/api/web/findings/<scan_id>/<finding_id>/verify` | Explicitly replay the stored plan; send an empty JSON object |
 | `GET` | `/api/settings` | Get all settings |
 | `PUT` | `/api/settings` | Update settings |
 | `GET` | `/api/profiles` | List scan profiles |

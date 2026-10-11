@@ -179,7 +179,7 @@ async function printScan(scanId) {
         });
         html += `</table>`;
       } else {
-        html += `<p>No open ports found.</p>`;
+        html += `<p>${job.config?.scan_ports === false ? 'Port scan was not selected.' : 'No open ports found.'}</p>`;
       }
       const vulns = (h.vulns || []);
       if(vulns.length) {
@@ -193,6 +193,19 @@ async function printScan(scanId) {
     });
   } else {
     html += `<p>No hosts were found during this scan.</p>`;
+  }
+  if(saved.web_findings?.length){
+    html += `<h2>Web Findings (${saved.web_findings.length})</h2><p>Evidence reproduction does not establish full exploit impact. Download the JSON report for captured exchanges and reproduction plans.</p>`;
+    saved.web_findings.forEach(row=>{
+      const detail = row.details || {};
+      html += `<h3>${esc(detail.title || row.type)}</h3><p><strong>${esc(row.severity)} · ${esc(row.confidence)}</strong> · ${esc(row.url)}</p>
+        <p><strong>Evidence:</strong> ${esc(row.evidence)}</p><p><strong>Remediation:</strong> ${esc(detail.remediation || 'Review application context.')}</p>
+        <p><strong>Limitations:</strong> ${esc(detail.limitations || 'Impact has not been verified.')}</p>
+        <p><strong>Verification:</strong> ${esc(row.verification?.status || 'Not run')} · ${esc(row.verification?.summary || '')}</p>`;
+    });
+  }
+  if(saved.web_coverage?.length){
+    html += `<h2>Web Coverage</h2>${saved.web_coverage.map(item=>`<p>${esc(item.endpoint || item.target)} · ${esc(item.status)} · ${esc(item.requests)} requests${item.issues?.length ? ' · ' + esc(item.issues.join('; ')) : ''}</p>`).join('')}`;
   }
   html += `</body></html>`;
   win.document.write(html);

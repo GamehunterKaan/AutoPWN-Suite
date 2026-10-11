@@ -1,4 +1,6 @@
 import ast
+import ipaddress
+import ssl
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -6,6 +8,7 @@ import pytest
 from modules.web.poc import browser_poc, build_plan, curl_poc, python_poc
 from modules.web.poc_runtime import validate_plan, verify_plan
 from tests.unit.test_web_dashboard import dashboard
+from tests.unit.test_web_tls import certificate_der
 
 
 def sample(kind="CORS", strategy="cors"):
@@ -40,6 +43,7 @@ def test_cors_poc_reproduces_headers_without_following_redirects(web_response):
     assert verification["status"] == "reproduced"
     assert verification["impact_verified"] is False
     assert "private-body" not in str(verification)
+    assert verification["observations"][0]["headers"]["Access-Control-Allow-Origin"] == "https://one.invalid"
     assert all(not row["allow_redirects"] for row in calls)
 
 
@@ -186,3 +190,95 @@ def test_tls_poc_never_uses_http_transport():
     with patch("modules.web.poc_runtime._check_tls", return_value=True):
         assert verify_plan(build_plan(result), transport=transport)["status"] == "reproduced"
     transport.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("kind,path,evidence,body,headers,status,expected", [
+    ("DEBUG_DISCLOSURE", "/docs", "diagnostic", "DEBUG = True", {"Content-Type": "text/plain"}, 200, "not_reproduced"),
+    ("DEBUG_DISCLOSURE", "/debug", "diagnostic", '<html id="summary">Django DEBUG = True</html>', {"Content-Type": "text/html"}, 500, "reproduced"),
+    ("DEBUG_DISCLOSURE", "/phpinfo", "diagnostic", '<title>phpinfo()</title>PHP Version 8', {"Content-Type": "text/html"}, 200, "reproduced"),
+    ("ERROR_DISCLOSURE", "/error", "trace", "Reference: Source Error:", {}, 500, "not_reproduced"),
+    ("ERROR_DISCLOSURE", "/error", "trace", 'Traceback (most recent call last):\nFile "app.py", line 2', {}, 500, "reproduced"),
+    ("EXPOSED_FILE", "/.env", "configuration", "<html><body>DB_PASSWORD=example\nDB_HOST=example</body></html>", {}, 200, "not_reproduced"),
+    ("EXPOSED_FILE", "/.env", "configuration", "DB_PASSWORD=example\nDB_PASSWORD=example", {}, 200, "not_reproduced"),
+    ("EXPOSED_FILE", "/.env", "configuration", "export DB_PASSWORD=example\n  DB_HOST=example", {}, 200, "reproduced"),
+    ("EXPOSED_FILE", "/.git/config", "configuration", "[core]\nrepositoryformatversion=0", {}, 200, "reproduced"),
+    ("EXPOSED_FILE", "/backup.zip", "archive", b"PK\x03\x04archive", {}, 200, "reproduced"),
+    ("WEB_CONFIG", "/", "No enforced Content-Security-Policy on this HTML response", "{}", {"Content-Type": "application/json"}, 200, "not_reproduced"),
+    ("WEB_CONFIG", "/", "No enforced Content-Security-Policy on this HTML response", "<html></html>", {}, 200, "reproduced"),
+    ("WEB_CONFIG", "/", "X-Content-Type-Options is missing or is not nosniff", "text", {"X-Content-Type-Options": " nosniff "}, 200, "not_reproduced"),
+    ("WEB_CONFIG", "/", "HSTS is missing or has no positive max-age", "text", {"Strict-Transport-Security": "max-age=123bad"}, 200, "reproduced"),
+])
+def test_response_pocs_preserve_scanner_preconditions(web_response, kind, path, evidence, body, headers, status, expected):
+    result = sample(kind, "response")
+    result.update(url="http://example.com" + path, evidence=evidence)
+    result["reproduction"]["requests"] = [{"url": result["url"]}]
+    response = web_response(body, status=status, headers=headers)
+    assert verify_plan(build_plan(result), transport=MagicMock(return_value=response))["status"] == expected
+
+
+@pytest.mark.unit
+def test_boolean_poc_cannot_reproduce_matching_error_pages(web_response):
+    result = sample("SQLI_BOOLEAN", "boolean_sqli")
+    result["reproduction"]["requests"] = [{"url": "http://example.com/?id=" + str(index)} for index in range(6)]
+    bodies = ("All records", "All records", "All records", "No results", "All records", "No results")
+    assert verify_plan(build_plan(result), transport=MagicMock(side_effect=[web_response(body, status=500) for body in bodies]))["status"] == "not_reproduced"
+
+
+@pytest.mark.unit
+def test_verification_metadata_redacts_redirect_credentials_and_cookie_headers(web_response):
+    result = sample("WEB_CONFIG", "response")
+    result["evidence"] = "X-Content-Type-Options is missing or is not nosniff"
+    result["reproduction"]["requests"] = [{"url": "http://example.com/"}]
+    response = web_response("", headers={"Location": "http://user:password@example.com/?token=secret#private", "Set-Cookie": "secret=value"})
+    verification = verify_plan(build_plan(result), transport=MagicMock(return_value=response))
+    assert verification["observations"][0]["headers"]["Location"] == "http://example.com/?token=REDACTED"
+    assert "Set-Cookie" not in str(verification)
+    assert "password" not in str(verification)
+    assert "secret" not in str(verification)
+
+
+@pytest.mark.unit
+def test_curl_poc_quotes_target_controlled_data_as_arguments():
+    import shlex
+    result = sample()
+    result["reproduction"]["requests"][0]["url"] = "http://example.com/?q=';echo danger;$HOME"
+    command = curl_poc(result).splitlines()[1]
+    args = shlex.split(command)
+    assert args[args.index("--url") + 1] == result["reproduction"]["requests"][0]["url"]
+    assert "--location" not in args
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("options,target,evidence,expected", [
+    ({"expired": True}, "https://example.com/", "Certificate expired at earlier time", "reproduced"),
+    ({}, "https://example.com/", "Certificate expired at earlier time", "not_reproduced"),
+    ({"future": True}, "https://example.com/", "Certificate is not valid before later time", "reproduced"),
+    ({"names": ("other.example",)}, "https://example.com/", "No certificate subject alternative name matches", "reproduced"),
+    ({"names": ("*.example.com",)}, "https://app.example.com/", "No certificate subject alternative name matches", "not_reproduced"),
+    ({"names": ("*.com",)}, "https://example.com/", "No certificate subject alternative name matches", "reproduced"),
+    ({"names": ("xn--bcher-kva.example",)}, "https://bücher.example/", "No certificate subject alternative name matches", "not_reproduced"),
+    ({"names": (ipaddress.ip_address("192.0.2.1"),)}, "https://192.0.2.1/", "No certificate subject alternative name matches", "not_reproduced"),
+    ({"names": None}, "https://example.com/", "No certificate subject alternative name matches", "reproduced"),
+])
+def test_tls_certificate_poc_checks_actual_certificate_metadata(certificate_der, options, target, evidence, expected):
+    result = sample("TLS_CERTIFICATE")
+    result["evidence"] = evidence
+    result["reproduction"]["target"] = target
+    context = MagicMock()
+    context.wrap_socket.return_value.__enter__.return_value.getpeercert.return_value = certificate_der(**options)
+    with patch("modules.web.poc_runtime.ssl.create_default_context", return_value=context), patch("modules.web.poc_runtime.socket.create_connection"):
+        assert verify_plan(build_plan(result))["status"] == expected
+    assert context.verify_mode == ssl.CERT_NONE
+
+
+@pytest.mark.unit
+def test_tls_poc_distinguishes_untrusted_certificates_from_connection_failures():
+    result = sample("TLS_TRUST")
+    result["reproduction"]["target"] = "https://example.com/"
+    context = MagicMock()
+    with patch("modules.web.poc_runtime.ssl.create_default_context", return_value=context), patch("modules.web.poc_runtime.socket.create_connection"):
+        context.wrap_socket.side_effect = ssl.SSLCertVerificationError("untrusted")
+        assert verify_plan(build_plan(result))["status"] == "reproduced"
+        context.wrap_socket.side_effect = OSError("unreachable")
+        assert verify_plan(build_plan(result))["status"] == "inconclusive"

@@ -102,6 +102,28 @@ def test_context_enforces_global_budget_and_cancellation():
 
 
 @pytest.mark.unit
+def test_successful_web_checks_do_not_erase_failed_cve_coverage(dashboard):
+    wu, _ = dashboard
+    nm = MagicMock()
+    nm.all_hosts.return_value = ["192.0.2.1"]
+    nm.__getitem__.return_value = {"addresses": {}, "tcp": {80: {"state": "open", "name": "http", "product": "nginx", "version": "1.0"}}}
+    config = wu._profile_config({"scan_web": True, "skip_discovery": True}) | {"target": "192.0.2.1"}
+    job = wu.ScanJob("job", config["target"], config)
+    def scan(endpoint, log, console, **kwargs):
+        kwargs["on_complete"]({"status": "completed", "requests": 1, "target": endpoint, "issues": []})
+        return []
+    with patch.object(wu.shutil, "which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm), \
+         patch("modules.nist_search.searchCVE", side_effect=RuntimeError("NVD unavailable")), \
+         patch("modules.web.webvuln.webvuln", side_effect=scan), patch.object(wu, "_notify"):
+        wu._run_scan(job)
+    host = job.hosts_list()[0]
+    assert job.status == "partial"
+    assert host["web_status"] == "completed"
+    assert host["lookup_status"] == "partial"
+    assert host["scan_status"] == "partial"
+
+
+@pytest.mark.unit
 def test_selected_header_only_check_makes_one_request_and_records_redacted_evidence(web_response):
     from modules.web.webvuln import webvuln
     controls = normalize_options()
@@ -117,3 +139,12 @@ def test_selected_header_only_check_makes_one_request_and_records_redacted_evide
     assert "private-token" not in str(results)
     assert all(item["reproduction"]["requests"][0]["redacted"] for item in results)
     assert summary["requests"] == 1
+
+
+@pytest.mark.unit
+def test_scan_evidence_removes_url_credentials_from_redirect_headers(web_response):
+    context = ScanContext("http://example.com/", MagicMock())
+    response = web_response(headers={"Location": "https://user:password@example.com/?token=secret#private"})
+    response.autopwn_truncated = False
+    record = context.capture(response, "GET", "http://example.com/", {}, context.before())
+    assert record["response"]["headers"]["Location"] == "https://example.com/?token=REDACTED"

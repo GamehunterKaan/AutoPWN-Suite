@@ -61,6 +61,8 @@
     const enabled = $(`${prefix}-web-enabled`);
     if (!enabled || !catalog) return;
     const blocked = sourceOffline(prefix);
+    const webOnly = $(`${prefix}-web-scope`).value === 'web';
+    if ($(`${prefix}-network-controls`)) $(`${prefix}-network-controls`).hidden = webOnly;
     enabled.disabled = blocked;
     const count = Object.keys(catalog.checks).filter(key => $(`${prefix}-web-check-${key}`).checked).length;
     $(`${prefix}-web-count`).textContent = `${count} of ${Object.keys(catalog.checks).length} checks selected`;
@@ -68,7 +70,7 @@
     warning.hidden = !blocked;
     warning.textContent = 'Offline source disables web requests. Choose an online source to scan a website.';
     $(`${prefix}-web-controls`).querySelectorAll('details input, details button').forEach(node => { node.disabled = blocked || !enabled.checked; });
-    if (prefix === 'f') $('f-target').placeholder = $(`${prefix}-web-scope`).value === 'web' ? 'https://app.example.com/path' : '192.168.1.0/24 or hostname';
+    if (prefix === 'f') $('f-target').placeholder = webOnly ? 'https://app.example.com/path' : '192.168.1.0/24 or hostname';
   }
   function readControls(prefix) {
     if (!catalog || !$(`${prefix}-web-enabled`)) return {};
@@ -80,7 +82,7 @@
       scan_ports: !webOnly, web_options:options, ...(webOnly ? {scan_vulns:false,skip_discovery:true} : {})};
   }
   function validateControls(prefix) {
-    if (!catalog) return 'Web controls are still loading. Please try again.';
+    if (!catalog) return pending[prefix]?.scan_web ? 'Web controls have not loaded. Refresh the dashboard to retry.' : '';
     const controls = readControls(prefix);
     if (prefix === 'f' && controls.scan_ports === false && sourceOffline(prefix)) return 'Web-only scans require an online source.';
     if (!controls.scan_ports && !controls.scan_web) return 'Enable web checks for a website-only scan.';
@@ -104,7 +106,10 @@
     return rows.filter(row => (!$('web-confidence').value || confidence(row.confidence) === $('web-confidence').value)
       && (!$('web-severity').value || severity(row.severity) === $('web-severity').value)
       && (!$('web-scan-filter').value || row.scan_id === $('web-scan-filter').value)
-      && (!search || [row.title,row.type,row.url,row.host,row.parameter,row.evidence].join(' ').toLowerCase().includes(search)));
+      && (!search || [row.title,row.type,row.url,row.host,row.parameter,row.evidence].join(' ').toLowerCase().includes(search)))
+      .sort((a,b) => ({high:0,medium:1,low:2,info:3}[severity(a.severity)] - {high:0,medium:1,low:2,info:3}[severity(b.severity)])
+        || ({candidate:0,advisory:1,observation:2}[confidence(a.confidence)] - {candidate:0,advisory:1,observation:2}[confidence(b.confidence)])
+        || (Date.parse(b.observed_at) || 0) - (Date.parse(a.observed_at) || 0));
   }
   function render() {
     const visible = filteredRows(), scanFilter = $('web-scan-filter').value;
@@ -182,7 +187,7 @@
     const labels = {running:'Verification running',reproduced:'Evidence reproduced',not_reproduced:'Evidence not reproduced',inconclusive:'Inconclusive',needs_input:'Local input required'};
     const node = $('web-verification-result');
     node.className = `web-verification-result ${result.status === 'reproduced' ? 'reproduced' : ''}`;
-    node.innerHTML = `${blocked ? `<p>${escape(blocked)}</p>` : ''}${result.status ? `<strong>${escape(labels[result.status] || result.status)}</strong> · ${escape(result.summary)}${result.checked_at ? `<p class="web-small-note">${escape(result.checked_at)}</p>` : ''}` : '<p>No verification run yet.</p>'}<p class="web-small-note">Reproducing evidence does not establish full exploit impact. Review application context and the limitations above.</p>`;
+    node.innerHTML = `${blocked ? `<p>${escape(blocked)}</p>` : ''}${result.status ? `<strong>${escape(labels[result.status] || result.status)}</strong> · ${escape(result.summary)}${result.checked_at ? `<p class="web-small-note">${escape(result.checked_at)}</p>` : ''}` : '<p>No verification run yet.</p>'}<p class="web-small-note">Reproducing evidence does not establish full exploit impact. Review application context and the limitations above.</p>${result.observations?.length ? `<details class="web-request"><summary>Verification exchanges · ${result.observations.length} requests</summary><pre>${escape(pretty(result.observations))}</pre></details>` : ''}`;
   }
   async function refreshDetail() {
     if (!selected) return;
@@ -199,6 +204,7 @@
     const revision = ++detailRevision;
     ++pocRevision;
     selected = null;
+    displayedPoc = '';
     $('web-detail-title').textContent = 'Loading finding…';
     $('web-detail-kind').textContent = 'Finding';
     $('web-detail-url').textContent = '';
@@ -206,6 +212,8 @@
     $('web-panel-overview').innerHTML = '<p class="web-small-note">Loading recorded evidence…</p>';
     $('web-panel-evidence').innerHTML = '';
     $('web-poc-code').textContent = '';
+    $('web-verification-result').textContent = '';
+    $('web-poc-help').textContent = '';
     $('web-poc-download').removeAttribute('href');
     $('web-verify-button').disabled = true;
     panel('overview');

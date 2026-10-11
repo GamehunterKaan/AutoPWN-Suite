@@ -5,6 +5,7 @@ import shutil
 import subprocess
 
 import pytest
+from bs4 import BeautifulSoup
 
 from modules.web.options import CHECKS, LIMITS, normalize_options
 from tests.unit.test_web_ui_behavior import run_js as run_app_js
@@ -54,6 +55,7 @@ def test_controls_round_trip_profiles_web_only_and_offline():
 window.webSecurity.setControls('f',{scan_web:true,scan_ports:false,web_options:{timeout:7,checks:{sqli:false}}});
 let saved=window.webSecurity.readControls('f');
 assert.equal(saved.scan_web,true);assert.equal(saved.scan_ports,false);assert.equal(saved.scan_vulns,false);
+assert.equal(nodes.get('f-network-controls').hidden,true);
 assert.equal(saved.web_options.checks.sqli,false);assert.equal(saved.web_options.checks.cors,true);assert.equal(saved.web_options.timeout,7);
 assert.equal(window.webSecurity.validateControls('f'),'');
 window.webSecurity.setOffline(true);
@@ -129,4 +131,28 @@ profiles.p={config:{scan_web:true,scan_ports:false}};document.getElementById('f-
 assert.equal(window.loaded.scan_web,true);
 document.getElementById('pf-name').value='Web';loadProfilesFromServer=async()=>{};
 await saveProfile();assert.equal(posted.scan_web,true);assert.equal(posted.web_options.timeout,7);
+""")
+
+
+def test_scan_scope_keeps_source_and_start_controls_outside_hidden_network_form():
+    html = BeautifulSoup(SCRIPT.with_name("index.html").read_text(encoding="utf-8"), "html.parser")
+    ids = [element["id"] for element in html.select("[id]")]
+    assert len(ids) == len(set(ids))
+    for prefix in ("f", "pf"):
+        network = html.find(id=f"{prefix}-network-controls")
+        assert network.find(id=f"{prefix}-mode")
+        assert not network.find(id=f"{prefix}-vuln-source")
+        assert not network.find(id=f"{prefix}-web-controls")
+        assert not network.find("button")
+    assert html.find(id="f-web-controls").find_parent(id="scan-form")
+    assert html.find(id="pf-web-controls").find_parent(id="profile-form")
+
+
+def test_scan_pdf_includes_web_evidence_and_coverage():
+    run_app_js("""
+scans={web:{id:'web',target:'example.test',config:{scan_ports:false},host_count:1}};let html='';
+window.open=()=>({document:{write(value){html=value},close(){}},close(){}});
+fetch=async()=>({ok:true,json:async()=>({hosts:[{ip:'example.test',ports:[]}],web_findings:[{type:'XSS',severity:'medium',confidence:'candidate',url:'http://example.test/',evidence:'<script>marker</script>',details:{title:'Reflected XSS',remediation:'Encode output'},verification:{status:'reproduced'}}],web_coverage:[{endpoint:'http://example.test/',status:'partial',requests:20,issues:['Budget reached']}]})});
+await printScan('web');assert.match(html,/Web Findings/);assert.match(html,/Encode output/);assert.match(html,/Budget reached/);
+assert.match(html,/&lt;script&gt;/);assert.ok(!html.includes('<script>marker'));assert.match(html,/Port scan was not selected/);
 """)

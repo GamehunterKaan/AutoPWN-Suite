@@ -40,7 +40,7 @@ def redact_url(url):
         parts = urlsplit(url)
         pairs = [(key, "REDACTED" if value and re.search(r"pass|secret|token|api.?key|auth|session|jwt|signature|csrf", key, re.I) else value)
                  for key, value in parse_qsl(parts.query, keep_blank_values=True)]
-        return urlunsplit(parts._replace(query=urlencode(pairs), fragment=""))
+        return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1], query=urlencode(pairs), fragment=""))
     except ValueError:
         return "Invalid URL"
 

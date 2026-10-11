@@ -48,6 +48,7 @@
         <option value="offline">Offline local database</option>
       </select>
     </div>
+    <div id="f-network-controls" class="web-network-controls">
     <div class="row2">
       <div><div class="fl">Mode</div>
         <select id="f-mode" onchange="updateNmapPreview()">
@@ -116,6 +117,7 @@
       <div><div class="fl">Nmap Command Preview</div>
         <textarea id="f-nmap-preview" readonly rows="3" style="background:var(--bg3);color:var(--accent);cursor:not-allowed;resize:vertical;" title="Generated Nmap Command"></textarea>
       </div>
+    </div>
     </div>
     <button class="btn btn-primary" onclick="startScan()" style="width:100%">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -273,6 +275,10 @@
             <div><div class="fl">Name</div><input type="text" id="pf-name" placeholder="e.g. Quick Scan"/></div>
             <div><div class="fl">Description</div><input type="text" id="pf-desc" placeholder="Optional description"/></div>
           </div>
+          <div><div class="fl">Vulnerability data</div>
+            <select id="pf-vuln-source"><option value="auto">Online, with local fallback</option><option value="online">Online NIST only</option><option value="offline">Offline local database</option></select>
+          </div>
+          <div id="pf-network-controls" class="web-network-controls">
           <div class="form-grid">
             <div><div class="fl">Mode</div>
               <select id="pf-mode" onchange="updateProfilePreview()"><option value="normal">Normal</option><option value="evade">Evasion</option><option value="noise">Noise</option></select>
@@ -284,9 +290,6 @@
               <select id="pf-scantype"><option value="">Auto</option><option value="arp">ARP</option><option value="ping">Ping</option></select>
             </div>
             <div><div class="fl">Timeout (s)</div><input type="number" id="pf-timeout" value="240" min="1" oninput="updateProfilePreview()"/></div>
-            <div><div class="fl">Vulnerability data</div>
-              <select id="pf-vuln-source"><option value="auto">Online, with local fallback</option><option value="online">Online NIST only</option><option value="offline">Offline local database</option></select>
-            </div>
           </div>
           <div class="form-grid">
             <div><div class="fl">Scan Technique</div>
@@ -315,6 +318,7 @@
           </div>
           <div><div class="fl">Nmap Command Preview</div>
             <textarea id="pf-nmap-preview" readonly rows="3" style="background:var(--bg3);color:var(--accent);cursor:not-allowed;resize:vertical;" title="Generated Nmap Command"></textarea>
+          </div>
           </div>
           <div class="inline-form-actions">
             <button class="btn btn-ghost btn-sm" onclick="hideProfileForm()">Cancel</button>

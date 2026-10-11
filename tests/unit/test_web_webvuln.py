@@ -82,3 +82,21 @@ def test_nmap_tls_tunnel_is_used_and_port_number_does_not_override_plain_http():
     rows = [["192.0.2.1", 9443, "http", "nginx", "1"], ["192.0.2.1", 8443, "http", "nginx", "1"]]
     scan = {"scan": {"192.0.2.1": {"tcp": {9443: {"name": "http", "tunnel": "ssl"}, 8443: {"name": "http"}}}}}
     assert web_endpoints("192.0.2.1", rows, scan) == ["https://192.0.2.1:9443/", "http://192.0.2.1:8443/"]
+
+
+@pytest.mark.unit
+def test_injection_endpoint_control_limits_every_classic_scanner(web_response):
+    from modules.web.options import CHECKS
+    controls = {"max_endpoints": 1, "checks": {name: name in ("sqli", "xss", "lfi") for name in CHECKS}}
+    url = "http://example.com/"
+    summary = {}
+    with patch("modules.web.webvuln.get", return_value=web_response(url=url)), \
+         patch("modules.web.webvuln.crawl", return_value={url + "a?id=1", url + "b?id=1"}), \
+         patch("modules.web.webvuln.LFIScanner") as lfi, patch("modules.web.webvuln.SQLIScanner") as sql, patch("modules.web.webvuln.XSSScanner") as xss:
+        for scanner, method in ((lfi, "test_lfi"), (sql, "test_sqli"), (xss, "test_xss")):
+            getattr(scanner.return_value, method).return_value = []
+        webvuln(url, MagicMock(), MagicMock(), controls=controls, on_complete=summary.update)
+    for scanner, method in ((lfi, "test_lfi"), (sql, "test_sqli"), (xss, "test_xss")):
+        getattr(scanner.return_value, method).assert_called_once_with(url + "a?id=1")
+    assert summary["status"] == "partial"
+    assert "Injection endpoint budget reached; coverage is limited." in summary["issues"]

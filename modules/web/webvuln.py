@@ -101,6 +101,9 @@ def _execute_webvuln(target, log, console):
     log.logger("info", f"Found {len(testable_urls)} testable urls.")
     scanners = [(LFIScanner(log, console), "test_lfi", "lfi"), (SQLIScanner(log, console), "test_sqli", "sqli"),
                 (XSSScanner(log, console), "test_xss", "xss")]
+    if any(enabled(name) for _, _, name in scanners) and len(testable_urls) > controls["max_endpoints"]:
+        log.logger("warning", "Injection endpoint budget reached; coverage is limited.")
+    testable_urls = testable_urls[:controls["max_endpoints"]]
     for url in testable_urls:
         for scanner, method, name in scanners:
             if enabled(name):
