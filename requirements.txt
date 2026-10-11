@@ -5,4 +5,3 @@ bs4
 distro
 flask
 flask-cors
-cryptography>=46.0.0

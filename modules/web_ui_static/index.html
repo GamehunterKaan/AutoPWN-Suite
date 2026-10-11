@@ -39,7 +39,6 @@
         <option value="">— No profile —</option>
       </select>
     </div>
-    <div id="f-web-controls" class="web-control-mount"></div>
     <div>
       <div class="fl">Vulnerability data</div>
       <select id="f-vuln-source">
@@ -48,7 +47,6 @@
         <option value="offline">Offline local database</option>
       </select>
     </div>
-    <div id="f-network-controls" class="web-network-controls">
     <div class="row2">
       <div><div class="fl">Mode</div>
         <select id="f-mode" onchange="updateNmapPreview()">
@@ -118,7 +116,6 @@
         <textarea id="f-nmap-preview" readonly rows="3" style="background:var(--bg3);color:var(--accent);cursor:not-allowed;resize:vertical;" title="Generated Nmap Command"></textarea>
       </div>
     </div>
-    </div>
     <button class="btn btn-primary" onclick="startScan()" style="width:100%">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       Start Scan
@@ -146,7 +143,6 @@
     <div class="tab active" onclick="switchTab('scans',this)">Active Scans <span class="tab-badge" id="badge-scans">0</span></div>
     <div class="tab" onclick="switchTab('hosts',this)">Discovered Hosts <span class="tab-badge" id="badge-hosts">0</span></div>
     <div class="tab" onclick="switchTab('vulns',this)">Vulnerabilities <span class="tab-badge" id="badge-vulns">0</span></div>
-    <button class="tab" id="web-tab-button" onclick="switchTab('web',this)">Web Security <span class="tab-badge" id="badge-web">0</span></button>
     <div class="tab" onclick="switchTab('term',this)">Terminal</div>
     <div class="tab" onclick="switchTab('settings',this)">Settings</div>
   </div>
@@ -202,26 +198,6 @@
   </div>
 
   <!-- Terminal -->
-  <section id="tc-web" class="tc" aria-label="Web security findings">
-    <div class="web-page">
-      <div class="web-page-heading"><div><div class="web-eyebrow">Application security</div><h1>Web Security</h1><p>Findings, evidence and verification in one place.</p></div>
-        <button class="btn btn-ghost btn-sm" data-web-action="export">Export report</button></div>
-      <div id="web-offline-note" class="web-notice" hidden>Offline mode: web scans and verification are disabled. Existing reports and PoCs remain available.</div>
-      <div id="web-summary" class="web-summary"></div>
-      <div class="web-filter-bar">
-        <label class="web-search"><span class="sr-only">Search web findings</span><input id="web-search" type="text" placeholder="Search finding, endpoint or parameter…"></label>
-        <label><span class="sr-only">Filter confidence</span><select id="web-confidence"><option value="">All findings</option><option value="candidate">Candidates</option><option value="advisory">Advisories</option><option value="observation">Observations</option></select></label>
-        <label><span class="sr-only">Filter severity</span><select id="web-severity"><option value="">All severities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="info">Info</option></select></label>
-        <label><span class="sr-only">Filter scan</span><select id="web-scan-filter"><option value="">All scans</option></select></label>
-      </div>
-      <div id="web-coverage" class="web-coverage"></div>
-      <div class="web-list-heading"><span id="web-result-count">0 findings</span><span>Select a finding to inspect its evidence</span></div>
-      <div id="web-findings-list" class="web-findings-list"></div>
-      <div id="web-empty" class="web-empty"><div class="web-empty-icon">&lt;/&gt;</div><h2>Start with a website.</h2><p>Enable web checks and scan an application to see its findings here.</p><button class="btn btn-primary" data-web-action="configure">Configure web scan</button></div>
-    </div>
-  </section>
-
-  <!-- Terminal -->
   <div id="tc-term" class="tc">
     <div id="term-toolbar">
       <span class="term-filter-label">Filter:</span>
@@ -270,15 +246,10 @@
         <div id="profile-form" class="inline-form" style="display:none">
           <div class="inline-form-title" id="profile-form-title">New Profile</div>
           <input type="hidden" id="pf-id"/>
-          <div id="pf-web-controls" class="web-control-mount"></div>
           <div class="row2">
             <div><div class="fl">Name</div><input type="text" id="pf-name" placeholder="e.g. Quick Scan"/></div>
             <div><div class="fl">Description</div><input type="text" id="pf-desc" placeholder="Optional description"/></div>
           </div>
-          <div><div class="fl">Vulnerability data</div>
-            <select id="pf-vuln-source"><option value="auto">Online, with local fallback</option><option value="online">Online NIST only</option><option value="offline">Offline local database</option></select>
-          </div>
-          <div id="pf-network-controls" class="web-network-controls">
           <div class="form-grid">
             <div><div class="fl">Mode</div>
               <select id="pf-mode" onchange="updateProfilePreview()"><option value="normal">Normal</option><option value="evade">Evasion</option><option value="noise">Noise</option></select>
@@ -290,6 +261,9 @@
               <select id="pf-scantype"><option value="">Auto</option><option value="arp">ARP</option><option value="ping">Ping</option></select>
             </div>
             <div><div class="fl">Timeout (s)</div><input type="number" id="pf-timeout" value="240" min="1" oninput="updateProfilePreview()"/></div>
+            <div><div class="fl">Vulnerability data</div>
+              <select id="pf-vuln-source"><option value="auto">Online, with local fallback</option><option value="online">Online NIST only</option><option value="offline">Offline local database</option></select>
+            </div>
           </div>
           <div class="form-grid">
             <div><div class="fl">Scan Technique</div>
@@ -318,7 +292,6 @@
           </div>
           <div><div class="fl">Nmap Command Preview</div>
             <textarea id="pf-nmap-preview" readonly rows="3" style="background:var(--bg3);color:var(--accent);cursor:not-allowed;resize:vertical;" title="Generated Nmap Command"></textarea>
-          </div>
           </div>
           <div class="inline-form-actions">
             <button class="btn btn-ghost btn-sm" onclick="hideProfileForm()">Cancel</button>
@@ -462,22 +435,6 @@
 </aside>
 </div>
 
-<dialog id="web-finding-dialog" class="web-dialog" aria-labelledby="web-detail-title">
-  <div class="web-dialog-header"><div><div class="web-eyebrow" id="web-detail-kind">Finding</div><h2 id="web-detail-title">Finding details</h2><div id="web-detail-badges" class="web-badges"></div></div><button class="web-close" data-web-action="close" aria-label="Close finding details">×</button></div>
-  <div id="web-detail-url" class="web-detail-url"></div>
-  <nav class="web-detail-tabs" aria-label="Finding sections"><button class="active" data-web-action="detail-tab" data-panel="overview">Overview</button><button data-web-action="detail-tab" data-panel="evidence">Evidence</button><button data-web-action="detail-tab" data-panel="poc">PoC &amp; Verify</button></nav>
-  <div class="web-dialog-body"><div id="web-panel-overview" class="web-detail-panel"></div><div id="web-panel-evidence" class="web-detail-panel" hidden></div>
-    <div id="web-panel-poc" class="web-detail-panel" hidden>
-      <div class="web-verification-card"><div><h3>Reproduce the recorded evidence</h3><p>Replay the same requests. Browser PoCs can help assess XSS and CORS impact.</p></div><button id="web-verify-button" class="btn btn-primary" data-web-action="verify">Verify evidence</button></div>
-      <div id="web-verification-result" class="web-verification-result"></div>
-      <div class="web-code-toolbar"><label><span class="sr-only">PoC format</span><select id="web-poc-format"><option value="python">Python PoC</option><option value="curl">curl requests</option><option value="html">Browser PoC</option><option value="json">Request plan</option></select></label><div><button class="btn btn-ghost btn-sm" data-web-action="copy-poc">Copy</button><a id="web-poc-download" class="btn btn-ghost btn-sm" download>Download</a></div></div>
-      <pre class="web-code"><code id="web-poc-code">Loading PoC…</code></pre>
-      <p id="web-poc-help" class="web-small-note"></p>
-    </div>
-  </div>
-</dialog>
-
-<script src="/web_security.js" defer></script>
 <script src="/app.js" defer></script>
 </body>
 </html>

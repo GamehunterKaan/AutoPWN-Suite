@@ -136,27 +136,6 @@ def mock_http_response():
     return _create_response
 
 
-@pytest.fixture
-def web_response():
-    """Real Requests responses for web checks, with no socket or cookie values in output."""
-    from requests import Response
-    from requests.structures import CaseInsensitiveDict
-
-    def create(text="", *, url="http://example.com/", status=200, headers=None, cookies=None):
-        response = Response()
-        response.url = url
-        response.status_code = status
-        response._content = text.encode("utf-8") if isinstance(text, str) else text
-        response._content_consumed = True
-        response.encoding = "utf-8"
-        response.headers = CaseInsensitiveDict(headers or {})
-        response.raw = MagicMock()
-        response.raw.headers.getlist.return_value = cookies or []
-        return response
-
-    return create
-
-
 @pytest.fixture(autouse=True)
 def reset_sys_modules():
     """Reset sys.modules to prevent module caching issues between tests."""

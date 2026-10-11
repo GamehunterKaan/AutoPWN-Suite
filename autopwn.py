@@ -27,7 +27,7 @@ from modules.utils import (
     check_nmap,
     cli,
 )
-from modules.web.webvuln import web_endpoints, webvuln
+from modules.web.webvuln import webvuln
 from modules.daemon.daemon_installer import InstallDaemon, UninstallDaemon, CreateConfig
 from modules.web_ui import start_server, FLASK_AVAILABLE
 from modules.nist_search import VulnerabilityLookup
@@ -66,15 +66,11 @@ def StartScanning(
 
     for host in Targets:
         web_targets = [host]
-        web_ports = []
-        web_scan_result = None
         if ScanPorts:
             PortScanResults = PortScan(
                 host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags
             )
             PortArray = AnalyseScanResults(PortScanResults, log, console, host)
-            web_ports = PortArray
-            web_scan_result = PortScanResults
             web_targets = ResolveScanHosts(PortScanResults, host)
             if ScanVulns:
                 for resolved_host in web_targets:
@@ -88,8 +84,7 @@ def StartScanning(
 
         if ScanWeb:
             for resolved_host in web_targets:
-                for endpoint in web_endpoints(resolved_host, web_ports, web_scan_result):
-                    webvuln(endpoint, log, console)
+                webvuln(resolved_host, log, console)
 
     console.print(
         "{time} - Scan completed.".format(

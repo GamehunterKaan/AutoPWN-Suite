@@ -57,12 +57,11 @@ class TestCrawler:
         initial_urls = {f"http://example.com/page{i}" for i in range(30)}
         mock_link_finder.return_value = initial_urls
 
-        found_urls = crawl("http://example.com", mock_log, max_pages=1)
+        found_urls = crawl("http://example.com", mock_log)
 
         # link_finder should only be called once
         mock_link_finder.assert_called_once()
-        assert found_urls == initial_urls | {"http://example.com/"}
-        mock_log.logger.assert_any_call("warning", "Web crawl budget reached; coverage is limited.")
+        assert found_urls == initial_urls
 
     @patch("modules.web.crawler.link_finder")
     @patch("modules.web.crawler.get")
@@ -75,14 +74,14 @@ class TestCrawler:
         mock_link_finder.side_effect = [
             {"http://example.com/page1"},
             {"http://example.com/page2"},
-            set(),
         ]
 
         found_urls = crawl("http://example.com", mock_log)
 
-        assert mock_link_finder.call_count == 3
-        assert found_urls == {"http://example.com/", "http://example.com/page1", "http://example.com/page2"}
+        assert mock_link_finder.call_count == 2
+        assert found_urls == {"http://example.com/page1", "http://example.com/page2"}
 
+    @patch("modules.web.crawler.ConnectionError", new=ConnectionError)
     @patch("modules.web.crawler.random_user_agent")
     @patch("modules.web.crawler.get", side_effect=ConnectionError)
     def test_crawl_initial_connection_error(self, mock_get, mock_ua, mock_log):
@@ -91,9 +90,9 @@ class TestCrawler:
 
         found_urls = crawl("http://example.com", mock_log)
 
-        # Keep the supplied seed; a failed fetch must still be visible in logs.
-        assert found_urls == {"http://example.com/"}
-        assert mock_log.logger.call_args.args[0] == "error"
+        # Assert that it returns an empty set and logs the error
+        assert found_urls == set()
+        mock_log.logger.assert_called_with("error", "Connection error raised.")
 
     @patch("modules.web.crawler.get")
     def test_nested_page_resolves_root_parent_query_and_fragments(self, mock_get, mock_log):
@@ -117,80 +116,4 @@ class TestCrawler:
     @patch("modules.web.crawler.get")
     def test_root_query_value_is_not_changed(self, mock_get, mock_links, mock_log):
         crawl("https://example.com?view=one", mock_log)
-        assert mock_links.call_args.args[0] == "https://example.com/?view=one"
-
-
-@pytest.mark.unit
-def test_get_forms_include_blank_repeated_and_selected_inputs(web_response):
-    page = "https://example.com/app/page"
-    response = web_response('''<base href="/search/">
-      <form action="find?discard=one"><input name="q"><input name="tag" value="a">
-      <input name="tag" value="b"><input name="disabled" disabled>
-      <select name="category"><option value="old">Old</option><option value="news" selected>News</option></select>
-      <input type="checkbox" name="all" checked><input type="checkbox" name="ignored">
-      <textarea name="note">hello</textarea><input type="submit" name="submit"></form>''', url=page)
-    with patch("modules.web.crawler.get", return_value=response):
-        urls = link_finder(page, MagicMock())
-    from urllib.parse import parse_qs, urlsplit
-    assert len(urls) == 1
-    url = next(iter(urls))
-    assert urlsplit(url).path == "/search/find"
-    assert parse_qs(urlsplit(url).query, keep_blank_values=True) == {
-        "q": [""], "tag": ["a", "b"], "category": ["news"], "all": ["on"], "note": ["hello"]}
-
-
-@pytest.mark.unit
-def test_post_password_upload_and_off_origin_forms_are_skipped(web_response):
-    response = web_response('''
-      <form method="post"><input name="q"></form>
-      <form><input type="PASSWORD" name="password"></form>
-      <form><input type="file" name="upload"></form>
-      <form action="https://external.com/"><input name="q"></form>''')
-    with patch("modules.web.crawler.get", return_value=response):
-        assert link_finder("http://example.com/", MagicMock()) == set()
-
-
-@pytest.mark.unit
-def test_external_redirect_is_not_fetched(web_response):
-    response = web_response(status=302, headers={"Location": "https://external.com/"})
-    with patch("modules.web.crawler.get", return_value=response) as get:
-        assert link_finder("http://example.com/", MagicMock()) == set()
-    get.assert_called_once()
-
-
-@pytest.mark.unit
-def test_crawl_limits_and_seed_query(web_response):
-    links = {f"http://example.com/page?id={i}" for i in range(200)}
-    with patch("modules.web.crawler.link_finder", return_value=links) as finder:
-        urls = crawl("http://example.com/?seed=yes", MagicMock(), max_pages=3, max_urls=5)
-    assert len(urls) == 5
-    assert "http://example.com/?seed=yes" in urls
-    assert finder.call_count <= 3
-
-
-@pytest.mark.unit
-def test_links_beyond_depth_limit_are_not_probed():
-    graph = {"http://example.com/": {"http://example.com/one"},
-             "http://example.com/one": {"http://example.com/two"},
-             "http://example.com/two": {"http://example.com/three"}}
-    log = MagicMock()
-    with patch("modules.web.crawler.link_finder", side_effect=lambda url, log: graph[url]) as finder:
-        assert crawl("http://example.com/", log, max_depth=2) == {
-            "http://example.com/", "http://example.com/one", "http://example.com/two"}
-    assert all(call.args[0] != "http://example.com/three" for call in finder.call_args_list)
-    log.logger.assert_any_call("warning", "Web crawl budget reached; coverage is limited.")
-
-
-@pytest.mark.unit
-def test_non_html_and_http_errors_are_not_crawled(web_response):
-    for response in (web_response('<a href="/injected">', headers={"Content-Type": "application/json"}),
-                     web_response('<a href="/error">', status=500)):
-        with patch("modules.web.crawler.get", return_value=response):
-            assert link_finder("http://example.com/", MagicMock()) == set()
-
-
-@pytest.mark.unit
-def test_malformed_base_links_and_actions_are_skipped(web_response):
-    response = web_response('<base href="http://[broken"><a href="http://[broken">Bad</a><a href="/good">Good</a><form action="http://[broken"><input name="q"></form>')
-    with patch("modules.web.crawler.get", return_value=response):
-        assert link_finder("http://example.com/", MagicMock()) == {"http://example.com/good"}
+        assert mock_get.call_args.args[0] == "https://example.com/?view=one"

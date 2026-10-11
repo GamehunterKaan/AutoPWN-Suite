@@ -124,7 +124,7 @@ def test_cli_range_vuln_and_web_phases_use_each_actual_host():
                       MagicMock(), MagicMock(), MagicMock())
     assert [call.args[0] for call in lookup.call_args_list] == [[rows[0]], [rows[1]]]
     assert [call.args[4] for call in downloads.call_args_list] == ["192.0.2.1", "192.0.2.2"]
-    assert [call.args[0] for call in web.call_args_list] == ["192.0.2.1", "http://192.0.2.2:80/"]
+    assert [call.args[0] for call in web.call_args_list] == ["192.0.2.1", "192.0.2.2"]
 
 
 def test_selecting_host_address_returns_without_another_prompt(monkeypatch):

@@ -18,9 +18,8 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 - Fully [automatic](#usage) scanning and exploitation
 - Detect network IP range without any user input
 - Vulnerability detection based on service versions
-- Web app vulnerability candidates (Unix/Windows LFI, reflected XSS, error-based SQLI)
-- Web response header and cookie configuration advisories
-- Web app directory discovery with catch-all page filtering
+- Web app vulnerability testing (LFI, XSS, SQLI)
+- Web app directory busting
 - Get information about vulnerabilities right from your terminal
 - Automatically download exploits related to discovered vulnerabilities
 - Noise mode for creating traffic on the network
@@ -43,7 +42,6 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 - **Live terminal output** - Watch nmap commands and results in real time via SSE
 - **Scan progress** - Live Nmap stage percentages, completed CVE lookup counts and target completion counters. The bar follows the current stage; stages without a reported percentage show ongoing activity. Stopped and failed scans retain their last measured progress.
 - **Scan profiles** - Save and reuse scan configurations (technique, speed, timeout, ports, evasion, custom flags)
-- **Web security dashboard** - Select application checks, inspect captured evidence and remediation, download PoCs, and explicitly replay recorded checks
 - **Scheduled scans** - Set up recurring scans on a cron schedule with automatic profile loading
 - **Scan techniques** - Choose between TCP SYN, TCP Connect, UDP, Window, ACK, FIN, Xmas, Null, Maimon and SCTP scans
 - **Evasion mode** - Fragmented packets, spoofed source port and padded data length
@@ -60,126 +58,6 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 ## How Does It Work?
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of software running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of keywords to search the [NIST vulnerability database.](https://www.nist.gov/)
-
-
-## Web application checks
-
-The CLI's existing web vulnerability prompt runs directory discovery and passive header/cookie
-checks even on sites with no query inputs. When port results are available it checks each detected
-TCP HTTP(S) service, including nonstandard ports; otherwise it tries the host's default web ports.
-The crawler follows same-origin links and discovers
-GET forms, preserving blank inputs, repeated parameter names and other query values. It skips
-POST forms, password forms and uploads. The default crawl limits are 250 pages, 1,000 discovered
-URLs and five levels of links; reaching a limit is reported as limited coverage.
-
-SQLi and LFI checks compare against the original response and repeat promising probes before
-reporting new database errors or Unix/Windows file signatures. Reflected XSS checks require an
-unescaped payload in a script element or HTML event handler in an HTML response; JSON, plain
-text, comments and inactive HTML contexts are excluded. Browser execution and CSP bypass are
-not verified, so injection findings remain **candidates** requiring review. Directory hits are
-**observations**, with random missing-path controls suppressing soft 404 pages and blanket
-login redirects. A protected path is not itself a vulnerability.
-
-Configuration checks report **advisories** for missing/invalid `nosniff`, HTML CSP and framing
-protection, HTTPS hostname HSTS, and cookie Secure/HttpOnly/SameSite flags. Cookie values are
-excluded from these advisories. Recommendations follow the
-[OWASP HTTP Headers Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html).
-They describe the response observed, not a complete configuration audit.
-
-Additional application checks include:
-
-- **Exposed files and directory indexes:** signature checks for environment files, Git metadata,
-  PHP source backups, database dumps, server configuration and backup archives. Directory listings
-  require an index heading and multiple child-file links. Sensitive contents are omitted from
-  findings; archives are not extracted. Known diagnostic pages and HTTP error stack traces are
-  reported without printing their settings or trace details.
-- **CORS:** two arbitrary origins and repeated `null` origins test credential permission. Public
-  wildcard access alone is not reported as a vulnerability. Wildcard-plus-credentials produces a
-  configuration advisory because browsers reject credentialed reads. Actual authenticated data
-  exposure is not verified.
-- **Open redirects:** redirect-like query parameters are tested with distinct controlled hosts.
-  A finding requires repeatable external `Location` destinations; those destinations are never
-  visited.
-- **Boolean SQLi:** two distinct true/false comparisons must agree against a stable original
-  response. Different content types, HTTP errors, SQL errors, unstable pages and truncated bodies
-  are excluded. These remain candidates; no timing probes or database extraction are performed.
-- **HTTP methods:** OPTIONS advertises capabilities; TRACE requires a repeatable request-line and
-  marker-header echo. These are observations. PUT, DELETE, PATCH and CONNECT are not sent, and
-  method probes carry no cookies or authorization headers. Automatic `.netrc` authentication is
-  suppressed for the additional diagnostic probes.
-- **Host headers:** two controlled values for each of Host and X-Forwarded-Host must influence
-  redirect hosts or generated absolute URLs. Plain text reflection is ignored. These remain
-  candidates, and password reset poisoning or cache poisoning impact is not verified. Requests
-  use unique query markers and request cache-control directives.
-- **TLS:** certificate expiry, future validity, SAN hostname/IP matching and local trust validation
-  are checked independently. Exact-version handshakes test TLS 1.0 and 1.1 support. A finding requires
-  successful negotiation; unsupported client capabilities and failed connections are reported as
-  incomplete checks. Private CA trust failures are advisories. This is not a complete cipher,
-  revocation or certificate-chain audit. Certificate parsing uses `cryptography`.
-
-All HTTP checks share a default budget of 10,000 requests per web endpoint, including discovery,
-crawling and injection probes. Injection and additional checks sample at most 100 discovered URLs
-per check family, with at most five parameters per URL. HTTP method checks run on the starting
-endpoint. TLS handshakes run separately. Reaching these limits is logged as
-limited coverage. Response bodies are read as prefixes capped at 1 MiB and connections are closed;
-file contents are not written to disk. Testing guidance follows the
-[OWASP Web Security Testing Guide](https://wstg.owasp.org/v4.2/4-Web_Application_Security_Testing/).
-
-Requests have a 10-second timeout and at most three followed redirects. Redirects are checked
-before following them; injection probes cannot leave the target origin. Initial endpoint
-discovery also permits the same hostname's HTTP port 80 to upgrade to HTTPS port 443.
-Self-signed HTTPS targets remain supported for application probes; TLS findings report certificate
-and trust problems separately.
-Offline mode continues to disable web probes.
-
-Module callers can supply a host, `host:port`, IPv6 address or explicit application URL:
-
-```python
-from modules.web.webvuln import webvuln
-
-findings = webvuln("https://example.com:8443/app/", log, console)
-```
-
-Each returned finding contains `type`, `url`, `parameter`, `severity`, `confidence`, `evidence`,
-an ID, timestamp, detection/impact/remediation context, captured exchanges and a reproduction plan.
-Sensitive query values and URL credentials are redacted. Captured exchanges include request roles,
-diagnostic headers, status, response-prefix hash/size, latency and truncation state; response bodies
-and cookie values are omitted. The CLI prints these results through its existing console/export flow.
-
-### Dashboard controls and verification
-
-Enable **Web checks** in the scan form. Use **Network + selected web checks** to check detected HTTP(S)
-services after Nmap, or **Website only** to enter an application URL without requiring Nmap or CVE lookup.
-Expand **Select checks** to choose among all 13 check groups. The **Light** preset selects headers/cookies
-and TLS; **All** selects every group. Expand **Limits & crawl** to control the HTTP request budget,
-timeout, crawl pages/URLs/depth, endpoints per injection/check family, parameters and response size cap.
-Save the same controls in a profile and use that profile for scheduled scans.
-Saved profiles retain their explicit limits when defaults change. Adjustable upper bounds are
-50,000 requests, 2,000 pages, 10,000 URLs, depth 10 and 1,000 probe endpoints. Larger scans take
-longer and send more requests; reaching any configured limit still reports incomplete coverage.
-
-The **Web Security** tab prioritizes severity and supports search and confidence/severity/scan filters.
-Coverage cards show enabled checks, request counts and incomplete-check reasons. Select a finding for:
-
-- **Overview:** observed evidence, detection method, potential impact, remediation, limitations, steps and CWE/OWASP references.
-- **Evidence:** baseline/probe/repeat requests, response metadata, available certificate metadata and the complete finding with verification history.
-- **PoC & Verify:** preview, copy or download a standalone Python reproducer, POSIX curl commands or a JSON request plan. XSS and credentialed CORS findings also provide a browser PoC.
-
-Downloading or viewing a PoC does not contact the target. **Verify evidence** explicitly replays only
-the stored same-origin plan, without authentication cookies, redirects or arbitrary supplied code.
-Python verification compares baseline/probe evidence and returns reproduced, not reproduced or
-inconclusive, with redacted response metadata. Run a downloaded Python PoC after installing
-`requests` and `cryptography`; restore any `REDACTED` query inputs locally first. The dashboard refuses
-server replay when local input is required. Browser PoCs require an explicit test click; use a
-controlled separate origin and an appropriate browser session to assess CORS or XSS behavior.
-Evidence reproduction does not establish database access, browser execution, authenticated data
-exposure or other full exploit impact.
-
-The dashboard keeps scan findings in memory for the current process. **Export report** saves filtered
-findings with their full evidence and verification history as JSON. Scan JSON exports include web
-findings/coverage, and scan PDF exports include their evidence/remediation summaries. Export results
-before restarting the dashboard. Offline mode disables web scans and verification while allowing
-existing findings and PoCs to be viewed or exported.
 
 
 ## Offline vulnerability database
@@ -384,11 +262,6 @@ The web UI exposes a full REST API:
 | `GET` | `/api/hosts` | All discovered hosts (merged) |
 | `GET` | `/api/log` | Log history |
 | `GET` | `/api/events` | SSE event stream |
-| `GET` | `/api/web/catalog` | Web check names, default controls, bounds and offline state |
-| `GET` | `/api/web/findings` | Web finding summaries across current scans |
-| `GET` | `/api/web/findings/<scan_id>/<finding_id>` | Complete finding, evidence and verification history |
-| `GET` | `/api/web/findings/<scan_id>/<finding_id>/poc?format=python` | Download a PoC; formats: python, curl, html, json |
-| `POST` | `/api/web/findings/<scan_id>/<finding_id>/verify` | Explicitly replay the stored plan; send an empty JSON object |
 | `GET` | `/api/settings` | Get all settings |
 | `PUT` | `/api/settings` | Update settings |
 | `GET` | `/api/profiles` | List scan profiles |
