@@ -21,11 +21,22 @@ def run_js(test):
 const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/strict');
 const nodes=new Map(), listeners={}, calls=[], messages=[], intervals=[];
 function node(id='') {
-  const children=new Map();
-  return {id,value:'',checked:false,disabled:false,hidden:false,open:false,innerHTML:'',textContent:'',dataset:{},
-    classList:{toggle(){}}, querySelector(selector){if(!children.has(selector))children.set(selector,node());return children.get(selector)},
-    querySelectorAll(){return []}, addEventListener(name,fn){listeners[id+':'+name]=fn},removeAttribute(name){delete this[name]},
+  const children=new Map();let html='',text='',details=[];
+  const element={id,value:'',checked:false,disabled:false,hidden:false,open:false,dataset:{},scrollTop:0,
+    classList:{toggle(){}}, querySelector(selector){
+      if(selector.startsWith('details'))return this.querySelectorAll(selector)[0] || null;
+      if(!children.has(selector))children.set(selector,node());return children.get(selector)},
+    querySelectorAll(selector){return /^details(?:\[|$)/.test(selector)?details:[]},
+    addEventListener(name,fn){listeners[id+':'+name]=fn},removeAttribute(name){delete this[name]},
     showModal(){this.open=true},close(){this.open=false},appendChild(){},remove(){},click(){},focus(){},scrollIntoView(){}};
+  Object.defineProperty(element,'innerHTML',{get(){return html},set(value){html=value;text='';details=[];
+    for(const match of value.matchAll(/<details\b([^>]*)>/g)){
+      const detail=node();detail.open=/\bopen(?:\s|$)/.test(match[1]);
+      detail.dataset.webDisclosure=/data-web-disclosure="([^"]*)"/.exec(match[1])?.[1];details.push(detail);
+    }
+  }});
+  Object.defineProperty(element,'textContent',{get(){return text},set(value){text=value;html='';details=[]}});
+  return element;
 }
 const document={getElementById(id){if(!nodes.has(id))nodes.set(id,node(id));return nodes.get(id)},
   querySelectorAll(){return []},createElement(){return node()},body:node(),addEventListener(name,fn){listeners[name]=fn}};
@@ -37,9 +48,9 @@ let responseRows=[row], responseJobs=[{id:'job',target:'example.test',status:'co
 const context=vm.createContext({document,window:{},URL,Blob,assert,console,navigator:{clipboard:{writeText:async()=>{}}},
   toast:(...args)=>messages.push(args),setInterval:fn=>intervals.push(fn),setTimeout(){},
   fetch:async(url,opts)=>{calls.push([url,opts]);let data=url==='/api/web/catalog'?catalog:url==='/api/web/findings'?responseRows:url==='/api/scans'?responseJobs:row;
-    return {ok:true,json:async()=>data,text:async()=>'<script>POC IS TEXT</script>'};}});
+    return {ok:true,json:async()=>JSON.parse(JSON.stringify(data)),text:async()=>'<script>POC IS TEXT</script>'};}});
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),context);
-context.nodes=nodes;context.calls=calls;context.row=row;context.catalog=catalog;context.messages=messages;
+context.nodes=nodes;context.calls=calls;context.row=row;context.catalog=catalog;context.messages=messages;context.responseJobs=responseJobs;
 context.emit=async(name,id,dataset={})=>listeners[name]({target:{id,value:document.getElementById(id).value,closest:()=>({dataset})}});
 context.flush=async()=>{for(let i=0;i<15;i++)await new Promise(resolve=>setImmediate(resolve));};
 (async()=>{await listeners.DOMContentLoaded();await vm.runInContext('(async()=>{'+process.argv[3]+'})()',context)})()
@@ -155,4 +166,66 @@ window.open=()=>({document:{write(value){html=value},close(){}},close(){}});
 fetch=async()=>({ok:true,json:async()=>({hosts:[{ip:'example.test',ports:[]}],web_findings:[{type:'XSS',severity:'medium',confidence:'candidate',url:'http://example.test/',evidence:'<script>marker</script>',details:{title:'Reflected XSS',remediation:'Encode output'},verification:{status:'reproduced'}}],web_coverage:[{endpoint:'http://example.test/',status:'partial',requests:20,issues:['Budget reached']}]})});
 await printScan('web');assert.match(html,/Web Findings/);assert.match(html,/Encode output/);assert.match(html,/Budget reached/);
 assert.match(html,/&lt;script&gt;/);assert.ok(!html.includes('<script>marker'));assert.match(html,/Port scan was not selected/);
+""")
+
+
+def test_periodic_offline_status_poll_does_not_replace_open_verification_exchanges():
+    run_js("""
+row.verification={status:'reproduced',summary:'Recorded evidence matched',observations:[{status:200}]};
+await emit('click','',{webAction:'open',scan:'job',id:'finding'});await flush();
+const result=nodes.get('web-verification-result'), exchanges=result.querySelector('details');exchanges.open=true;
+for(let i=0;i<3;i++)window.webSecurity.setOffline(false);
+assert.equal(result.querySelector('details'),exchanges);assert.equal(exchanges.open,true);
+window.webSecurity.setOffline(true);
+assert.equal(result.querySelector('details').open,true);assert.equal(nodes.get('web-verify-button').disabled,true);
+window.webSecurity.setOffline(false);
+assert.equal(result.querySelector('details').open,true);assert.equal(nodes.get('web-verify-button').disabled,false);
+""")
+
+
+def test_new_verification_result_preserves_open_and_closed_evidence_sections():
+    run_js("""
+row.observations=[{request:{role:'baseline',url:row.url},response:{status:200}},
+  {request:{role:'probe',url:row.url},response:{status:200}}];
+row.reproduction.certificate={subject:'example.test'};
+row.verification={status:'reproduced',summary:'First run',observations:[{status:200}]};
+await emit('click','',{webAction:'open',scan:'job',id:'finding'});await flush();
+const evidence=nodes.get('web-panel-evidence'), verification=nodes.get('web-verification-result');
+const sections=evidence.querySelectorAll('details');sections[0].open=false;sections[1].open=true;sections[2].open=false;sections[3].open=true;
+verification.querySelector('details').open=true;
+row.verification={status:'not_reproduced',summary:'Second run: no match',observations:[{status:403}]};
+await window.webSecurity.refresh();
+assert.equal(verification.querySelector('details').open,true);assert.match(verification.innerHTML,/Second run: no match/);
+assert.equal(evidence.querySelectorAll('details')[0].open,false);assert.equal(evidence.querySelectorAll('details')[1].open,true);
+assert.equal(evidence.querySelectorAll('details')[2].open,false);assert.equal(evidence.querySelectorAll('details')[3].open,true);
+""")
+
+
+def test_verification_preserves_expansion_across_running_phase_and_resets_on_reopen():
+    run_js("""
+row.verification={status:'reproduced',summary:'First run',observations:[{status:200}]};
+await emit('click','',{webAction:'open',scan:'job',id:'finding'});await flush();
+const verification=nodes.get('web-verification-result');verification.querySelector('details').open=true;
+row.verification={status:'running',summary:'Replaying recorded evidence'};
+await window.webSecurity.refresh();assert.equal(verification.querySelector('details'),null);
+row.verification={status:'not_reproduced',summary:'Second run',observations:[{status:403}]};
+await window.webSecurity.refresh();assert.equal(verification.querySelector('details').open,true);
+await emit('click','',{webAction:'close'});
+await emit('click','',{webAction:'open',scan:'job',id:'finding'});await flush();
+assert.match(verification.innerHTML,/Second run/);assert.equal(verification.querySelector('details').open,false);
+row.id='other';await emit('click','',{webAction:'open',scan:'job',id:'other'});await flush();
+assert.equal(verification.querySelector('details').open,false);
+""")
+
+
+def test_incomplete_coverage_card_stays_open_on_polls_and_issue_updates():
+    run_js("""
+responseJobs[0].status='partial';responseJobs[0].web_coverage=[{endpoint:row.url,status:'partial',requests:20,issues:['Request budget reached']}];
+await window.webSecurity.refresh();const coverage=nodes.get('web-coverage'), detail=coverage.querySelector('details');detail.open=true;
+await window.webSecurity.refresh();assert.equal(coverage.querySelector('details'),detail);assert.equal(detail.open,true);
+responseJobs[0].web_coverage[0].issues.push('Response size limit reached');
+await window.webSecurity.refresh();assert.equal(coverage.querySelector('details').open,true);assert.match(coverage.innerHTML,/Response size limit reached/);
+coverage.querySelector('details').open=false;responseJobs[0].web_coverage[0].requests=21;
+await window.webSecurity.refresh();assert.equal(coverage.querySelector('details').open,false);
+assert.equal(calls.filter(([,opts])=>opts?.method==='POST').length,0);
 """)

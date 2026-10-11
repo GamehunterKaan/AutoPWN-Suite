@@ -6,6 +6,7 @@
   const severity = value => ['high','medium','low','info'].includes(value) ? value : 'info';
   const confidence = value => ['candidate','advisory','observation'].includes(value) ? value : 'observation';
   const pending = {};
+  const renderedPanels = new WeakMap();
   const limitLabels = {request_budget:'Request budget',timeout:'Timeout (seconds)',max_pages:'Crawl pages',max_urls:'Crawl URLs',max_depth:'Crawl depth',max_endpoints:'Probe endpoints',max_parameters:'Parameters / URL',max_response_kb:'Response cap (KB)'};
   let catalog = null, offline = false, rows = [], jobs = [], busy = false;
   let selected = null, detailRevision = 0, pocRevision = 0, detailBusy = false, displayedPoc = '';
@@ -30,6 +31,24 @@
       return `<a href="${escape(url.href)}" target="_blank" rel="noopener noreferrer">${escape(ref.title)}</a>`;
     } catch (_) { return ''; }
   }
+
+  function renderDisclosurePanel(node, markup, scope, rememberMissingChoices = false) {
+    const previous = renderedPanels.get(node);
+    const sameScope = previous?.scope === scope;
+    // Polls must not replace unchanged DOM, including a user's selection and focus.
+    if (sameScope && previous.markup === markup) return;
+    // A new verification briefly omits its exchanges while the replay is running.
+    const choices = sameScope && rememberMissingChoices ? new Map(previous.choices) : new Map();
+    if (sameScope) node.querySelectorAll('details[data-web-disclosure]').forEach(detail => {
+      choices.set(detail.dataset.webDisclosure, detail.open);
+    });
+    node.innerHTML = markup;
+    if (sameScope) node.querySelectorAll('details[data-web-disclosure]').forEach(detail => {
+      if (choices.has(detail.dataset.webDisclosure)) detail.open = choices.get(detail.dataset.webDisclosure);
+    });
+    renderedPanels.set(node, {scope, markup, choices});
+  }
+  const findingScope = row => `${detailRevision}:${endpoint(row)}`;
 
   function mount(prefix) {
     const root = $(`${prefix}-web-controls`);
@@ -126,16 +145,16 @@
     $('web-findings-list').innerHTML = visible.map(row => `<button class="web-finding-row ${severity(row.severity)}" data-web-action="open" data-scan="${escape(row.scan_id)}" data-id="${escape(row.id)}">
       <span class="web-severity-bar"></span><span><span class="web-finding-title">${escape(row.title || row.type)}${row.verification?.status === 'reproduced' ? pill('Evidence reproduced','reproduced') : ''}</span><span class="web-finding-url">${escape(row.url)}${row.parameter ? ` · ${escape(row.parameter)}` : ''}</span></span>
       <span class="web-finding-side">${pill(confidence(row.confidence),confidence(row.confidence))}${pill(severity(row.severity),severity(row.severity))}<span aria-hidden="true">↗</span></span></button>`).join('');
-    $('web-coverage').innerHTML = scopedJobs.map(job => {
+    renderDisclosurePanel($('web-coverage'), scopedJobs.map(job => {
       const coverage = job.web_coverage || [];
       if (!coverage.length) return `<div class="web-coverage-item">${escape(job.target)} · ${escape(job.status)}${job.status === 'completed' ? ' · web coverage not recorded' : ''}</div>`;
       return coverage.map(item => {
         const incomplete = item.status !== 'completed';
         const checks = Object.entries(item.controls?.checks || {}).filter(([,enabled]) => enabled).map(([key]) => catalog?.checks[key] || key);
         const issues = item.issues || [];
-        return `<div class="web-coverage-item ${incomplete ? 'partial' : ''}"><details><summary>${escape(item.endpoint || item.target)} · ${incomplete ? escape(item.status) : 'Checked'} · ${item.requests || 0} requests</summary><ul>${checks.length ? `<li>Enabled checks: ${escape(checks.join(', '))}</li>` : ''}${issues.map(issue => `<li>${escape(issue)}</li>`).join('')}${!issues.length ? '<li>Selected checks completed within the configured limits. Unreported vulnerabilities may still exist.</li>' : ''}</ul></details></div>`;
+        return `<div class="web-coverage-item ${incomplete ? 'partial' : ''}"><details data-web-disclosure="${escape(JSON.stringify([job.id,item.host,item.endpoint || item.target]))}"><summary>${escape(item.endpoint || item.target)} · ${incomplete ? escape(item.status) : 'Checked'} · ${item.requests || 0} requests</summary><ul>${checks.length ? `<li>Enabled checks: ${escape(checks.join(', '))}</li>` : ''}${issues.map(issue => `<li>${escape(issue)}</li>`).join('')}${!issues.length ? '<li>Selected checks completed within the configured limits. Unreported vulnerabilities may still exist.</li>' : ''}</ul></details></div>`;
       }).join('');
-    }).join('');
+    }).join(''), 'coverage');
   }
   async function refresh() {
     if (busy) return;
@@ -162,13 +181,13 @@
     $('web-detail-badges').innerHTML = pill(severity(row.severity),severity(row.severity)) + pill(confidence(row.confidence),confidence(row.confidence)) + pill(`Scan ${row.scan_id.slice(0,8)}`) + (row.verification?.status === 'reproduced' ? pill('Evidence reproduced','reproduced') : '');
     $('web-panel-overview').innerHTML = card('Observed evidence',row.evidence) + `<div class="web-detail-grid"><div>${card('How this was detected',info.detection)}${card('Potential impact',info.impact)}</div><div>${card('Remediation',info.remediation)}${card('What still needs verification',info.limitations)}</div></div><div class="web-detail-card"><h3>Verification steps</h3><ol>${(info.verification_steps || []).map(step => `<li>${escape(step)}</li>`).join('')}</ol></div><div class="web-detail-card"><h3>References</h3>${(info.references || []).map(safeReference).join('')}<p class="web-small-note">Observed ${escape(row.observed_at || 'time not recorded')} · Host ${escape(row.host)}</p></div>`;
     const observations = row.observations || [];
-    $('web-panel-evidence').innerHTML = `<p class="web-small-note">Recorded HTTP exchanges, including baseline comparisons. Sensitive query values are redacted. Response bodies and cookie values are omitted.</p>`
+    renderDisclosurePanel($('web-panel-evidence'), `<p class="web-small-note">Recorded HTTP exchanges, including baseline comparisons. Sensitive query values are redacted. Response bodies and cookie values are omitted.</p>`
       + observations.map((record,index) => {
         const req = record.request || {}, res = record.response || {};
-        return `<details class="web-request"${index === 0 ? ' open' : ''}><summary>${escape(req.role || 'probe')} · ${escape(req.method)} <span class="web-request-uri">${escape(req.url)}</span>${pill(`HTTP ${res.status}`)}</summary><pre>${escape(pretty({request:req,response:res,phase:record.phase}))}</pre></details>`;
+        return `<details class="web-request" data-web-disclosure="observation-${index}"${index === 0 ? ' open' : ''}><summary>${escape(req.role || 'probe')} · ${escape(req.method)} <span class="web-request-uri">${escape(req.url)}</span>${pill(`HTTP ${res.status}`)}</summary><pre>${escape(pretty({request:req,response:res,phase:record.phase}))}</pre></details>`;
       }).join('') + (!observations.length ? '<p class="web-small-note">No HTTP exchanges were attached to this finding. Review the recorded plan and available certificate metadata.</p>' : '')
-      + (row.reproduction?.certificate ? `<details class="web-request" open><summary>Certificate metadata</summary><pre>${escape(pretty(row.reproduction.certificate))}</pre></details>` : '')
-      + `<details class="web-request"><summary>Complete finding · plan and verification history</summary><pre>${escape(pretty(row))}</pre></details>`;
+      + (row.reproduction?.certificate ? `<details class="web-request" data-web-disclosure="certificate" open><summary>Certificate metadata</summary><pre>${escape(pretty(row.reproduction.certificate))}</pre></details>` : '')
+      + `<details class="web-request" data-web-disclosure="complete-finding"><summary>Complete finding · plan and verification history</summary><pre>${escape(pretty(row))}</pre></details>`, findingScope(row));
     renderVerification(row);
   }
   function replayBlocked(row) {
@@ -187,7 +206,7 @@
     const labels = {running:'Verification running',reproduced:'Evidence reproduced',not_reproduced:'Evidence not reproduced',inconclusive:'Inconclusive',needs_input:'Local input required'};
     const node = $('web-verification-result');
     node.className = `web-verification-result ${result.status === 'reproduced' ? 'reproduced' : ''}`;
-    node.innerHTML = `${blocked ? `<p>${escape(blocked)}</p>` : ''}${result.status ? `<strong>${escape(labels[result.status] || result.status)}</strong> · ${escape(result.summary)}${result.checked_at ? `<p class="web-small-note">${escape(result.checked_at)}</p>` : ''}` : '<p>No verification run yet.</p>'}<p class="web-small-note">Reproducing evidence does not establish full exploit impact. Review application context and the limitations above.</p>${result.observations?.length ? `<details class="web-request"><summary>Verification exchanges · ${result.observations.length} requests</summary><pre>${escape(pretty(result.observations))}</pre></details>` : ''}`;
+    renderDisclosurePanel(node, `${blocked ? `<p>${escape(blocked)}</p>` : ''}${result.status ? `<strong>${escape(labels[result.status] || result.status)}</strong> · ${escape(result.summary)}${result.checked_at ? `<p class="web-small-note">${escape(result.checked_at)}</p>` : ''}` : '<p>No verification run yet.</p>'}<p class="web-small-note">Reproducing evidence does not establish full exploit impact. Review application context and the limitations above.</p>${result.observations?.length ? `<details class="web-request" data-web-disclosure="verification-exchanges"><summary>Verification exchanges · ${result.observations.length} requests</summary><pre>${escape(pretty(result.observations))}</pre></details>` : ''}`, findingScope(row), true);
   }
   async function refreshDetail() {
     if (!selected) return;
