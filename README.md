@@ -9,6 +9,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 ![GitHub Closed Pull Requests](https://img.shields.io/github/issues-pr-closed/GamehunterKaan/AutoPWN-Suite)
 ![GitHub Closed Issues](https://img.shields.io/github/issues-closed-raw/GamehunterKaan/AutoPWN-Suite)
 ![GitHub Repo Stars](https://img.shields.io/github/stars/GamehunterKaan/AutoPWN-Suite?style=social)
+![License](https://img.shields.io/github/license/GamehunterKaan/AutoPWN-Suite)
 ![Banner](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/banner.png)
 
 
@@ -323,11 +324,14 @@ docker compose up --build
 I would be glad if you are willing to contribute this project. I am looking forward to merge your pull request unless its something that is not needed or just a personal preference. Also minor changes and bug fixes will not be merged. Please create an issue for those and I will do it myself. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
 
 
-## Legal
+## License
 
-You may not rent or lease, distribute, modify, sell or transfer the software to a third party. AutoPWN Suite is free for distribution, and modification with the condition that credit is provided to the creator and not used for commercial use. You may not use software for illegal or nefarious purposes. No liability for consequential damages to the maximum extent permitted by all applicable laws.
+AutoPWN Suite is licensed under the [Apache License 2.0](LICENSE.md). See [NOTICE](NOTICE) for attribution.
 
+Third-party dependencies are covered by their own licenses (e.g. python-nmap is GPL).
+
+This tool is intended for authorized security testing only. You are responsible for complying with all applicable laws.
 
 ## Support or Contact
 
-Having trouble using this tool? You can [create an issue](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new/choose) or [create a discussion!](https://github.com/GamehunterKaan/AutoPWN-Suite/discussions)
+Having trouble using this tool? You can [create an issue.](https://github.com/GamehunterKaan/AutoPWN-Suite/issues/new/choose)
