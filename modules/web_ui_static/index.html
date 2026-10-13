@@ -424,7 +424,7 @@
         <div class="s-section-title">Webhook Notifications</div>
         <div class="toggle-row">
           <span class="toggle-label">Enable webhook notifications</span>
-          <label class="toggle"><input type="checkbox" id="s-webhook-enabled" onchange="toggleWebhookSection()"/><span class="toggle-slider"></span></label>
+          <label class="toggle"><input type="checkbox" id="s-webhook-enabled" onchange="changeWebhookEnabled()"/><span class="toggle-slider"></span></label>
         </div>
         <div id="webhook-section" style="display:none;flex-direction:column;gap:12px">
           <div><div class="fl">Webhook URL</div>
@@ -435,10 +435,10 @@
             <div class="chk-row"><input type="checkbox" id="s-wh-onerror" checked/><label for="s-wh-onerror">On scan error</label></div>
             <div class="chk-row"><input type="checkbox" id="s-wh-onvuln" checked/><label for="s-wh-onvuln">On vulnerabilities found</label></div>
           </div>
-          <div class="s-actions">
-            <button class="btn btn-primary btn-sm" onclick="saveWebhookSettings()">Save Webhook Settings</button>
-            <button class="btn btn-ghost btn-sm" onclick="testWebhook()">Send Test Ping</button>
-          </div>
+        </div>
+        <div class="s-actions">
+          <button id="s-webhook-save" class="btn btn-primary btn-sm" onclick="saveWebhookSettings()">Save Webhook Settings</button>
+          <button id="s-webhook-test" class="btn btn-ghost btn-sm" onclick="testWebhook()" disabled>Send Test Ping</button>
         </div>
       </div>
 

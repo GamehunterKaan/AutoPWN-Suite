@@ -917,20 +917,52 @@ async function testEmail(){
 }
 
 // ── Settings: Webhook ─────────────────────────────────────────────────────────
+let webhookPersisting=false, persistedWebhookEnabled=false, webhookRevision=0;
 function toggleWebhookSection(){
   const on=document.getElementById('s-webhook-enabled').checked;
   document.getElementById('webhook-section').style.display=on?'flex':'none';
+  document.getElementById('s-webhook-save').disabled=webhookPersisting;
+  document.getElementById('s-webhook-test').disabled=!on||webhookPersisting;
+}
+async function persistWebhookSettings(update,message){
+  if(webhookPersisting) return;
+  webhookPersisting=true;
+  webhookRevision++;
+  const checkbox=document.getElementById('s-webhook-enabled');
+  checkbox.disabled=true;
+  toggleWebhookSection();
+  try{
+    const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({webhook:update})});
+    if(!r.ok){
+      const data=await r.json().catch(()=>({}));
+      throw new Error(data.error||'Failed to save webhook settings.');
+    }
+    persistedWebhookEnabled=update.enabled;
+    checkbox.checked=update.enabled;
+    toast(message);
+  }catch(error){
+    checkbox.checked=persistedWebhookEnabled;
+    toast(`Webhook setting was not saved: ${error.message}`,false);
+  }finally{
+    webhookPersisting=false;
+    checkbox.disabled=false;
+    toggleWebhookSection();
+  }
+}
+async function changeWebhookEnabled(){
+  const enabled=document.getElementById('s-webhook-enabled').checked;
+  await persistWebhookSettings({enabled},enabled?'Webhook notifications enabled.':'Webhook notifications disabled.');
 }
 async function saveWebhookSettings(){
-  const body={webhook:{
+  const update={
     enabled:     document.getElementById('s-webhook-enabled').checked,
     url:         document.getElementById('s-webhook-url').value,
     on_complete:   document.getElementById('s-wh-oncomplete').checked,
     on_error:      document.getElementById('s-wh-onerror').checked,
     on_vuln_found: document.getElementById('s-wh-onvuln').checked,
-  }};
-  const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  toast(r.ok?'Webhook settings saved.':'Failed to save.',r.ok);
+  };
+  await persistWebhookSettings(update,'Webhook settings saved.');
 }
 async function testWebhook(){
   const r=await fetch('/api/settings/test_webhook',{method:'POST'});
@@ -1123,6 +1155,7 @@ async function deleteSchedule(sid){
 
 // ── Load settings into form ───────────────────────────────────────────────────
 async function loadSettingsIntoForm(){
+  const revision=webhookRevision;
   const r=await fetch('/api/settings'); const d=await r.json();
   document.getElementById('s-nist-key').value=d.nist_api_key||'';
   const em=d.email||{};
@@ -1138,11 +1171,14 @@ async function loadSettingsIntoForm(){
   document.getElementById('s-email-onvuln').checked=em.on_vuln_found!==false;
   toggleEmailSection();
   const wh=d.webhook||{};
-  document.getElementById('s-webhook-enabled').checked=!!wh.enabled;
-  document.getElementById('s-webhook-url').value=wh.url||'';
-  document.getElementById('s-wh-oncomplete').checked=wh.on_complete!==false;
-  document.getElementById('s-wh-onerror').checked=wh.on_error!==false;
-  document.getElementById('s-wh-onvuln').checked=wh.on_vuln_found!==false;
+  if(revision===webhookRevision&&!webhookPersisting){
+    persistedWebhookEnabled=!!wh.enabled;
+    document.getElementById('s-webhook-enabled').checked=persistedWebhookEnabled;
+    document.getElementById('s-webhook-url').value=wh.url||'';
+    document.getElementById('s-wh-oncomplete').checked=wh.on_complete!==false;
+    document.getElementById('s-wh-onerror').checked=wh.on_error!==false;
+    document.getElementById('s-wh-onvuln').checked=wh.on_vuln_found!==false;
+  }
   toggleWebhookSection();
 }
 

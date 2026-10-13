@@ -21,9 +21,9 @@ def run_js(test):
 const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/strict');
 const nodes=new Map(), listeners={}, calls=[], messages=[], intervals=[];
 function node(id='') {
-  const children=new Map();let html='',text='',details=[];
+  const children=new Map(), classes=new Set();let html='',text='',details=[];
   const element={id,value:'',checked:false,disabled:false,hidden:false,open:false,dataset:{},scrollTop:0,
-    classList:{toggle(){}}, querySelector(selector){
+    classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name)},contains(name){return classes.has(name)}}, querySelector(selector){
       if(selector.startsWith('details'))return this.querySelectorAll(selector)[0] || null;
       if(!children.has(selector))children.set(selector,node());return children.get(selector)},
     querySelectorAll(selector){return /^details(?:\[|$)/.test(selector)?details:[]},
@@ -50,7 +50,7 @@ const context=vm.createContext({document,window:{},URL,Blob,assert,console,navig
   fetch:async(url,opts)=>{calls.push([url,opts]);let data=url==='/api/web/catalog'?catalog:url==='/api/web/findings'?responseRows:url==='/api/scans'?responseJobs:row;
     return {ok:true,json:async()=>JSON.parse(JSON.stringify(data)),text:async()=>'<script>POC IS TEXT</script>'};}});
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),context);
-context.nodes=nodes;context.calls=calls;context.row=row;context.catalog=catalog;context.messages=messages;context.responseJobs=responseJobs;
+context.nodes=nodes;context.calls=calls;context.row=row;context.catalog=catalog;context.messages=messages;context.responseJobs=responseJobs;context.responseRows=responseRows;
 context.emit=async(name,id,dataset={})=>listeners[name]({target:{id,value:document.getElementById(id).value,closest:()=>({dataset})}});
 context.flush=async()=>{for(let i=0;i<15;i++)await new Promise(resolve=>setImmediate(resolve));};
 (async()=>{await listeners.DOMContentLoaded();await vm.runInContext('(async()=>{'+process.argv[3]+'})()',context)})()
@@ -76,6 +76,20 @@ assert.match(window.webSecurity.validateControls('f'),/online source/);
 window.webSecurity.setOffline(false);assert.equal(window.webSecurity.readControls('f').scan_web,true);
 nodes.get('f-vuln-source').value='offline';await emit('change','f-vuln-source');
 assert.equal(window.webSecurity.readControls('f').scan_web,false);
+""")
+
+
+def test_web_finding_badge_is_visible_and_tracks_refreshes():
+    run_js("""
+assert.equal(nodes.get('badge-web').textContent,1);
+assert.equal(nodes.get('badge-web').classList.contains('show'),true);
+responseRows.length=0;
+await window.webSecurity.refresh();
+assert.equal(nodes.get('badge-web').textContent,0);
+assert.equal(nodes.get('badge-web').classList.contains('show'),false);
+responseRows.push(row);
+await window.webSecurity.refresh();
+assert.equal(nodes.get('badge-web').classList.contains('show'),true);
 """)
 
 

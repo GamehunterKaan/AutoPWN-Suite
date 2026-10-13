@@ -56,6 +56,63 @@ assert.match(nodes.get('database-status').textContent,/123 CVEs/);
 """)
 
 
+def test_webhook_toggle_persists_false_without_erasing_url_or_sending_a_ping():
+    run_js("""
+const stored={webhook:{enabled:true,url:'https://example.invalid/hook',on_complete:true,on_error:false,on_vuln_found:true}};
+const calls=[];
+fetch=async(url,opts)=>{
+  calls.push([url,opts]);
+  if(opts){Object.assign(stored.webhook,JSON.parse(opts.body).webhook);return {ok:true,json:async()=>({ok:true})};}
+  return {ok:true,json:async()=>JSON.parse(JSON.stringify(stored))};
+};
+await loadSettingsIntoForm();
+document.getElementById('s-webhook-enabled').checked=false;
+await changeWebhookEnabled();
+assert.equal(stored.webhook.enabled,false);
+assert.equal(stored.webhook.url,'https://example.invalid/hook');
+assert.equal(stored.webhook.on_error,false);
+assert.equal(nodes.get('webhook-section').style.display,'none');
+assert.equal(nodes.get('s-webhook-save').disabled,false);
+assert.equal(nodes.get('s-webhook-test').disabled,true);
+await loadSettingsIntoForm();
+assert.equal(nodes.get('s-webhook-enabled').checked,false);
+assert.deepEqual(JSON.parse(calls[1][1].body),{webhook:{enabled:false}});
+assert.equal(calls.every(([url])=>url==='/api/settings'),true);
+""")
+
+
+def test_webhook_toggle_reverts_and_reports_failed_persistence():
+    run_js("""
+fetch=async(url,opts)=>opts ? {ok:false,json:async()=>({error:'Storage unavailable'})}
+  : {ok:true,json:async()=>({webhook:{enabled:true,url:'https://example.invalid/hook'}})};
+await loadSettingsIntoForm();
+document.getElementById('s-webhook-enabled').checked=false;
+await changeWebhookEnabled();
+assert.equal(nodes.get('s-webhook-enabled').checked,true);
+assert.equal(nodes.get('s-webhook-enabled').disabled,false);
+assert.equal(nodes.get('s-webhook-test').disabled,false);
+assert.match(nodes.get('toast-el').textContent,/not saved.*Storage unavailable/);
+""")
+
+
+def test_stale_settings_read_cannot_undo_successful_webhook_toggle():
+    run_js("""
+let finishRead;
+fetch=async(url,opts)=>opts ? {ok:true,json:async()=>({ok:true})}
+  : {ok:true,json:async()=>({webhook:{enabled:true,url:'https://example.invalid/hook'}})};
+await loadSettingsIntoForm();
+fetch=async(url,opts)=>opts ? {ok:true,json:async()=>({ok:true})}
+  : {ok:true,json:()=>new Promise(resolve=>{finishRead=resolve})};
+const stale=loadSettingsIntoForm();
+await Promise.resolve();await Promise.resolve();
+document.getElementById('s-webhook-enabled').checked=false;
+await changeWebhookEnabled();
+finishRead({webhook:{enabled:true}});
+await stale;
+assert.equal(nodes.get('s-webhook-enabled').checked,false);
+""")
+
+
 def test_dashboard_toggle_saves_global_setting_and_restores_online_controls():
     run_js("""
 let enabled=false;

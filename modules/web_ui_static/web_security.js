@@ -135,6 +135,7 @@
     const scoped = scanFilter ? rows.filter(row => row.scan_id === scanFilter) : rows;
     const scopedJobs = jobs.filter(job => job.config?.scan_web && (!scanFilter || job.id === scanFilter));
     $('badge-web').textContent = rows.length;
+    $('badge-web').classList.toggle('show', rows.length > 0);
     const stats = [[scoped.length,'Total findings',''],[scoped.filter(row => severity(row.severity) === 'high').length,'High severity','priority'],
       [scoped.filter(row => row.verification?.status === 'reproduced').length,'Evidence reproduced','verified'],[scopedJobs.filter(job => ['running','stopping'].includes(job.status)).length,'Active web scans','']];
     $('web-summary').innerHTML = stats.map(([value,label,style]) => `<div class="web-stat ${style}"><strong>${value}</strong><span>${label}</span></div>`).join('');
