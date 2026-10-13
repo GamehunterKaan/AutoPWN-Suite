@@ -5,6 +5,7 @@ from requests.exceptions import RequestException
 
 from modules.web.findings import emit, finding
 from modules.web.http import scoped_get
+from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
 from modules.web.query import parameter_indexes, probe_url, query_parts
 
 class SQLIScanner:
@@ -31,7 +32,7 @@ class SQLIScanner:
 
     def exploit_sqli(self, base_url, url_params):
         original = f"{base_url}?{'&'.join(url_params)}"
-        indexes = [index for index in parameter_indexes(url_params) if (original, index) not in self.tested_urls]
+        indexes = [index for index in parameter_indexes(url_params) if (original, index) not in self.tested_urls and not parameter_done("sqli", original, index)]
         if not indexes:
             return []
         try:
@@ -41,6 +42,7 @@ class SQLIScanner:
             return []
         found = []
         for index in indexes:
+            revision = begin_parameter()
             self.tested_urls.add((original, index))
             for payload in (self.sqli_test, "'", '"'):
                 test_url = probe_url(base_url, url_params, index, payload)
@@ -60,6 +62,7 @@ class SQLIScanner:
                     found.append(result)
                     emit(self.console, result)
                     break
+            finish_parameter("sqli", original, index, revision)
         self.findings.extend(found)
         return found
 

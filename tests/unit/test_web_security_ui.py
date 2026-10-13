@@ -79,6 +79,42 @@ assert.equal(window.webSecurity.readControls('f').scan_web,false);
 """)
 
 
+def test_web_speed_and_delay_survive_form_and_profile_round_trip():
+    run_js("""
+window.webSecurity.setControls('f',{scan_web:true,web_options:{speed:1,request_delay_ms:2500}});
+assert.equal(window.webSecurity.readControls('f').web_options.speed,1);
+assert.equal(window.webSecurity.readControls('f').web_options.request_delay_ms,2500);
+window.webSecurity.setControls('pf',{scan_web:true,web_options:{speed:5,request_delay_ms:0}});
+assert.equal(window.webSecurity.readControls('pf').web_options.speed,5);
+assert.equal(window.webSecurity.validateControls('pf'),'');
+assert.match(nodes.get('f-web-controls').innerHTML,/Web speed/);
+assert.match(nodes.get('f-web-controls').innerHTML,/No added delay/);
+""")
+
+
+def test_resume_dialog_edits_limits_and_launches_only_on_submit():
+    run_js("""
+responseJobs[0].status='partial';responseJobs[0].can_resume=true;
+responseJobs[0].web_coverage=[{endpoint:row.url,status:'partial',requests:20,issues:['Request budget reached']}];
+await window.webSecurity.refresh();assert.match(nodes.get('web-coverage').innerHTML,/Resume scan/);
+fetch=async(url,opts)=>{
+  calls.push([url,opts]);
+  const data=url==='/api/scans/job'?{...responseJobs[0],resume_web_options:{...catalog.defaults,max_pages:500}}:url==='/api/scans'?responseJobs:url==='/api/web/findings'?responseRows:{ok:true};
+  return {ok:true,json:async()=>data};
+};
+const before=calls.length;await window.webSecurity.resume('job');
+assert.equal(nodes.get('scan-resume-dialog').open,true);
+assert.equal(nodes.get('rs-web-limit-max_pages').value,500);
+assert.equal(calls.slice(before).filter(([,opts])=>opts?.method==='POST').length,0);
+nodes.get('rs-web-limit-speed').value='2';nodes.get('rs-web-limit-request_budget').value='40';
+await emit('click','',{webAction:'resume-submit'});await flush();
+const [url,opts]=calls.find(([url,opts])=>url==='/api/scans/job/resume'&&opts?.method==='POST');
+assert.equal(JSON.parse(opts.body).web_options.speed,2);
+assert.equal(JSON.parse(opts.body).web_options.request_budget,40);
+assert.equal(nodes.get('scan-resume-dialog').open,false);
+""")
+
+
 def test_web_finding_badge_is_visible_and_tracks_refreshes():
     run_js("""
 assert.equal(nodes.get('badge-web').textContent,1);

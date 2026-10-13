@@ -8,6 +8,7 @@ from urllib.parse import parse_qsl, quote, urlsplit
 from requests.exceptions import RequestException
 
 from modules.web.findings import emit, finding
+from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
 from modules.web.query import parameter_indexes, probe_url, query_parts
 from modules.web.sqli import SQLIScanner
 
@@ -42,7 +43,7 @@ class BooleanSQLIScanner:
 
     def test(self, url):
         base, params = query_parts(url)
-        indexes = list(parameter_indexes(params))
+        indexes = [index for index in parameter_indexes(params) if not parameter_done("boolean_sqli", url, index)]
         if not indexes:
             return []
         if len(indexes) > self.max_parameters:
@@ -57,6 +58,7 @@ class BooleanSQLIScanner:
         if not 200 <= status < 300 or _kind(repeated) != _kind(baseline):
             return []
         if getattr(baseline, "autopwn_truncated", False) or getattr(repeated, "autopwn_truncated", False):
+            self.client.log.logger("warning", f"Boolean SQLi baseline incomplete on {url}: response size limit reached.")
             return []
         baseline_text = _shape(baseline, url)
         if _similar(baseline_text, _shape(repeated, url)) < .98 or self.errors._errors(baseline.text):
@@ -66,6 +68,7 @@ class BooleanSQLIScanner:
         for index in indexes[:self.max_parameters]:
             if (url, index) in self.tested:
                 continue
+            revision = begin_parameter()
             self.tested.add((url, index))
             original = parse_qsl(params[index], keep_blank_values=True)[0][1]
             for suffix in ("", "'", '"'):
@@ -102,4 +105,5 @@ class BooleanSQLIScanner:
                     found.append(result)
                     emit(self.console, result)
                     break
+            finish_parameter("boolean_sqli", url, index, revision)
         return found

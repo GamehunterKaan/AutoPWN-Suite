@@ -7,7 +7,9 @@
   const confidence = value => ['candidate','advisory','observation'].includes(value) ? value : 'observation';
   const pending = {};
   const renderedPanels = new WeakMap();
-  const limitLabels = {request_budget:'Request budget',timeout:'Timeout (seconds)',max_pages:'Crawl pages',max_urls:'Crawl URLs',max_depth:'Crawl depth',max_endpoints:'Probe endpoints',max_parameters:'Parameters / URL',max_response_kb:'Response cap (KB)'};
+  const limitLabels = {speed:'Web speed',request_delay_ms:'Minimum request delay (ms)',request_budget:'Request budget / attempt',timeout:'Timeout (seconds)',max_pages:'Crawl pages / attempt',max_urls:'Crawl URLs',max_depth:'Crawl depth',max_endpoints:'Probe endpoints / attempt',max_parameters:'Parameters / URL',max_response_kb:'Response cap (KB)'};
+  const speeds = ['0 · Very slow (5 s)', '1 · Slow (2 s)', '2 · Gentle (500 ms)', '3 · Normal (100 ms)', '4 · Fast (25 ms)', '5 · No added delay'];
+  let resumeJob = null, resumeBusy = false;
   let catalog = null, offline = false, rows = [], jobs = [], busy = false;
   let selected = null, detailRevision = 0, pocRevision = 0, detailBusy = false, displayedPoc = '';
 
@@ -50,6 +52,12 @@
   }
   const findingScope = row => `${detailRevision}:${endpoint(row)}`;
 
+  function limitFields(prefix) {
+    return Object.entries(catalog.limits).map(([key,bounds]) => `<label>${escape(limitLabels[key] || key)}${key === 'speed'
+      ? `<select id="${prefix}-web-limit-speed">${speeds.map((label,index) => `<option value="${index}">${escape(label)}</option>`).join('')}</select>`
+      : `<input id="${prefix}-web-limit-${escape(key)}" type="number" step="1" min="${bounds[1]}" max="${bounds[2]}">`}</label>`).join('');
+  }
+
   function mount(prefix) {
     const root = $(`${prefix}-web-controls`);
     if (!root || !catalog) return;
@@ -61,7 +69,7 @@
         <div class="web-control-warning" id="${prefix}-web-warning" hidden></div>
         <details><summary>Select checks</summary><div class="web-preset-actions"><button data-web-action="preset" data-prefix="${prefix}" data-preset="all">All</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="light">Light</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="none">None</button></div>
           <div class="web-check-grid">${Object.entries(catalog.checks).map(([key,label]) => `<label><input type="checkbox" id="${prefix}-web-check-${escape(key)}">${escape(label)}</label>`).join('')}</div></details>
-        <details><summary>Limits &amp; crawl</summary><div class="web-limit-grid">${Object.entries(catalog.limits).map(([key,bounds]) => `<label>${escape(limitLabels[key] || key)}<input id="${prefix}-web-limit-${escape(key)}" type="number" step="1" min="${bounds[1]}" max="${bounds[2]}"></label>`).join('')}</div></details>
+        <details><summary>Speed, limits &amp; crawl</summary><div class="web-limit-grid">${limitFields(prefix)}</div><p class="web-small-note">Web speed sets the delay between requests; minimum request delay can slow it further.</p></details>
       </div></div>`;
     setControls(prefix, pending[prefix] || {});
   }
@@ -88,7 +96,7 @@
     const warning = $(`${prefix}-web-warning`);
     warning.hidden = !blocked;
     warning.textContent = 'Offline source disables web requests. Choose an online source to scan a website.';
-    $(`${prefix}-web-controls`).querySelectorAll('details input, details button').forEach(node => { node.disabled = blocked || !enabled.checked; });
+    $(`${prefix}-web-controls`).querySelectorAll('details input, details select, details button').forEach(node => { node.disabled = blocked || !enabled.checked; });
     if (prefix === 'f') $('f-target').placeholder = webOnly ? 'https://app.example.com/path' : '192.168.1.0/24 or hostname';
   }
   function readControls(prefix) {
@@ -120,6 +128,45 @@
     if (selected) renderVerification(selected);
   }
 
+  async function resume(scanId) {
+    try {
+      resumeJob = await json(`/api/scans/${encodeURIComponent(scanId)}`);
+      if (!resumeJob.can_resume) throw new Error('This scan is already running or completed.');
+      if (offline && resumeJob.config?.scan_web) throw new Error('Web checks are disabled in offline mode.');
+      $('scan-resume-target').textContent = resumeJob.target;
+      $('scan-resume-limits').hidden = !resumeJob.config?.scan_web;
+      if (resumeJob.config?.scan_web) {
+        if (!catalog) throw new Error('Web controls have not loaded.');
+        $('scan-resume-limits').innerHTML = limitFields('rs');
+        const controls = resumeJob.resume_web_options || resumeJob.config.web_options || {};
+        Object.keys(catalog.limits).forEach(key => { $(`rs-web-limit-${key}`).value = controls[key] ?? catalog.defaults[key]; });
+      }
+      $('scan-resume-submit').disabled = false;
+      $('scan-resume-dialog').showModal();
+    } catch (error) { notify(`Could not resume scan: ${error.message}`,false); }
+  }
+  async function submitResume() {
+    if (!resumeJob || resumeBusy) return;
+    const body = {};
+    if (resumeJob.config?.scan_web) {
+      body.web_options = {};
+      for (const [key,bounds] of Object.entries(catalog.limits)) {
+        const raw = String($(`rs-web-limit-${key}`).value);
+        if (!/^\d+$/.test(raw) || Number(raw) < bounds[1] || Number(raw) > bounds[2]) {
+          notify(`${limitLabels[key]} must be ${bounds[1]}–${bounds[2]}.`,false); return;
+        }
+        body.web_options[key] = Number(raw);
+      }
+    }
+    resumeBusy = true; $('scan-resume-submit').disabled = true;
+    try {
+      await json(`/api/scans/${encodeURIComponent(resumeJob.id)}/resume`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      $('scan-resume-dialog').close(); notify('Scan resumed. Continuing unfinished work.');
+      await refresh(); if (typeof poll === 'function') await poll();
+    } catch (error) { notify(`Could not resume scan: ${error.message}`,false); }
+    finally { resumeBusy = false; $('scan-resume-submit').disabled = false; }
+  }
+
   function filteredRows() {
     const search = $('web-search').value.trim().toLowerCase();
     return rows.filter(row => (!$('web-confidence').value || confidence(row.confidence) === $('web-confidence').value)
@@ -149,7 +196,8 @@
     renderDisclosurePanel($('web-coverage'), scopedJobs.map(job => {
       const coverage = job.web_coverage || [];
       if (!coverage.length) return `<div class="web-coverage-item">${escape(job.target)} · ${escape(job.status)}${job.status === 'completed' ? ' · web coverage not recorded' : ''}</div>`;
-      return coverage.map(item => {
+      const resumeButton = job.can_resume ? `<button class="btn btn-primary btn-sm" data-web-action="resume" data-scan="${escape(job.id)}" ${offline ? 'disabled' : ''}>Resume scan</button>` : '';
+      return resumeButton + coverage.map(item => {
         const incomplete = item.status !== 'completed';
         const checks = Object.entries(item.controls?.checks || {}).filter(([,enabled]) => enabled).map(([key]) => catalog?.checks[key] || key);
         const issues = item.issues || [];
@@ -310,6 +358,9 @@
     else if (action === 'detail-tab') panel(node.dataset.panel);
     else if (action === 'verify') verify();
     else if (action === 'export') exportReport();
+    else if (action === 'resume') resume(node.dataset.scan);
+    else if (action === 'resume-close') $('scan-resume-dialog').close();
+    else if (action === 'resume-submit') submitResume();
     else if (action === 'copy-poc' && displayedPoc) {
       try { await navigator.clipboard.writeText(displayedPoc); notify('PoC copied.'); }
       catch (_) { notify('Clipboard unavailable. Download the PoC or select its code.',false); }
@@ -341,5 +392,5 @@
     } catch (error) { $('web-result-count').textContent = `Could not load web controls: ${error.message}`; }
     setInterval(refresh,5000);
   });
-  window.webSecurity = {setControls,readControls,validateControls,setOffline,refresh};
+  window.webSecurity = {setControls,readControls,validateControls,setOffline,refresh,resume};
 })();

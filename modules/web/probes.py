@@ -10,6 +10,7 @@ from requests.exceptions import RequestException
 from modules.web.findings import emit, finding
 from modules.web.http import is_html
 from modules.web.query import parameter_indexes, probe_url, query_parts
+from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
 
 
 def _publish(console, results):
@@ -53,6 +54,9 @@ def check_redirects(client, url, console, *, max_parameters=5):
         client.log.logger("warning", f"Redirect parameter budget reached on {url}; coverage is limited.")
     results = []
     for index in indexes[:max_parameters]:
+        if parameter_done("redirects", url, index):
+            continue
+        revision = begin_parameter()
         for prefix in ("https://", "//"):
             successful = []
             try:
@@ -72,6 +76,7 @@ def check_redirects(client, url, console, *, max_parameters=5):
                                        parameter=params[index].split("=", 1)[0], severity="medium",
                                        reproduction={"strategy": "redirect", "parameter": params[index].split("=", 1)[0], "requests": [{"url": probe} for probe in successful]}))
                 break
+        finish_parameter("redirects", url, index, revision)
     return _publish(console, results)
 
 

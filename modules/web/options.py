@@ -16,7 +16,8 @@ TYPE_CHECK = {"WEB_CONFIG": "headers", "DIR": "directories", "DIR_LISTING": "dir
               "SQLI_BOOLEAN": "boolean_sqli", "XSS": "xss", "LFI": "lfi", "TLS_TRUST": "tls",
               "TLS_CERTIFICATE": "tls", "TLS_PROTOCOL": "tls", "HTTP_METHODS": "methods",
               "TRACE_ENABLED": "methods", "HOST_HEADER": "host_headers"}
-LIMITS = {"request_budget": (10000, 20, 50000), "timeout": (10, 1, 30),
+LIMITS = {"speed": (3, 0, 5), "request_delay_ms": (0, 0, 60000),
+          "request_budget": (10000, 20, 50000), "timeout": (10, 1, 30),
           "max_pages": (250, 1, 2000), "max_urls": (1000, 1, 10000), "max_depth": (5, 0, 10),
           "max_endpoints": (100, 1, 1000), "max_parameters": (5, 1, 20),
           "max_response_kb": (1024, 64, 2048)}

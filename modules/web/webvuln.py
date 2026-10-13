@@ -7,6 +7,7 @@ from requests import get
 from requests.exceptions import RequestException
 
 from modules.logger import banner
+from modules.nmap_progress import ScanCancelled
 from modules.random_user_agent import random_user_agent
 from modules.web.crawler import crawl
 from modules.web.dirbust import dirbust
@@ -18,7 +19,7 @@ from modules.web.sqli import SQLIScanner
 from modules.web.xss import XSSScanner
 from modules.web.additional import additional_checks, critical_checks
 from modules.web.planning import prioritize_urls, skip_discovered_url
-from modules.web.runtime import ACTIVE, ScanContext, WebBudgetExceeded, allowed, enabled, options, stage
+from modules.web.runtime import ACTIVE, ScanContext, WebBudgetExceeded, allowed, enabled, options, stage, run_task, task_done
 
 
 def target_urls(target):
@@ -103,7 +104,8 @@ def _execute_webvuln(target, log, console):
 
     def test_priority_endpoints(discovered, limit):
         candidates = (url for url in discovered if same_origin(target_url, url)
-                      and query_parts(url)[1] and (url == target_url or not skip_discovered_url(url)))
+                      and query_parts(url)[1] and (url == target_url or not skip_discovered_url(url))
+                      and any(enabled(name) and not task_done(name, url) for name in ("lfi", "sqli", "boolean_sqli", "xss")))
         for url in prioritize_urls(candidates, target_url):
             if len(selected) >= limit:
                 break
@@ -113,7 +115,7 @@ def _execute_webvuln(target, log, console):
             for scanner, method, name in fast_scanners:
                 if enabled(name):
                     stage({"lfi": "Priority file inclusion", "sqli": "Priority SQL injection"}[name])
-                    results.extend(getattr(scanner, method)(url))
+                    results.extend(run_task(name, url, lambda: getattr(scanner, method)(url)))
 
     # Reserve the early part of endpoint coverage for fast high-impact probes.
     # They run while crawling, before a large site can exhaust the request cap.
@@ -137,7 +139,9 @@ def _execute_webvuln(target, log, console):
     testable_urls = prioritize_urls(url for url in urls if same_origin(target_url, url) and query_parts(url)[1]
                                    and (url == target_url or not skip_discovered_url(url)))
     log.logger("info", f"Found {len(testable_urls)} testable urls.")
-    if any(enabled(name) for name in ("lfi", "sqli", "boolean_sqli", "xss")) and len(testable_urls) > controls["max_endpoints"]:
+    remaining = [url for url in testable_urls if any(enabled(name) and not task_done(name, url)
+                 for name in ("lfi", "sqli", "boolean_sqli", "xss"))]
+    if len(set(remaining) | selected) > controls["max_endpoints"]:
         log.logger("warning", "Injection endpoint budget reached; coverage is limited.")
     test_priority_endpoints(testable_urls, controls["max_endpoints"])
     chosen = prioritize_urls(selected, target_url)
@@ -146,7 +150,7 @@ def _execute_webvuln(target, log, console):
         scanner = XSSScanner(log, console)
         for url in chosen:
             stage("Reflected XSS")
-            results.extend(scanner.test_xss(url))
+            results.extend(run_task("xss", url, lambda: scanner.test_xss(url)))
     # Discovery of exposed content and generic protection advisories comes after
     # injection checks, so it cannot consume their entire request budget.
     if any(enabled(name) for name in ("directories", "exposed_files", "errors")):
@@ -154,26 +158,42 @@ def _execute_webvuln(target, log, console):
         results.extend(dirbust(target_url, console, log))
     results.extend(additional_checks(target_url, urls, response, log, console, headers, include_boolean=False))
     if enabled("headers"):
-        results.extend(inspect_response(target_url, response, console))
+        results.extend(run_task("headers", target_url, lambda: inspect_response(target_url, response, console)))
     log.logger("info", f"Web checks completed: {len(results)} findings (candidates, advisories and observations).")
     return results
 
 
-def webvuln(target, log, console, *, controls=None, should_stop=None, progress=None, on_finding=None, on_complete=None):
-    context = ScanContext(target, log, controls=controls, should_stop=should_stop, progress=progress, on_finding=on_finding)
+def webvuln(target, log, console, *, controls=None, should_stop=None, progress=None, on_finding=None, on_complete=None, checkpoint=None):
+    context = ScanContext(target, log, controls=controls, should_stop=should_stop, progress=progress, on_finding=on_finding, checkpoint=checkpoint)
     class ScanLog:
         def logger(self, level, message):
             if level in ("warning", "error") and any(word in str(message).lower() for word in ("limited", "incomplete", "budget", "failed", "unable", "unavailable", "not checked", "no reachable", "connection error")):
+                context.problem_revision += 1
                 if str(message) not in context.issues:
                     context.issues.append(str(message))
             log.logger(level, message)
     try:
         with context.activate():
             results = _execute_webvuln(target, ScanLog(), console)
-            return [result for result in results if allowed(result["type"])]
+            # Include findings emitted before an earlier interruption as well.
+            combined = context.findings + results
+            unique = {}
+            for index, result in enumerate(combined):
+                if allowed(result["type"]):
+                    unique[result.get("id", f"legacy-{index}")] = result
+            return list(unique.values())
     except WebBudgetExceeded:
         return context.findings
+    except ScanCancelled:
+        raise
+    except Exception:
+        context.issue("Web checks failed; coverage is incomplete.")
+        raise
     finally:
+        context.state["requests"] = context.state.get("requests", 0) + context.requests
+        context.state["attempts"] = context.state.get("attempts", 0) + 1
         if on_complete:
             on_complete({"status": "stopped" if context.should_stop() else "partial" if context.issues else "completed", "requests": context.requests,
+                         "total_requests": context.state["requests"], "attempts": context.state["attempts"],
+                         "completed_tasks": len(context.state["tasks"]),
                          "issues": context.issues, "target": context.target, "controls": context.options})

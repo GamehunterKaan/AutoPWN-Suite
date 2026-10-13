@@ -167,12 +167,27 @@ and cookie values are omitted. The CLI prints these results through its existing
 Enable **Web checks** in the scan form. Use **Network + selected web checks** to check detected HTTP(S)
 services after Nmap, or **Website only** to enter an application URL without requiring Nmap or CVE lookup.
 Expand **Select checks** to choose among all 13 check groups. The **Light** preset selects headers/cookies
-and TLS; **All** selects every group. Expand **Limits & crawl** to control the HTTP request budget,
+and TLS; **All** selects every group. Expand **Speed, limits & crawl** to control web request pacing, the HTTP request budget,
 timeout, crawl pages/URLs/depth, endpoints per injection/check family, parameters and response size cap.
 Save the same controls in a profile and use that profile for scheduled scans.
 Saved profiles retain their explicit limits when defaults change. Adjustable upper bounds are
 50,000 requests, 2,000 pages, 10,000 URLs, depth 10 and 1,000 probe endpoints. Larger scans take
 longer and send more requests; reaching any configured limit still reports incomplete coverage.
+
+Web speed is independent of Nmap speed: 0–5 adds minimum delays of 5 seconds, 2 seconds,
+500 ms, 100 ms, 25 ms or no delay between request starts. **Minimum request delay** can increase
+that delay; timeout controls both HTTP requests and TLS connections. These settings are saved
+with profiles and used by scheduled scans.
+
+Use **Resume** on an incomplete, stopped or failed scan, or **Resume scan** in its web coverage
+card. Review the suggested speed and limits, then resume the same job. Completed checks,
+findings, crawl results, Nmap observations and successful CVE lookups are retained. Unfinished
+web checks get fresh request, page and endpoint budgets for each attempt; completed inputs
+and directory paths are skipped. Discovery, parameter and response caps that blocked the last
+attempt are increased in the suggested settings, within the supported bounds. Interrupted
+inputs and failed checks are retried. Completion means the selected checks finished; unreachable
+pages, response caps and unavailable local TLS capabilities can still leave coverage partial.
+Resuming keeps the original target and selected checks. Start a new scan to change either.
 
 The **Web Security** tab prioritizes severity and supports search and confidence/severity/scan filters.
 Coverage cards show enabled checks, request counts and incomplete-check reasons. Select a finding for:
@@ -191,7 +206,9 @@ controlled separate origin and an appropriate browser session to assess CORS or 
 Evidence reproduction does not establish database access, browser execution, authenticated data
 exposure or other full exploit impact.
 
-The dashboard keeps scan findings in memory for the current process. **Export report** saves filtered
+The dashboard keeps scan findings and resume checkpoints in memory for the current process.
+Checkpoints are private and are not included in exports; restarting the dashboard discards them.
+**Export report** saves filtered
 findings with their full evidence and verification history as JSON. Scan JSON exports include web
 findings/coverage, and scan PDF exports include their evidence/remediation summaries. Export results
 before restarting the dashboard. Offline mode disables web scans and verification while allowing

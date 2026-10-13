@@ -54,7 +54,7 @@ def public_request(method, url, headers=None, role="probe"):
 
 
 class ScanContext:
-    def __init__(self, target, log, *, controls=None, should_stop=None, progress=None, on_finding=None):
+    def __init__(self, target, log, *, controls=None, should_stop=None, progress=None, on_finding=None, checkpoint=None):
         self.target = target
         self.log = log
         self.options = normalize_options(controls)
@@ -62,11 +62,16 @@ class ScanContext:
         self.progress = progress
         self.on_finding = on_finding
         self.requests = 0
-        self.findings = []
+        self.state = checkpoint if checkpoint is not None else {}
+        self.state.setdefault("tasks", {})
+        self.state.setdefault("findings", [])
+        self.findings = deepcopy(self.state["findings"])
         self.records = deque(maxlen=self.options["request_budget"])
         self.issues = []
         self.phase = "Preparing web checks"
         self.discovery = False
+        self.problem_revision = 0
+        self.last_request = None
 
     @contextmanager
     def activate(self):
@@ -94,14 +99,42 @@ class ScanContext:
         if self.requests >= self.options["request_budget"]:
             self.issue("Request budget reached; coverage is limited.")
             raise WebBudgetExceeded("Web request budget reached")
+        # Speed controls pacing, independently of the port scanner's timing.
+        delay = max((5000, 2000, 500, 100, 25, 0)[self.options["speed"]],
+                    self.options["request_delay_ms"]) / 1000
+        if self.last_request is not None:
+            remaining = self.last_request + delay - time.monotonic()
+            while remaining > 0:
+                time.sleep(min(remaining, .1))
+                self.checkpoint()
+                remaining = self.last_request + delay - time.monotonic()
+        self.last_request = time.monotonic()
         self.requests += 1
         self.publish_progress()
         return time.monotonic()
 
     def issue(self, message):
+        self.problem_revision += 1
         if message not in self.issues:
             self.issues.append(message)
             self.log.logger("warning", message)
+
+    def task_key(self, name, url):
+        return json.dumps([name, url])
+
+    def task_done(self, name, url):
+        return self.task_key(name, url) in self.state["tasks"]
+
+    def run_task(self, name, url, action):
+        self.checkpoint()
+        key = self.task_key(name, url)
+        if key in self.state["tasks"]:
+            return deepcopy(self.state["tasks"][key])
+        revision = self.problem_revision
+        results = action()
+        if self.problem_revision == revision:
+            self.state["tasks"][key] = deepcopy(results)
+        return results
 
     def capture(self, response, method, url, headers, started):
         request = public_request(method, url, headers)
@@ -155,6 +188,7 @@ class ScanContext:
             return
         if not any(old["id"] == result["id"] for old in self.findings):
             self.findings.append(deepcopy(result))
+            self.state["findings"] = deepcopy(self.findings)
             if self.on_finding:
                 self.on_finding(deepcopy(result))
 
@@ -163,3 +197,29 @@ def stage(name):
     current = ACTIVE.get()
     if current:
         current.stage(name)
+
+
+def run_task(name, url, action):
+    current = ACTIVE.get()
+    return current.run_task(name, url, action) if current else action()
+
+
+def task_done(name, url):
+    current = ACTIVE.get()
+    return bool(current and current.task_done(name, url))
+
+
+def parameter_done(name, url, index):
+    return task_done(name + "_parameter", json.dumps([url, index]))
+
+
+def begin_parameter():
+    current = ACTIVE.get()
+    return current.problem_revision if current else 0
+
+
+def finish_parameter(name, url, index, revision):
+    current = ACTIVE.get()
+    if current and current.problem_revision == revision:
+        key = current.task_key(name + "_parameter", json.dumps([url, index]))
+        current.state["tasks"][key] = []

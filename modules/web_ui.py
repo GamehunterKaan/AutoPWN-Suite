@@ -391,6 +391,12 @@ class ScanJob:
         self._hosts: dict[str, dict] = {}
         self._web_findings = {}
         self._web_coverage = []
+        self._web_checkpoints = {}
+        self._network_results = {}
+        self._lookup_results = {}
+        self._targets = None
+        self._completed_hosts = set()
+        self.resume_count = 0
         self._progress = {"phase": "preparing", "detail": "Preparing scan", "percent": None,
                           "completed": None, "total": None, "host": "",
                           "target_index": 0, "targets_completed": 0, "targets_total": None,
@@ -513,8 +519,12 @@ class ScanJob:
 
     def add_web_coverage(self, ip, endpoint, summary):
         with self._lock:
-            self._web_coverage.append({"host": ip, "endpoint": redact_url(endpoint), **deepcopy(summary)})
-            self._hosts[ip]["web_status"] = summary["status"]
+            public_endpoint = redact_url(endpoint)
+            self._web_coverage = [row for row in self._web_coverage
+                                  if (row["host"], row["endpoint"]) != (ip, public_endpoint)]
+            self._web_coverage.append({"host": ip, "endpoint": public_endpoint, **deepcopy(summary)})
+            statuses = [row["status"] for row in self._web_coverage if row["host"] == ip]
+            self._hosts[ip]["web_status"] = "completed" if all(s == "completed" for s in statuses) else "partial"
 
     def to_dict(self) -> dict:
         with self._lock:
@@ -539,6 +549,9 @@ class ScanJob:
             "progress":    progress,
             "web_finding_count": web_count,
             "web_coverage": web_coverage,
+            "resume_count": self.resume_count,
+            "can_resume": status in ("partial", "stopped", "error"),
+            "resume_web_options": _resume_web_options(self) if status in ("partial", "stopped", "error") and self.config.get("scan_web") else None,
         }
 
     def to_full_dict(self) -> dict:
@@ -984,7 +997,9 @@ def _run_scan(job: ScanJob) -> None:
             scantype = ScanType.Ping
 
         # Host discovery
-        if not skip_discovery:
+        if job._targets is not None:
+            targets = list(job._targets)
+        elif not skip_discovery:
             job.set_progress("discovery", "Discovering hosts", host=target)
             _log(job, f"[*] Discovering hosts on {target}")
             if job.should_stop():
@@ -1008,8 +1023,11 @@ def _run_scan(job: ScanJob) -> None:
 
             _log(job, f"[+] {len(hosts_found)} host(s) discovered", "success")
             targets = hosts_found
+            if not had_failures:
+                job._targets = list(targets)
         else:
             targets = [target] if isinstance(target, str) else list(target)
+            job._targets = list(targets)
 
         # Per-host
         for target_index, host_ip in enumerate(targets):
@@ -1027,9 +1045,11 @@ def _run_scan(job: ScanJob) -> None:
                 continue
 
             try:
-                nm = PortScan(host_ip, log, speed, host_timeout, scanmode, nmap_flags,
-                              progress=lambda task, percent: job.set_progress("port_scan", task, percent=percent),
-                              should_stop=job.should_stop)
+                nm = job._network_results.get(host_ip)
+                if nm is None:
+                    nm = PortScan(host_ip, log, speed, host_timeout, scanmode, nmap_flags,
+                                  progress=lambda task, percent: job.set_progress("port_scan", task, percent=percent),
+                                  should_stop=job.should_stop)
             except ScanCancelled:
                 raise
             except SystemExit as e:
@@ -1058,7 +1078,14 @@ def _run_scan(job: ScanJob) -> None:
             for observed_ip in resolved:
                 if job.should_stop():
                     break
-                host_failed = _collect_host_results(job, nm, observed_ip, log, silent, scan_vulns, api_key, lookup=lookup)
+                job._network_results[host_ip] = nm
+                previous = job.get_or_create_host(observed_ip)
+                if observed_ip in job._completed_hosts:
+                    continue
+                if previous.get("lookup_status") in ("completed", "skipped"):
+                    host_failed = False
+                else:
+                    host_failed = _collect_host_results(job, nm, observed_ip, log, silent, scan_vulns, api_key, lookup=lookup)
                 if config.get("scan_web"):
                     from modules.web.webvuln import web_endpoints
                     host_data = job.get_or_create_host(observed_ip)
@@ -1069,6 +1096,9 @@ def _run_scan(job: ScanJob) -> None:
                 if host_failed:
                     had_failures = True
                     job.mark_host_done(observed_ip, "partial")
+                elif not job.should_stop():
+                    job.mark_host_done(observed_ip)
+                    job._completed_hosts.add(observed_ip)
             if not job.should_stop():
                 job.complete_target()
 
@@ -1110,11 +1140,16 @@ def _run_host_web(job, ip, endpoints, log, console, *, offline=False):
             raise ScanCancelled("Web scan stopped")
         summary = {}
         with job._lock:
+            if any(row["host"] == ip and row["endpoint"] == redact_url(endpoint) and row["status"] == "completed"
+                   for row in job._web_coverage):
+                continue
+            checkpoint = job._web_checkpoints.setdefault((ip, endpoint), {})
             host["web_status"] = "scanning"
         try:
             webvuln(endpoint, log, console, controls=job.config.get("web_options"), should_stop=job.should_stop,
                     progress=lambda stage, used, budget: job.set_progress("web_checks", f"{stage} · {used}/{budget} requests", host=ip),
-                    on_finding=lambda result: job.add_web_finding(ip, endpoint, result), on_complete=summary.update)
+                    on_finding=lambda result: job.add_web_finding(ip, endpoint, result), on_complete=summary.update,
+                    checkpoint=checkpoint)
         except ScanCancelled:
             if summary:
                 job.add_web_coverage(ip, endpoint, summary)
@@ -1173,8 +1208,13 @@ def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, look
         job.set_progress("vulnerabilities", f"Querying {keyword}", percent=100 * lookup_index / len(tasks),
                          completed=lookup_index, total=len(tasks))
         try:
-            cves = (lookup.search(keyword, log, api_key) if lookup is not None
-                    else searchCVE(keyword, log, api_key, strict=True))
+            cache_key = (ip, port["port"], port["protocol"], keyword)
+            cves = job._lookup_results.get(cache_key)
+            if cves is None:
+                cves = (lookup.search(keyword, log, api_key) if lookup is not None
+                        else searchCVE(keyword, log, api_key, strict=True))
+                cves = list(cves)
+                job._lookup_results[cache_key] = cves
         except Exception as exc:
             failed = True
             _log(job, f"[-] CVE search error ({keyword}): {exc}", "error")
@@ -1212,6 +1252,19 @@ def _launch_scan(config: dict) -> ScanJob:
 
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
+
+def _resume_web_options(job):
+    """Expand discovery/parameter caps that blocked the previous attempt."""
+    from modules.web.options import LIMITS
+    controls = normalize_options(job.config.get("web_options"))
+    issues = " ".join(issue for row in job._web_coverage for issue in row.get("issues", [])).lower()
+    for name in ("max_pages", "max_urls", "max_depth", "max_parameters", "max_response_kb"):
+        blocked = ((name == "max_parameters" and "parameter" in issues)
+                   or (name in ("max_pages", "max_urls", "max_depth") and "crawl budget" in issues)
+                   or (name == "max_response_kb" and ("size limit" in issues or "response exceeded" in issues)))
+        if blocked:
+            controls[name] = min(LIMITS[name][2], max(controls[name] + 1, controls[name] * 2))
+    return controls
 
 def _integer_option(value, field, minimum, maximum=None):
     """Accept JSON integers or integer form values without silently truncating."""
@@ -1485,6 +1538,41 @@ def _build_app(static_dir: Path) -> "Flask":
             mimetype="application/json",
             headers={"Content-Disposition": f"attachment; filename=autopwn_scan_{scan_id[:8]}.json"}
         )
+
+    @app.route("/api/scans/<scan_id>/resume", methods=["POST"])
+    def api_scan_resume(scan_id):
+        job = _get_scan(scan_id)
+        if not job:
+            return jsonify({"error": "Scan not found"}), 404
+        body = request.get_json(silent=True) or {}
+        if set(body) - {"web_options"}:
+            return jsonify({"error": "Only web limits and speed may be changed when resuming."}), 400
+        # Reserve the existing job before launching to prevent double resumes.
+        with _mode_lock, job._lock:
+            if job.status not in ("partial", "stopped", "error"):
+                return jsonify({"error": "Only incomplete or stopped scans can be resumed."}), 409
+            if job.config.get("scan_web") and (_offline_enabled() or job.config.get("vulnerability_source") == "offline"):
+                return jsonify({"error": "Web checks are disabled in offline mode."}), 409
+            if job.config.get("scan_vulns") and (_offline_enabled() or job.config.get("vulnerability_source") == "offline") and not database_status(_VULNERABILITY_DB)["ready"]:
+                return jsonify({"error": "Offline database unavailable."}), 409
+            try:
+                controls = normalize_options(body.get("web_options", {}), _resume_web_options(job))
+                if controls["checks"] != normalize_options(job.config.get("web_options"))["checks"]:
+                    raise ValueError("Keep the original check selection when resuming; start a new scan to change it.")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            job.config["web_options"] = controls
+            job.resume_count += 1
+            job._stop_flag.clear()
+            job.status = "running"
+            job.finished_at = ""
+            job.error = ""
+            job._progress.update(phase="preparing", detail="Resuming unfinished work", percent=None,
+                                 completed=None, total=None, targets_completed=0)
+            job._progress["revision"] += 1
+            threading.Thread(target=_run_scan, args=(job,), daemon=True).start()
+        job._publish_progress()
+        return jsonify({"ok": True, "scan_id": job.id, "resume_count": job.resume_count})
 
     @app.route("/api/scan/start", methods=["POST"])
     def api_scan_start():

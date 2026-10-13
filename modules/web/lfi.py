@@ -7,6 +7,7 @@ from requests.exceptions import RequestException
 
 from modules.web.findings import emit, finding
 from modules.web.http import scoped_get
+from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
 from modules.web.query import parameter_indexes, probe_url, query_parts
 
 
@@ -43,7 +44,7 @@ class LFIScanner:
         def input_key(index):
             return base_url, index, tuple(url_params[:index] + url_params[index + 1:]), url_params[index].split("=", 1)[0]
         indexes = [index for index in parameter_indexes(url_params)
-                   if (original, index) not in self.tested_urls and input_key(index) not in self.confirmed_inputs]
+                   if (original, index) not in self.tested_urls and input_key(index) not in self.confirmed_inputs and not parameter_done("lfi", original, index)]
         if not indexes:
             return []
         try:
@@ -53,6 +54,7 @@ class LFIScanner:
             return []
         found = []
         for index in indexes:
+            revision = begin_parameter()
             self.tested_urls.add((original, index))
             for payload in self.lfi_tests:
                 test_url = probe_url(base_url, url_params, index, payload)
@@ -74,6 +76,7 @@ class LFIScanner:
                     self.confirmed_inputs.add(input_key(index))
                     emit(self.console, result)
                     break
+            finish_parameter("lfi", original, index, revision)
         self.findings.extend(found)
         return found
 

@@ -11,6 +11,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 
 from modules.web.findings import emit, finding
+from modules.web.runtime import ACTIVE
 
 
 def _context(version=None, *, verify=True):
@@ -30,7 +31,10 @@ def _context(version=None, *, verify=True):
 
 
 def _handshake(context, hostname, port):
-    with socket.create_connection((hostname, port), timeout=10) as connection:
+    current = ACTIVE.get()
+    if current:
+        current.before()
+    with socket.create_connection((hostname, port), timeout=current.options["timeout"] if current else 10) as connection:
         with context.wrap_socket(connection, server_hostname=hostname) as secure:
             return secure.getpeercert(binary_form=True), secure.version()
 

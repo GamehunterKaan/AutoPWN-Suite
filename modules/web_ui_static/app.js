@@ -663,6 +663,7 @@ function renderScans(){
         <div class="sc-time">${esc(job.finished_at?`Finished ${timeAgo(job.finished_at)}`:`Started ${timeAgo(job.started_at)}`)}</div>
         <div style="display:flex;gap:8px">
           ${running?`<button class="btn btn-danger btn-sm" data-action="stop-scan" data-id="${esc(job.id)}">Stop</button>`:''}
+          ${job.can_resume?`<button class="btn btn-primary btn-sm" data-action="resume-scan" data-id="${esc(job.id)}">Resume</button>`:''}
           ${!running?`<button class="btn btn-ghost btn-sm" data-action="print-scan" data-id="${esc(job.id)}">Export PDF</button>`:''}
           ${!running?`<a class="btn btn-ghost btn-sm" href="/api/scans/${encodeURIComponent(job.id)}/download" download style="text-decoration:none">Export JSON</a>`:''}
         </div>
@@ -1189,6 +1190,7 @@ document.addEventListener('click', (e) => {
   const id = t.dataset.id;
   switch(t.dataset.action){
     case 'stop-scan':       stopScan(id); break;
+    case 'resume-scan':     window.webSecurity?.resume(id); break;
     case 'print-scan':      printScan(id); break;
     case 'download-host':   downloadHostJson(id); break;
     case 'print-host':      printHost(id); break;

@@ -9,6 +9,7 @@ from requests.exceptions import RequestException
 
 from modules.web.findings import emit, finding
 from modules.web.http import is_html, scoped_get
+from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
 from modules.web.query import parameter_indexes, probe_url, query_parts
 
 
@@ -46,8 +47,9 @@ class XSSScanner:
         original = f"{base_url}?{'&'.join(url_params)}"
         found = []
         for index in parameter_indexes(url_params):
-            if (original, index) in self.tested_urls:
+            if (original, index) in self.tested_urls or parameter_done("xss", original, index):
                 continue
+            revision = begin_parameter()
             self.tested_urls.add((original, index))
             for test in self.xss_test:
                 marker = "".join(choices(ascii_letters, k=16))
@@ -66,6 +68,7 @@ class XSSScanner:
                     found.append(result)
                     emit(self.console, result)
                     break
+            finish_parameter("xss", original, index, revision)
         self.findings.extend(found)
         return found
 

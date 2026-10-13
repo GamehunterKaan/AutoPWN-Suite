@@ -11,6 +11,7 @@ from modules.random_user_agent import random_user_agent
 from modules.web.http import is_html, resolve_url, same_origin, scoped_get
 from modules.web.options import LIMITS
 from modules.web.planning import prioritize_urls, skip_discovered_url
+from modules.web.runtime import ACTIVE
 
 
 def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS["max_urls"][0], max_depth=LIMITS["max_depth"][0], on_discovered=None) -> set[str]:
@@ -19,18 +20,34 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
     if not same_origin(target_url, target_url) or max_pages <= 0 or max_urls <= 0:
         return set()
     log.logger("info", f"Crawling web application at {target_url} ...")
+    current = ACTIVE.get()
+    graph = current.state.setdefault("crawl", {}) if current else {}
     urls, visited = {target_url}, set()
+    fetched = 0
     limited = False
     pending = deque([(target_url, 0)])
     if on_discovered:
         on_discovered({target_url})
-    while pending and len(visited) < max_pages:
+    while pending:
+        if current:
+            current.checkpoint()
         page, depth = pending.popleft()
         if page in visited:
             continue
+        if page not in graph and fetched >= max_pages:
+            limited = True
+            continue
         visited.add(page)
+        if page in graph:
+            links = graph[page]
+        else:
+            revision = current.problem_revision if current else 0
+            links = link_finder(page, log)
+            fetched += 1
+            if not current or current.problem_revision == revision:
+                graph[page] = sorted(links)
         discovered = set()
-        for url in prioritize_urls(link_finder(page, log)):
+        for url in prioritize_urls(links):
             if not same_origin(target_url, url) or url in urls or skip_discovered_url(url):
                 continue
             if depth >= max_depth:
@@ -45,7 +62,7 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
                 pending.append((url, depth + 1))
         if on_discovered and discovered:
             on_discovered(discovered)
-    if limited or pending or len(urls) >= max_urls:
+    if limited:
         log.logger("warning", "Web crawl budget reached; coverage is limited.")
     return urls
 

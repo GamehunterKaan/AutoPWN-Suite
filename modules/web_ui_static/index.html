@@ -462,6 +462,16 @@
 </aside>
 </div>
 
+<dialog id="scan-resume-dialog" class="web-dialog" aria-labelledby="scan-resume-title">
+  <div class="web-dialog-header"><div><h2 id="scan-resume-title">Resume scan</h2><div id="scan-resume-target" class="web-detail-url"></div></div><button class="web-close" data-web-action="resume-close" aria-label="Close resume settings">×</button></div>
+  <div class="web-dialog-body">
+    <p>Keep findings and completed work, and continue unfinished checks. Each attempt gets a fresh request budget. Limits that blocked discovery are increased in the suggested settings below.</p>
+    <div id="scan-resume-limits" class="web-limit-grid"></div>
+    <p class="web-small-note">Checkpoints are available while this dashboard process is running. Failed requests or unsupported checks may still leave coverage incomplete.</p>
+    <button id="scan-resume-submit" class="btn btn-primary" data-web-action="resume-submit">Resume scan</button>
+  </div>
+</dialog>
+
 <dialog id="web-finding-dialog" class="web-dialog" aria-labelledby="web-detail-title">
   <div class="web-dialog-header"><div><div class="web-eyebrow" id="web-detail-kind">Finding</div><h2 id="web-detail-title">Finding details</h2><div id="web-detail-badges" class="web-badges"></div></div><button class="web-close" data-web-action="close" aria-label="Close finding details">×</button></div>
   <div id="web-detail-url" class="web-detail-url"></div>
