@@ -1,3 +1,5 @@
+# Runtime Python packages. Install the Nmap executable separately and add it to PATH.
+# Nmap XML/process handling uses the standard library; no Python Nmap wrapper is needed.
 requests>=2.33.0
 rich
 beautifulsoup4

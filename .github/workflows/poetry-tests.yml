@@ -32,5 +32,10 @@ jobs:
     - name: Install dependencies
       run: poetry install
 
+    - name: Install system Nmap for loopback integration tests
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y nmap
+
     - name: Run tests
       run: poetry run test

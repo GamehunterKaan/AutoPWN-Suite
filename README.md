@@ -71,6 +71,12 @@ results are supported. Dashboard scans retain live progress and cancellation.
 The adapter also exposes complete raw XML, CPE identifiers and nested NSE tables
 for callers that need more detail, and rejects failed or incomplete XML output.
 
+`python -m pytest` checks dependency declarations, XML parsing and process cleanup.
+With Nmap installed, the suite also scans temporary loopback HTTP/TLS services through
+the CLI, Python API and dashboard, and checks IPv6 when available. These live cases
+are skipped when the executable is missing; the parser and process tests still run.
+Poetry CI installs system Nmap so the live checks run there too.
+
 
 ## Web application checks
 
