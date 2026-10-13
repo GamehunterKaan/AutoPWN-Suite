@@ -1,10 +1,10 @@
 [tool.poetry]
 name = "autopwn-suite"
-version = "2.4.4"
+version = "2.5.0"
 description = "AutoPWN Suite - Automated Vulnerability Scanning and Exploitation Tool"
 authors = ["AutoPWN Suite Contributors"]
 readme = "README.md"
-license = "GPL-3.0"
+license = "Apache-2.0"
 homepage = "https://github.com/GamehunterKaan/AutoPWN-Suite"
 repository = "https://github.com/GamehunterKaan/AutoPWN-Suite"
 keywords = ["security", "penetration-testing", "vulnerability-scanner", "exploitation"]
@@ -13,7 +13,7 @@ classifiers = [
     "Environment :: Console",
     "Environment :: Web Environment",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
