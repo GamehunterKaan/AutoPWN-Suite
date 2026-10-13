@@ -205,7 +205,7 @@ async function printScan(scanId) {
     });
   }
   if(saved.web_coverage?.length){
-    html += `<h2>Web Coverage</h2>${saved.web_coverage.map(item=>`<p>${esc(item.endpoint || item.target)} · ${esc(item.status)} · ${esc(item.requests)} requests${item.issues?.length ? ' · ' + esc(item.issues.join('; ')) : ''}</p>`).join('')}`;
+    html += `<h2>Web Coverage</h2>${saved.web_coverage.map(item=>`<p>${esc(item.endpoint || item.target)} · ${esc(item.status)} · ${esc(item.total_requests ?? item.requests)} requests${item.attempts > 1 ? ' over ' + esc(item.attempts) + ' attempts' : ''}${item.issues?.length ? ' · ' + esc(item.issues.join('; ')) : ''}</p>`).join('')}`;
   }
   html += `</body></html>`;
   win.document.write(html);

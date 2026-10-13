@@ -72,6 +72,8 @@ class ScanContext:
         self.discovery = False
         self.problem_revision = 0
         self.last_request = None
+        self.task_name = None
+        self.task_url = None
 
     @contextmanager
     def activate(self):
@@ -131,7 +133,12 @@ class ScanContext:
         if key in self.state["tasks"]:
             return deepcopy(self.state["tasks"][key])
         revision = self.problem_revision
-        results = action()
+        previous = self.task_name, self.task_url
+        self.task_name, self.task_url = name, url
+        try:
+            results = action()
+        finally:
+            self.task_name, self.task_url = previous
         if self.problem_revision == revision:
             self.state["tasks"][key] = deepcopy(results)
         return results

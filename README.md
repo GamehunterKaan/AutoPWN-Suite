@@ -182,7 +182,7 @@ with profiles and used by scheduled scans.
 Use **Resume** on an incomplete, stopped or failed scan, or **Resume scan** in its web coverage
 card. Review the suggested speed and limits, then resume the same job. Completed checks,
 findings, crawl results, Nmap observations and successful CVE lookups are retained. Unfinished
-web checks get fresh request, page and endpoint budgets for each attempt; completed inputs
+web checks get fresh request, page, endpoint and per-URL parameter budgets for each attempt; completed inputs
 and directory paths are skipped. Discovery, parameter and response caps that blocked the last
 attempt are increased in the suggested settings, within the supported bounds. Interrupted
 inputs and failed checks are retried. Completion means the selected checks finished; unreachable

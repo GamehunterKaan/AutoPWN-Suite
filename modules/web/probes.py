@@ -49,7 +49,7 @@ def check_cors(client, url, console):
 def check_redirects(client, url, console, *, max_parameters=5):
     base, params = query_parts(url)
     names = {"next", "url", "redirect", "redirect_url", "redirect_uri", "return", "returnto", "return_to", "returnurl", "continue", "dest", "destination", "goto"}
-    indexes = [index for index in parameter_indexes(params) if unquote(params[index].split("=", 1)[0]).lower() in names]
+    indexes = list(parameter_indexes(params, names=names))
     if len(indexes) > max_parameters:
         client.log.logger("warning", f"Redirect parameter budget reached on {url}; coverage is limited.")
     results = []

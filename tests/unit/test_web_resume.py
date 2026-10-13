@@ -92,6 +92,97 @@ def test_failed_check_is_retried_while_successful_check_is_kept(web_response):
     assert scanner.return_value.test_xss.call_count == 2
 
 
+def test_parameter_limit_batches_continue_to_remaining_inputs(web_response):
+    url = "http://example.com/?file=one&path=two&include=three"
+    state, summaries = {}, []
+    with patch("modules.web.webvuln.get", side_effect=lambda *a, **kw: web_response(url=url)), \
+         patch("modules.web.lfi.get", side_effect=lambda requested, **kw: web_response(url=requested)) as get, \
+         patch("modules.web.webvuln.crawl", return_value={url}):
+        for _ in range(3):
+            webvuln(url, MagicMock(), MagicMock(), controls=controls("lfi", max_parameters=1),
+                    checkpoint=state, on_complete=summaries.append)
+    assert [row["status"] for row in summaries] == ["partial", "partial", "completed"]
+    assert get.call_count == 30  # One baseline and nine probes per input.
+    assert summaries[-1]["total_requests"] == sum(row["requests"] for row in summaries)
+
+
+def test_redirect_batches_only_count_relevant_inputs(web_response):
+    from modules.web.probes import check_redirects
+    from modules.web.runtime import run_task
+    url = "http://example.com/?file=a&path=b&next=one&redirect=two"
+    state, issues = {}, []
+    client = MagicMock()
+    client.send.side_effect = lambda probe: web_response(url=probe)
+    for _ in range(2):
+        context = ScanContext(url, MagicMock(), controls=controls("redirects", max_parameters=1), checkpoint=state)
+        with context.activate():
+            run_task("redirects", url, lambda: check_redirects(client, url, MagicMock(), max_parameters=1))
+        issues.append(context.issues)
+    assert issues[0] and not issues[1]
+    assert client.send.call_count == 8
+
+
+def test_findings_survive_request_budget_exit_and_successful_resume(web_response):
+    from modules.web.findings import finding, emit
+    from modules.web.runtime import ACTIVE, WebBudgetExceeded
+    url = "http://example.com/?id=1"
+    state, summaries, reported = {}, [], []
+    def sql(url):
+        result = finding("SQLI", url, "Synthetic repeatable evidence", severity="high")
+        emit(MagicMock(), result)
+        return [result]
+    def xss(url):
+        if not summaries:
+            ACTIVE.get().issue("Request budget reached; coverage is limited.")
+            raise WebBudgetExceeded()
+        return []
+    with patch("modules.web.webvuln.get", return_value=web_response(url=url)), \
+         patch("modules.web.webvuln.crawl", return_value={url}), \
+         patch("modules.web.webvuln.SQLIScanner") as scanner, patch("modules.web.webvuln.XSSScanner") as xss_scanner:
+        scanner.return_value.test_sqli.side_effect = sql
+        xss_scanner.return_value.test_xss.side_effect = xss
+        first = webvuln(url, MagicMock(), MagicMock(), controls=controls("sqli", "xss"), checkpoint=state,
+                       on_complete=summaries.append, on_finding=reported.append)
+        second = webvuln(url, MagicMock(), MagicMock(), controls=controls("sqli", "xss"), checkpoint=state,
+                        on_complete=summaries.append, on_finding=reported.append)
+    assert [row["status"] for row in summaries] == ["partial", "completed"]
+    assert first == second and len(second) == len(reported) == 1
+    assert scanner.return_value.test_sqli.call_count == 1
+
+
+def test_stopped_web_scan_resumes_without_skipping_unfinished_host(dashboard):
+    wu, client = dashboard
+    nm = MagicMock()
+    nm.all_hosts.return_value = ["192.0.2.1"]
+    nm.__getitem__.return_value = {"addresses": {}, "tcp": {80: {"state": "open", "name": "http", "product": "nginx", "version": "1"}}}
+    config = wu._profile_config({"skip_discovery": True, "scan_web": True}) | {"target": "192.0.2.1"}
+    job = wu.ScanJob("job", config["target"], config)
+    wu._register_scan(job)
+    attempts = []
+    def web(endpoint, log, console, **kwargs):
+        attempts.append(kwargs["checkpoint"])
+        if len(attempts) == 1:
+            kwargs["checkpoint"]["saved"] = True
+            job.request_stop()
+            kwargs["on_complete"]({"status": "stopped", "issues": [], "requests": 3})
+            raise ScanCancelled("Stopped")
+        assert kwargs["checkpoint"]["saved"]
+        kwargs["on_complete"]({"status": "completed", "issues": [], "requests": 2})
+        return []
+    with patch.object(wu.shutil, "which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm) as scan, \
+         patch("modules.nist_search.searchCVE", return_value=[]) as lookup, \
+         patch("modules.web.webvuln.webvuln", side_effect=web), patch.object(wu, "_notify"), patch.object(wu.threading, "Thread"):
+        wu._run_scan(job)
+        assert job.status == "stopped"
+        assert client.post("/api/scans/job/resume", json={}).status_code == 200
+        wu._run_scan(job)
+    assert job.status == "completed"
+    assert scan.call_count == lookup.call_count == 1
+    assert len(attempts) == 2 and attempts[0] is attempts[1]
+    assert job.hosts_list()[0]["scan_status"] == "completed"
+    assert len(job.to_dict()["web_coverage"]) == 1
+
+
 def test_directory_resume_continues_after_budget_without_repeating_paths(web_response):
     from modules.web.dirbust import dirbust
     from modules.web.runtime import WebBudgetExceeded

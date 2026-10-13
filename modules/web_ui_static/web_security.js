@@ -7,7 +7,7 @@
   const confidence = value => ['candidate','advisory','observation'].includes(value) ? value : 'observation';
   const pending = {};
   const renderedPanels = new WeakMap();
-  const limitLabels = {speed:'Web speed',request_delay_ms:'Minimum request delay (ms)',request_budget:'Request budget / attempt',timeout:'Timeout (seconds)',max_pages:'Crawl pages / attempt',max_urls:'Crawl URLs',max_depth:'Crawl depth',max_endpoints:'Probe endpoints / attempt',max_parameters:'Parameters / URL',max_response_kb:'Response cap (KB)'};
+  const limitLabels = {speed:'Web speed',request_delay_ms:'Minimum request delay (ms)',request_budget:'Request budget / attempt',timeout:'Timeout (seconds)',max_pages:'Crawl pages / attempt',max_urls:'Crawl URLs',max_depth:'Crawl depth',max_endpoints:'Probe endpoints / attempt',max_parameters:'Parameters / URL / attempt',max_response_kb:'Response cap (KB)'};
   const speeds = ['0 · Very slow (5 s)', '1 · Slow (2 s)', '2 · Gentle (500 ms)', '3 · Normal (100 ms)', '4 · Fast (25 ms)', '5 · No added delay'];
   let resumeJob = null, resumeBusy = false;
   let catalog = null, offline = false, rows = [], jobs = [], busy = false;
@@ -201,7 +201,7 @@
         const incomplete = item.status !== 'completed';
         const checks = Object.entries(item.controls?.checks || {}).filter(([,enabled]) => enabled).map(([key]) => catalog?.checks[key] || key);
         const issues = item.issues || [];
-        return `<div class="web-coverage-item ${incomplete ? 'partial' : ''}"><details data-web-disclosure="${escape(JSON.stringify([job.id,item.host,item.endpoint || item.target]))}"><summary>${escape(item.endpoint || item.target)} · ${incomplete ? escape(item.status) : 'Checked'} · ${item.requests || 0} requests</summary><ul>${checks.length ? `<li>Enabled checks: ${escape(checks.join(', '))}</li>` : ''}${issues.map(issue => `<li>${escape(issue)}</li>`).join('')}${!issues.length ? '<li>Selected checks completed within the configured limits. Unreported vulnerabilities may still exist.</li>' : ''}</ul></details></div>`;
+        return `<div class="web-coverage-item ${incomplete ? 'partial' : ''}"><details data-web-disclosure="${escape(JSON.stringify([job.id,item.host,item.endpoint || item.target]))}"><summary>${escape(item.endpoint || item.target)} · ${incomplete ? escape(item.status) : 'Checked'} · ${escape(item.total_requests ?? item.requests ?? 0)} requests${item.attempts > 1 ? ` over ${escape(item.attempts)} attempts` : ''}</summary><ul>${checks.length ? `<li>Enabled checks: ${escape(checks.join(', '))}</li>` : ''}${issues.map(issue => `<li>${escape(issue)}</li>`).join('')}${!issues.length ? '<li>Selected checks completed within the configured limits. Unreported vulnerabilities may still exist.</li>' : ''}</ul></details></div>`;
       }).join('');
     }).join(''), 'coverage');
   }
