@@ -62,6 +62,15 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of software running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of keywords to search the [NIST vulnerability database.](https://www.nist.gov/)
 
+The CLI, Python API and dashboard use the project's `modules/nmap_backend.py` adapter
+to run the system Nmap executable directly and parse its
+[XML output](https://nmap.org/book/output-formats-xml-output.html) with Python's standard library.
+Install Nmap and make sure `nmap` is on `PATH`; no Python Nmap wrapper is required.
+Host discovery, TCP/UDP services, OS/vendor detection, custom Nmap flags and NSE
+results are supported. Dashboard scans retain live progress and cancellation.
+The adapter also exposes complete raw XML, CPE identifiers and nested NSE tables
+for callers that need more detail, and rejects failed or incomplete XML output.
+
 
 ## Web application checks
 
@@ -455,7 +464,7 @@ I would be glad if you are willing to contribute this project. I am looking forw
 
 AutoPWN Suite is licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
 
-Third-party dependencies are covered by their own licenses (e.g. python-nmap is GPL).
+Third-party dependencies are covered by their own licenses.
 
 This tool is intended for authorized security testing only. You are responsible for complying with all applicable laws.
 

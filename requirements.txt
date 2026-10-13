@@ -1,6 +1,5 @@
 requests>=2.33.0
 rich
-python-nmap
 beautifulsoup4
 distro
 urllib3>=2.8.0,<3.0.0

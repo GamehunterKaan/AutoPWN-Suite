@@ -837,17 +837,6 @@ pytest = ">=6.2.5"
 dev = ["pre-commit", "pytest-asyncio", "tox"]
 
 [[package]]
-name = "python-nmap"
-version = "0.7.1"
-description = "This is a python class to use nmap and access scan results from python3"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "python-nmap-0.7.1.tar.gz", hash = "sha256:f75af6b91dd8e3b0c31f869db32163f62ada686945e5b7c25f84bc0f7fad3b64"},
-]
-
-[[package]]
 name = "requests"
 version = "2.33.0"
 description = "Python HTTP for Humans."
@@ -997,4 +986,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "282925f26494c379066eb896064c970ba44caed8d99fa93b428a6489ae1ec587"
+content-hash = "1edfdd493d20aa50f50fa754e30ff9ab07e06c282d04c1bac28771644e06c318"
