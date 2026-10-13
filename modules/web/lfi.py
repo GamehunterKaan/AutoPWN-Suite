@@ -26,6 +26,7 @@ class LFIScanner:
         self.console = console
         self.tested_urls = set()
         self.findings = []
+        self.confirmed_inputs = set()
         self.lfi_tests = [
             "../../../../../../etc/passwd", "/etc/passwd",
             "..%2F..%2F..%2F..%2F..%2F..%2Fetc/passwd",
@@ -39,7 +40,10 @@ class LFIScanner:
 
     def exploit_lfi(self, base_url, url_params):
         original = f"{base_url}?{'&'.join(url_params)}"
-        indexes = [index for index in parameter_indexes(url_params) if (original, index) not in self.tested_urls]
+        def input_key(index):
+            return base_url, index, tuple(url_params[:index] + url_params[index + 1:]), url_params[index].split("=", 1)[0]
+        indexes = [index for index in parameter_indexes(url_params)
+                   if (original, index) not in self.tested_urls and input_key(index) not in self.confirmed_inputs]
         if not indexes:
             return []
         try:
@@ -67,6 +71,7 @@ class LFIScanner:
                                      reproduction={"strategy": "file_inclusion", "requests": [
                                          {"url": original, "role": "baseline"}, {"url": test_url, "role": "probe"}, {"url": test_url, "role": "repeat"}]})
                     found.append(result)
+                    self.confirmed_inputs.add(input_key(index))
                     emit(self.console, result)
                     break
         self.findings.extend(found)

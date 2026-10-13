@@ -16,7 +16,8 @@ from modules.web.passive import inspect_response
 from modules.web.query import query_parts
 from modules.web.sqli import SQLIScanner
 from modules.web.xss import XSSScanner
-from modules.web.additional import additional_checks
+from modules.web.additional import additional_checks, critical_checks
+from modules.web.planning import prioritize_urls, skip_discovered_url
 from modules.web.runtime import ACTIVE, ScanContext, WebBudgetExceeded, allowed, enabled, options, stage
 
 
@@ -94,29 +95,66 @@ def _execute_webvuln(target, log, console):
     current = ACTIVE.get()
     if current:
         current.target = target_url
-    results = inspect_response(target_url, response, console) if enabled("headers") else []
-    # These checks also run for static sites with no query parameters.
-    if any(enabled(name) for name in ("directories", "exposed_files", "errors")):
-        stage("Directory and content discovery")
-        results.extend(dirbust(target_url, console, log))
+    results = []
     controls = options()
+    selected = set()
+    fast_scanners = [(LFIScanner(log, console), "test_lfi", "lfi"),
+                     (SQLIScanner(log, console), "test_sqli", "sqli")]
+
+    def test_priority_endpoints(discovered, limit):
+        candidates = (url for url in discovered if same_origin(target_url, url)
+                      and query_parts(url)[1] and (url == target_url or not skip_discovered_url(url)))
+        for url in prioritize_urls(candidates, target_url):
+            if len(selected) >= limit:
+                break
+            if url in selected:
+                continue
+            selected.add(url)
+            for scanner, method, name in fast_scanners:
+                if enabled(name):
+                    stage({"lfi": "Priority file inclusion", "sqli": "Priority SQL injection"}[name])
+                    results.extend(getattr(scanner, method)(url))
+
+    # Reserve the early part of endpoint coverage for fast high-impact probes.
+    # They run while crawling, before a large site can exhaust the request cap.
+    early_limit = max(1, controls["max_endpoints"] // 4)
+    test_priority_endpoints({target_url}, early_limit)
+
+    def on_discovered(discovered):
+        previous_phase = current.phase if current else None
+        try:
+            test_priority_endpoints(discovered, early_limit)
+        finally:
+            if current:
+                current.phase = previous_phase
+                current.publish_progress()
+
     urls = {target_url}
     if any(enabled(name) for name in ("cors", "redirects", "sqli", "boolean_sqli", "xss", "lfi", "host_headers", "errors", "directories")):
         stage("Discovering links and GET forms")
-        urls = crawl(target_url, log, max_pages=controls["max_pages"], max_urls=controls["max_urls"], max_depth=controls["max_depth"]) if current else crawl(target_url, log)
-    results.extend(additional_checks(target_url, urls, response, log, console, headers))
-    testable_urls = sorted(url for url in urls if same_origin(target_url, url) and query_parts(url)[1])
+        urls = crawl(target_url, log, max_pages=controls["max_pages"], max_urls=controls["max_urls"], max_depth=controls["max_depth"],
+                     on_discovered=on_discovered) if current else crawl(target_url, log)
+    testable_urls = prioritize_urls(url for url in urls if same_origin(target_url, url) and query_parts(url)[1]
+                                   and (url == target_url or not skip_discovered_url(url)))
     log.logger("info", f"Found {len(testable_urls)} testable urls.")
-    scanners = [(LFIScanner(log, console), "test_lfi", "lfi"), (SQLIScanner(log, console), "test_sqli", "sqli"),
-                (XSSScanner(log, console), "test_xss", "xss")]
-    if any(enabled(name) for _, _, name in scanners) and len(testable_urls) > controls["max_endpoints"]:
+    if any(enabled(name) for name in ("lfi", "sqli", "boolean_sqli", "xss")) and len(testable_urls) > controls["max_endpoints"]:
         log.logger("warning", "Injection endpoint budget reached; coverage is limited.")
-    testable_urls = testable_urls[:controls["max_endpoints"]]
-    for url in testable_urls:
-        for scanner, method, name in scanners:
-            if enabled(name):
-                stage({"lfi": "File inclusion", "sqli": "SQL injection", "xss": "Reflected XSS"}[name])
-                results.extend(getattr(scanner, method)(url))
+    test_priority_endpoints(testable_urls, controls["max_endpoints"])
+    chosen = prioritize_urls(selected, target_url)
+    results.extend(critical_checks(target_url, chosen, response, log, console, headers))
+    if enabled("xss"):
+        scanner = XSSScanner(log, console)
+        for url in chosen:
+            stage("Reflected XSS")
+            results.extend(scanner.test_xss(url))
+    # Discovery of exposed content and generic protection advisories comes after
+    # injection checks, so it cannot consume their entire request budget.
+    if any(enabled(name) for name in ("directories", "exposed_files", "errors")):
+        stage("Directory and content discovery")
+        results.extend(dirbust(target_url, console, log))
+    results.extend(additional_checks(target_url, urls, response, log, console, headers, include_boolean=False))
+    if enabled("headers"):
+        results.extend(inspect_response(target_url, response, console))
     log.logger("info", f"Web checks completed: {len(results)} findings (candidates, advisories and observations).")
     return results
 

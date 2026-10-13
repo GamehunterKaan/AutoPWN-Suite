@@ -131,5 +131,6 @@ def check_host_headers(client, url, console):
             break
         if len(matched) == 2:
             results.append(finding("HOST_HEADER", url, f"Two {header} values influenced redirect or generated URL hosts; exploit impact not verified",
-                                   parameter=header, severity="medium", reproduction={"strategy": "host_header", "header": header, "requests": matched}))
+                                   parameter=header, severity="low", confidence="advisory",
+                                   reproduction={"strategy": "host_header", "header": header, "requests": matched}))
     return _publish(console, results)

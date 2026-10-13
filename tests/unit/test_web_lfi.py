@@ -48,3 +48,19 @@ def test_timeout_and_url_without_query():
         get.assert_not_called()
         assert scanner.test_lfi("http://example.com/page?file=readme") == []
     scanner.log.logger.assert_called_once()
+
+
+def test_confirmed_file_input_is_not_retested_for_every_router_value(web_response):
+    scanner = LFIScanner(MagicMock(), MagicMock())
+
+    def respond(url, **kwargs):
+        page = parse_qs(urlsplit(url).query).get("page", [""])[0]
+        return web_response("root:x:0:0:root:/root:/bin/bash" if "etc/passwd" in page else "Normal page", url=url)
+
+    with patch("modules.web.lfi.get", side_effect=respond) as get:
+        assert len(scanner.test_lfi("http://example.com/index.php?page=home.php")) == 1
+        initial_requests = get.call_count
+        assert scanner.test_lfi("http://example.com/index.php?page=other.php") == []
+        assert get.call_count == initial_requests
+        # A different accompanying input is a different request context.
+        assert len(scanner.test_lfi("http://example.com/index.php?page=other.php&language=en")) == 1

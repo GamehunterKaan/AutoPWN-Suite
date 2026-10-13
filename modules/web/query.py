@@ -1,6 +1,6 @@
 """Build one-parameter probes without losing the page's other query inputs."""
 
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, urlsplit, urlunsplit
 
 
 def probe_url(base_url, url_params, index, payload):
@@ -20,8 +20,10 @@ def query_parts(url):
 def parameter_indexes(params):
     # A repeated name is a separate input; preserve its position and context.
     from modules.web.runtime import ACTIVE
+    from modules.web.planning import parameter_priority
     current = ACTIVE.get()
     indexes = [index for index, param in enumerate(params) if param.split("=", 1)[0]]
+    indexes.sort(key=lambda index: parameter_priority(*parse_qsl(params[index], keep_blank_values=True)[0]))
     if current and len(indexes) > current.options["max_parameters"]:
         current.issue("Query parameter limit reached; coverage is limited.")
         indexes = indexes[:current.options["max_parameters"]]

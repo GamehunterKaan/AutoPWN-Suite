@@ -29,3 +29,15 @@ def test_orchestrator_includes_additional_results(web_response):
     with patch("modules.web.webvuln.get", return_value=web_response(url="http://example.com/")), patch("modules.web.webvuln.dirbust", return_value=[]), patch("modules.web.webvuln.crawl", return_value=set()), patch("modules.web.webvuln.inspect_response", return_value=[]), patch("modules.web.webvuln.additional_checks", return_value=[result]) as additional:
         assert webvuln("example.com", MagicMock(), MagicMock()) == [result]
     additional.assert_called_once()
+
+
+def test_host_header_advisories_are_not_repeated_for_every_query_value(web_response):
+    from modules.web.options import CHECKS
+    from modules.web.runtime import ScanContext
+    urls = {f"http://example.com/index.php?page={number}" for number in range(100)}
+    controls = {"checks": {name: name == "host_headers" for name in CHECKS}}
+    context = ScanContext("http://example.com/", MagicMock(), controls=controls)
+    with context.activate(), patch("modules.web.http.request", return_value=web_response("Normal page")), \
+         patch("modules.web.additional.check_host_headers", return_value=[]) as headers:
+        additional_checks("http://example.com/", urls, web_response(), MagicMock(), MagicMock())
+    assert headers.call_count == 2  # Root plus index.php, retaining separate paths.

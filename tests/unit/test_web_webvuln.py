@@ -42,7 +42,7 @@ def test_scanners_aggregate_structured_results_and_filter_off_origin_urls(web_re
         lfi.return_value.test_lfi.return_value = [{"type": "LFI"}]
         sql.return_value.test_sqli.return_value = []
         xss.return_value.test_xss.return_value = [{"type": "XSS"}]
-        assert [item["type"] for item in webvuln("example.com", MagicMock(), MagicMock())] == ["DIR", "LFI", "XSS"]
+        assert [item["type"] for item in webvuln("example.com", MagicMock(), MagicMock())] == ["LFI", "XSS", "DIR"]
     lfi.return_value.test_lfi.assert_called_once_with(probe)
     sql.return_value.test_sqli.assert_called_once_with(probe)
     xss.return_value.test_xss.assert_called_once_with(probe)

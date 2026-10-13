@@ -10,9 +10,10 @@ from requests.exceptions import RequestException
 from modules.random_user_agent import random_user_agent
 from modules.web.http import is_html, resolve_url, same_origin, scoped_get
 from modules.web.options import LIMITS
+from modules.web.planning import prioritize_urls, skip_discovered_url
 
 
-def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS["max_urls"][0], max_depth=LIMITS["max_depth"][0]) -> set[str]:
+def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS["max_urls"][0], max_depth=LIMITS["max_depth"][0], on_discovered=None) -> set[str]:
     parts = urlsplit(urldefrag(target_url)[0])
     target_url = urlunsplit(parts._replace(path=parts.path or "/"))
     if not same_origin(target_url, target_url) or max_pages <= 0 or max_urls <= 0:
@@ -21,13 +22,16 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
     urls, visited = {target_url}, set()
     limited = False
     pending = deque([(target_url, 0)])
+    if on_discovered:
+        on_discovered({target_url})
     while pending and len(visited) < max_pages:
         page, depth = pending.popleft()
         if page in visited:
             continue
         visited.add(page)
-        for url in sorted(link_finder(page, log)):
-            if not same_origin(target_url, url) or url in urls:
+        discovered = set()
+        for url in prioritize_urls(link_finder(page, log)):
+            if not same_origin(target_url, url) or url in urls or skip_discovered_url(url):
                 continue
             if depth >= max_depth:
                 limited = True
@@ -36,8 +40,11 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
                 limited = True
                 break
             urls.add(url)
+            discovered.add(url)
             if depth < max_depth:
                 pending.append((url, depth + 1))
+        if on_discovered and discovered:
+            on_discovered(discovered)
     if limited or pending or len(urls) >= max_urls:
         log.logger("warning", "Web crawl budget reached; coverage is limited.")
     return urls
