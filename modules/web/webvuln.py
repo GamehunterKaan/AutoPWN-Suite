@@ -41,7 +41,15 @@ def target_urls(target):
 def web_endpoints(host, port_rows, scan_result=None):
     """Use observed TCP web services, including TLS and nonstandard ports."""
     authority = f"[{host}]" if ":" in host and not host.startswith("[") else host
-    services = scan_result.get("scan", {}).get(host, {}).get("tcp", {}) if isinstance(scan_result, dict) else {}
+    if isinstance(scan_result, dict):
+        services = scan_result.get("scan", {}).get(host, {}).get("tcp", {})
+    elif scan_result is not None:
+        try:
+            services = scan_result[host].get("tcp", {})
+        except KeyError:
+            services = {}
+    else:
+        services = {}
     targets = []
     for row in port_rows:
         if row[0] != host or (len(row) > 5 and row[5] == "udp"):

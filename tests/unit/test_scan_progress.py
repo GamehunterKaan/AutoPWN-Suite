@@ -17,7 +17,7 @@ def progress_web(tmp_path, monkeypatch):
     monkeypatch.setattr(wu, "_notify", MagicMock())
     monkeypatch.setattr(wu.shutil, "which", lambda _: "nmap")
     monkeypatch.setattr("requests.sessions.Session.request", lambda *a, **k: pytest.fail("Unexpected HTTP"))
-    monkeypatch.setattr("nmap.PortScanner.__init__", lambda *a, **k: pytest.fail("Unexpected real Nmap"))
+    monkeypatch.setattr("modules.nmap_backend.PortScanner.__init__", lambda *a, **k: pytest.fail("Unexpected real Nmap"))
     return wu
 
 
@@ -26,6 +26,23 @@ def nmap_result(ip):
     nm.all_hosts.return_value = [ip]
     nm.__getitem__.return_value = {"addresses": {"ipv4": ip}, "tcp": {}}
     return nm
+
+
+def test_dashboard_worker_accepts_parsed_adapter_results(progress_web, monkeypatch):
+    from modules.nmap_backend import PortScanner
+    from tests.unit.test_nmap_backend import XML
+    nm = PortScanner.__new__(PortScanner)  # Recorded XML needs no executable.
+    nm.load_xml(XML.replace(b'state="open|filtered"', b'state="open"'))
+    monkeypatch.setattr("modules.scanner.PortScan", lambda *a, **k: nm)
+    monkeypatch.setattr("modules.scanner.is_root", lambda: True)
+    job = progress_web.ScanJob("adapter", "192.0.2.10", {
+        "target": "192.0.2.10", "skip_discovery": True, "scan_vulns": False})
+    progress_web._run_scan(job)
+    assert job.status == "completed"
+    host = job.hosts_list()[0]
+    assert (host["mac"], host["vendor"], host["os"]) == ("AA:BB:CC:DD:EE:FF", "Example & Co", "Linux 5.x")
+    assert {(port["port"], port["protocol"], port["product"]) for port in host["ports"]} == {
+        (9443, "tcp", "nginx"), (53, "udp", "ISC BIND")}
 
 
 def rows(ip):
