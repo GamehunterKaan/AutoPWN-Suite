@@ -147,6 +147,25 @@ def test_reader_start_failure_reaps_child(fake_spawn, monkeypatch):
     assert process.terminated and process.stdout.closed and process.stderr.closed
 
 
+@pytest.mark.parametrize("fail_on", [1, 2])
+def test_reader_construction_failure_reaps_child(fake_spawn, monkeypatch, fail_on):
+    _, process = fake_spawn
+    thread_type = monitored.threading.Thread
+    calls = 0
+
+    def create_reader(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == fail_on:
+            raise RuntimeError("cannot construct reader")
+        return thread_type(*args, **kwargs)
+
+    monkeypatch.setattr(monitored.threading, "Thread", create_reader)
+    with pytest.raises(RuntimeError, match="cannot construct reader"):
+        monitored.scan_with_progress(scanner(), "192.0.2.1", "-sV", MagicMock())
+    assert process.terminated and process.stdout.closed and process.stderr.closed
+
+
 def test_stderr_is_preserved_for_the_xml_parser(fake_spawn):
     spawn, _ = fake_spawn
     spawn.return_value = FakeProcess(stderr=b"Warning: host timeout\nUnreachable host\n")

@@ -87,13 +87,14 @@ def scan_with_progress(scanner, hosts, arguments, progress=None, should_stop=Non
             except Exception as exc:
                 errors.append(exc)
 
-        readers = [threading.Thread(target=drain, args=(process.stdout, output, True), daemon=True),
-                   threading.Thread(target=drain, args=(process.stderr, error_output), daemon=True)]
         started_readers = []
         cancelled = False
         timed_out = False
         try:
-            for reader in readers:
+            # Reader construction can fail too; the child already belongs to us.
+            for stream, destination, report in ((process.stdout, output, True),
+                                                (process.stderr, error_output, False)):
+                reader = threading.Thread(target=drain, args=(stream, destination, report), daemon=True)
                 reader.start()
                 started_readers.append(reader)
             while True:
@@ -102,11 +103,15 @@ def scan_with_progress(scanner, hosts, arguments, progress=None, should_stop=Non
                 if should_stop():
                     cancelled = True
                     break
-                if deadline is not None and time.monotonic() >= deadline:
-                    timed_out = True
-                    break
+                wait_timeout = 0.25
+                if deadline is not None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        timed_out = True
+                        break
+                    wait_timeout = min(wait_timeout, remaining)
                 try:
-                    process.wait(timeout=0.25)
+                    process.wait(timeout=wait_timeout)
                     break
                 except subprocess.TimeoutExpired:
                     continue

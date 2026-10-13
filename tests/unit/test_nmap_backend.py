@@ -228,6 +228,26 @@ def test_overall_timeout_reaps_child_and_clears_old_results(scanner, monkeypatch
     assert scanner.all_hosts() == []
 
 
+def test_timeout_shorter_than_poll_interval_is_enforced(scanner, monkeypatch):
+    class SlowProcess(FakeProcess):
+        def wait(self, timeout=None):
+            if self.returncode is not None:
+                return self.returncode
+            # This scan would complete in 100 ms if allowed to overrun its limit.
+            if timeout >= 0.1:
+                self.returncode = 0
+                return 0
+            raise runner.subprocess.TimeoutExpired("nmap", timeout)
+
+    process = SlowProcess(stdout=XML)
+    monkeypatch.setattr(runner.subprocess, "Popen", MagicMock(return_value=process))
+    times = iter([0, 0.01, 0.06])
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(times))
+    with pytest.raises(TimeoutError, match="exceeded timeout"):
+        scanner.scan(timeout=0.05)
+    assert process.terminated and scanner.all_hosts() == []
+
+
 def test_spawn_failure_does_not_leave_old_results(scanner, monkeypatch):
     scanner.load_xml(XML)
     monkeypatch.setattr(runner.subprocess, "Popen", MagicMock(side_effect=FileNotFoundError("nmap removed")))
