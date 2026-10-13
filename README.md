@@ -453,7 +453,7 @@ I would be glad if you are willing to contribute this project. I am looking forw
 
 ## License
 
-AutoPWN Suite is licensed under the [Apache License 2.0](LICENSE.md). See [NOTICE](NOTICE) for attribution.
+AutoPWN Suite is licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
 
 Third-party dependencies are covered by their own licenses (e.g. python-nmap is GPL).
 
