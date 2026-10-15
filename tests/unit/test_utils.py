@@ -68,7 +68,7 @@ class TestSaveOutput:
         assert f"Report saved to [cyan]{output_path}[/cyan]" in call_args[0]
 
     @patch("modules.utils.datetime")
-    def test_save_with_automatic_filename(self, mock_datetime, mock_console, temp_dir):
+    def test_save_with_automatic_filename(self, mock_datetime, mock_console, temp_dir, monkeypatch):
         """
         Verify file is saved with an automatic name (DATE-HOST.ext) in the 'outputs'
         directory when no output_file is provided.
@@ -78,10 +78,10 @@ class TestSaveOutput:
         target = "192.168.1.10"
         expected_filename = "2023-10-27_192.168.1.10.txt"
 
-        # Change current directory to temp_dir to isolate file creation
-        os.chdir(temp_dir)
-
-        SaveOutput(mock_console, "txt", None, "outputs", target)
+        # Restore cwd before temp_dir is removed, including on assertion failures.
+        with monkeypatch.context() as patch_context:
+            patch_context.chdir(temp_dir)
+            SaveOutput(mock_console, "txt", None, "outputs", target)
 
         expected_relative_path = os.path.join("outputs", expected_filename)
 
@@ -106,7 +106,7 @@ class TestSaveOutput:
         mock_console.save_svg.assert_called_once_with(str(output_path) + ".svg")
 
     @patch("modules.utils.datetime")
-    def test_save_with_multihost_target(self, mock_datetime, mock_console, temp_dir):
+    def test_save_with_multihost_target(self, mock_datetime, mock_console, temp_dir, monkeypatch):
         """
         Verify an automatic filename with 'multihost' is created for a list of targets.
         """
@@ -115,10 +115,9 @@ class TestSaveOutput:
         targets = ["192.168.1.10", "192.168.1.11"]
         expected_filename = "2023-10-27_multihost.html"
 
-        # Change current directory to temp_dir to isolate file creation
-        os.chdir(temp_dir)
-
-        SaveOutput(mock_console, "html", None, "outputs", targets)
+        with monkeypatch.context() as patch_context:
+            patch_context.chdir(temp_dir)
+            SaveOutput(mock_console, "html", None, "outputs", targets)
 
         expected_relative_path = os.path.join("outputs", expected_filename)
 
