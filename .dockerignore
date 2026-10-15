@@ -11,6 +11,17 @@ coverage.xml
 .venv
 venv
 .env
+.env.*
+api.txt
+lapi.txt
+autopwn-daemon.conf
+modules/web_ui_settings.json
+modules/web_ui_profiles.json
+modules/web_ui_schedules.json
+outputs
+exploits
+dist
+build
 tests
 **/vulnerabilities.sqlite3*
 **/.nvd-*.sqlite3*
