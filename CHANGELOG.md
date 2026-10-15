@@ -16,6 +16,9 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Security changes
 
+- Add a reviewed authenticity-backfill workflow that signs original release
+  bytes and publishes current SBOMs/findings without rebuilding or replacing
+  images; new-release and rebuild security gates remain mandatory.
 - Add keyless Cosign signing and verification for release manifests and exact
   container digests, using restricted release-job permissions and pinned actions.
 - Define coordinated disclosure response targets and a predictable public

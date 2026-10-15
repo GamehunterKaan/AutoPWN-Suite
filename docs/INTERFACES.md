@@ -170,3 +170,9 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   functions for payload details; only send to destinations you control/trust.
 - Distribution interfaces are GitHub releases/source and the Docker Hub image.
   [Releasing](RELEASING.md) defines signed artifact formats and verification.
+  Authenticity backfills add an original OCI image-index snapshot plus per-platform
+  CycloneDX SBOMs, OSV `results`/`packages` reports, policy results containing
+  `version`, `packages` and `violations`, and backfill records identifying exact
+  source/image/platform digests and assessment time. The signed manifest marks
+  these as `authenticity_backfill` with `rebuilt` and `security_clearance` both
+  false; these fields do not declare dependency findings fixed or non-exploitable.

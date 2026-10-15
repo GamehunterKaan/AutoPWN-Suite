@@ -34,14 +34,47 @@ alone gets `contents:write` and no OIDC or Docker credentials. Workflow defaults
 remain read-only. Third-party actions/tools are pinned. These checks apply to
 historical rebuilds too; an old tag does not waive current security policy.
 
-The workflow can also be dispatched **from main** with an existing published
-release tag, for example to sign v2.6.0 after this automation has been merged.
-It validates tag syntax, source package version and ancestry in `origin/main`.
-Historical changelog notes may come from the trusted automation checkout. It
-refuses releases with existing uploaded assets and never silently overwrites
-them. Resolve partial uploads manually after inspecting the failed run. Only a
-release currently identified as GitHub's latest release updates the image's
-`latest` tag; historical backfills do not move it to an older release.
+The build/publish workflow validates tag syntax, source package version and
+ancestry in `origin/main`. It refuses existing uploaded assets and never silently
+overwrites them. Resolve partial uploads manually after inspecting the failed
+run. Only GitHub's latest stable release updates the image's `latest` alias.
+
+## Authenticity backfill for an existing release
+
+Use **Backfill release signatures**, dispatched from main, when adding signatures
+to an already published release such as v2.6.0:
+
+```sh
+gh workflow run backfill-release-signatures.yml --ref main -f tag=v2.6.0 \
+  -f image-digest=sha256:7a241cc52d8afda6c63e5a67cceda69cee691e4570aaf674f5dae5c05c8748bb
+```
+
+Record the expected original index digest independently before dispatch; the
+example above is the verified original v2.6.0 digest. A tag that has moved to a
+different digest is rejected rather than silently signed.
+
+This path does **not rebuild or replace application source or Docker images** and
+does not change version/latest image tags. It snapshots the existing official
+image index and both platform digests, checks their source-revision/version
+labels against the reviewed Git tag, and reads image contents without executing
+them. Source SCA/SAST checks must still pass. Syft SBOMs and complete current
+image SCA/policy reports accompany the signature backfill. Scanner errors or
+incomplete reports stop it; completed reports with findings remain visible and
+are included in signed hashes rather than suppressed.
+
+The signed manifest explicitly records `purpose: authenticity_backfill`,
+`rebuilt: false` and `security_clearance: false`, plus the original platform
+digests and findings. Signing establishes the identity/integrity of existing
+bytes; it does not declare dependencies safe or findings fixed. Remediate
+applicable findings before a new software release or rebuild under
+[Security testing](SECURITY_TESTING.md). Adding backfill metadata does not turn
+those findings into VEX not-affected declarations.
+
+This is a separately reviewed metadata-only operation. It can run only from
+protected main and requires an existing non-draft release without uploaded
+assets. It archives the exact original tagged source, uses descriptive trusted
+changelog notes, signs the unchanged original image digest and manifest through
+GitHub OIDC, and uploads verified assets. It never publishes a new software tag.
 
 ## Published artifact format
 
@@ -60,6 +93,9 @@ release currently identified as GitHub's latest release updates the image's
 - `release-manifest.sigstore.json`: Cosign signing certificate/signature and
   transparency-log verification bundle for the manifest.
 - The container's exact `sha256:` digest also has a Cosign registry signature.
+- Authenticity backfills additionally include a versioned `-image-index.json`
+  and per-architecture `-sca.json`, `-policy.json` and `-backfill.json` records;
+  every file is covered by the manifest's SHA-256 values.
 
 The manifest and bundle form the signature envelope; they cannot include their
 own hashes recursively. Prefer these attached project archives when verifying
@@ -77,13 +113,14 @@ from the trusted workflow/ref, not from an untrusted bundle:
 gh release download v2.6.0 --repo GamehunterKaan/AutoPWN-Suite --dir release-files
 cd release-files
 cosign verify-blob --bundle release-manifest.sigstore.json \
-  --certificate-identity 'https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/backfill-release-signatures.yml@refs/heads/main' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   release-manifest.json
 ```
 
-That exact identity is for a manual backfill from main. For an automatic published
-release, use the same workflow path followed by `@refs/tags/vVERSION`. Confirm the
+That exact identity is for an authenticity backfill from main. For an automatic
+published release, use `publish-docker.yml@refs/tags/vVERSION` under the same
+repository's `.github/workflows/` path instead. Confirm the
 expected repository, workflow, ref and source commit against the release record.
 Do not disable identity or issuer checking. Missing signatures are a verification
 failure, not a reason to bypass verification.

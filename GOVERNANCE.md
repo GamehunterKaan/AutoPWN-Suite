@@ -26,6 +26,9 @@ release-write permissions. Docker Hub push/sign access uses
 the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. An OIDC identity
 signs release artifacts through Sigstore; no long-lived signing key is stored.
 Dependabot proposes dependency updates; it does not approve or merge them.
+The separate authenticity-backfill workflow inventories existing image digests
+and adds signatures/reports to an existing release without rebuilding images or
+moving their tags; it uses the same isolated signing and upload authorities.
 
 ## Responsibilities and decisions
 
