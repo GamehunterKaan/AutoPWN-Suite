@@ -279,6 +279,38 @@ def test_resume_network_reuses_nmap_and_only_retries_failed_cve_lookups(dashboar
     assert all(len(host["vulns"]) == 1 for host in job.hosts_list())
 
 
+@pytest.mark.parametrize("mixed", [False, True])
+def test_resume_retries_nmap_timeouts_instead_of_caching_empty_success(dashboard, mixed):
+    from modules.nmap_backend import PortScanner
+    wu, client = dashboard
+    def observation(timed_out):
+        nm = PortScanner(nmap_path="unused")
+        hosts = (f'<host timedout="{str(timed_out).lower()}"><status state="up" reason="user-set"/>'
+                 '<address addr="192.0.2.1" addrtype="ipv4"/></host>')
+        if mixed:
+            hosts += '<host><status state="up"/><address addr="192.0.2.2" addrtype="ipv4"/></host>'
+        nm.load_xml('<nmaprun>' + hosts + '<runstats><finished exit="success"/>'
+                    '<hosts up="2" down="0" total="2"/></runstats></nmaprun>')
+        return nm
+    target = "192.0.2.0/24" if mixed else "192.0.2.1"
+    config = wu._profile_config({"skip_discovery": True, "scan_vulns": False}) | {"target": target}
+    job = wu.ScanJob("job", target, config)
+    wu._register_scan(job)
+    with patch.object(wu.shutil, "which", return_value="nmap"), \
+         patch("modules.scanner.PortScan", side_effect=[observation(True), observation(False)]) as scan, \
+         patch.object(wu, "_notify"), patch.object(wu.threading, "Thread"):
+        wu._run_scan(job)
+        assert job.status == "partial" and job.to_dict()["can_resume"]
+        assert "192.0.2.1" not in job._completed_hosts
+        assert target not in job._network_results
+        if mixed:
+            assert "192.0.2.2" in job._completed_hosts
+        assert client.post("/api/scans/job/resume", json={}).status_code == 200
+        wu._run_scan(job)
+    assert job.status == "completed" and scan.call_count == 2
+    assert all(host["scan_status"] == "completed" for host in job.hosts_list())
+
+
 def test_pacing_uses_speed_and_minimum_delay_and_is_cancellable():
     now = [0.0]
     def sleep(seconds):

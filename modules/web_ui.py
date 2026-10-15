@@ -1075,12 +1075,24 @@ def _run_scan(job: ScanJob) -> None:
                 _log(job, f"[-] No scan observation returned for {host_ip}", "warning")
                 job.complete_target()
                 continue
+            timed_out = {ip for ip in resolved if ip not in job._completed_hosts
+                         and str(nm[ip].get("timedout", "false")).lower() == "true"}
+            if timed_out:
+                # Retrying this target must run Nmap again, including when a
+                # range returned a mixture of complete and timed-out hosts.
+                job._network_results.pop(host_ip, None)
+            else:
+                job._network_results[host_ip] = nm
             for observed_ip in resolved:
                 if job.should_stop():
                     break
-                job._network_results[host_ip] = nm
                 previous = job.get_or_create_host(observed_ip)
                 if observed_ip in job._completed_hosts:
+                    continue
+                if observed_ip in timed_out:
+                    had_failures = True
+                    job.mark_host_done(observed_ip, "partial")
+                    _log(job, f"[-] Nmap timed out on {observed_ip}; port coverage is incomplete. Resume to retry.", "warning")
                     continue
                 if previous.get("lookup_status") in ("completed", "skipped"):
                     host_failed = False
