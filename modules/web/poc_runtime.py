@@ -281,6 +281,8 @@ def _check_tls(plan):
         context.set_ciphers("DEFAULT:@SECLEVEL=0")
     try:
         with socket.create_connection((hostname, port), timeout=10) as connection:
+            # TLS_PROTOCOL intentionally repeats an exact legacy-version handshake.
+            # No HTTP, credentials or application data is sent; other checks keep default TLS versions.
             with context.wrap_socket(connection, server_hostname=hostname) as secure:
                 if kind == "TLS_TRUST":
                     return False

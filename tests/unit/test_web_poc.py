@@ -1,7 +1,7 @@
 import ast
 import ipaddress
 import ssl
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -237,6 +237,24 @@ def test_tls_poc_never_uses_http_transport():
     with patch("modules.web.poc_runtime._check_tls", return_value=True):
         assert verify_plan(build_plan(result), transport=transport)["status"] == "reproduced"
     transport.assert_not_called()
+
+
+@pytest.mark.parametrize("label,version", [("TLSv1", ssl.TLSVersion.TLSv1), ("TLSv1.1", ssl.TLSVersion.TLSv1_1)])
+def test_legacy_tls_poc_only_checks_the_exact_negotiated_version(label, version):
+    result = sample("TLS_PROTOCOL")
+    result["evidence"] = f"Server negotiated obsolete {label}"
+    result["reproduction"]["target"] = "https://example.com:8443/"
+    context = MagicMock()
+    secure = context.wrap_socket.return_value.__enter__.return_value
+    secure.version.return_value = label
+    with patch("modules.web.poc_runtime.ssl.create_default_context", return_value=context), \
+         patch("modules.web.poc_runtime.socket.create_connection") as connect:
+        assert verify_plan(build_plan(result))["status"] == "reproduced"
+    assert context.minimum_version == context.maximum_version == version
+    assert secure.method_calls == [call.version()]
+    connect.assert_called_once_with(("example.com", 8443), timeout=10)
+    connect.return_value.__exit__.assert_called_once()
+    context.wrap_socket.return_value.__exit__.assert_called_once()
 
 
 @pytest.mark.unit

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import ipaddress
 import ssl
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 import pytest
 
-from modules.web.tls import check_tls, inspect_certificate
+from modules.web.tls import _context, _handshake, check_tls, inspect_certificate
 
 
 @pytest.fixture
@@ -58,6 +58,25 @@ def test_obsolete_tls_requires_actual_exact_version_handshake(certificate_der):
     assert contexts[0].verify_mode == ssl.CERT_REQUIRED
     assert contexts[1].minimum_version == contexts[1].maximum_version == ssl.TLSVersion.TLSv1
     assert contexts[2].minimum_version == contexts[2].maximum_version == ssl.TLSVersion.TLSv1_1
+
+
+@pytest.mark.parametrize("verify", [True, False])
+def test_non_legacy_tls_contexts_keep_modern_protocol_defaults(verify):
+    context = _context(verify=verify)
+    assert context.minimum_version >= ssl.TLSVersion.TLSv1_2
+    assert context.verify_mode == (ssl.CERT_REQUIRED if verify else ssl.CERT_NONE)
+
+
+def test_tls_handshake_reads_metadata_without_application_data():
+    context = MagicMock()
+    secure = context.wrap_socket.return_value.__enter__.return_value
+    secure.getpeercert.return_value = b"certificate"
+    secure.version.return_value = "TLSv1"
+    with patch("modules.web.tls.socket.create_connection") as connect:
+        assert _handshake(context, "example.com", 8443) == (b"certificate", "TLSv1")
+    assert secure.method_calls == [call.getpeercert(binary_form=True), call.version()]
+    connect.return_value.__exit__.assert_called_once()
+    context.wrap_socket.return_value.__exit__.assert_called_once()
 
 
 @pytest.mark.unit
