@@ -1,0 +1,66 @@
+name: Refresh human review check
+
+on:
+  workflow_run:
+    workflows: [Human review events]
+    types: [completed]
+
+permissions:
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: human-review-refresh-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh existing approval check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      pull-requests: read
+    steps:
+      # workflow_run executes this handler from protected main. Never check out
+      # PR code or download its artifacts into this Actions-write job.
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const signal = context.payload.workflow_run;
+            if (signal.event !== 'pull_request_review' || !/^[0-9a-f]{40}$/.test(signal.head_sha)) {
+              throw new Error('Expected a review-event notification with a commit SHA');
+            }
+            // Fork event runs can omit pull_requests; resolve through GitHub's
+            // commit association API, then validate every candidate's live head.
+            const candidates = signal.pull_requests?.length ? signal.pull_requests :
+              await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,
+                {...context.repo, commit_sha: signal.head_sha});
+            for (const candidate of candidates) {
+              const number = candidate.number;
+              const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
+              if (pr.state !== 'open' || pr.base.ref !== 'main' || pr.head.sha !== signal.head_sha) continue;
+              const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                ...context.repo, workflow_id: 'human-review.yml', event: 'pull_request',
+                head_sha: pr.head.sha, per_page: 100
+              });
+              const matching = runs.filter(run => run.head_sha === pr.head.sha &&
+                run.event === 'pull_request' && run.head_branch === pr.head.ref &&
+                (!run.pull_requests?.length || run.pull_requests.some(p => p.number === number)));
+              if (!matching.length) throw new Error(`No original approval check found for PR #${number}`);
+              // Refresh every current-head run (e.g. opened and ready_for_review),
+              // so an earlier failure cannot remain as another required check.
+              for (const run of matching) {
+                let completed = false;
+                for (let attempt = 0; attempt < 90; attempt++) {
+                  const {data: current} = await github.rest.pulls.get({...context.repo, pull_number: number});
+                  if (current.state !== 'open' || current.head.sha !== signal.head_sha) return;
+                  const {data: status} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: run.id});
+                  if (status.status === 'completed') { completed = true; break; }
+                  await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+                if (!completed) throw new Error(`Approval check ${run.id} is still running; retry this refresh`);
+                await github.rest.actions.reRunWorkflow({...context.repo, run_id: run.id});
+                core.info(`Re-evaluating original approval check ${run.id} for PR #${number}`);
+              }
+            }

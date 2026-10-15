@@ -1,0 +1,192 @@
+name: Backfill release signatures
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing published release to sign without rebuilding or replacing images
+        required: true
+        type: string
+      image-digest:
+        description: Independently recorded original Docker image index digest (sha256:...)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag }}
+  IMAGE: docker.io/gamehunterkaan/autopwn-suite
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+      digest: ${{ steps.release.outputs.digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate published release and snapshot its original image index
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_DIGEST: ${{ inputs.image-digest }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          assets="$RUNNER_TEMP/assets"
+          commit="$(python scripts/release_assets.py prepare --tag "$RELEASE_TAG" --output "$assets")"
+          release="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          test "$(jq -r .draft <<< "$release")" = false
+          test "$(jq '.assets | length' <<< "$release")" = 0
+          digest="$(python scripts/release_assets.py image-index --tag "$RELEASE_TAG" --output "$assets")"
+          test "$digest" = "$EXPECTED_DIGEST"
+          {
+            printf 'commit=%s\ndigest=%s\n' "$commit" "$digest"
+          } >> "$GITHUB_OUTPUT"
+          cat >> "$assets/release-notes.md" <<'NOTICE'
+
+          ## Authenticity backfill
+
+          Signatures and inventories were added after the original release.
+          No application source or Docker image was rebuilt or replaced.
+          The attached per-platform SCA and policy reports preserve current
+          findings; signatures establish authenticity, not security clearance.
+          See the backfill records and security advisory index for limitations.
+          NOTICE
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backfill-source
+          path: ${{ runner.temp }}/assets/
+          if-no-files-found: error
+
+  source-security:
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/security.yml
+    with:
+      source-ref: ${{ needs.validate.outputs.commit }}
+
+  inventory:
+    needs: [validate, source-security]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: backfill-source
+          path: ${{ runner.temp }}/source-assets
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned scanners
+        run: python scripts/install_security_tools.py --directory "$RUNNER_TEMP/security-tools" --syft
+      - name: Inventory the existing image without executing it
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          original="$RUNNER_TEMP/source-assets"
+          assets="$RUNNER_TEMP/assets"
+          mkdir -p "$assets" "$RUNNER_TEMP/source"
+          tar --extract --gzip --file "$original/autopwn-suite-$RELEASE_TAG.tar.gz" --strip-components=1 --directory "$RUNNER_TEMP/source"
+          cp "$original/autopwn-suite-$RELEASE_TAG-image-index.json" "$assets/"
+          child="$(python scripts/release_assets.py platform-digest --tag "$RELEASE_TAG" --output "$assets" --arch "$ARCH")"
+          docker pull --platform "linux/$ARCH" "$IMAGE@$child"
+          docker image inspect "$IMAGE@$child" > "$RUNNER_TEMP/image-config.json"
+          image_id="$(docker image inspect "$IMAGE@$child" --format '{{.Id}}')"
+          docker image save --output "$RUNNER_TEMP/image.tar" "$image_id"
+          "$RUNNER_TEMP/security-tools/syft" scan "docker-archive:$RUNNER_TEMP/image.tar" -o "cyclonedx-json=$assets/autopwn-suite-$RELEASE_TAG-linux-$ARCH.cdx.json"
+          scan_exit=0
+          python scripts/security_policy.py --repo "$RUNNER_TEMP/source" --output "$RUNNER_TEMP/reports" --osv "$RUNNER_TEMP/security-tools/osv-scanner" --image-archive "$RUNNER_TEMP/image.tar" || scan_exit=$?
+          # A completed assessment with findings is preserved, not suppressed.
+          # Missing reports or scanner errors fail backfill-record validation.
+          [[ "$scan_exit" = 0 || "$scan_exit" = 1 ]]
+          cp "$RUNNER_TEMP/reports/sca.json" "$assets/autopwn-suite-$RELEASE_TAG-linux-$ARCH-sca.json"
+          cp "$RUNNER_TEMP/reports/policy-result.json" "$assets/autopwn-suite-$RELEASE_TAG-linux-$ARCH-policy.json"
+          python scripts/release_assets.py backfill-record --tag "$RELEASE_TAG" --output "$assets" --arch "$ARCH" --image-config "$RUNNER_TEMP/image-config.json"
+          rm "$assets/autopwn-suite-$RELEASE_TAG-image-index.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backfill-inventory-${{ matrix.arch }}
+          path: ${{ runner.temp }}/assets/
+          if-no-files-found: error
+
+  sign:
+    needs: [validate, inventory]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: backfill-*
+          path: assets
+          merge-multiple: true
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Sign original image digest and manifest of inventories and reports
+        env:
+          DIGEST: ${{ needs.validate.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python scripts/release_assets.py manifest --tag "$RELEASE_TAG" --output assets --image "$IMAGE" --digest "$DIGEST" --backfill
+          identity="https://github.com/$GITHUB_WORKFLOW_REF"
+          cosign sign --yes "$IMAGE@$DIGEST"
+          cosign verify --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$IMAGE@$DIGEST"
+          cosign sign-blob --yes --bundle assets/release-manifest.sigstore.json assets/release-manifest.json
+          cosign verify-blob --bundle assets/release-manifest.sigstore.json --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com assets/release-manifest.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signed-backfill
+          path: assets/
+          if-no-files-found: error
+
+  publish:
+    needs: sign
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: signed-backfill
+          path: assets
+      - name: Attach verified signatures and current findings to existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" assets/* --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" --notes-file assets/release-notes.md --repo "$GITHUB_REPOSITORY"

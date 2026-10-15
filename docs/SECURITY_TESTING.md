@@ -48,6 +48,15 @@ targets never waive the merge/release gate. Resolve all policy violations before
 non-exploitability justification. Archive reports in Actions (30 days) and review
 current database results when cutting a release.
 
+An independently reviewed **authenticity backfill** may add signatures and
+assessment metadata to an already published release without rebuilding,
+replacing or retagging any software image. Its source checks must pass; its
+complete image findings, policy results and SBOMs are published under signed
+hashes, explicitly marked as having no security clearance. This operation does
+not suppress findings or create a new software release. All new versions and
+all rebuilds retain the blocking policy above, including historical rebuilds.
+See [Releasing](RELEASING.md#authenticity-backfill-for-an-existing-release).
+
 ## Static application security testing (SAST)
 
 Bandit 1.9.4 inspects every tracked non-test Python file, including release

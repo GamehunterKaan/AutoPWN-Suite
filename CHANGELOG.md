@@ -9,6 +9,8 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Functional changes
 
+- Refresh the original independent-human approval checks after review changes,
+  avoiding duplicate approval checks and stale failures after approval.
 - Document project governance, dependency selection, source builds, architecture,
   all external interfaces, release operations and security-assessment results.
 - Prepare official source archives from reviewed version tags and publish
@@ -16,6 +18,9 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Security changes
 
+- Add a reviewed authenticity-backfill workflow that signs original release
+  bytes and publishes current SBOMs/findings without rebuilding or replacing
+  images; new-release and rebuild security gates remain mandatory.
 - Add keyless Cosign signing and verification for release manifests and exact
   container digests, using restricted release-job permissions and pinned actions.
 - Define coordinated disclosure response targets and a predictable public

@@ -104,3 +104,94 @@ def test_runtime_version_must_match(source_repo):
 def test_manifest_rejects_invalid_registry_or_digest(source_repo, tmp_path, image, digest):
     with pytest.raises(ValueError, match="official Docker Hub"):
         release.write_manifest(source_repo, "v2.6.0", tmp_path, image, digest)
+
+
+@pytest.fixture
+def backfill_assets(source_repo, tmp_path):
+    notes = tmp_path / "notes.md"
+    notes.write_text("## [2.6.0]\n### Functional changes\nChanges.\n### Security changes\nSecurity.\n")
+    output = tmp_path / "assets"
+    commit = release.prepare(source_repo, "v2.6.0", output, notes)
+    index = {"manifests": [{"platform": {"os": "linux", "architecture": arch},
+                            "digest": "sha256:" + char * 64}
+                           for arch, char in [("amd64", "a"), ("arm64", "b")]]}
+    data = json.dumps(index).encode()
+    (output / "autopwn-suite-v2.6.0-image-index.json").write_bytes(data)
+    for arch in ("amd64", "arm64"):
+        prefix = f"autopwn-suite-v2.6.0-linux-{arch}"
+        (output / f"{prefix}.cdx.json").write_text(json.dumps({
+            "bomFormat": "CycloneDX", "components": [{"name": "nmap"}, {"name": "requests"}],
+        }))
+        (output / f"{prefix}-sca.json").write_text(json.dumps({"results": [{"packages": [{
+            "package": {"name": "example", "version": "1"},
+            "vulnerabilities": [{"id": "SYNTHETIC-TEST-1"}],
+        }]}]}))
+        (output / f"{prefix}-policy.json").write_text(json.dumps({
+            "version": "2.6.0", "packages": 1, "violations": ["Synthetic test finding"],
+        }))
+        (tmp_path / f"config-{arch}.json").write_text(json.dumps([{
+            "Os": "linux", "Architecture": arch,
+            "RepoDigests": ["gamehunterkaan/autopwn-suite@" + release.platform_digest(index, arch)],
+            "Config": {"Labels": {"org.opencontainers.image.revision": commit,
+                                   "org.opencontainers.image.version": "2.6.0"}},
+        }]))
+    return output, "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def record_both(source_repo, output, tmp_path):
+    for arch in ("amd64", "arm64"):
+        release.backfill_record(source_repo, "v2.6.0", output, arch, tmp_path / f"config-{arch}.json")
+
+
+def test_backfill_binds_original_images_and_keeps_findings(source_repo, tmp_path, backfill_assets):
+    output, digest = backfill_assets
+    record_both(source_repo, output, tmp_path)
+    with pytest.raises(ValueError, match="Unexpected"):
+        release.write_manifest(source_repo, "v2.6.0", output, release.OFFICIAL_IMAGE, digest)
+    manifest = release.write_manifest(source_repo, "v2.6.0", output, release.OFFICIAL_IMAGE, digest, backfill=True)
+    assert len(manifest["assets"]) == 13
+    assert manifest["publication"]["security_clearance"] is False
+    assert manifest["publication"]["rebuilt"] is False
+    assert all(r["policy_violations"] == ["Synthetic test finding"] for r in manifest["publication"]["platforms"])
+    for asset in manifest["assets"]:
+        assert asset["sha256"] == hashlib.sha256((output / asset["name"]).read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("field,value", [("Architecture", "arm64"), ("RepoDigests", []), ("Config", {"Labels": {}})])
+def test_backfill_rejects_wrong_platform_digest_or_revision(source_repo, tmp_path, backfill_assets, field, value):
+    output, _ = backfill_assets
+    config_path = tmp_path / "config-amd64.json"
+    config = json.loads(config_path.read_text())
+    config[0][field] = value
+    config_path.write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="does not match"):
+        release.backfill_record(source_repo, "v2.6.0", output, "amd64", config_path)
+
+
+def test_backfill_does_not_treat_failed_scan_as_success(source_repo, tmp_path, backfill_assets):
+    output, _ = backfill_assets
+    (output / "autopwn-suite-v2.6.0-linux-amd64-sca.json").write_text('{"results":[]}')
+    with pytest.raises(ValueError, match="complete current scan"):
+        release.backfill_record(source_repo, "v2.6.0", output, "amd64", tmp_path / "config-amd64.json")
+
+
+def test_backfill_rejects_tampered_index_or_clearance(source_repo, tmp_path, backfill_assets):
+    output, digest = backfill_assets
+    record_both(source_repo, output, tmp_path)
+    with pytest.raises(ValueError, match="index digest mismatch"):
+        release.write_manifest(source_repo, "v2.6.0", output, release.OFFICIAL_IMAGE, "sha256:" + "c" * 64, backfill=True)
+    path = output / "autopwn-suite-v2.6.0-linux-amd64-backfill.json"
+    record = json.loads(path.read_text())
+    record["security_clearance"] = True
+    path.write_text(json.dumps(record))
+    with pytest.raises(ValueError, match="does not bind"):
+        release.write_manifest(source_repo, "v2.6.0", output, release.OFFICIAL_IMAGE, digest, backfill=True)
+
+
+def test_backfill_rejects_ambiguous_or_invalid_platform():
+    entry = {"platform": {"os": "linux", "architecture": "amd64"}, "digest": "sha256:" + "a" * 64}
+    with pytest.raises(ValueError, match="exactly one"):
+        release.platform_digest({"manifests": [entry, entry]}, "amd64")
+    entry["digest"] = "invalid"
+    with pytest.raises(ValueError, match="exactly one"):
+        release.platform_digest({"manifests": [entry]}, "amd64")

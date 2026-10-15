@@ -1,0 +1,17 @@
+name: Human review events
+
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions: {}
+
+jobs:
+  notify:
+    name: Notify review change
+    if: github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      # No PR checkout, artifacts, credentials, or user-controlled shell input.
+      # The trusted default-branch workflow_run handler performs the refresh.
+      - run: ':'

@@ -7,6 +7,10 @@ verified material consumers and reconciled the subsequently separated release
 jobs. This is static architecture analysis, not a penetration test or a new
 repository security audit. The five validated runtime findings remain attributed
 to [the assessment](SECURITY_ASSESSMENT.md), not newly discovered here.
+The 2026-10-16 update adds a metadata-only authenticity-backfill path for already
+published releases, with existing-image findings preserved in signed reports.
+Review-event notifications now refresh the original PR approval run through a
+trusted default-branch handler, avoiding duplicate required approval checks.
 
 ## 1. Overview
 
@@ -26,7 +30,8 @@ in process memory. There is no multi-tenant identity or object-ownership model.
 | Providers and database | `modules/nist_search.py:80`, `modules/vulnerability_db.py:31` |
 | Notifications and downloads | `modules/report.py:36`, `modules/getexploits.py:126` |
 | Installed/service/container startup | `install.sh:27`, `modules/daemon/daemon_installer.py:298`, `Dockerfile:22`, `docker-compose.yml:6` |
-| CI and release | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:24`, `scripts/release_assets.py:23` |
+| CI and release | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:24`, `scripts/release_assets.py:96` |
+| Existing-release authenticity backfill | `.github/workflows/backfill-release-signatures.yml:27`, `scripts/release_assets.py:22`, `scripts/release_assets.py:59` |
 
 ```mermaid
 flowchart LR
@@ -51,6 +56,10 @@ flowchart LR
   A --> X[Registry push]
   X --> S[OIDC signing]
   S --> G[GitHub asset upload]
+  M --> AB[Existing release: pinned original image digest]
+  AB --> AI[Read-only inventories / visible SCA findings]
+  AI --> AS[Sign original digest and assessment metadata]
+  AS --> G
 ```
 
 Ingress authentication is an operator obligation, not a built-in application
@@ -102,11 +111,15 @@ expand a leading tilde (`modules/web_ui.py:144`,
 | Evidence replay | Restricted request capability | Stored finding -> generated validated plan; reject submitted plans/body | Same origin, GET/OPTIONS/TRACE, at most 12 requests, four concurrent verifications | Recorded target/operator | trust_env=False, no redirects, cookie clearing, prefix cap; `modules/web_ui.py:1660`, `modules/web/poc_runtime.py:28`, `modules/web/poc_runtime.py:318` |
 | Notifications | SMTP/webhook credentials/reports | Explicit CLI or enabled dashboard settings; offline gates | Configured recipients, secret references only | Selected receiver | Timeouts and enable/offline gates; SMTP validation limitation remains; `modules/report.py:75`, `modules/report.py:100`, `modules/web_ui.py:695`, `modules/web_ui.py:739` |
 | Contributor CI | Candidate source execution | PR/push -> hosted tests/scanners | Read-only GitHub credentials, no publishing secrets | Runner/package providers | Explicit permissions, no persisted checkout credential; `.github/workflows/poetry-tests.yml:14`, `.github/workflows/security.yml:22` |
-| Release validation | Versioned source archives/VEX | Valid tag, versions, origin/main ancestry | Runner-temp assets from exact tagged commit | Read-only validation job | Empty staging/existing-assets refusal; `scripts/release_assets.py:23`, `.github/workflows/publish-docker.yml:24` |
+| Review-check refresh | Rerun authority over the original approval checks | Credential-free review event -> trusted default-branch workflow_run; validate open main PR and matching current SHA | Only human-review.yml pull_request runs at the current PR head | GitHub Actions API | Actions-write handler never checks out PR code or consumes PR artifacts; `.github/workflows/human-review-events.yml:9`, `.github/workflows/human-review-refresh.yml:17` |
+| Release validation | Versioned source archives/VEX | Valid tag, versions, origin/main ancestry | Runner-temp assets from exact tagged commit | Read-only validation job | Empty staging/existing-assets refusal; `scripts/release_assets.py:96`, `.github/workflows/publish-docker.yml:24` |
 | Release build | Image archives and per-architecture SBOMs | Validated commit's immutable source-archive handoff -> isolated amd64/arm64 builds -> scans | Runner-temp image/SBOM/reports | Read-only build runner; no registry/OIDC secrets | Source policy and actual image SCA precede push; `.github/workflows/publish-docker.yml:71` |
 | Registry push | Distribution capability | Successful build/scan artifacts only | `docker.io/gamehunterkaan/autopwn-suite:<version>` | Docker Hub | Docker publishing secret only; no GitHub token permissions; `.github/workflows/publish-docker.yml:136` |
 | OIDC signing | Image digest and manifest authenticity | Push digest + archived source/SBOM/VEX -> verified signatures | Exact SHA-256 image digest and asset hashes | Registry/Sigstore, downstream verifiers | contents:read, id-token:write, registry signing access; `.github/workflows/publish-docker.yml:172` |
 | GitHub publication | Release assets/notes | Successfully signed artifact handoff | Version-associated assets, no overwrite flag | GitHub release API/users | contents:write only; no checkout, OIDC or registry credentials; `.github/workflows/publish-docker.yml:217` |
+| Existing-release snapshot | Original OCI index/source identity | Protected-main dispatch; validated tag; caller-supplied original SHA-256 must match registry index bytes | Versioned image-index snapshot and original amd64/arm64 digests | Read-only validation job | HTTPS plus index content hash, fixed official repository and exact platform selection; `.github/workflows/backfill-release-signatures.yml:27`, `scripts/release_assets.py:22` |
+| Existing-image inventory | SBOM and current SCA/policy findings | Pull/save original child digest; no image execution; verify platform, source-revision/version labels and repository digest | Per-platform SBOM, SCA, policy and backfill JSON | Read-only inventory jobs; later public release consumers | Missing/error reports fail; completed findings are retained, not waived; `.github/workflows/backfill-release-signatures.yml:82`, `scripts/release_assets.py:59` |
+| Backfill publication | Authenticity of existing software and current assessment metadata | Inventory records bind original source/index/platform digests; manifest explicitly denies security clearance or rebuild | Original image digest receives a signature; all metadata hashes receive a signed manifest | Registry signature storage, Sigstore and GitHub release consumers | Separate read/OIDC/registry signing and release-write upload jobs; no Docker build, retag or image push step; `.github/workflows/backfill-release-signatures.yml:136`, `.github/workflows/backfill-release-signatures.yml:176` |
 
 Importing the CLI imports web_ui and creates its effective data directory before
 argument parsing; dashboard startup loads the JSON files later
@@ -116,6 +129,15 @@ whereas the root daemon does. Actual Windows ACLs, volume host backing paths,
 OS temporary directories, selected executable and deployed firewall/proxy
 configuration are unverified external resources; this model does not assume
 their protection.
+
+Authenticity backfills do not release new software or bypass new-release/rebuild
+gates. They sign an already published image by immutable digest and append
+inventories/reports with `rebuilt: false` and `security_clearance: false`.
+Source checks still gate this path; completed existing-image findings remain
+visible under signed hashes. Missing assessments or a changed original digest
+stop it. A matching registry source label is an identity consistency check, not
+independent reproducible-build proof. Operator review of the original expected
+digest and trusted registry ownership remain prerequisites.
 
 ## 2. Threat model, trust boundaries and assumptions
 
@@ -173,8 +195,10 @@ remaining rows are threat scenarios and control analysis, not new findings.
 | Medium / open | SMTP intermediary captures login/report | Email enabled + active intermediary/forged endpoint | Credential/report disclosure | TLS invocation/timeouts, no verified context | Disable email or use protected transport pending context fix | `modules/report.py:77`, `modules/web_ui.py:739`; AUTOPWN-SA-2026-003 |
 | Medium / open | Core web probe sends ambient credentials | Applicable matching/default credential entry | Credential disclosure to selected target/intermediary | Additional probes/replay suppress credentials; core paths differ | Dedicated account without ambient secrets; extend suppression | `modules/web/http.py:152`, `modules/web/dirbust.py:61`; AUTOPWN-SA-2026-004 |
 | Medium / open | Trickle response retains workers despite Stop | Selected hostile target streams below inactivity timeout | Worker/verification-slot exhaustion | Byte/count limits; Nmap has distinct process deadline | External process deadline pending transport fix | `modules/web/http.py:21`, `modules/web/poc_runtime.py:329`; AUTOPWN-SA-2026-005 |
-| High-impact hypothesis | Malicious dependency/action executes during privileged publication | Compromised dependency or approved automation; actual job authority needed | Distribution compromise | Read-only PR jobs, pinned tools/actions, secret-free builds, separate push/sign/upload | Review provenance, require all gates and non-author human; inspect artifacts | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:71`, `.github/workflows/human-review.yml:23` |
-| High-impact hypothesis | Forged/replaced artifact trusted by consumer | Distribution channel compromise; verifier omits expected identity/digest | Execute substituted release | Signed hashes/digest and exact issuer/workflow verification design | Follow release verification; never trust mutable tags alone | `scripts/release_assets.py:105`, `docs/RELEASING.md:1` |
+| High-impact hypothesis | Malicious dependency/action executes during privileged publication | Compromised dependency or approved automation; actual job authority needed | Distribution compromise | Read-only PR jobs, pinned tools/actions, secret-free builds, separate push/sign/upload | Review provenance, require all gates and non-author human; inspect artifacts | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:71`, `.github/workflows/human-review.yml:21` |
+| Review-refresh boundary | An untrusted review notification tries to gain write authority | Fork review events can supply candidate metadata but no trusted code or artifacts | Unauthorized workflow rerun or false approval | Fixed approval workflow, GitHub-resolved PR/head checks, trusted default-branch API-only handler; rerun retains original read-only permissions and revalidates actual human reviews | Keep Actions-write code outside PR execution and never accept artifact paths or workflow IDs from notifications | `.github/workflows/human-review-refresh.yml:26`, `.github/workflows/human-review.yml:21` |
+| High-impact hypothesis | Forged/replaced artifact trusted by consumer | Distribution channel compromise; verifier omits expected identity/digest | Execute substituted release | Signed hashes/digest and exact issuer/workflow verification design | Follow release verification; never trust mutable tags alone | `scripts/release_assets.py:200`, `docs/RELEASING.md:1` |
+| Conditional backfill hypothesis | A moved image tag or hidden assessment is incorrectly attested as the original safe release | Altered registry tag, omitted report or operator trusts signature as security clearance | False provenance or unsafe reliance on known-vulnerable bytes | Expected original index digest must match; exact source/platform labels and report inventory validated; signed records deny security clearance | Independently record the original digest, verify the dedicated workflow identity, inspect signed findings and remediate before new releases | `.github/workflows/backfill-release-signatures.yml:44`, `scripts/release_assets.py:59`, `scripts/release_assets.py:152` |
 | Medium hypothesis | Local/backup reader obtains plaintext settings/INI/evidence | Host/volume/file access beyond intended scanner account | Secret/evidence exposure, future schedule changes | Host ACLs/ingress; atomic replacement only | Owner-only storage, encrypted backups, rotation, dedicated account | `modules/web_ui.py:148`, `modules/daemon/daemon_installer.py:300`, `docs/SECRETS.md:1` |
 | Conditional parser/provider hypothesis | Malformed target/feed data crosses interpreter/storage boundary | Selected target/provider response | Parser denial of service or data corruption; execution requires further evidence | argv, XML parsing, origin checks, parameterized DB, staged updates, sanitized paths | Preserve limits, review parsers/schema changes and regressions | `modules/nmap_backend.py:99`, `modules/vulnerability_db.py:253`, `modules/getexploits.py:126` |
 | Controlled boundary | Arbitrary replay/write or download execution | Client tries to submit a plan/foreign origin; operator separately executes attachment | No new capability established through reviewed replay/download interface | Empty-body requirement, generated plan validation, origin/header/method limits; downloads not executed | Preserve these independent controls and tests | `modules/web_ui.py:1638`, `modules/web_ui.py:1660`, `modules/web/poc_runtime.py:28` |
@@ -211,4 +235,4 @@ in sorted repository-path order as path-NUL-bytes-NUL, excluding ignored files.
 It identifies the inspected architecture inputs, not a signed software release.
 
 Repository: target_sha256_f4729301817a49c0c92d2ef33ffd0bd514e1296e7084a6d623842b3beb1924f8
-Version: snapshot:2399020e17646b8e6e5c0825b34d6edcc35ed9810ac5fe138a14e0c3815f0155
+Version: snapshot:48d86360ede1e1e77b81f76bee3c34fa281ed7787c9e194f7f20175de9b20404
