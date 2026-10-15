@@ -449,12 +449,19 @@ scanner.save_to_file("autopwn.json")
 
 ## Development and Testing
 
-You can use poetry to install dependencies and run tests.
+Use **Poetry 2.5.1** to install dependencies and run tests. This is the version
+required by `pyproject.toml`, pinned in CI, and used to generate `poetry.lock`.
 
 #### Installing Dependencies
 ```console
+pipx install poetry==2.5.1
 poetry install
 ```
+
+After changing dependencies, run `poetry lock` with Poetry 2.5.1 and commit
+`pyproject.toml` and `poetry.lock` together. This retains already locked versions
+unless their constraints require a change. Use `poetry check --lock` to verify
+that the lockfile matches the project; CI runs the same check before installation.
 
 #### Running Tests
 ```console

@@ -1,6 +1,7 @@
 [tool.poetry]
 name = "autopwn-suite"
 version = "2.6.0"
+requires-poetry = "==2.5.1"
 description = "AutoPWN Suite - Automated Vulnerability Scanning and Exploitation Tool"
 authors = ["AutoPWN Suite Contributors"]
 readme = "README.md"
