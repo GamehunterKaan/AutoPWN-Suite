@@ -1,7 +1,8 @@
 # Automated security policy
 
-The maintainer owns triage; an independent human reviews code, dependency,
-workflow and exception changes before merge. Run the **Security policy** check
+The maintainer owns triage and reviews contributions from other authors before
+merge. Maintainer-authored changes require passing checks but no second person's
+approval, as documented in [Governance](../GOVERNANCE.md). Run the **Security policy** check
 on every PR and main push, without path filters. Require it alongside tests and
 CodeQL in branch protection. Run it again on the exact release commit, then scan
 both built image architectures before any image push/signing/upload. Scanner

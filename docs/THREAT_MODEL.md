@@ -45,8 +45,9 @@ flowchart LR
   C --> R[Reports / notifications]
   W --> R
   P[Contributor PR] --> Q[Read-only tests / SCA / SAST]
-  Q --> U[Independent human review]
+  Q -->|External contribution| U[Maintainer review]
   U --> M[Protected main / release tag]
+  Q -->|Maintainer-authored change| M
   M --> A[Read-only build / SBOM / image SCA]
   A --> X[Registry push]
   X --> S[OIDC signing]
@@ -173,7 +174,7 @@ remaining rows are threat scenarios and control analysis, not new findings.
 | Medium / open | SMTP intermediary captures login/report | Email enabled + active intermediary/forged endpoint | Credential/report disclosure | TLS invocation/timeouts, no verified context | Disable email or use protected transport pending context fix | `modules/report.py:77`, `modules/web_ui.py:739`; AUTOPWN-SA-2026-003 |
 | Medium / open | Core web probe sends ambient credentials | Applicable matching/default credential entry | Credential disclosure to selected target/intermediary | Additional probes/replay suppress credentials; core paths differ | Dedicated account without ambient secrets; extend suppression | `modules/web/http.py:152`, `modules/web/dirbust.py:61`; AUTOPWN-SA-2026-004 |
 | Medium / open | Trickle response retains workers despite Stop | Selected hostile target streams below inactivity timeout | Worker/verification-slot exhaustion | Byte/count limits; Nmap has distinct process deadline | External process deadline pending transport fix | `modules/web/http.py:21`, `modules/web/poc_runtime.py:329`; AUTOPWN-SA-2026-005 |
-| High-impact hypothesis | Malicious dependency/action executes during privileged publication | Compromised dependency or approved automation; actual job authority needed | Distribution compromise | Read-only PR jobs, pinned tools/actions, secret-free builds, separate push/sign/upload | Review provenance, require all gates and non-author human; inspect artifacts | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:71`, `.github/workflows/human-review.yml:23` |
+| High-impact hypothesis | Malicious dependency/action executes during privileged publication | Compromised dependency or approved automation; actual job authority needed | Distribution compromise | Read-only PR jobs, pinned tools/actions, secret-free builds, separate push/sign/upload | Review provenance, require automated gates, review external contributions and inspect artifacts; maintainer-authored changes have no enforced independent approval | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:71`, `GOVERNANCE.md:43` |
 | High-impact hypothesis | Forged/replaced artifact trusted by consumer | Distribution channel compromise; verifier omits expected identity/digest | Execute substituted release | Signed hashes/digest and exact issuer/workflow verification design | Follow release verification; never trust mutable tags alone | `scripts/release_assets.py:105`, `docs/RELEASING.md:1` |
 | Medium hypothesis | Local/backup reader obtains plaintext settings/INI/evidence | Host/volume/file access beyond intended scanner account | Secret/evidence exposure, future schedule changes | Host ACLs/ingress; atomic replacement only | Owner-only storage, encrypted backups, rotation, dedicated account | `modules/web_ui.py:148`, `modules/daemon/daemon_installer.py:300`, `docs/SECRETS.md:1` |
 | Conditional parser/provider hypothesis | Malformed target/feed data crosses interpreter/storage boundary | Selected target/provider response | Parser denial of service or data corruption; execution requires further evidence | argv, XML parsing, origin checks, parameterized DB, staged updates, sanitized paths | Preserve limits, review parsers/schema changes and regressions | `modules/nmap_backend.py:99`, `modules/vulnerability_db.py:253`, `modules/getexploits.py:126` |
@@ -211,4 +212,4 @@ in sorted repository-path order as path-NUL-bytes-NUL, excluding ignored files.
 It identifies the inspected architecture inputs, not a signed software release.
 
 Repository: target_sha256_f4729301817a49c0c92d2ef33ffd0bd514e1296e7084a6d623842b3beb1924f8
-Version: snapshot:1cc6ed33cf82442534e193dea23da5ad071420fd3db2f54e87cdb5d295df5dbd
+Version: snapshot:a775668b01969872282ab9f39a1503a2a898c968d9767d54f5068783a19eb368

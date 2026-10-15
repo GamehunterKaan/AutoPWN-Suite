@@ -15,9 +15,10 @@ Please note we have a code of conduct, please follow it in all your interactions
    modifications under `Unreleased` in [CHANGELOG.md](../CHANGELOG.md). The
    maintainer assigns the release version using [SemVer](https://semver.org/).
 4. Run `poetry check --lock` and `poetry run test` using Poetry 2.5.1. All required
-   CI checks must pass before merging. The maintainer reviews and merges accepted
-   changes after a non-author human approves them. Bot/AI review cannot replace
-   that approval; administrators must follow the same rule.
+   CI checks must pass before merging. The maintainer reviews contributions from
+   other authors before merging them. Maintainer-authored
+   changes may merge after required checks pass without another person's
+   approval; see [Governance](../GOVERNANCE.md).
 5. Use [Build instructions](../docs/BUILDING.md) and
    [Dependency management](../docs/DEPENDENCIES.md). Dependency changes must
    update both runtime manifests and the lockfile as applicable. Do not commit

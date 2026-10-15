@@ -40,14 +40,17 @@ Dependabot proposes dependency updates; it does not approve or merge them.
   maintains the access list. Secrets belong in GitHub Actions secrets or protected
   local configuration, never in Git.
 
-All changes use pull requests, passing required checks and at least **one
-non-author human approval** before merging. The author and latest pusher cannot
-approve their own change. Dismiss stale approvals when new commits arrive.
-Bot/AI reviews do not satisfy the human requirement. Apply protection to
-administrators and do not bypass review to obtain a badge. With the current
-single-member inventory, an eligible independent human reviewer must be
-appointed before an owner-authored change can merge. GitHub's actual settings
-enforce required checks and reviews; keep them aligned with this policy.
+All changes use pull requests and passing required automated checks before
+merging. The maintainer reviews pull requests from other contributors before
+merging them. Maintainer-authored changes may merge after the required checks
+pass; another person's approval is not required. GitHub's protections apply to
+administrators and keep the test/security checks required.
+
+This single-maintainer process does not enforce non-author human approval for
+every change and therefore does not meet OpenSSF control OSPS-QA-07.01. Reviewing
+other contributors' work does not provide independent review of the maintainer's
+own changes. Keep badge answers and the documented process consistent with the
+actual GitHub settings.
 
 ## Review before granting sensitive access
 

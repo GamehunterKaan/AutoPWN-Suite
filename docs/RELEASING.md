@@ -9,9 +9,10 @@
    `### Functional changes` and `### Security changes`. Describe security impact
    and link applicable advisories; do not publish uncoordinated exploit details.
    If no security changes were made, say so explicitly rather than inventing one.
-3. Merge only after the required tests, Security policy, CodeQL checks and
-   non-author human approval pass. Protect administrators too; never bypass the
-   independent human review. Resolve SCA/SAST violations under
+3. Merge only after the required tests, Security policy and CodeQL checks pass.
+   The maintainer reviews other contributors' pull requests; maintainer-authored
+   changes do not require another person's approval. Protect administrators with
+   the same required automated checks. Resolve SCA/SAST violations under
    [Security testing](SECURITY_TESTING.md) and review native dependency license
    obligations. Update [SUPPORT.md](../SUPPORT.md), the
    [threat model](THREAT_MODEL.md) and advisories for relevant changes.
