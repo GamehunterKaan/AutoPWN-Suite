@@ -23,8 +23,7 @@ existing release summaries; they do not retroactively claim artifact signing.
 - Require CI results through repository branch settings; these settings must be
   verified separately from the documentation/workflow change.
 - Add fail-closed OSV/Bandit policy checks, version-specific VEX handling,
-  and dependency license review. The maintainer reviews external contributions;
-  maintainer-authored changes require automated checks without a second approver.
+  dependency license review, and independent human approval enforcement.
 - Build and inspect each container architecture before publication, attach
   CycloneDX SBOMs, and bind SBOM/VEX hashes into the signed release manifest.
 - Publish a threat model, credential access/rotation policy, support lifecycle
