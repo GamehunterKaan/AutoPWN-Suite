@@ -53,6 +53,26 @@ def wu(_isolate_web_ui_state):
     return _isolate_web_ui_state
 
 
+def test_webhook_disable_survives_settings_reload(app, wu, monkeypatch):
+    wu._settings = wu._deep_merge(wu._DEFAULT_SETTINGS, {
+        "webhook": {"enabled": True, "url": "https://example.invalid/hook", "on_error": False}})
+    wu._save_settings()
+    client = app.test_client()
+    response = client.put("/api/settings", json={"webhook": {"enabled": False}})
+    assert response.status_code == 200
+    saved = json.loads(wu._SETTINGS_FILE.read_text())
+    assert saved["webhook"]["enabled"] is False
+    assert saved["webhook"]["url"] == "https://example.invalid/hook"
+    assert saved["webhook"]["on_error"] is False
+    wu._settings.clear()
+    wu._load_settings()
+    assert client.get("/api/settings").get_json()["webhook"]["enabled"] is False
+    post = Mock()
+    monkeypatch.setattr(wu._requests, "post", post)
+    assert client.post("/api/settings/test_webhook").status_code == 400
+    post.assert_not_called()
+
+
 @pytest.fixture
 def app(wu):
     """Create a Flask test app."""

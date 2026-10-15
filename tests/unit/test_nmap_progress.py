@@ -78,9 +78,7 @@ def test_streams_task_progress_and_preserves_complete_xml(fake_spawn):
     assert "--stats-every" in args and "-v" in args and "-n" in args
     assert "192.0.2.1" in args and "192.0.2.2" in args
     assert spawn.call_args.kwargs.get("shell", False) is False
-    assert nm._nmap_last_output == XML
-    nm.analyse_nmap_xml_scan.assert_called_once_with(nmap_xml_output=XML, nmap_err="",
-                                                    nmap_err_keep_trace=[], nmap_warn_keep_trace=[])
+    nm.load_xml.assert_called_once_with(XML, stderr="")
     assert process.stdout.closed and process.stderr.closed
     assert not process.terminated
 
@@ -105,7 +103,7 @@ def test_cancel_stops_only_this_child_process_and_closes_pipes(fake_spawn, stubb
         monitored.scan_with_progress(nm, "192.0.2.1", "-sV", MagicMock(), lambda: next(stops, True))
     assert process.terminated and process.killed is stubborn
     assert process.stdout.closed and process.stderr.closed
-    nm.analyse_nmap_xml_scan.assert_not_called()
+    nm.load_xml.assert_not_called()
 
 
 def test_cancel_before_launch_does_not_spawn(fake_spawn):
@@ -122,7 +120,7 @@ def test_child_failure_is_not_parsed_as_success(fake_spawn):
     nm = scanner()
     with pytest.raises(RuntimeError, match="permission denied"):
         monitored.scan_with_progress(nm, "192.0.2.1", "-sV", MagicMock())
-    nm.analyse_nmap_xml_scan.assert_not_called()
+    nm.load_xml.assert_not_called()
     assert process.stderr.closed
 
 
@@ -149,18 +147,35 @@ def test_reader_start_failure_reaps_child(fake_spawn, monkeypatch):
     assert process.terminated and process.stdout.closed and process.stderr.closed
 
 
-def test_warnings_and_errors_are_forwarded_to_the_existing_parser(fake_spawn):
+@pytest.mark.parametrize("fail_on", [1, 2])
+def test_reader_construction_failure_reaps_child(fake_spawn, monkeypatch, fail_on):
+    _, process = fake_spawn
+    thread_type = monitored.threading.Thread
+    calls = 0
+
+    def create_reader(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == fail_on:
+            raise RuntimeError("cannot construct reader")
+        return thread_type(*args, **kwargs)
+
+    monkeypatch.setattr(monitored.threading, "Thread", create_reader)
+    with pytest.raises(RuntimeError, match="cannot construct reader"):
+        monitored.scan_with_progress(scanner(), "192.0.2.1", "-sV", MagicMock())
+    assert process.terminated and process.stdout.closed and process.stderr.closed
+
+
+def test_stderr_is_preserved_for_the_xml_parser(fake_spawn):
     spawn, _ = fake_spawn
     spawn.return_value = FakeProcess(stderr=b"Warning: host timeout\nUnreachable host\n")
     nm = scanner()
     monitored.scan_with_progress(nm, "192.0.2.1", "-sV", MagicMock())
-    parsed = nm.analyse_nmap_xml_scan.call_args.kwargs
-    assert parsed["nmap_warn_keep_trace"] == ["Warning: host timeout"]
-    assert parsed["nmap_err_keep_trace"] == ["Unreachable host"]
+    nm.load_xml.assert_called_once_with(XML, stderr="Warning: host timeout\nUnreachable host\n")
 
 
-def test_streaming_preserves_real_python_nmap_host_and_service_results(fake_spawn):
-    from nmap import PortScanner
+def test_streaming_preserves_host_and_service_results(fake_spawn):
+    from modules.nmap_backend import PortScanner
     xml = b'''<nmaprun args="nmap -sV 192.0.2.1">
       <scaninfo type="syn" protocol="tcp" numservices="1" services="22"/>
       <taskprogress task="Service scan" time="2" percent="75.00"/>
@@ -171,12 +186,12 @@ def test_streaming_preserves_real_python_nmap_host_and_service_results(fake_spaw
       <runstats><finished time="3" timestr="done" elapsed="2.0"/><hosts up="1" down="0" total="1"/></runstats>
     </nmaprun>'''
     fake_spawn[0].return_value = FakeProcess(stdout=xml)
-    nm = PortScanner.__new__(PortScanner)  # Bypass the constructor's binary probe.
-    nm._nmap_path = "nmap"
+    nm = PortScanner(nmap_path="nmap")
     monitored.scan_with_progress(nm, "192.0.2.1", "-sV", MagicMock())
     assert nm.all_hosts() == ["192.0.2.1"]
     assert nm["192.0.2.1"]["tcp"][22]["product"] == "OpenSSH"
     assert nm["192.0.2.1"]["tcp"][22]["version"] == "8.2p1"
+    assert nm.get_nmap_last_output() == xml
 
 
 def test_pipe_read_error_aborts_nmap_instead_of_waiting_forever(fake_spawn, monkeypatch):

@@ -21,7 +21,7 @@ from modules.utils import ScanMode, ScanType
 
 @pytest.fixture
 def mock_port_scanner():
-    """Fixture for a mocked nmap.PortScanner."""
+    """Fixture for the project's Nmap adapter."""
     with patch("modules.scanner.PortScanner") as mock_scanner_class:
         mock_instance = MagicMock()
         mock_scanner_class.return_value = mock_instance

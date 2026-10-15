@@ -1,7 +1,7 @@
 from json import dumps
 from typing import Any, Dict, List, Type, Union
 
-from nmap import PortScanner
+from modules.nmap_backend import PortScanner
 
 from modules.nist_search import searchCVE, VulnerabilityLookup
 from modules.searchvuln import GenerateKeyword

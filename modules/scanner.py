@@ -3,7 +3,7 @@ from enum import Enum
 from multiprocessing import Process
 from time import sleep
 
-from nmap import PortScanner
+from modules.nmap_backend import PortScanner
 from rich import box
 from rich.table import Table
 
@@ -56,7 +56,7 @@ def TestPing(target, mode=ScanMode.Normal, *, offline=False, progress=None, shou
     else:
         nm.scan(hosts=target, arguments=arguments)
 
-    return nm.all_hosts()
+    return nm.all_hosts(up_only=True)
 
 
 # do a arp scan using nmap
@@ -74,7 +74,7 @@ def TestArp(target, mode=ScanMode.Normal, *, offline=False, progress=None, shoul
     else:
         nm.scan(hosts=target, arguments=arguments)
 
-    return nm.all_hosts()
+    return nm.all_hosts(up_only=True)
 
 
 # run a port scan on target using nmap

@@ -18,7 +18,7 @@ def local_database(feed_server, monkeypatch):
     monkeypatch.setattr("requests.Session", lambda: pytest.fail("Offline scan tried HTTP"))
     monkeypatch.setattr("modules.nist_search.get", lambda *a, **k: pytest.fail("Offline scan contacted NVD"))
     monkeypatch.setattr("requests.sessions.Session.request", lambda *a, **k: pytest.fail("Test tried a real HTTP request"))
-    monkeypatch.setattr("nmap.PortScanner.__init__", lambda *a, **k: pytest.fail("Test tried real Nmap"))
+    monkeypatch.setattr("modules.nmap_backend.PortScanner.__init__", lambda *a, **k: pytest.fail("Test tried real Nmap"))
     return path
 
 

@@ -1,61 +1,72 @@
+import re
+
 from requests import get
-from requests import packages
-from requests.exceptions import ConnectionError, RequestException
-from modules.web.query import probe_url
+from requests.exceptions import RequestException
 
-
-packages.urllib3.disable_warnings()
+from modules.web.findings import emit, finding
+from modules.web.http import scoped_get
+from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
+from modules.web.query import parameter_indexes, probe_url, query_parts
 
 class SQLIScanner:
     def __init__(self, log, console) -> None:
         self.log = log
         self.console = console
-        self.tested_urls = []
+        self.tested_urls = set()
+        self.findings = []
         self.sqli_test = "'1"
         self.sql_dbms_errors = [
-            "sql syntax",
-            "valid mysql result",
-            "valid postgresql result",
-            "sql server",
-            "sybase message",
-            "oracle error",
-            "microsoft access driver",
-            "you have an error",
-            "corresponds to your",
-            "syntax to use near",
-            "sqlite.exception",
+            r"you have an error in your sql syntax",
+            r"warning.*?mysql(?:i)?[_\W]",
+            r"postgresql.*?error|pg_query\(\).*?failed|psycopg\w*\.errors\.syntaxerror",
+            r"unclosed quotation mark after the character string",
+            r"microsoft.*?(?:odbc|oledb).*?sql server|sqlserverexception",
+            r"\bORA-\d{5}\b",
+            r"microsoft.*?(?:jet|access).*?database",
+            r"sqlite(?:3)?\.(?:operationalerror|exception)|sqlite_error|sqlite.*?syntax error",
+            r"syntax error.*?at or near",
         ]
 
-    def exploit_sqli(self, base_url, url_params) -> None:
-        for index, param in enumerate(url_params):
-            param_no_value = param.split("=")[0]
-            main_url = f"{base_url}?{param_no_value}"
+    def _errors(self, text):
+        return {pattern for pattern in self.sql_dbms_errors if re.search(pattern, text, re.I)}
 
-            if not main_url in self.tested_urls:
-                self.tested_urls.append(main_url)
-                test_url = probe_url(base_url, url_params, index, self.sqli_test)
-            else:
-                continue
+    def exploit_sqli(self, base_url, url_params):
+        original = f"{base_url}?{'&'.join(url_params)}"
+        indexes = [index for index in parameter_indexes(url_params) if (original, index) not in self.tested_urls and not parameter_done("sqli", original, index)]
+        if not indexes:
+            return []
+        try:
+            baseline = self._errors(scoped_get(get, original).text)
+        except RequestException:
+            self.log.logger("error", f"Connection error raised on: {original}, skipping")
+            return []
+        found = []
+        for index in indexes:
+            revision = begin_parameter()
+            self.tested_urls.add((original, index))
+            for payload in (self.sqli_test, "'", '"'):
+                test_url = probe_url(base_url, url_params, index, payload)
+                try:
+                    new_errors = self._errors(scoped_get(get, test_url).text) - baseline
+                    if not new_errors:
+                        continue
+                    repeated = self._errors(scoped_get(get, test_url).text) - baseline
+                except RequestException:
+                    self.log.logger("error", f"Connection error raised on: {test_url}, skipping")
+                    break
+                if new_errors & repeated:
+                    result = finding("SQLI", test_url, "Repeatable database error absent from the baseline",
+                                     parameter=url_params[index].split("=", 1)[0], severity="high",
+                                     reproduction={"strategy": "sqli_error", "requests": [
+                                         {"url": original, "role": "baseline"}, {"url": test_url, "role": "probe"}, {"url": test_url, "role": "repeat"}]})
+                    found.append(result)
+                    emit(self.console, result)
+                    break
+            finish_parameter("sqli", original, index, revision)
+        self.findings.extend(found)
+        return found
 
-            try:
-                response = get(test_url, verify=False, timeout=10)
-            except RequestException:
-                self.log.logger("error", f"Connection error raised on: {test_url}, skipping")
-                return  # Exit if we can't connect
-
-            response_text_lower = response.text.lower()
-            for error in self.sql_dbms_errors:
-                if error in response_text_lower:
-                    self.console.print(
-                        f"[red][[/red][green]+[/green][red]][/red]"
-                        + f" [white]SQLI :[/white] {test_url}"
-                    )
-                    return  # Exit after finding the first vulnerability for this URL
-
-    def test_sqli(self, url) -> None:
-        """
-        Test for SQLI
-        """
-        base_url, separator, params = url.partition("?")
-        if separator and params:
-            self.exploit_sqli(base_url, params.split("&"))
+    def test_sqli(self, url):
+        """Test each query input with bounded, error-based probes."""
+        base_url, params = query_parts(url)
+        return self.exploit_sqli(base_url, params) if params else []
