@@ -198,6 +198,8 @@ Coverage cards show enabled checks, request counts and incomplete-check reasons.
 
 Downloading or viewing a PoC does not contact the target. **Verify evidence** explicitly replays only
 the stored same-origin plan, without authentication cookies, redirects or arbitrary supplied code.
+When detection followed validated same-origin redirects, its PoCs replay the final recorded URLs
+directly; the evidence keeps the intermediate redirect exchanges.
 Python verification compares baseline/probe evidence and returns reproduced, not reproduced or
 inconclusive, with redacted response metadata. Run a downloaded Python PoC after installing
 `requests` and `cryptography`; restore any `REDACTED` query inputs locally first. The dashboard refuses

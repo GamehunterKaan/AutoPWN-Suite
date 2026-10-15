@@ -183,10 +183,15 @@ class ScanContext:
             if matches:
                 index, match = matches[-1] if planned["role"] == "baseline" else matches[0]
                 used.add(index)
-                planned["headers"] = deepcopy(match["request"]["headers"])
-                record = deepcopy(match)
-                record["request"]["role"] = planned["role"]
-                result["observations"].append(record)
+                exchanges = [match, *match.get("redirects", [])]
+                final_request = exchanges[-1]["request"]
+                planned.update(url=final_request["url"], headers=deepcopy(final_request["headers"]),
+                               redacted=final_request["redacted"])
+                for offset, exchange in enumerate(exchanges):
+                    record = deepcopy(exchange)
+                    record.pop("redirects", None)
+                    record["request"]["role"] = planned["role"] if offset == len(exchanges) - 1 else planned["role"] + " redirect"
+                    result["observations"].append(record)
         result["details"] = describe_finding(result)
         return result
 

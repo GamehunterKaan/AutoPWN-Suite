@@ -1,5 +1,6 @@
 """Bounded web requests that validate redirects before following them."""
 
+from copy import deepcopy
 from urllib.parse import urldefrag, urljoin, urlsplit
 
 from requests.exceptions import RequestException, TooManyRedirects
@@ -48,7 +49,7 @@ def bounded_request(call, *args, max_bytes=1_048_576, **kwargs):
     response._content_consumed = True
     if current:
         method, url = (args[0], args[1]) if len(args) > 1 else ("GET", args[0])
-        current.capture(response, method, url, kwargs.get("headers", {}), started)
+        response.autopwn_observation = current.capture(response, method, url, kwargs.get("headers", {}), started)
     return response
 
 
@@ -127,6 +128,17 @@ def scoped_get(get, url, *, allow_upgrade=False, **kwargs):
     Only initial endpoint discovery may upgrade the same host from port 80 to
     HTTPS on port 443. Injection probes remain on their exact original origin.
     """
+    from modules.web.runtime import ACTIVE
+    context = ACTIVE.get()
+    exchanges = []
+
+    def finish(response):
+        if len(exchanges) > 1:
+            # Link only the exchanges from this successful scoped request.
+            # Evidence can then retain the hops and replay the final URL.
+            exchanges[0]["redirects"] = deepcopy(exchanges[1:])
+        return response
+
     try:
         initial_origin = origin(url)
     except ValueError as exc:
@@ -138,11 +150,13 @@ def scoped_get(get, url, *, allow_upgrade=False, **kwargs):
             raise TooManyRedirects("Redirect loop in web scan")
         visited.add(current)
         response = bounded_request(get, current, timeout=10, verify=False, allow_redirects=False, **kwargs)
+        if context:
+            exchanges.append(response.autopwn_observation)
         if response.status_code not in (301, 302, 303, 307, 308):
-            return response
+            return finish(response)
         location = response.headers.get("Location")
         if not isinstance(location, str) or not location:
-            return response
+            return finish(response)
         response.close()
         try:
             destination = urldefrag(urljoin(current, location))[0]

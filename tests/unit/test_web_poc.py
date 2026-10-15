@@ -74,6 +74,53 @@ def test_sql_poc_requires_baseline_difference_and_repeat(web_response):
     assert verify_plan(build_plan(result), transport=MagicMock(return_value=web_response("You have an error in your SQL syntax")))["status"] == "not_reproduced"
 
 
+@pytest.mark.parametrize("kind", ["sqli", "lfi", "xss"])
+def test_redirected_findings_record_final_evidence_and_reproduce_without_redirects(web_response, kind):
+    from urllib.parse import parse_qs, urlsplit, urlunsplit
+    from modules.web.runtime import ScanContext, redact_url
+    from modules.web.sqli import SQLIScanner
+    from modules.web.lfi import LFIScanner
+    from modules.web.xss import XSSScanner
+    scanners = {"sqli": (SQLIScanner, "test_sqli"), "lfi": (LFIScanner, "test_lfi"), "xss": (XSSScanner, "test_xss")}
+    url = "http://example.com/read?file=one&token=private"
+    def site(requested, **kwargs):
+        parts = urlsplit(requested)
+        if parts.path in ("/read", "/middle"):
+            path = "/middle" if parts.path == "/read" else "/read/"
+            return web_response(status=302, url=requested, headers={"Location": urlunsplit(parts._replace(path=path))})
+        value = parse_qs(parts.query)["file"][0]
+        if kind == "sqli":
+            body = "You have an error in your SQL syntax" if "'" in value else "Normal page"
+        elif kind == "lfi":
+            body = "root:x:0:0:root:/root:/bin/bash" if "passwd" in value else "Normal page"
+        else:
+            body = "<html>" + value + "</html>"
+        return web_response(body, url=requested)
+    context = ScanContext(url, MagicMock(), controls={"speed": 5})
+    scanner, method = scanners[kind]
+    with context.activate(), patch(f"modules.web.{kind}.get", side_effect=site):
+        result = getattr(scanner(MagicMock(), MagicMock()), method)(url)[0]
+    result["endpoint"] = redact_url(url)
+    assert "private" not in str(result)
+    plan = build_plan(result)
+    assert all(urlsplit(row["url"]).path == "/read/" for row in plan["requests"])
+    assert all("REDACTED" in row["url"] for row in plan["requests"])
+    statuses = [row["response"]["status"] for row in result["observations"]]
+    assert statuses == [302, 302, 200] * len(plan["requests"])
+    # Restore the local input as a user would before running the download.
+    for row in plan["requests"]:
+        row["url"] = row["url"].replace("REDACTED", "private")
+    calls = []
+    def transport(method, requested, **kwargs):
+        calls.append((requested, kwargs))
+        return site(requested)
+    verified = verify_plan(plan, transport=transport)
+    assert verified["status"] == "reproduced"
+    assert len(calls) == len(plan["requests"])
+    assert all(urlsplit(requested).path == "/read/" and not kwargs["allow_redirects"] for requested, kwargs in calls)
+    assert all('/read/?' in line for line in curl_poc(result).splitlines() if line.startswith('curl'))
+
+
 @pytest.mark.unit
 def test_xss_poc_rejects_comment_and_inactive_reflection(web_response):
     result = sample("XSS", "xss_reflection")
