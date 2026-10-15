@@ -35,6 +35,39 @@ def test_crawl_resumes_uncrawled_pages_and_retains_links_hidden_by_limits():
     assert Counter(calls) == Counter({url: 1 for url in graph})
 
 
+@pytest.mark.parametrize("status", [401, 403, 408, 429, 500, 503])
+def test_http_crawl_failure_stays_pending_and_resume_discovers_recovered_links(web_response, status):
+    root, page, leaf = "http://example.com/", "http://example.com/page", "http://example.com/leaf"
+    state, summaries, calls = {}, [], []
+    def fetch(url, **kwargs):
+        calls.append(url)
+        if url == page and not summaries:
+            return web_response("Unavailable", status=status, url=url, headers={"Content-Type": "application/json"})
+        body = '<a href="/page">page</a>' if url == root else '<a href="/leaf">leaf</a>' if url == page else "Done"
+        return web_response(body, url=url)
+    with patch("modules.web.webvuln.get", side_effect=lambda url, **kw: web_response(url=url)), \
+         patch("modules.web.crawler.get", side_effect=fetch):
+        webvuln(root, MagicMock(), MagicMock(), controls=controls("sqli"), checkpoint=state, on_complete=summaries.append)
+        assert summaries[0]["status"] == "partial"
+        assert any(f"HTTP {status}" in issue for issue in summaries[0]["issues"])
+        assert page not in state["crawl"] and leaf not in state["crawl"]
+        webvuln(root, MagicMock(), MagicMock(), controls=controls("sqli"), checkpoint=state, on_complete=summaries.append)
+    assert summaries[-1]["status"] == "completed" and not summaries[-1]["issues"]
+    assert Counter(calls) == {root: 1, page: 2, leaf: 1}
+
+
+@pytest.mark.parametrize("status", [404, 410])
+def test_missing_crawl_pages_are_terminal_observations(web_response, status):
+    root, page = "http://example.com/", "http://example.com/missing"
+    state, summary = {}, {}
+    def fetch(url, **kwargs):
+        return web_response('<a href="/missing">missing</a>', url=url) if url == root else web_response(status=status, url=url)
+    with patch("modules.web.webvuln.get", return_value=web_response(url=root)), patch("modules.web.crawler.get", side_effect=fetch):
+        webvuln(root, MagicMock(), MagicMock(), controls=controls("sqli"), checkpoint=state, on_complete=summary.update)
+    assert summary["status"] == "completed" and not summary["issues"]
+    assert state["crawl"][page] == []
+
+
 def test_endpoint_batches_reach_completed_without_retesting_finished_checks(web_response):
     root = "http://example.com/"
     urls = {root + f"page?id={i}" for i in range(6)}

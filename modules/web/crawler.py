@@ -74,9 +74,16 @@ def link_finder(target_url, log) -> set[str]:
         log.logger("error", f"Unable to crawl {target_url}: {exc}")
         return set()
     page_url = response.url if isinstance(response.url, str) else target_url
-    if not same_origin(target_url, page_url) or not is_html(response):
-        return set()
     if isinstance(response.status_code, int) and response.status_code >= 400:
+        if response.status_code not in (404, 410):
+            message = f"Unable to crawl {target_url}: HTTP {response.status_code}; coverage is incomplete."
+            current = ACTIVE.get()
+            if current:
+                current.issue(message)
+            else:
+                log.logger("warning", message)
+        return set()
+    if not same_origin(target_url, page_url) or not is_html(response):
         return set()
     soup = BeautifulSoup(response.text, "html.parser")
     urls = set()
