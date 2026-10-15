@@ -4,45 +4,115 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing published release tag to build and sign (for example v2.6.0)'
+        required: true
+        type: string
 
 permissions:
   contents: read
-  packages: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
 
 jobs:
   build-and-push:
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout trusted release automation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release and prepare source archives
+        id: release
+        env:
+          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_DIR="$RUNNER_TEMP/autopwn-release-source"
+          ASSET_DIR="$RUNNER_TEMP/autopwn-release-assets"
+          printf 'SOURCE_DIR=%s\nASSET_DIR=%s\n' "$SOURCE_DIR" "$ASSET_DIR" >> "$GITHUB_ENV"
+          commit="$(python scripts/release_assets.py prepare --tag "$RELEASE_TAG" --output "$ASSET_DIR")"
+          release="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          test "$(jq -r .draft <<< "$release")" = false
+          test "$(jq '.assets | length' <<< "$release")" = 0
+          git worktree add --detach "$SOURCE_DIR" "$commit"
+          image="docker.io/${DOCKER_USER,,}/autopwn-suite"
+          [[ "$image" =~ ^docker\.io/[a-z0-9]+([._-][a-z0-9]+)*/autopwn-suite$ ]]
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          {
+            printf 'image=%s\n' "$image"
+            printf 'version=%s\n' "${RELEASE_TAG#v}"
+            if [ "$latest" = "$RELEASE_TAG" ]; then printf 'latest=true\n'; else printf 'latest=false\n'; fi
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/autopwn-suite
+          images: ${{ steps.release.outputs.image }}
+          flavor: latest=false
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.release.outputs.version }}
+            type=semver,value=${{ env.RELEASE_TAG }},pattern={{major}}.{{minor}},enable=${{ steps.release.outputs.latest }}
+            type=raw,value=latest,enable=${{ steps.release.outputs.latest }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: .
+          context: ${{ env.SOURCE_DIR }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+
+      - name: Sign and verify image and release manifest
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/release_assets.py manifest --tag "$RELEASE_TAG" --output "$ASSET_DIR" --image "$IMAGE" --digest "$DIGEST"
+          identity="https://github.com/$GITHUB_WORKFLOW_REF"
+          cosign sign --yes "$IMAGE@$DIGEST"
+          cosign verify --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$IMAGE@$DIGEST"
+          cosign sign-blob --yes --bundle "$ASSET_DIR/release-manifest.sigstore.json" "$ASSET_DIR/release-manifest.json"
+          cosign verify-blob --bundle "$ASSET_DIR/release-manifest.sigstore.json" --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$ASSET_DIR/release-manifest.json"
+
+      - name: Publish verified release assets and descriptive notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" "$ASSET_DIR"/* --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" --notes-file "$ASSET_DIR/release-notes.md" --repo "$GITHUB_REPOSITORY"

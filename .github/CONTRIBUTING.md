@@ -11,10 +11,21 @@ Please note we have a code of conduct, please follow it in all your interactions
    build.
 2. Update the README.md with details of changes to the interface, this includes new environment 
    variables, exposed ports, useful file locations and container parameters.
-3. Increase the version numbers in any examples files and the README.md to the new version that this
-   Pull Request would represent. The versioning scheme we use is [SemVer](http://semver.org/).
-4. You may merge the Pull Request in once you have the sign-off of two other developers, or if you 
-   do not have permission to do that, you may request the second reviewer to merge it for you.
+3. Add or update tests for behavior changes and document functional and security
+   modifications under `Unreleased` in [CHANGELOG.md](../CHANGELOG.md). The
+   maintainer assigns the release version using [SemVer](https://semver.org/).
+4. Run `poetry check --lock` and `poetry run test` using Poetry 2.5.1. All required
+   CI checks must pass before merging. The maintainer reviews and merges accepted
+   changes; any exceptional bypass needs an explicit explanation in the PR.
+5. Use [Build instructions](../docs/BUILDING.md) and
+   [Dependency management](../docs/DEPENDENCIES.md). Dependency changes must
+   update both runtime manifests and the lockfile as applicable. Do not commit
+   credentials, generated executables or unreviewable application binaries.
+
+The project roles and access inventory are in [GOVERNANCE.md](../GOVERNANCE.md).
+Contributors must have the legal right to submit each contribution under the
+repository's Apache-2.0 license, as required by GitHub's contribution terms.
+Report security issues privately using [SECURITY.md](../SECURITY.md).
 
 ## Code of Conduct
 

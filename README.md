@@ -15,6 +15,12 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 
 ## Features
 
+Project documentation: [build from source](docs/BUILDING.md),
+[dependency management](docs/DEPENDENCIES.md), [architecture](docs/ARCHITECTURE.md),
+[interfaces](docs/INTERFACES.md), [governance](GOVERNANCE.md),
+[changelog](CHANGELOG.md), [release verification](docs/RELEASING.md), and
+[security policy](SECURITY.md).
+
 ### CLI
 - Fully [automatic](#usage) scanning and exploitation
 - Detect network IP range without any user input
@@ -439,7 +445,7 @@ The web UI exposes a full REST API:
 ## Module Usage
 
 ```python
-from autopwn_suite.api import AutoScanner
+from api import AutoScanner
 
 scanner = AutoScanner()
 json_results = scanner.scan("192.168.0.1")
@@ -483,8 +489,11 @@ poetry run test -m "not slow"
 
 #### Running with Docker (Development)
 ```bash
-docker compose up --build
+docker build --tag autopwn-suite:local .
 ```
+
+See [Build from source](docs/BUILDING.md) for prerequisites, package builds and
+running the locally built image. The Compose file runs a published image.
 
 
 ## Contributing to AutoPWN Suite

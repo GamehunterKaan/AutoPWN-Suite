@@ -18,23 +18,22 @@ jobs:
         os: [ubuntu-latest, macos-latest]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
     - name: Set up Python 3.10
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: "3.10"
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-    - name: OS specific run
-      uses: KnicKnic/os-specific-run@v1.0.4
-      with:
-        linux: |
-          sudo apt-get update
-          sudo apt-get install nmap -y
-        macos: |
-          bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          brew install nmap
+    - name: Install Nmap on Linux
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends nmap -y
+    - name: Install Nmap on macOS
+      if: runner.os == 'macOS'
+      run: brew install nmap
     - name: Import test
       run: python -c "import autopwn; import api"
     - name: Automatic test
