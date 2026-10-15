@@ -9,9 +9,12 @@
    `### Functional changes` and `### Security changes`. Describe security impact
    and link applicable advisories; do not publish uncoordinated exploit details.
    If no security changes were made, say so explicitly rather than inventing one.
-3. Merge a reviewed PR only after required status checks pass. Any exceptional
-   manual bypass must be explained in that PR. Protect `main`, prevent direct
-   pushes/deletion, and require the PR test checks in GitHub branch settings.
+3. Merge only after the required tests, Security policy, CodeQL checks and
+   non-author human approval pass. Protect administrators too; never bypass the
+   independent human review. Resolve SCA/SAST violations under
+   [Security testing](SECURITY_TESTING.md) and review native dependency license
+   obligations. Update [SUPPORT.md](../SUPPORT.md), the
+   [threat model](THREAT_MODEL.md) and advisories for relevant changes.
 4. Create the version tag at reviewed history on `main` and publish the GitHub
    release with its descriptive changelog. The publishing workflow archives the
    exact tagged source, builds the multi-platform image, and signs/verifies both
@@ -21,10 +24,15 @@
    before claiming signed distribution. A configured workflow alone is not proof
    that an existing release is signed.
 
-The release job explicitly gets `contents:write` and `id-token:write`; workflow
-defaults remain read-only. Docker Hub publishing uses existing repository secrets
-`DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN`. Pin third-party release actions by commit.
-Never give PR tests publishing credentials or run unreviewed PR source in this job.
+Read-only jobs validate/archive the release and run source security checks, then
+build each architecture without publication secrets. Syft generates a CycloneDX
+SBOM from each actual image archive; OSV checks installed OS/Python dependencies
+and Python licenses before registry publication. A separate push job has no
+GitHub token permissions and only the Docker Hub credentials it needs. Signing
+gets `contents:read`, `id-token:write` and registry signature-push access. Upload
+alone gets `contents:write` and no OIDC or Docker credentials. Workflow defaults
+remain read-only. Third-party actions/tools are pinned. These checks apply to
+historical rebuilds too; an old tag does not waive current security policy.
 
 The workflow can also be dispatched **from main** with an existing published
 release tag, for example to sign v2.6.0 after this automation has been merged.
@@ -40,8 +48,15 @@ release currently identified as GitHub's latest release updates the image's
 - `autopwn-suite-vVERSION.tar.gz` and `.zip`: source archives made by `git archive`
   from the validated tag/commit, with a versioned top-level directory.
 - `release-notes.md`: descriptive changelog for that version.
-- `release-manifest.json`: release tag, source commit, SHA-256 of each of the three
-  files above, and the exact Docker Hub image digest.
+- `autopwn-suite-vVERSION-linux-amd64.cdx.json` and `-linux-arm64.cdx.json`:
+  machine-readable SBOMs of each built architecture, including native and Python
+  dependencies. The container includes compiled native software even though the
+  project's application source is Python.
+- `autopwn-suite-vVERSION-vex-index.json` and any listed versioned OpenVEX files:
+  a snapshot of reviewed non-exploitability declarations. The index may list no
+  documents when no such determination has been made.
+- `release-manifest.json`: release tag, source commit, SHA-256 of every archive,
+  note, SBOM and VEX file above, and the exact Docker Hub image digest.
 - `release-manifest.sigstore.json`: Cosign signing certificate/signature and
   transparency-log verification bundle for the manifest.
 - The container's exact `sha256:` digest also has a Cosign registry signature.
@@ -55,7 +70,7 @@ Older releases without these artifacts must be treated as unsigned.
 ## Consumer verification
 
 Install Cosign 3.x from its official distribution and GitHub CLI. Download the
-five release files without executing them. Choose the expected signer identity
+release files without executing them. Choose the expected signer identity
 from the trusted workflow/ref, not from an untrusted bundle:
 
 ```sh

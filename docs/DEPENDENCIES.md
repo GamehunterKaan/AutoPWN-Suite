@@ -50,5 +50,11 @@ by AutoPWN. They must not be treated as package dependencies or checked into Git
    and the exact changes in the lockfile and container dependencies. Track
    remaining work in an issue without publishing undisclosed exploit details.
 
+The [security testing policy](SECURITY_TESTING.md) defines mandatory OSV
+vulnerability/malicious-package checks, license thresholds, VEX exceptions and
+pre-release image checks. Every compiled image architecture receives a CycloneDX
+SBOM generated from its actual image archive, covered by the signed release
+manifest. Do not infer installed image contents from the Poetry lockfile alone.
+
 The maintainer owns this process. A lockfile or passing CI alone is not proof
 that dependencies are safe; document assessment and mitigation decisions.

@@ -48,11 +48,15 @@ def test_archives_use_tag_and_manifest_binds_every_asset(source_repo, tmp_path):
         assert archive.read("autopwn-suite-v2.6.0/source.txt") == b"reviewed source"
         assert not any(name.endswith("secret.txt") for name in archive.namelist())
     digest = "sha256:" + "a" * 64
+    for arch in ("amd64", "arm64"):
+        (output / f"autopwn-suite-v2.6.0-linux-{arch}.cdx.json").write_text(json.dumps({
+            "bomFormat": "CycloneDX", "components": [{"name": "nmap"}, {"name": "requests"}],
+        }))
     manifest = release.write_manifest(source_repo, "v2.6.0", output,
                                       "docker.io/gamehunterkaan/autopwn-suite", digest)
     assert manifest["source_commit"] == commit
     assert manifest["container"]["digest"] == digest
-    assert len(manifest["assets"]) == 3
+    assert len(manifest["assets"]) == 6
     for asset in manifest["assets"]:
         assert asset["sha256"] == hashlib.sha256((output / asset["name"]).read_bytes()).hexdigest()
     assert json.loads((output / "release-manifest.json").read_text()) == manifest

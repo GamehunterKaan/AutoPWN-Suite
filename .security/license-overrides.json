@@ -1,0 +1,22 @@
+{
+  "pkg:pypi/colorama@0.4.6": {
+    "license": "BSD-3-Clause",
+    "evidence": "https://github.com/tartley/colorama/blob/0.4.6/LICENSE.txt",
+    "sha256": "cac35c02686e5d04a5a7140bfb3b36e73aed496656e891102e428886d7930318"
+  },
+  "pkg:pypi/itsdangerous@2.2.0": {
+    "license": "BSD-3-Clause",
+    "evidence": "https://github.com/pallets/itsdangerous/blob/2.2.0/LICENSE.txt",
+    "sha256": "63af09891b6be8ad1a4252ed43af0f4efba7fc948e228367bed7f3c5ae0b09d7"
+  },
+  "pkg:pypi/jinja2@3.1.6": {
+    "license": "BSD-3-Clause",
+    "evidence": "https://github.com/pallets/jinja/blob/3.1.6/LICENSE.txt",
+    "sha256": "3b49dcee4105eb37bac10faf1be260408fe85d252b8e9df2e0979fc1e094437b"
+  },
+  "pkg:pypi/packaging@25.0": {
+    "license": "Apache-2.0 OR BSD-2-Clause",
+    "evidence": "https://github.com/pypa/packaging/blob/25.0/LICENSE",
+    "sha256": "cad1ef5bd340d73e074ba614d26f7deaca5c7940c3d8c34852e65c4909686c48"
+  }
+}

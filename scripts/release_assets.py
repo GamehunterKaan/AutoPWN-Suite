@@ -8,6 +8,9 @@ import re
 import subprocess
 
 
+POLICY_ROOT = Path(__file__).resolve().parents[1] / ".security"
+
+
 TAG = re.compile(r"v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?")
 IMAGE = re.compile(r"docker\.io/[a-z0-9]+(?:[._-][a-z0-9]+)*/autopwn-suite")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
@@ -60,6 +63,16 @@ def prepare(repo, tag, output, changelog, reviewed_ref="refs/remotes/origin/main
                         f"--prefix=autopwn-suite-{tag}/", f"--output={destination.resolve()}",
                         commit], check=True)
     (output / "release-notes.md").write_text(notes, encoding="utf-8", newline="\n")
+    index = json.loads((POLICY_ROOT / "vex/index.json").read_text(encoding="utf-8"))
+    names = []
+    for name in index["documents"]:
+        if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]*\.openvex\.json", name):
+            raise ValueError("Invalid VEX filename")
+        destination = f"autopwn-suite-{tag}-{name}"
+        (output / destination).write_bytes((POLICY_ROOT / "vex" / name).read_bytes())
+        names.append(destination)
+    (output / f"autopwn-suite-{tag}-vex-index.json").write_text(
+        json.dumps({"schema_version": 1, "documents": names}, indent=2) + "\n", encoding="utf-8")
     return commit
 
 
@@ -68,8 +81,22 @@ def write_manifest(repo, tag, output, image, digest, reviewed_ref="refs/remotes/
     if not IMAGE.fullmatch(image) or not DIGEST.fullmatch(digest):
         raise ValueError("Expected an official Docker Hub image and a SHA-256 digest")
     names = [f"autopwn-suite-{tag}.tar.gz", f"autopwn-suite-{tag}.zip", "release-notes.md"]
+    names += [f"autopwn-suite-{tag}-linux-{arch}.cdx.json" for arch in ("amd64", "arm64")]
+    vex_index = f"autopwn-suite-{tag}-vex-index.json"
+    index = json.loads((output / vex_index).read_text(encoding="utf-8"))
+    for name in index["documents"]:
+        if not re.fullmatch(rf"autopwn-suite-{re.escape(tag)}-[a-zA-Z0-9][a-zA-Z0-9._-]*\.openvex\.json", name):
+            raise ValueError("Invalid versioned VEX filename")
+    names += [vex_index, *index["documents"]]
     if set(p.name for p in output.iterdir()) != set(names):
         raise ValueError("Unexpected or missing release staging assets")
+    for arch in ("amd64", "arm64"):
+        sbom = json.loads((output / f"autopwn-suite-{tag}-linux-{arch}.cdx.json").read_text(encoding="utf-8"))
+        if sbom.get("bomFormat") != "CycloneDX" or not sbom.get("components"):
+            raise ValueError("Every image architecture requires a nonempty CycloneDX SBOM")
+        package_names = {component.get("name") for component in sbom["components"]}
+        if not {"nmap", "requests"}.issubset(package_names):
+            raise ValueError("Image SBOM must include native and Python runtime dependencies")
     assets = []
     for name in names:
         path = output / name

@@ -67,10 +67,10 @@ flowchart LR
 
 | Resource / boundary | Effective behavior and responsibility |
 | --- | --- |
-| Dashboard socket | Defaults to `0.0.0.0:8080`; CLI options override environment defaults. Flask has no built-in authentication and enables CORS. Treat access as administrative authority; bind to loopback or protect the entire service with authenticated access and a firewall. |
+| Dashboard socket | Defaults to `0.0.0.0:8080`; CLI options override environment defaults, then present INI WEBUI values override the parsed CLI values. Flask has no built-in authentication and enables CORS. Treat access as administrative authority; bind to loopback or protect the entire service with authenticated access and a firewall. |
 | Dashboard files | `AUTOPWN_DATA_DIR` or the `modules/` directory contains `web_ui_settings.json`, `web_ui_profiles.json`, and `web_ui_schedules.json`. Settings include credentials; files are JSON, not an encrypted secret store. Restrict filesystem/backups accordingly. |
 | Local CVE database | Explicit `--vuln-db` overrides the default `vulnerabilities.sqlite3` under `AUTOPWN_DATA_DIR` or `modules/`. Readers use a read-only snapshot; updates stage, verify and replace the complete database under an update lock. |
-| Container | `Dockerfile` runs the application as the container's default user; Compose uses host networking and a named volume at `/data`. `AUTOPWN_DATA_DIR=/data` puts all three JSON files and the default CVE database in that volume. The volume is not encrypted or isolated by application user roles. |
+| Container | `Dockerfile` runs the application as the container's default user; plain Docker defaults JSON/database storage to `/app/modules`. Supplied Compose uses host networking and a named volume at `/data`; its `AUTOPWN_DATA_DIR=/data` puts all three JSON files and the default CVE database in that volume. The volume is not encrypted or isolated by application user roles. CWD-based outputs/downloads are separate. |
 | Nmap and systemd | Process privileges carry into network operations and NSE. Some scans and service installation need root; custom flags are trusted operator capabilities, not a sandbox for untrusted clients. |
 | Target responses | Treat all scan results, links, descriptions and redirects as untrusted. Web discovery is same-origin and budgeted; HTML display must escape results. Target TLS diagnostics intentionally inspect certificate failures/legacy protocols, unlike trusted update/distribution channels. |
 | Offline mode | Disables online lookups, web probes/replay, notifications, exploit downloads and automatic Nmap installation. Nmap still contacts selected targets. User hostnames/NSE scripts can have their own network behavior. |
@@ -79,4 +79,5 @@ flowchart LR
 The software is an operator-controlled security tool, not a multi-tenant scanning
 service. Target control must not imply control of operator files, credentials or
 browser execution. See [Security assessment](SECURITY_ASSESSMENT.md) for reviewed
-threats and limitations and [Interfaces](INTERFACES.md) for inputs and outputs.
+threats and limitations, [Threat model](THREAT_MODEL.md) for attack surfaces and
+effective resources, and [Interfaces](INTERFACES.md) for inputs and outputs.

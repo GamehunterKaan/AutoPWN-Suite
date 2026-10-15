@@ -22,6 +22,12 @@ existing release summaries; they do not retroactively claim artifact signing.
   vulnerability-information channel.
 - Require CI results through repository branch settings; these settings must be
   verified separately from the documentation/workflow change.
+- Add fail-closed OSV/Bandit policy checks, version-specific VEX handling,
+  dependency license review, and independent human approval enforcement.
+- Build and inspect each container architecture before publication, attach
+  CycloneDX SBOMs, and bind SBOM/VEX hashes into the signed release manifest.
+- Publish a threat model, credential access/rotation policy, support lifecycle
+  and end-of-life rules. Separate build, registry, signing and upload privileges.
 - The assessment identifies existing runtime issues; this infrastructure change
   does not claim to fix them. See the assessment and advisory status.
 

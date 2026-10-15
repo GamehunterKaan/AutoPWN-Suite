@@ -19,7 +19,9 @@ Project documentation: [build from source](docs/BUILDING.md),
 [dependency management](docs/DEPENDENCIES.md), [architecture](docs/ARCHITECTURE.md),
 [interfaces](docs/INTERFACES.md), [governance](GOVERNANCE.md),
 [changelog](CHANGELOG.md), [release verification](docs/RELEASING.md), and
-[security policy](SECURITY.md).
+[security policy](SECURITY.md), [support lifecycle](SUPPORT.md),
+[threat model](docs/THREAT_MODEL.md), [secret management](docs/SECRETS.md), and
+[security checks](docs/SECURITY_TESTING.md).
 
 ### CLI
 - Fully [automatic](#usage) scanning and exploitation

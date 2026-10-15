@@ -48,6 +48,10 @@ Do not invent CVE identifiers or claim that an empty advisory list proves safety
 Security fixes target the latest stable release. Users of older releases should
 upgrade unless an advisory specifies a supported backport. Assessments and
 advisories explicitly identify the versions they cover.
+See [support lifecycle](SUPPORT.md) for scope, duration and end-of-life rules,
+[secret management](docs/SECRETS.md) for storage/access/rotation requirements, and
+[automated security policy](docs/SECURITY_TESTING.md) for SCA/SAST thresholds and
+non-exploitability decisions.
 
 The dashboard is an administrative interface with no built-in login. Restrict
 access to trusted operators, bind to loopback when possible, and use authenticated

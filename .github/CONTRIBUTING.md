@@ -16,7 +16,8 @@ Please note we have a code of conduct, please follow it in all your interactions
    maintainer assigns the release version using [SemVer](https://semver.org/).
 4. Run `poetry check --lock` and `poetry run test` using Poetry 2.5.1. All required
    CI checks must pass before merging. The maintainer reviews and merges accepted
-   changes; any exceptional bypass needs an explicit explanation in the PR.
+   changes after a non-author human approves them. Bot/AI review cannot replace
+   that approval; administrators must follow the same rule.
 5. Use [Build instructions](../docs/BUILDING.md) and
    [Dependency management](../docs/DEPENDENCIES.md). Dependency changes must
    update both runtime manifests and the lockfile as applicable. Do not commit
@@ -26,6 +27,33 @@ The project roles and access inventory are in [GOVERNANCE.md](../GOVERNANCE.md).
 Contributors must have the legal right to submit each contribution under the
 repository's Apache-2.0 license, as required by GitHub's contribution terms.
 Report security issues privately using [SECURITY.md](../SECURITY.md).
+
+## Test policy and interpreting results
+
+Run `poetry run test` locally with Python 3.10+ after installing the dependencies
+in [BUILDING.md](../docs/BUILDING.md). Pytest runs unit and integration tests in
+`tests/`, including native Nmap contracts, configuration/offline behavior, web
+probe budgets, dashboard/API/scheduler state, persistence, provider parsing and
+release/security gates. Install Nmap for loopback integration tests. Tests use
+synthetic/mock targets where possible; never substitute an unauthorized host.
+
+CI runs the Poetry suite on every PR to main and every main push. It requires
+all tests to pass and at least **80% branch-aware overall coverage**; failures,
+errors or coverage below the threshold block merge. Read the failing assertion
+and traceback, repair the behavior and rerun the affected tests, then the suite.
+Review skipped tests and explain any new skip; a skipped case is not evidence
+that its behavior passed. The separate Linux/macOS jobs import the app and run
+a loopback scan; CodeQL and the [security policy](../docs/SECURITY_TESTING.md)
+also run on every change. Checks rerun after pushes to an open PR.
+
+Every **major behavior change** must add or update automated tests: new features,
+interfaces, permission or trust boundaries, data formats/storage, scheduling,
+dependency behavior, and changes to scan results, cancellation or limits. Tests
+must exercise expected behavior, failure paths and relevant boundary cases;
+bug fixes need a regression demonstrating the bug. Reviewers check this before
+approval. Documentation-only edits need no redundant behavior test. Update the
+[threat model](../docs/THREAT_MODEL.md) for new features or breaking changes that
+affect security boundaries.
 
 ## Code of Conduct
 

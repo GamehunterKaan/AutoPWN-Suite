@@ -20,8 +20,9 @@ Do not list secret values, recovery codes, or private reporting details here.
 ## Automation identities
 
 GitHub Actions uses short-lived `GITHUB_TOKEN` credentials. The repository default
-is read-only, and each workflow declares its permissions. The publishing job
-explicitly requests release-write and OIDC permissions; Docker Hub access uses
+is read-only, and each workflow declares its permissions. Builds and scans have
+read-only access; only signing receives OIDC and only publication receives
+release-write permissions. Docker Hub push/sign access uses
 the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. An OIDC identity
 signs release artifacts through Sigstore; no long-lived signing key is stored.
 Dependabot proposes dependency updates; it does not approve or merge them.
@@ -39,11 +40,38 @@ Dependabot proposes dependency updates; it does not approve or merge them.
   maintains the access list. Secrets belong in GitHub Actions secrets or protected
   local configuration, never in Git.
 
-Changes normally use pull requests. Automated test/status checks must pass before
-merging. An exceptional bypass must be an explicit maintainer decision recorded
-in the pull request with its reason and follow-up; silence or an unfinished run is
-not approval. GitHub's actual settings, rather than this policy alone, enforce
-required checks. The owner must keep those settings aligned with this policy.
+All changes use pull requests, passing required checks and at least **one
+non-author human approval** before merging. The author and latest pusher cannot
+approve their own change. Dismiss stale approvals when new commits arrive.
+Bot/AI reviews do not satisfy the human requirement. Apply protection to
+administrators and do not bypass review to obtain a badge. With the current
+single-member inventory, an eligible independent human reviewer must be
+appointed before an owner-authored change can merge. GitHub's actual settings
+enforce required checks and reviews; keep them aligned with this policy.
+
+## Review before granting sensitive access
+
+Before granting write/maintain/admin permissions, merge authority, secret access,
+private-advisory access or publishing rights, the owner must review the person's
+identity and relevant contribution/review history. Confirm identity through an
+established channel, check any claimed trusted-organization affiliation, confirm
+MFA/passkey use, and assess security judgment and the specific task requiring
+access. An account name, contribution volume or automated approval is not enough.
+
+Record the approver, justification, scope and review/expiry date in the access
+request; keep private identity material private. Grant the lowest necessary
+role, preferably temporary, and update the public human access inventory above.
+New contributors receive no elevated permissions automatically. Review access
+quarterly and on role changes; promptly remove unused access and rotate exposed
+credentials under [Secrets](docs/SECRETS.md). No collaborator has been added by
+this policy change.
+
+The project currently releases from one source repository. Before incorporating
+a project-owned source subrepository, document it here and verify that its
+review, access, CI, security-testing, disclosure and release controls are at least
+as strict as this repository's applicable baseline. Block release if a subproject
+does not meet those controls. Third-party packages remain subject to the
+dependency and license policy.
 
 Discuss design and scope in repository issues or discussions. The maintainer
 resolves disagreements and documents significant decisions in the relevant issue
