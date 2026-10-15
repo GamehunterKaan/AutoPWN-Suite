@@ -1569,10 +1569,11 @@ def _build_app(static_dir: Path) -> "Flask":
                 return jsonify({"error": "Offline database unavailable."}), 409
             try:
                 controls = normalize_options(body.get("web_options", {}), _resume_web_options(job))
-                if controls["checks"] != normalize_options(job.config.get("web_options"))["checks"]:
-                    raise ValueError("Keep the original check selection when resuming; start a new scan to change it.")
-            except ValueError as exc:
-                return jsonify({"error": str(exc)}), 400
+                original_checks = normalize_options(job.config.get("web_options"))["checks"]
+            except ValueError:
+                return jsonify({"error": "Invalid web scan configuration"}), 400
+            if controls["checks"] != original_checks:
+                return jsonify({"error": "Keep the original check selection when resuming; start a new scan to change it."}), 400
             job.config["web_options"] = controls
             job.resume_count += 1
             job._stop_flag.clear()

@@ -274,6 +274,40 @@ def test_invalid_resume_is_atomic(dashboard, body):
     assert job.status == "partial" and job.resume_count == 0
 
 
+@pytest.mark.parametrize("failure", ["internal_details", "oversized_integer", "malformed_integer", "check_selection"])
+def test_resume_validation_does_not_serialize_exceptions_or_change_job(dashboard, failure):
+    from copy import deepcopy
+    wu, client = dashboard
+    job = wu.ScanJob("job", "example.com", {"scan_web": True, "web_options": {}})
+    job.mark_done("partial")
+    job.request_stop()
+    wu._register_scan(job)
+    before = deepcopy(job.to_dict())
+    body = {"web_options": {}}
+    if failure == "oversized_integer":
+        import sys
+        limit = sys.get_int_max_str_digits()
+        if not limit:
+            pytest.skip("Python integer conversion limit is disabled")
+        body["web_options"]["speed"] = "9" * (limit + 1)
+    elif failure == "malformed_integer":
+        body["web_options"]["speed"] = "++2"
+    elif failure == "check_selection":
+        body["web_options"]["checks"] = {"sqli": False}
+    with patch.object(wu.threading, "Thread") as thread:
+        if failure == "internal_details":
+            with patch.object(wu, "normalize_options", side_effect=ValueError("/private/config: secret-token-123")):
+                response = client.post("/api/scans/job/resume", json=body)
+        else:
+            response = client.post("/api/scans/job/resume", json=body)
+    assert response.status_code == 400
+    expected = ("Keep the original check selection when resuming; start a new scan to change it."
+                if failure == "check_selection" else "Invalid web scan configuration")
+    assert response.get_json() == {"error": expected}
+    assert job.to_dict() == before and job.should_stop()
+    thread.assert_not_called()
+
+
 def test_resume_offline_guard_and_completed_guard(dashboard):
     wu, client = dashboard
     job = wu.ScanJob("job", "example.com", {"scan_web": True})
