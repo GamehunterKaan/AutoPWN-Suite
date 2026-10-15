@@ -103,10 +103,10 @@ expand a leading tilde (`modules/web_ui.py:144`,
 | Notifications | SMTP/webhook credentials/reports | Explicit CLI or enabled dashboard settings; offline gates | Configured recipients, secret references only | Selected receiver | Timeouts and enable/offline gates; SMTP validation limitation remains; `modules/report.py:75`, `modules/report.py:100`, `modules/web_ui.py:695`, `modules/web_ui.py:739` |
 | Contributor CI | Candidate source execution | PR/push -> hosted tests/scanners | Read-only GitHub credentials, no publishing secrets | Runner/package providers | Explicit permissions, no persisted checkout credential; `.github/workflows/poetry-tests.yml:14`, `.github/workflows/security.yml:22` |
 | Release validation | Versioned source archives/VEX | Valid tag, versions, origin/main ancestry | Runner-temp assets from exact tagged commit | Read-only validation job | Empty staging/existing-assets refusal; `scripts/release_assets.py:23`, `.github/workflows/publish-docker.yml:24` |
-| Release build | Image archives and per-architecture SBOMs | Validated commit -> isolated amd64/arm64 builds -> scans | Runner-temp image/SBOM/reports | Read-only build runner; no registry/OIDC secrets | Source policy and actual image SCA precede push; `.github/workflows/publish-docker.yml:71` |
-| Registry push | Distribution capability | Successful build/scan artifacts only | `docker.io/gamehunterkaan/autopwn-suite:<version>` | Docker Hub | Docker publishing secret only; no GitHub token permissions; `.github/workflows/publish-docker.yml:131` |
-| OIDC signing | Image digest and manifest authenticity | Push digest + archived source/SBOM/VEX -> verified signatures | Exact SHA-256 image digest and asset hashes | Registry/Sigstore, downstream verifiers | contents:read, id-token:write, registry signing access; `.github/workflows/publish-docker.yml:166` |
-| GitHub publication | Release assets/notes | Successfully signed artifact handoff | Version-associated assets, no overwrite flag | GitHub release API/users | contents:write only; no checkout, OIDC or registry credentials; `.github/workflows/publish-docker.yml:211` |
+| Release build | Image archives and per-architecture SBOMs | Validated commit's immutable source-archive handoff -> isolated amd64/arm64 builds -> scans | Runner-temp image/SBOM/reports | Read-only build runner; no registry/OIDC secrets | Source policy and actual image SCA precede push; `.github/workflows/publish-docker.yml:71` |
+| Registry push | Distribution capability | Successful build/scan artifacts only | `docker.io/gamehunterkaan/autopwn-suite:<version>` | Docker Hub | Docker publishing secret only; no GitHub token permissions; `.github/workflows/publish-docker.yml:136` |
+| OIDC signing | Image digest and manifest authenticity | Push digest + archived source/SBOM/VEX -> verified signatures | Exact SHA-256 image digest and asset hashes | Registry/Sigstore, downstream verifiers | contents:read, id-token:write, registry signing access; `.github/workflows/publish-docker.yml:172` |
+| GitHub publication | Release assets/notes | Successfully signed artifact handoff | Version-associated assets, no overwrite flag | GitHub release API/users | contents:write only; no checkout, OIDC or registry credentials; `.github/workflows/publish-docker.yml:217` |
 
 Importing the CLI imports web_ui and creates its effective data directory before
 argument parsing; dashboard startup loads the JSON files later
@@ -211,4 +211,4 @@ in sorted repository-path order as path-NUL-bytes-NUL, excluding ignored files.
 It identifies the inspected architecture inputs, not a signed software release.
 
 Repository: target_sha256_f4729301817a49c0c92d2ef33ffd0bd514e1296e7084a6d623842b3beb1924f8
-Version: snapshot:7e201add497cf1534a43e20e6f10d7ff92e9d9490f6c88d3aa17b719143699fc
+Version: snapshot:1cc6ed33cf82442534e193dea23da5ad071420fd3db2f54e87cdb5d295df5dbd
