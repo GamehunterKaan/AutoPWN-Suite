@@ -9,6 +9,8 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Functional changes
 
+- Refresh the original independent-human approval checks after review changes,
+  avoiding duplicate approval checks and stale failures after approval.
 - Document project governance, dependency selection, source builds, architecture,
   all external interfaces, release operations and security-assessment results.
 - Prepare official source archives from reviewed version tags and publish

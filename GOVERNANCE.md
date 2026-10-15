@@ -29,6 +29,11 @@ Dependabot proposes dependency updates; it does not approve or merge them.
 The separate authenticity-backfill workflow inventories existing image digests
 and adds signatures/reports to an existing release without rebuilding images or
 moving their tags; it uses the same isolated signing and upload authorities.
+Review events use a credential-free notification workflow. A handler from
+protected main has Actions-write access only to rerun the original approval
+checks for the PR's current revision; it never checks out PR code or consumes
+PR artifacts. This refreshes approvals and dismissals without creating another
+required approval check.
 
 ## Responsibilities and decisions
 

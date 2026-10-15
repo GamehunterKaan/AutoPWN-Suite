@@ -4,8 +4,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
-  pull_request_review:
-    types: [submitted, dismissed]
 
 permissions:
   pull-requests: read
@@ -23,6 +21,10 @@ jobs:
           script: |
             const number = context.payload.pull_request.number;
             const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
+            if (pr.head.sha !== context.payload.pull_request.head.sha) {
+              core.setFailed('This check belongs to an older PR revision.');
+              return;
+            }
             const reviews = await github.paginate(github.rest.pulls.listReviews, {...context.repo, pull_number: number});
             const latest = new Map();
             for (const review of reviews) {
