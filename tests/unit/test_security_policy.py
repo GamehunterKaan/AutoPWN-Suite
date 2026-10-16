@@ -1,12 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Security checks must reject findings, missing coverage and broad suppressions."""
 
-from datetime import datetime, timezone
 import importlib.util
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-
 
 spec = importlib.util.spec_from_file_location(
     "security_policy", Path(__file__).resolve().parents[2] / "scripts/security_policy.py")

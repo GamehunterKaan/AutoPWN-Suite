@@ -1,14 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Archive reviewed tagged source and bind release assets to their digests."""
 
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
 import re
 import subprocess
 import urllib.request
-
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
 
 POLICY_ROOT = Path(__file__).resolve().parents[1] / ".security"
 
@@ -203,9 +205,35 @@ def write_manifest(repo, tag, output, image, digest, reviewed_ref="refs/remotes/
     if backfill:
         manifest["publication"] = {"purpose": "authenticity_backfill", "security_clearance": False,
                                    "rebuilt": False, "platforms": records}
+    manifest["assets"], manifest["supporting_archive"] = bundle_supporting(output, tag, assets)
     (output / "release-manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     return manifest
+
+
+def bundle_supporting(output, tag, assets):
+    """Keep source downloads separate and bind every supporting file in one ZIP."""
+    sources = {f"autopwn-suite-{tag}.tar.gz", f"autopwn-suite-{tag}.zip"}
+    supporting = sorted((asset for asset in assets if asset["name"] not in sources),
+                        key=lambda asset: asset["name"])
+    name = f"autopwn-suite-{tag}-security.zip"
+    destination = output / name
+    with zipfile.ZipFile(destination, "x") as archive:
+        for asset in supporting:
+            info = zipfile.ZipInfo(asset["name"], date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, (output / asset["name"]).read_bytes())
+    # Verify the completed bundle before removing the separate staging copies.
+    with zipfile.ZipFile(destination) as archive:
+        for asset in supporting:
+            if hashlib.sha256(archive.read(asset["name"])).hexdigest() != asset["sha256"]:
+                raise ValueError("Supporting archive hash mismatch")
+    published = [asset for asset in assets if asset["name"] in sources]
+    published.append({"name": name, "sha256": hashlib.sha256(destination.read_bytes()).hexdigest()})
+    for asset in supporting:
+        (output / asset["name"]).unlink()
+    return published, {"name": name, "files": supporting}
 
 
 def main():

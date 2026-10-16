@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Fail closed on dependency and static-analysis policy violations.
 
 Scanners run without installing application dependencies or executing project code.
@@ -5,15 +7,15 @@ The JSON reports are retained even when a finding blocks the change or release.
 """
 
 import argparse
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
-from pathlib import Path
 import re
 import subprocess
 import sys
-import tomllib
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
+import tomllib
 
 POLICY_ROOT = Path(__file__).resolve().parents[1] / ".security"
 ALLOWED_LICENSES = {
