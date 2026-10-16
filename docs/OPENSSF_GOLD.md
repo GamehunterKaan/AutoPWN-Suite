@@ -9,11 +9,11 @@ is the case. Gold requires the Silver badge first (`achieve_silver`); see
 
 | Status | Criteria |
 | --- | --- |
-| **Met in the repository** | `copyright_per_file`, `license_per_file`, `small_tasks`, `test_statement_coverage90`, `test_branch_coverage80`, `test_invocation`, `test_continuous_integration`, `repo_distributed`, `crypto_tls12`, `code_review_standards`, `two_person_review`, `security_review`, `dynamic_analysis` (workflow not yet run on GitHub) |
+| **Met in the repository or on the live site** | `hardened_site`, `copyright_per_file`, `license_per_file`, `small_tasks`, `test_statement_coverage90`, `test_branch_coverage80`, `test_invocation`, `test_continuous_integration`, `repo_distributed`, `crypto_tls12`, `code_review_standards`, `two_person_review`, `security_review`, `dynamic_analysis` (workflow not yet run on GitHub) |
 | **Met, with limits** | `build_reproducible`, `hardening` |
 | **Met by maintainer attestation or determination** | `bus_factor`, `contributors_unassociated`, `require_2FA` |
 | **Met once the release ships** | `crypto_used_network` |
-| **Maintainer action** | `hardened_site` (website headers), `secure_2FA` (SHOULD) |
+| **Maintainer action** | `secure_2FA` (SHOULD, optional) |
 | **Unmet (justified)** | `dynamic_analysis_enable_assertions` (SHOULD) |
 | **Prerequisite** | `achieve_silver` |
 
@@ -39,7 +39,7 @@ is the case. Gold requires the Silver badge first (`achieve_silver`); see
 | `test_branch_coverage80` | **Met (Python)** | 87.64% of Python branches (2,417 of 2,758) in the latest local run. JavaScript is not measured. |
 | `crypto_used_network` | **Met after release** | Provider, SMTP and web-scan traffic verify TLS by default and the dashboard is loopback-only by default; plain-HTTP scan targets are chosen by the operator. Unreleased. |
 | `crypto_tls12` | **Met** | The supported Python TLS stack negotiates TLS 1.2 or later by default. |
-| `hardened_site` | **Maintainer action** | Checked 2026-10-16: `https://kaangultekin.net/projects/autopwn-suite/` returns HTTP 200 with **none** of the hardening headers (`Strict-Transport-Security`, `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`). The site is served by GitHub Pages (`Server: GitHub.com`), which cannot set custom response headers, so this needs a proxy or CDN in front of it (for example Cloudflare response-header rules) or a host that supports a headers file. Re-check with `curl -sI` after the change. GitHub controls the headers of the repository and release pages. |
+| `hardened_site` | **Met** | Checked 2026-10-16: public DNS (1.1.1.1 and 8.8.8.8) resolves `kaangultekin.net` to Cloudflare, and `https://kaangultekin.net/projects/autopwn-suite/` returns `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin` and a `Content-Security-Policy` limited to the site's own origin plus named script, style and font hosts. The CSP still allows `'unsafe-inline'` for scripts and styles, which a strict header scanner may flag. GitHub controls the headers of the repository and release pages. |
 | `security_review` | **Met** | An independent source review of v2.6.0 is recorded in [SECURITY_ASSESSMENT.md](SECURITY_ASSESSMENT.md) and the [threat model](THREAT_MODEL.md), within the last five years, considering the security requirements and boundaries. The maintainer also attests an independent reviewer for the new authentication code; no report of that review is in the repository. |
 | `hardening` | **Met, with limits** | See the [assurance case](ASSURANCE_CASE.md). The container runs as root and Nmap runs with full privileges; least privilege would strengthen this. |
 | `dynamic_analysis` | **Met** | An OWASP ZAP baseline scan of the running dashboard (unauthenticated sign-in surface and an authenticated crawl) runs on pull requests and pushes to `main`, and the container publication job depends on it, so a release cannot be pushed without it ([workflow](../.github/workflows/dynamic-analysis.yml), [rules](../.github/zap/rules.tsv)). Seeded fuzz tests ([test_fuzz_inputs.py](../tests/unit/test_fuzz_inputs.py)) also run on every change. The first ZAP run found missing security headers, which were fixed. The workflow was calibrated in a local container; it has **not yet run on a GitHub-hosted runner**. Its Replacer rule and a few informational ZAP alerts are explicitly ignored with written reasons. |
@@ -48,8 +48,7 @@ is the case. Gold requires the Silver badge first (`achieve_silver`); see
 ## Remaining steps
 
 1. Finish Silver and ship the release; `crypto_used_network` and the Silver items that depend on it follow.
-2. Add the hardening headers (HSTS, CSP, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`) to
-   `kaangultekin.net` for `hardened_site`, then re-check; prefer a security key or passkey for `secure_2FA`.
+2. Optionally prefer a security key or passkey for `secure_2FA`.
 3. Watch the first GitHub run of the dynamic-analysis workflow and fix any difference from the local calibration.
 4. Keep the attested items current: `bus_factor`, `contributors_unassociated` and `require_2FA` are the maintainer's
    statements, not facts the repository can verify, so a reviewer may ask for more detail.
