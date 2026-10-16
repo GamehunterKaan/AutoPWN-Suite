@@ -2,17 +2,31 @@
 
 AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems automatically.
 
-![GitHub Top Language](https://img.shields.io/github/languages/top/GamehunterKaan/AutoPWN-Suite)
-![Repo Size](https://img.shields.io/github/repo-size/GamehunterKaan/AutoPWN-Suite)
-[![Tests](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml/badge.svg)](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml)
-[![OpenSSF Baseline](https://www.bestpractices.dev/projects/15518/baseline)](https://www.bestpractices.dev/en/projects/15518/baseline-3)
-![GitHub Contributors](https://img.shields.io/github/contributors/GamehunterKaan/AutoPWN-Suite)
-![GitHub Closed Pull Requests](https://img.shields.io/github/issues-pr-closed/GamehunterKaan/AutoPWN-Suite)
-![GitHub Closed Issues](https://img.shields.io/github/issues-closed-raw/GamehunterKaan/AutoPWN-Suite)
-![GitHub Repo Stars](https://img.shields.io/github/stars/GamehunterKaan/AutoPWN-Suite?style=social)
-![License](https://img.shields.io/github/license/GamehunterKaan/AutoPWN-Suite)
-[![OpenSSF Baseline](https://www.bestpractices.dev/projects/15518/baseline)](https://www.bestpractices.dev/projects/15518/baseline-3)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15518/badge)](https://www.bestpractices.dev/projects/15518)
+<table align="center">
+  <tr>
+    <td align="center">
+      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml/badge.svg" alt="security policy"></a>
+      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml/badge.svg" alt="dynamic analysis"></a>
+      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/releases"><img src="https://img.shields.io/github/v/release/GamehunterKaan/AutoPWN-Suite?color=3ba9ee&label=release" alt="release"></a>
+      <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="license: Apache 2.0"></a>
+      <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.10%2B-3776AB.svg" alt="Python 3.10+"></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <sub><b>Security Badges</b></sub><br>
+      <a href="https://www.bestpractices.dev/projects/15518"><img src="https://www.bestpractices.dev/badge_static/passing" alt="OpenSSF Best Practices Passing" height="20"></a>
+      <a href="https://www.bestpractices.dev/projects/15518"><img src="https://www.bestpractices.dev/badge_static/silver" alt="OpenSSF Best Practices Silver" height="20"></a>
+      <a href="https://www.bestpractices.dev/projects/15518"><img src="https://www.bestpractices.dev/badge_static/gold" alt="OpenSSF Best Practices Gold" height="20"></a><br>
+      <a href="https://www.bestpractices.dev/projects/15518/baseline-1"><img src="https://www.bestpractices.dev/badge_static/baseline-1" alt="OpenSSF Baseline 1" height="20"></a>
+      <a href="https://www.bestpractices.dev/projects/15518/baseline-2"><img src="https://www.bestpractices.dev/badge_static/baseline-2" alt="OpenSSF Baseline 2" height="20"></a>
+      <a href="https://www.bestpractices.dev/projects/15518/baseline-3"><img src="https://www.bestpractices.dev/badge_static/baseline-3" alt="OpenSSF Baseline 3" height="20"></a><br>
+      <a href="https://scorecard.dev/viewer/?uri=github.com/GamehunterKaan/AutoPWN-Suite"><img src="https://api.securityscorecards.dev/projects/github.com/GamehunterKaan/AutoPWN-Suite/badge" alt="OpenSSF Scorecard" height="20"></a>
+    </td>
+  </tr>
+</table>
+
 ![Banner](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/banner.png)
 
 
@@ -53,10 +67,7 @@ trusted network controls, and verify releases before use. See the
 
 ## Achievements and project health
 
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15518/badge)](https://www.bestpractices.dev/projects/15518)
-[![OpenSSF Baseline](https://www.bestpractices.dev/projects/15518/baseline)](https://www.bestpractices.dev/en/projects/15518/baseline-3)
-
-The badges above show the live status that
+The badges at the top show the status that
 [OpenSSF Best Practices project 15518](https://www.bestpractices.dev/projects/15518)
 reports for the Best Practices levels and the
 [OpenSSF Baseline](https://www.bestpractices.dev/en/projects/15518/baseline-3) levels.
