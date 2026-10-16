@@ -54,6 +54,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   (`docs/ASSURANCE_CASE.md`), the [regression-test ledger](docs/REGRESSION_LEDGER.md) and OpenSSF
   [Silver](docs/OPENSSF_SILVER.md) and [Gold](docs/OPENSSF_GOLD.md) preparation records.
 - Add an SPDX license identifier and copyright notice to every source file.
+- Limit the blocking vulnerability gate to Python requirements. Operating-system packages in
+  the base image are still inventoried and reported but no longer block a release; known
+  malicious packages still block in any ecosystem.
 - Prepare official source archives from reviewed version tags and publish
   descriptive version notes alongside a signed release manifest.
 

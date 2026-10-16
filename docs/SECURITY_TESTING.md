@@ -16,8 +16,10 @@ must cover every package/version in `poetry.lock`; new lockfile entries are
 included automatically. Only standard PyPI sources are approved. Human review
 also checks provenance, unexpected package names, maintainer changes and install
 scripts: no scanner proves that an unknown package is benign. The release scan
-checks actual installed Python and OS packages in each Docker image, covering
-pip resolution differences from the Poetry environment.
+checks the Python packages actually installed in each Docker image, covering
+pip resolution differences from the Poetry environment. Operating-system packages
+inherited from the base image are inventoried in the signed SBOM and scan reports but
+do not block a release; a known malicious package blocks in any ecosystem.
 
 **Threshold:** every known applicable dependency vulnerability, regardless of
 severity or available fix, blocks merge/release until upgraded, removed or

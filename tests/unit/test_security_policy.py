@@ -50,6 +50,26 @@ def test_sca_blocks_all_known_vulnerabilities_and_malware(root):
     assert count == 1 and len(violations) == 2
 
 
+def os_report(vulns=(), ecosystem="Debian:13"):
+    return {"results": [{"packages": [{"package": {
+        "name": "libc6", "version": "2.41", "ecosystem": ecosystem, "purl": "pkg:deb/debian/libc6@2.41",
+    }, "vulnerabilities": [{"id": v} for v in vulns]}]}]}
+
+
+def test_only_python_requirements_block_on_known_vulnerabilities(root):
+    # Operating-system packages from the base image are inventoried but do not block.
+    assert policy.evaluate_sca(os_report(["DEBIAN-CVE-TEST-1"]), "2.6.0", root) == ([], 1)
+    # The same finding in a Python requirement (including one installed in an image) blocks.
+    combined = {"results": os_report(["DEBIAN-CVE-TEST-1"])["results"] + report(["CVE-TEST-1"])["results"]}
+    violations, count = policy.evaluate_sca(combined, "2.6.0", root)
+    assert count == 2 and violations == ["pkg:pypi/example@1.0: CVE-TEST-1"]
+
+
+def test_known_malware_blocks_in_any_ecosystem(root):
+    violations, _ = policy.evaluate_sca(os_report(["MAL-TEST-1"]), "2.6.0", root)
+    assert violations == ["pkg:deb/debian/libc6@2.41: MAL-TEST-1"]
+
+
 def test_clean_inventory_passes_and_missing_package_fails(root):
     assert policy.evaluate_sca(report(), "2.6.0", root, expected={("example", "1.0")}) == ([], 1)
     with pytest.raises(ValueError, match="omitted"):

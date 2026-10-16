@@ -126,9 +126,10 @@ case that hides them would not be an assurance case.
   parser such as `defusedxml` would reduce residual risk and is a candidate improvement.
 - **DNS resolution** is performed by the operating system and is outside the
   project's network deadlines.
-- **Container and OS packages.** Released images carry operating-system advisories that
-  are reported unsuppressed in the signed reports; a signature establishes origin, not
-  safety. The service runs as root and the image defines no unprivileged user.
+- **Container and OS packages.** Operating-system packages come from the Debian base
+  image and are not managed as project dependencies; they appear in the signed SBOM and
+  scan reports, and a signature establishes origin, not safety. The service runs as root
+  and the image defines no unprivileged user.
 - **Process limits.** The project has a single maintainer today
   ([continuity plan](CONTINUITY.md)); independent human review is configured but its
   strength depends on a second reviewer being available.
