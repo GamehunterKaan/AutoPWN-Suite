@@ -11,7 +11,7 @@ There is no automatic merge or publication on a failed security check.
 ## Software composition analysis (SCA)
 
 OSV-Scanner 2.7.0 queries OSV's known-vulnerability/malicious-package records for
-all 34 current locked runtime and development Python dependencies. The inventory
+all 35 current locked runtime and development Python dependencies. The inventory
 must cover every package/version in `poetry.lock`; new lockfile entries are
 included automatically. Only standard PyPI sources are approved. Human review
 also checks provenance, unexpected package names, maintainer changes and install

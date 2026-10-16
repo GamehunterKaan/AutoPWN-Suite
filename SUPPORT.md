@@ -23,3 +23,11 @@ ordinary bugs and questions. Report vulnerabilities privately using
 [SECURITY.md](SECURITY.md); its acknowledgement and coordination timeframes apply
 throughout triage, including reports about unsupported versions. Known unresolved
 issues and mitigations are in the [advisory index](docs/SECURITY_ADVISORIES.md).
+
+Support depends on one volunteer maintainer. The
+[continuity plan](docs/CONTINUITY.md) explains how issue handling and releases are
+meant to continue if the maintainer is unavailable, and the
+[roadmap](docs/ROADMAP.md) lists planned work and non-goals. Accessibility barriers
+in the dashboard and internationalization problems are treated as ordinary bugs; see
+[accessibility](docs/ACCESSIBILITY.md) and
+[internationalization](docs/INTERNATIONALIZATION.md).

@@ -78,24 +78,36 @@ GitHub OIDC, and uploads verified assets. It never publishes a new software tag.
 
 ## Published artifact format
 
-- `autopwn-suite-vVERSION.tar.gz` and `.zip`: source archives made by `git archive`
-  from the validated tag/commit, with a versioned top-level directory.
-- `release-notes.md`: descriptive changelog for that version.
-- `autopwn-suite-vVERSION-linux-amd64.cdx.json` and `-linux-arm64.cdx.json`:
-  machine-readable SBOMs of each built architecture, including native and Python
-  dependencies. The container includes compiled native software even though the
-  project's application source is Python.
-- `autopwn-suite-vVERSION-vex-index.json` and any listed versioned OpenVEX files:
-  a snapshot of reviewed non-exploitability declarations. The index may list no
-  documents when no such determination has been made.
-- `release-manifest.json`: release tag, source commit, SHA-256 of every archive,
-  note, SBOM and VEX file above, and the exact Docker Hub image digest.
-- `release-manifest.sigstore.json`: Cosign signing certificate/signature and
-  transparency-log verification bundle for the manifest.
-- The container's exact `sha256:` digest also has a Cosign registry signature.
-- Authenticity backfills additionally include a versioned `-image-index.json`
-  and per-architecture `-sca.json`, `-policy.json` and `-backfill.json` records;
-  every file is covered by the manifest's SHA-256 values.
+The next release using this layout publishes **five attached files**:
+
+| File | Contents |
+| --- | --- |
+| `autopwn-suite-vVERSION.tar.gz` | Exact tagged source, archived by `git archive` under a versioned directory. |
+| `autopwn-suite-vVERSION.zip` | The same tagged source in ZIP format. |
+| `autopwn-suite-vVERSION-security.zip` | Release notes, both platform SBOMs, VEX index/declarations and any backfill reports. |
+| `release-manifest.json` | Release/source identity, hashes of the three archives, hashes of every supporting ZIP member, and exact Docker image digest. |
+| `release-manifest.sigstore.json` | Cosign certificate/signature and transparency-log verification bundle for the manifest. |
+
+The security ZIP preserves the original report filenames and bytes at its root:
+`release-notes.md`, per-platform `-linux-amd64.cdx.json` / `-linux-arm64.cdx.json`
+CycloneDX SBOMs, and a versioned `-vex-index.json` plus any listed OpenVEX files.
+The SBOMs include native and Python dependencies. The VEX index can be empty
+when no non-exploitability determination has been made. Authenticity backfills
+also include the original `-image-index.json` and per-architecture `-sca.json`,
+`-policy.json` and `-backfill.json` records. Findings stay available inside this
+archive, with the same assessment times and limitations.
+
+The manifest's `assets` array hashes the three downloadable archives. Its
+`supporting_archive` object identifies the security ZIP by `name` and lists each
+member's `name` and `sha256` in `files`. The ZIP uses fixed timestamps and member
+ordering; its completed contents are verified before separate staging copies
+are removed. Release notes are read from the ZIP for the GitHub release body.
+The container's exact `sha256:` digest also has a Cosign registry signature.
+
+Existing releases, including the already signed v2.6.0 release, retain their
+previous separate-file layout. This change does not replace their assets or
+invalidate their existing signatures. Both layouts use the same top-level
+manifest hash verification below; only bundled layouts add `supporting_archive`.
 
 The manifest and bundle form the signature envelope; they cannot include their
 own hashes recursively. Prefer these attached project archives when verifying
@@ -132,6 +144,7 @@ outside the download directory:
 import hashlib
 import json
 from pathlib import Path
+import zipfile
 
 manifest = json.loads(Path("release-manifest.json").read_text())
 for asset in manifest["assets"]:
@@ -140,6 +153,17 @@ for asset in manifest["assets"]:
         raise ValueError("Invalid manifest filename")
     if hashlib.sha256(Path(name).read_bytes()).hexdigest() != asset["sha256"]:
         raise ValueError(f"Hash mismatch: {name}")
+if "supporting_archive" in manifest:
+    supporting = manifest["supporting_archive"]
+    if Path(supporting["name"]).name != supporting["name"]:
+        raise ValueError("Invalid supporting archive filename")
+    with zipfile.ZipFile(supporting["name"]) as archive:
+        expected = {entry["name"] for entry in supporting["files"]}
+        if len(archive.namelist()) != len(expected) or set(archive.namelist()) != expected:
+            raise ValueError("Unexpected or missing supporting files")
+        for entry in supporting["files"]:
+            if hashlib.sha256(archive.read(entry["name"])).hexdigest() != entry["sha256"]:
+                raise ValueError(f"Supporting hash mismatch: {entry['name']}")
 print(manifest["source_commit"], manifest["container"])
 ```
 

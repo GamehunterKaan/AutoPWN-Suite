@@ -14,7 +14,9 @@ Please note we have a code of conduct, please follow it in all your interactions
 3. Add or update tests for behavior changes and document functional and security
    modifications under `Unreleased` in [CHANGELOG.md](../CHANGELOG.md). The
    maintainer assigns the release version using [SemVer](https://semver.org/).
-4. Run `poetry check --lock` and `poetry run test` using Poetry 2.5.1. All required
+4. Run `poetry check --lock`, `poetry run ruff check .` and `poetry run test`
+   using Poetry 2.5.1, and follow the [coding standards](../docs/CODING_STANDARDS.md)
+   (PEP 8 via Ruff for Python, ESLint for the dashboard JavaScript). All required
    CI checks must pass before merging. The maintainer reviews and merges accepted
    changes after a non-author human approves them. Bot/AI review cannot replace
    that approval; administrators must follow the same rule.
@@ -22,11 +24,131 @@ Please note we have a code of conduct, please follow it in all your interactions
    [Dependency management](../docs/DEPENDENCIES.md). Dependency changes must
    update both runtime manifests and the lockfile as applicable. Do not commit
    credentials, generated executables or unreviewable application binaries.
+6. Sign off every commit under the
+   [Developer Certificate of Origin](#developer-certificate-of-origin-dco).
+7. For user-interface changes, follow the
+   [accessibility requirements](#accessibility-and-internationalization-requirements).
+
+Check the [roadmap](../docs/ROADMAP.md) for planned work and non-goals before
+proposing a large feature.
 
 The project roles and access inventory are in [GOVERNANCE.md](../GOVERNANCE.md).
 Contributors must have the legal right to submit each contribution under the
 repository's Apache-2.0 license, as required by GitHub's contribution terms.
 Report security issues privately using [SECURITY.md](../SECURITY.md).
+
+## Developer Certificate of Origin (DCO)
+
+This project uses the [Developer Certificate of Origin 1.1](https://developercertificate.org/)
+instead of a contributor license agreement. By signing off a commit, you certify
+that you have the right to submit it under the repository's Apache-2.0 license.
+**Every commit in a pull request must contain a `Signed-off-by` trailer** with
+your real name and an e-mail address you control:
+
+```text
+Signed-off-by: Your Name <you@example.com>
+```
+
+Git adds this line when you commit with `-s`:
+
+```sh
+git commit -s -m "Describe the change"
+# Add a missing sign-off to the latest commit
+git commit --amend -s --no-edit
+# Add sign-offs to every commit on your branch (rewrites history)
+git rebase --signoff main
+```
+
+The name and e-mail must match your Git `user.name` and `user.email`. If you use the
+GitHub web editor, enable sign-off for web commits in your own GitHub settings or
+add the trailer to the commit message. The maintainer checks sign-off during review
+and does not merge a pull request that lacks it. No automated DCO check is currently
+configured. The requirement applies to contributions made after this section was
+merged; earlier commits are not retroactively changed.
+
+The full text of the certificate follows.
+
+> Developer Certificate of Origin
+> Version 1.1
+>
+> Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+>
+> Everyone is permitted to copy and distribute verbatim copies of this
+> license document, but changing it is not allowed.
+>
+> Developer's Certificate of Origin 1.1
+>
+> By making a contribution to this project, I certify that:
+>
+> (a) The contribution was created in whole or in part by me and I
+> have the right to submit it under the open source license
+> indicated in the file; or
+>
+> (b) The contribution is based upon previous work that, to the best
+> of my knowledge, is covered under an appropriate open source
+> license and I have the right under that license to submit that
+> work with modifications, whether created in whole or in part
+> by me, under the same open source license (unless I am
+> permitted to submit under a different license), as indicated
+> in the file; or
+>
+> (c) The contribution was provided directly to me by some other
+> person who certified (a), (b) or (c) and I have not modified
+> it.
+>
+> (d) I understand and agree that this project and the contribution
+> are public and that a record of the contribution (including all
+> personal information I submit with it, including my sign-off) is
+> maintained indefinitely and may be redistributed consistent with
+> this project or the open source license(s) involved.
+
+## Accessibility and internationalization requirements
+
+The dashboard has known accessibility gaps listed in
+[ACCESSIBILITY.md](../docs/ACCESSIBILITY.md), and the project is English-only as
+described in [INTERNATIONALIZATION.md](../docs/INTERNATIONALIZATION.md). Changes to
+`modules/web_ui_static/` or other user-facing output must not make either worse:
+
+- Use native controls (`<button>`, `<label for>`, `<dialog>`) or the correct ARIA
+  roles, names and keyboard handling; do not add `onclick` to a plain `<div>`.
+- Keep a visible focus indicator, at least 4.5:1 text contrast, and do not convey
+  state by color alone. Announce dynamic status through `aria-live` regions.
+- Verify the change with the keyboard alone and at 200% zoom, and use the checklist
+  in ACCESSIBILITY.md in your pull request description.
+- Keep new user-facing strings together, as complete sentences with placeholders (no
+  string concatenation or hand-built plurals), use UTF-8 explicitly, and keep stored or
+  exchanged data locale-independent (ISO 8601 timestamps, stable keys).
+
+Reviewers check these points for any change that affects the dashboard or
+user-visible text.
+
+## Code-quality warnings
+
+The full rules, rationale and exceptions are in the
+[coding standards](../docs/CODING_STANDARDS.md); contributions must comply with them.
+Run the same quality checks locally that run in the required Poetry CI job:
+
+```sh
+poetry run ruff check .
+node --check modules/web_ui_static/app.js
+node --check modules/web_ui_static/web_security.js
+node --check modules/web_ui_static/auth.js
+node --check modules/web_ui_static/login.js
+npx --yes eslint@10.12.0 --config eslint.config.mjs modules/web_ui_static
+poetry run python scripts/export_locked_requirements.py --check
+```
+
+Ruff 0.17.1 enforces PEP 8 (`E`, `W`), Pyflakes (`F`), flake8-bugbear (`B`) and
+sorted imports (`I`) with a 200-column limit, as configured in `pyproject.toml`. Any
+finding fails the check; resolve it before merge (`ruff check . --fix` applies the safe
+fixes). ESLint applies the explicit rule set in `eslint.config.mjs` to the dashboard
+scripts. Warnings raised by this project's own code (deprecated APIs, syntax warnings)
+are errors under `pytest`. Do not silence a real defect; a justified exception must be
+narrow, explained where it is configured, and called out in the pull request. Node is
+needed for these developer checks, not to run the Python application. Shared pytest
+fixtures and intentional public re-exports use explicit `name as name` imports so they
+remain registered/exported without unused-import warnings. Security findings follow
+[the separate SCA/SAST policy](../docs/SECURITY_TESTING.md).
 
 ## Test policy and interpreting results
 

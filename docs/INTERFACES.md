@@ -1,7 +1,8 @@
 # External software interfaces
 
-This describes the v2.6.0 CLI, Python API, HTTP API, configuration, persistent
-formats and outbound integrations. [Architecture](ARCHITECTURE.md) explains the
+This describes the CLI, Python API, HTTP API, configuration, persistent
+formats and outbound integrations of the current source tree. Items marked
+*unreleased* are not in v2.6.0. [Architecture](ARCHITECTURE.md) explains the
 actors and trust boundaries. These interfaces are operator/admin capabilities,
 not isolated accounts or a public multi-tenant service.
 
@@ -22,17 +23,19 @@ installer creates its wrapper. Arguments are parsed in `modules/utils.py`.
 | `-sd/--skip-discovery`, `-st/--scan-type` | Skip discovery, or choose `arp`/`ping` discovery. Privileges limit available techniques. |
 | `-nf/--nmap-flags` | Trusted operator Nmap arguments; pass a single argument such as `-nf="-p 80,443"`. These expose native Nmap capabilities, not a restricted remote job language. |
 | `-s/--speed`, `-ht/--host-timeout` | Nmap speed 0–5 (default 3) and per-host timeout in seconds (default 240). |
-| `-a/--api` | Optional NVD API key. Keep it out of committed files and shell history where possible. |
+| `-a/--api` | Optional NVD API key. Keep it out of committed files and shell history where possible. When omitted, `AUTOPWN_NIST_API_KEY_FILE` (unreleased) names a one-line key file that is read at use time, before `api.txt`. |
 | `-m/--mode`, `-nt/--noise-timeout` | `normal`, `evade`, or `noise`; optional noise duration. Raw-packet features depend on host privileges. |
 | `-sed/--skip-exploit-download` | Suppress optional exploit reference downloads. Downloading does not execute the files. |
 | `--offline`, `--vuln-source`, `--vuln-db` | Force offline integration policy; select `auto`/`online`/`offline` CVE source; choose SQLite database path. Offline mode still sends requested Nmap target traffic. |
 | `--update-vuln-db`, `--vuln-db-status` | Explicitly update the official local NVD mirror or print database readiness/freshness and exit. |
 | `-o/--output`, `-of/--output-folder`, `-ot/--output-type` | Explicit output path or generated file under an output directory; `html`, `txt`, or `svg`. Output defaults to `outputs/` relative to the working directory. |
-| `-rp/--report`, `-rpw/--report-webhook` | Select `email`/`webhook` notification and webhook destination. |
-| `-rpe/--report-email`, `-rpep/--report-email-password` | SMTP username and password. |
+| `-rp/--report`, `-rpw/--report-webhook` | Select `email`/`webhook` notification and webhook destination. When no destination is given, `AUTOPWN_WEBHOOK_URL_FILE` (unreleased) names a one-line file holding it, before the interactive prompt. |
+| `-rpe/--report-email`, `-rpep/--report-email-password` | SMTP username and password. When no password is given, `AUTOPWN_SMTP_PASSWORD_FILE` (unreleased) names a one-line password file, before the interactive prompt. |
 | `-rpet/--report-email-to`, `-rpef/--report-email-from` | Report recipient and From address. |
-| `-rpes/--report-email-server`, `-rpesp/--report-email-server-port` | SMTP host and port; 465 selects implicit TLS, other ports use STARTTLS. See known certificate-validation limitations in the advisory index. |
-| `--web`, `--web-host`, `--web-port` | Start the dashboard; default listener `0.0.0.0:8080`. Use `--web-host 127.0.0.1` for local access. |
+| `-rpes/--report-email-server`, `-rpesp/--report-email-server-port` | SMTP host and port; 465 selects implicit TLS, other ports use STARTTLS. Both validate the certificate chain and hostname before authentication; invalid certificates fail delivery. |
+| `--insecure-tls` | Unreleased. Do not verify TLS certificates of scanned websites (INI `insecure_tls`). By default web scan requests verify target certificates, so scans of self-signed targets need this option; use it only for targets you trust. TLS diagnostics are unaffected. |
+| `--web`, `--web-host`, `--web-port` | Start the dashboard; default listener `127.0.0.1:8080` (unreleased; v2.6.0 defaulted to `0.0.0.0`). `--web-host 0.0.0.0` listens on all interfaces, and non-loopback clients then require HTTPS. |
+| `--web-reset-account` | Unreleased. Reset the dashboard account to `admin` with a new random password, print it once, invalidate existing sessions and exit. Run it on the server with the same `AUTOPWN_DATA_DIR`. |
 
 The CLI prints progress, discoveries and candidate findings and writes the
 selected report. Normal completion returns process status zero; unhandled/startup
@@ -72,18 +75,36 @@ Other implementation helpers are internal and are not a compatibility promise.
 
 ## HTTP API
 
-Base URL is the configured dashboard listener. The current server has no built-in
-authentication; the entire API needs trusted access or protected ingress.
+Base URL is the configured dashboard listener. v2.6.0 has no built-in
+authentication; the entire API needed trusted access or protected ingress. In the
+unreleased source, every route except the sign-in page and its assets
+(`/login`, `/login.js`, `/login.css`, `/favicon.ico`) and `/api/auth/login`
+requires an authenticated session: the `HttpOnly`, `SameSite=Strict`
+`autopwn_session` cookie (8 hours, server-side, revocable). Non-GET requests also
+need the session's `X-CSRF-Token` header, and a present `Origin` header must
+match the request origin. Peers that are not loopback must use HTTPS (or the
+operator sets `AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy); other
+requests get 403. Unauthenticated API requests get 401, and an unreadable account
+file gets 503. The account is one shared administrator, so any signed-in
+client still has the full API authority below.
 POST/PUT inputs use `Content-Type: application/json` and JSON objects. Responses
 are JSON except static files, SSE and downloads. Errors normally use
-`{"error":"message"}` with 400 (invalid input), 404 (missing resource), 409
-(state/offline conflict), or 500 (operation failure). POST creation returns 201
-where noted; asynchronous verification/database updates return 202.
+`{"error":"message"}` with 400 (invalid input), 401 (not signed in), 403
+(CSRF/origin/HTTPS/credential refusal), 404 (missing resource), 409
+(state/offline conflict), 429 (too many sign-in attempts) or 500 (operation
+failure). POST creation returns 201 where noted; asynchronous verification/database
+updates return 202.
 
 | Method and path | Input | Output / effect |
 | --- | --- | --- |
 | `GET /`, `/favicon.ico`, static assets | Asset path | HTML, JavaScript, CSS or icon; static assets are served from the application static directory. |
 | `GET /api/version` | None | `{version}`. |
+| `GET /login`, `/login.js`, `/login.css` | None | Unreleased. Sign-in page assets, public. |
+| `GET /api/auth/login` | None | Unreleased. Starts a sign-in challenge: `{csrf_token}` and a 5-minute `autopwn_login` cookie. |
+| `POST /api/auth/login` | `{username,password}` plus the challenge `X-CSRF-Token` | Unreleased. `{username,csrf_token}` and the session cookie; 401 for wrong credentials, 429 when rate limited. |
+| `GET /api/auth/session` | None | Unreleased. `{username,csrf_token}` for the current session. |
+| `POST /api/auth/logout` | None | Unreleased. `{ok}`; revokes the session. |
+| `PUT /api/auth/account` | `{username,current_password,new_password}` (new password optional, 15-128 characters) | Unreleased. Changes the username/password after verifying the current password; returns a fresh session and signs out others; 403 for a wrong current password. |
 | `GET /api/scans` | None | Array of job summaries including config, status, timestamps, counts, hosts, progress, web findings/coverage. |
 | `GET /api/scans/<scan_id>` | Job ID | One job summary; 404 if absent. |
 | `GET /api/scans/<scan_id>/download` | Job ID | JSON attachment with complete serializable job/results. Private resume checkpoints are excluded. |
@@ -101,8 +122,8 @@ where noted; asynchronous verification/database updates return 202.
 | `GET /api/hosts` | None | Latest observed host records, with latest-attempt information where applicable. |
 | `GET /api/log` | None | Retained log/event entries. |
 | `GET /api/events` | SSE connection | `text/event-stream` with JSON event data and heartbeat comments. Disconnect to unsubscribe. |
-| `GET /api/settings` | None | Settings object; SMTP password is masked, but this is still sensitive configuration. |
-| `PUT /api/settings` | Partial settings object | `{ok}`; merges/persists configuration. Masked SMTP password sentinel preserves the stored password. |
+| `GET /api/settings` | None | Stored settings object; SMTP password is masked, but this is still sensitive configuration (a stored NVD key and webhook URL are returned as saved). Values supplied by `*_FILE` credential files are not included. |
+| `PUT /api/settings` | Partial settings object | `{ok}`; merges/persists configuration. Masked SMTP password sentinel preserves the stored password. Account or credential keys are refused (400); use `PUT /api/auth/account`. |
 | `POST /api/settings/test_email` | Empty object | `{ok}` after configured test mail, or error. Disabled offline. |
 | `POST /api/settings/test_webhook` | Empty object | `{ok,status_code}` after configured test POST, or error. Disabled offline. |
 | `GET /api/profiles` | None | Profile array: `id,name,description,created_at,config`. |
@@ -127,18 +148,28 @@ falls back to normal in the dashboard. Job statuses are `running`, `stopping`,
 
 `web_options.checks` maps catalog check names to booleans. Other controls are
 `speed`, `min_delay_ms`, `timeout`, `request_budget`, `max_pages`, `max_urls`,
-`max_depth`, `max_endpoints`, `max_parameters`, and `max_response_kb`.
+`max_depth`, `max_endpoints`, `max_parameters`, and `max_response_kb`. The
+unreleased source adds boolean `verify_tls` (default `true`): target certificates
+are verified unless it is `false` ("Accept untrusted certificates" in the
+dashboard), and the value is recorded with each finding's reproduction.
 Use `/api/web/catalog` for authoritative current defaults/bounds. Results report
-coverage limitations; HTTP timeout currently bounds socket inactivity rather
-than total wall-clock duration (see advisories).
+coverage limitations; HTTP timeout bounds active network I/O through headers and
+body, and Stop interrupts active reads. OS DNS resolution is outside this bound.
+Diagnostic probes/replay do not import `.netrc`, environment proxies or ambient
+credentials. Each response is isolated from cookies set by previous responses.
 
 ### Settings and schedules
 
 Settings contain `nist_api_key`, boolean `offline_mode`, and `email`/`webhook`
-objects. Email keys are `enabled,smtp_host,smtp_port,username,password,from_addr,
+objects. In the unreleased source, `AUTOPWN_NIST_API_KEY_FILE`,
+`AUTOPWN_SMTP_PASSWORD_FILE` and `AUTOPWN_WEBHOOK_URL_FILE` override the
+corresponding stored values at use time and are never written to the settings
+file. Email keys are `enabled,smtp_host,smtp_port,username,password,from_addr,
 to_addr,on_complete,on_error,on_vuln_found`. Webhook keys are
 `enabled,url,on_complete,on_error,on_vuln_found`. Treat all notification
 destinations and credentials as privileged configuration.
+Private SMTP certificate authorities must be trusted by the platform or supplied
+through Python's `SSL_CERT_FILE`/`SSL_CERT_DIR` trust configuration.
 
 Schedule keys are `name,target,profile_id,enabled,type,interval_value,
 interval_unit,time_utc,weekday`. Types are `interval`, `daily`, `weekly`;
@@ -148,13 +179,19 @@ Schedules use the selected profile when firing and must satisfy offline policy.
 
 ## Files, configuration and integrations
 
-- Environment: `AUTOPWN_WEB_HOST`, `AUTOPWN_WEB_PORT`, `AUTOPWN_DATA_DIR`.
+- Environment: `AUTOPWN_WEB_HOST` (default `127.0.0.1`), `AUTOPWN_WEB_PORT`,
+  `AUTOPWN_DATA_DIR`, and (unreleased) `AUTOPWN_WEB_SECURE_COOKIE=1` for a
+  TLS-terminating proxy plus `AUTOPWN_NIST_API_KEY_FILE`,
+  `AUTOPWN_SMTP_PASSWORD_FILE` and `AUTOPWN_WEBHOOK_URL_FILE`, each naming a
+  one-line UTF-8 file of at most 4096 bytes. See [Secrets](SECRETS.md).
   `--vuln-db` selects an explicit database separately. INI configuration sections
   are `AUTOPWN`, `REPORT` and `WEBUI`; use `--create-config` and
   the parser in `modules/utils.py` for the accepted keys. Do not commit generated
   configuration or key files `api.txt`/`lapi.txt`.
 - JSON state files contain settings and dictionaries of profiles/schedules keyed
-  by their IDs. They are implementation-managed state, not a stable migration
+  by their IDs. The unreleased dashboard also keeps `web_ui_auth.json` (plaintext
+  username, scrypt password hash and a revision) beside them; do not edit it by
+  hand, use the account settings or `--web-reset-account`. They are implementation-managed state, not a stable migration
   API. SQLite schema/readiness is versioned internally. Export before moving
   versions; never edit an active database directly.
 - Nmap receives argv and returns XML/progress. Online NVD receives service
@@ -162,7 +199,10 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   optional downloaded bytes. Explicit NVD mirror maintenance uses annual
   JSON/gzip feeds with metadata checksums.
 - Web checks send bounded HTTP probes and TLS diagnostic handshakes to selected
-  targets. Server replay is explicit. Generated Python/curl/HTML/JSON PoCs are
+  targets. Unreleased builds verify target certificates for the HTTP probes and
+  replay unless `verify_tls` is false; diagnostic handshakes deliberately inspect
+  untrusted certificates and legacy protocols without trusting them. Server replay
+  is explicit. Generated Python/curl/HTML/JSON PoCs are
   downloads; running one is a separate operator action.
 - CLI webhook delivery sends its report payload; dashboard webhook delivery
   sends JSON scan/test events. SMTP delivers MIME scan reports/test messages to
@@ -176,3 +216,8 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   source/image/platform digests and assessment time. The signed manifest marks
   these as `authenticity_backfill` with `rebuilt` and `security_clearance` both
   false; these fields do not declare dependency findings fixed or non-exploitable.
+  New publications bundle these supporting files and release notes in one
+  `autopwn-suite-vVERSION-security.zip`. The manifest's `assets` hashes the three
+  downloadable archives; `supporting_archive.name` and `supporting_archive.files`
+  identify the ZIP and each member's `name`/`sha256`. Existing separate-file
+  releases keep their original manifest and assets.

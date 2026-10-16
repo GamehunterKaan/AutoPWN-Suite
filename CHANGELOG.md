@@ -9,15 +9,80 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Functional changes
 
+- **Breaking:** require sign-in for the web dashboard. A single administrator account is
+  kept in `web_ui_auth.json` (username and scrypt password hash). A random `admin`
+  password is generated and printed once on first launch; change it in Settings
+  (Account, which needs the current password) or regenerate it with
+  `--web-reset-account`, which also invalidates every session. Existing API clients
+  and scripts must sign in (`/api/auth/login`) and send the session CSRF token on
+  non-GET requests.
+- **Breaking:** the dashboard now listens on `127.0.0.1` by default (previously
+  `0.0.0.0`). The supplied `docker-compose.yml` sets `AUTOPWN_WEB_HOST=127.0.0.1`;
+  the Docker image still sets `0.0.0.0` inside the container, so publish its port to
+  loopback only (`-p 127.0.0.1:8080:8080`). Remote access needs an explicit
+  `--web-host`/`AUTOPWN_WEB_HOST` and HTTPS: clients that are not loopback are
+  refused over plain HTTP, or set `AUTOPWN_WEB_SECURE_COOKIE=1` behind a
+  TLS-terminating reverse proxy.
+- **Breaking:** web scan requests now verify target TLS certificates by default.
+  Scans of targets with self-signed or otherwise untrusted certificates need the new
+  `--insecure-tls` option (INI `insecure_tls`, or the dashboard's "Accept untrusted
+  certificates" checkbox, web option `verify_tls`). The choice is recorded with each
+  finding and honored by generated Python and curl PoCs and by replay.
+- Read the NVD key, SMTP password and webhook URL from files named by
+  `AUTOPWN_NIST_API_KEY_FILE`, `AUTOPWN_SMTP_PASSWORD_FILE` and
+  `AUTOPWN_WEBHOOK_URL_FILE` (one line, at most 4096 bytes), at use time so
+  rotation needs no restart. `api.txt` remains supported.
+- Make the container build repeatable: the Dockerfile pins the base image digest and a
+  Debian snapshot and installs hash-pinned `requirements-locked.txt` (generated from
+  `poetry.lock` by `scripts/export_locked_requirements.py`), and honors
+  `SOURCE_DATE_EPOCH`. `install.sh` and `uninstall.sh` honor `PREFIX`, `BINDIR`,
+  `APPDIR` and `DESTDIR` for packagers; defaults are unchanged.
+- Add a pinned Python lint gate (Ruff rules E, W, F, B, I at 200 columns), ESLint and
+  JavaScript syntax checks and the locked-requirements check to the required Poetry
+  CI job; project-originated Deprecation, Future and Syntax warnings are errors
+  under pytest. See [coding standards](docs/CODING_STANDARDS.md), with local commands
+  and Passing badge evidence documented.
+- Consolidate release notes, SBOMs and security reports into one verified ZIP,
+  keeping new release publications to five files including source and signatures.
 - Refresh the original independent-human approval checks after review changes,
   avoiding duplicate approval checks and stale failures after approval.
 - Document project governance, dependency selection, source builds, architecture,
   all external interfaces, release operations and security-assessment results.
+- Add documents for the [roadmap](docs/ROADMAP.md), [continuity](docs/CONTINUITY.md),
+  [accessibility](docs/ACCESSIBILITY.md), [internationalization](docs/INTERNATIONALIZATION.md),
+  [coding standards](docs/CODING_STANDARDS.md), the assurance case
+  (`docs/ASSURANCE_CASE.md`), the [image advisory triage](docs/IMAGE_ADVISORY_TRIAGE.md),
+  the [regression-test ledger](docs/REGRESSION_LEDGER.md) and OpenSSF
+  [Silver](docs/OPENSSF_SILVER.md) and [Gold](docs/OPENSSF_GOLD.md) preparation records.
+- Add an SPDX license identifier and copyright notice to every source file.
 - Prepare official source archives from reviewed version tags and publish
   descriptive version notes alongside a signed release manifest.
 
 ### Security changes
 
+- Fix profile metadata HTML injection, enforce certificate/hostname validation
+  for SMTP TLS, suppress ambient credentials in all diagnostic web requests,
+  and interrupt slow HTTP/HTTPS responses on deadline or scan Stop. Evidence
+  replay uses the same bounded transport, including standalone downloads.
+  These fixes address AUTOPWN-SA-2026-002 through 005; dashboard access is covered by
+  the next entries.
+- Mitigate AUTOPWN-SA-2026-001 (unauthenticated dashboard administration) in
+  unreleased changes: a loopback default bind, sign-in on every route by default,
+  scrypt password hashing, server-side revocable 8-hour sessions in an `HttpOnly`,
+  `SameSite=Strict` cookie, per-session CSRF tokens on non-GET requests, same-origin
+  `Origin` checks (CORS is no longer enabled), failed-login rate limiting with
+  bounded hashing capacity, HTTPS required for non-loopback clients, and no-store,
+  nosniff and frame-deny response headers. Not released and not marked fixed in any
+  published version; residual limits are one shared administrator account, no MFA,
+  plaintext-at-rest settings and operator-provided HTTPS for remote access.
+  The maintainer decided on 2026-10-16 that this closes the advisory; it applies to
+  v2.6.0 users only after the next release.
+- Verify target certificates by default for core, crawl, directory, probe and
+  evidence-replay web requests, which previously accepted any certificate. TLS
+  diagnostics still inspect untrusted certificates and legacy protocols without
+  trusting them and send no HTTP request or credentials.
+- Credential files keep NVD, SMTP and webhook secrets out of the dashboard's
+  `web_ui_settings.json`, which otherwise stores them in plaintext.
 - Add a reviewed authenticity-backfill workflow that signs original release
   bytes and publishes current SBOMs/findings without rebuilding or replacing
   images; new-release and rebuild security gates remain mandatory.
@@ -33,8 +98,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   CycloneDX SBOMs, and bind SBOM/VEX hashes into the signed release manifest.
 - Publish a threat model, credential access/rotation policy, support lifecycle
   and end-of-life rules. Separate build, registry, signing and upload privileges.
-- The assessment identifies existing runtime issues; this infrastructure change
-  does not claim to fix them. See the assessment and advisory status.
+- The assessment identifies existing runtime issues. The infrastructure changes do
+  not themselves fix them; local fixes and mitigations (none released) are listed
+  above. See the assessment and advisory status.
 
 ## [2.6.0] - 2026-10-15
 
