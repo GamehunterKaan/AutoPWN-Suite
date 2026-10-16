@@ -143,11 +143,10 @@ and covered by deterministic tests. No external targets, real credentials,
 published releases or repository protection settings were changed.
 
 Later local run (unreleased tree, Windows): `python -m pytest tests/unit -q`
-reports **1050 passed, 11 platform-specific skips** with 91.79% statement and
-87.64% branch coverage (90.48% combined). `ruff check .`, `node --check` on all
-four dashboard scripts and `scripts/export_locked_requirements.py --check` pass
-locally; ESLint was not run in that environment. These are local results, not CI
-or release evidence.
+reports **1062 passed, 11 platform-specific skips** with 91.93% statement and
+87.93% branch coverage (90.67% combined). `ruff check .`, `node --check` on all
+four dashboard scripts, ESLint and `scripts/export_locked_requirements.py --check`
+pass locally. These are local results, not CI or release evidence.
 
 ## Record maintenance
 

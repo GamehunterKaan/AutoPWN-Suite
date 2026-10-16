@@ -69,7 +69,7 @@ Base URL for evidence: <https://github.com/GamehunterKaan/AutoPWN-Suite/blob/mai
 | `code_of_conduct` | MUST | **Met** | Contributor Covenant in a standard location. | `.github/CODE_OF_CONDUCT.md` |
 | `roles_responsibilities` | MUST | **Met** | Maintainer, release manager, owner and security-contact roles and their holders are public. | `GOVERNANCE.md` |
 | `access_continuity` | MUST | **Met (owner attestation)** | The owner attests successor arrangements for GitHub, Docker Hub and the domain/DNS, so issues, change acceptance and releases can continue within a week. Details are held privately and intentionally not recorded in the repository. | `docs/CONTINUITY.md` |
-| `bus_factor` | SHOULD | **Unmet (justified)** | Bus factor is 1 today; the continuity plan states what is needed to reach 2. | `docs/CONTINUITY.md` |
+| `bus_factor` | SHOULD | **Met (maintainer attestation)** | The maintainer attests a bus factor of 2 and offers a second maintainer account with write access as evidence; the continuity plan records the arrangements. | `docs/CONTINUITY.md` |
 | `documentation_roadmap` | MUST | **Met** | Twelve-month roadmap with intended work and explicit non-goals. | `docs/ROADMAP.md` |
 | `documentation_architecture` | MUST | **Met** | Architecture, actors, components and data flows documented. | `docs/ARCHITECTURE.md` |
 | `documentation_security` | MUST | **Met** | What users can and cannot expect for security is documented. | `SECURITY.md`, `docs/ASSURANCE_CASE.md` |
@@ -155,10 +155,10 @@ Base URL for evidence: <https://github.com/GamehunterKaan/AutoPWN-Suite/blob/mai
 
 Local run on Windows with Python 3.14 (CI uses 3.10 and 3.11; these numbers are not CI output):
 
-- **Tests:** 1,050 passed, 11 platform-specific skips (Linux/macOS-only and POSIX
+- **Tests:** 1,062 passed, 11 platform-specific skips (Linux/macOS-only and POSIX
   installer tests; the installer tests were run separately under Linux/WSL and passed).
-- **Python coverage:** 91.79% statement coverage (5,504 of 5,996) and 87.64% branch
-  coverage (2,417 of 2,758); the combined figure reported by `pytest-cov` is 90.48%.
+- **Python coverage:** 91.93% statement coverage (5,527 of 6,012) and 87.93% branch
+  coverage (2,425 of 2,758); the combined figure reported by `pytest-cov` is 90.67%.
   JavaScript coverage is not measured.
 - **Ruff 0.17.1** (`E`, `W`, `F`, `B`, `I`): no findings.
 - **ESLint 10.12.0** on `modules/web_ui_static`: no findings.

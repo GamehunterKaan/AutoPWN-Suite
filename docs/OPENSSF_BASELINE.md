@@ -6,9 +6,9 @@ implementation and evidence. It does not certify the badge or pre-fill unmet
 controls as met. Documentation/workflow changes must merge before main-branch
 URLs provide authoritative evidence. Runtime findings remain disclosed: four are
 fixed locally awaiting release, while the dashboard-access finding
-(AUTOPWN-SA-2026-001) is mitigated in unreleased changes (sign-in, loopback
-default bind) and still needs maintainer confirmation of its disposition. Nothing
-here has shipped in a release. See [advisories](SECURITY_ADVISORIES.md) for exact status.
+(AUTOPWN-SA-2026-001) is fixed in unreleased changes (sign-in, loopback default
+bind) and was closed by the maintainer on 2026-10-16. Nothing here has shipped in
+a release. See [advisories](SECURITY_ADVISORIES.md) for exact status.
 
 | Control | Evidence and remaining condition |
 | --- | --- |

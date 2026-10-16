@@ -1,28 +1,27 @@
 # Access continuity and bus factor
 
-AutoPWN Suite currently has one maintainer with sensitive access (see
-[GOVERNANCE.md](../GOVERNANCE.md)). This document defines how issue handling,
-change acceptance and releases can continue **within one week** if that person is
-suddenly unavailable (illness, loss of account access, death or abandonment), and
-what is needed to raise the project's bus factor. It describes policy and
-procedure. It does not claim that any successor, escrow or emergency-access
-arrangement already exists; the status table below says exactly what is and is not
-in place.
+AutoPWN Suite has an owner and, per the owner's attestation, a second maintainer
+account (see [GOVERNANCE.md](../GOVERNANCE.md)). This document defines how issue
+handling, change acceptance and releases can continue **within one week** if the
+owner is suddenly unavailable (illness, loss of account access, death or
+abandonment), and what would make the project's bus factor verifiable. It describes
+policy and procedure; the status table below says exactly what is attested and what
+is not recorded.
 
 ## Honest bus-factor statement
 
-- **Current bus factor: 1.** Git history shows commits under two names
-  (`GamehunterKaan` and `Kaan Gültekin`) that both belong to the sole owner, plus
-  automated Dependabot commits. Since 2025-10-01 no other human has authored a commit.
-  Earlier contributors (for example `iaacornus`, last commit April 2024) hold no
-  recorded sensitive access.
-- Only the owner can currently administer the repository, rotate the Docker Hub
-  secrets, approve releases and read private security reports.
-- The project **cannot** reach bus factor 2 by documentation alone. It requires a
-  second trusted human to be granted access under the review rules in
-  [GOVERNANCE.md](../GOVERNANCE.md).
+- **Bus factor: 2, per the owner's attestation of 2026-10-16.** The owner states that a
+  second maintainer account (<https://github.com/autosec-overflow>) holds the GitHub,
+  Docker Hub and DNS successor arrangements. The repository confirms only that this
+  account has **write** access to the repository (admin is not granted); the rest is
+  the owner's statement and cannot be verified from the repository.
+- Git history is almost entirely the owner's commits (under two names) plus Dependabot;
+  since 2025-10-01 no other human has authored a commit. Earlier contributors (for
+  example `iaacornus`, last commit April 2024) hold no recorded sensitive access.
+- Documentation cannot establish a bus factor by itself. The list below is the
+  checklist for making the second maintainer's access visible and tested.
 
-### What is needed to reach bus factor 2
+### Making bus factor 2 verifiable
 
 1. Identify a trusted contributor or maintainer and complete the identity,
    history, MFA/passkey and task review in
@@ -103,7 +102,7 @@ assumed.
 
 | Arrangement | Status |
 | --- | --- |
-| Second maintainer or designated backup with repository admin | Not configured |
+| Second maintainer or designated backup | Per the owner's attestation of 2026-10-16: an account with repository write access (admin not granted); details held privately |
 | Second human reviewer able to approve owner-authored changes | Not configured |
 | GitHub account successor designation | In place per the owner's attestation of 2026-10-16; the person and mechanism are intentionally not recorded in the repository |
 | Password-manager emergency access or sealed-envelope escrow | Not recorded |

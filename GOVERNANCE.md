@@ -37,8 +37,9 @@ required approval check.
 
 ## Continuity and project direction
 
-The project currently has **one maintainer**, so its bus factor is 1. The
-[access continuity plan](docs/CONTINUITY.md) describes the access a successor needs
+The owner attests a bus factor of 2: a second maintainer account with write access
+to the repository, which also holds the successor arrangements. This cannot be
+verified from the repository itself. The [access continuity plan](docs/CONTINUITY.md) describes the access a successor needs
 (repository administration, the Docker Hub credentials listed in
 [Secrets](docs/SECRETS.md), the signing identity and the project domain), the
 succession and emergency-access procedure, how issues, reviews and releases can
