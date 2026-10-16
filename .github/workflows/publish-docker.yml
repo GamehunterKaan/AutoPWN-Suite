@@ -31,6 +31,7 @@ jobs:
       image: ${{ steps.release.outputs.image }}
       version: ${{ steps.release.outputs.version }}
       latest: ${{ steps.release.outputs.latest }}
+      source_date_epoch: ${{ steps.release.outputs.source_date_epoch }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -48,6 +49,9 @@ jobs:
           test "$(jq -r .draft <<< "$release")" = false
           test "$(jq '.assets | length' <<< "$release")" = 0
           latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          # Commit time of the reviewed release commit; fixes image timestamps.
+          epoch="$(git show --no-patch --format=%ct "$commit")"
+          [[ "$epoch" =~ ^[0-9]+$ ]]
           {
             printf 'commit=%s\nversion=%s\n' "$commit" "${RELEASE_TAG#v}"
             printf 'image=%s\n' docker.io/gamehunterkaan/autopwn-suite
@@ -105,7 +109,11 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           push: false
           tags: autopwn-release:${{ matrix.arch }}
-          outputs: type=docker,dest=${{ runner.temp }}/image.tar
+          # Repeatable build inputs: SOURCE_DATE_EPOCH is the release commit time;
+          # rewrite-timestamp clamps file mtimes in layers to it (BuildKit >= 0.13).
+          build-args: |
+            SOURCE_DATE_EPOCH=${{ needs.validate.outputs.source_date_epoch }}
+          outputs: type=docker,dest=${{ runner.temp }}/image.tar,rewrite-timestamp=true
       - name: Generate SBOM and gate actual image dependencies before publication
         env:
           ARCH: ${{ matrix.arch }}
@@ -229,5 +237,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          unzip -p "assets/autopwn-suite-$RELEASE_TAG-security.zip" release-notes.md > "$RUNNER_TEMP/release-notes.md"
           gh release upload "$RELEASE_TAG" assets/* --repo "$GITHUB_REPOSITORY"
-          gh release edit "$RELEASE_TAG" --notes-file assets/release-notes.md --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" --repo "$GITHUB_REPOSITORY"
