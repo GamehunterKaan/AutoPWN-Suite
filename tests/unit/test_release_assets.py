@@ -234,3 +234,14 @@ def test_backfill_rejects_ambiguous_or_invalid_platform():
     entry["digest"] = "invalid"
     with pytest.raises(ValueError, match="exactly one"):
         release.platform_digest({"manifests": [entry]}, "amd64")
+
+
+def test_current_version_has_matching_release_notes_and_runtime_version():
+    """Catch a version bump without its changelog section at PR time, not in the release run."""
+    root = Path(__file__).resolve().parents[2]
+    version = release.re.search(r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(encoding="utf-8"), release.re.MULTILINE)[1]
+    runtime = release.re.findall(r'^\s*__version__\s*=\s*"([^"]+)"', (root / "autopwn.py").read_text(encoding="utf-8"), release.re.MULTILINE)
+    assert runtime == [version], "autopwn.py __version__ must equal the pyproject version"
+    # Needs a '## [<version>]' section with non-empty Functional and Security notes, as the release workflow does.
+    notes = release.release_notes((root / "CHANGELOG.md").read_text(encoding="utf-8"), f"v{version}")
+    assert notes.startswith(f"# AutoPWN Suite v{version}")
