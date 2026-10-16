@@ -41,15 +41,24 @@ class InvalidCredentials(ValueError):
     pass
 
 
+class InvalidAccount(ValueError):
+    """The submitted username or password breaks the account rules; the message is safe to show."""
+
+
+# Responses use these fixed texts, never the text of a caught exception.
+ACCOUNT_UNAVAILABLE = "Dashboard account is unavailable. Run --web-reset-account on the server."
+CREDENTIALS_REJECTED = "Current password is incorrect or the account changed."
+
+
 def validate_account(username, password):
     if not isinstance(username, str) or not _USERNAME.fullmatch(username):
-        raise ValueError("Username must contain 1–64 letters, numbers, dots, underscores, @ or hyphens.")
+        raise InvalidAccount("Username must contain 1–64 letters, numbers, dots, underscores, @ or hyphens.")
     if not isinstance(password, str) or not 15 <= len(password) <= 128 or password.isspace():
-        raise ValueError("Password must contain 15–128 characters.")
+        raise InvalidAccount("Password must contain 15–128 characters.")
     try:
         password.encode("utf-8")
     except UnicodeError:
-        raise ValueError("Password contains invalid Unicode.") from None
+        raise InvalidAccount("Password contains invalid Unicode.") from None
 
 
 def password_hash(password):
@@ -119,7 +128,7 @@ class AccountStore:
                 raise ValueError("Invalid account configuration")
             return data
         except (OSError, ValueError, UnicodeError):
-            raise AccountUnavailable("Dashboard account is unavailable. Run --web-reset-account on the server.") from None
+            raise AccountUnavailable(ACCOUNT_UNAVAILABLE) from None
 
     def _save(self, username, encoded):
         data = {"username": username, "password_hash": encoded, "revision": secrets.token_hex(16)}
@@ -154,7 +163,7 @@ class AccountStore:
         with self.transaction():
             data = self.load()
             if data["revision"] != revision or not password_matches(current_password, data["password_hash"]):
-                raise InvalidCredentials("Current password is incorrect or the account changed.")
+                raise InvalidCredentials(CREDENTIALS_REJECTED)
             validate_account(username, new_password if new_password else "validation-placeholder")
             encoded = password_hash(new_password) if new_password else data["password_hash"]
             return self._save(username, encoded)
@@ -278,8 +287,8 @@ def install_auth(app, static_dir, account_path):
             return None
         try:
             g.dashboard_session = auth.find(request.cookies.get(COOKIE))
-        except AccountUnavailable as error:
-            return jsonify({"error": str(error)}), 503
+        except AccountUnavailable:
+            return jsonify({"error": ACCOUNT_UNAVAILABLE}), 503
         if g.dashboard_session is None:
             if request.path.startswith("/api/") or request.method not in ("GET", "HEAD"):
                 return jsonify({"error": "Authentication required."}), 401
@@ -342,15 +351,15 @@ def install_auth(app, static_dir, account_path):
             set_cookie(response, token)
             response.delete_cookie(LOGIN_COOKIE, path="/")
             return response
-        except AccountUnavailable as error:
-            return jsonify({"error": str(error)}), 503
+        except AccountUnavailable:
+            return jsonify({"error": ACCOUNT_UNAVAILABLE}), 503
 
     @app.get("/api/auth/session")
     def dashboard_session():
         try:
             return jsonify({"username": store.load()["username"], "csrf_token": g.dashboard_session.csrf})
-        except AccountUnavailable as error:
-            return jsonify({"error": str(error)}), 503
+        except AccountUnavailable:
+            return jsonify({"error": ACCOUNT_UNAVAILABLE}), 503
 
     @app.post("/api/auth/logout")
     def dashboard_logout():
@@ -376,11 +385,14 @@ def install_auth(app, static_dir, account_path):
             response = jsonify({"username": data["username"], "csrf_token": entry.csrf})
             set_cookie(response, token)
             return response
-        except InvalidCredentials as error:
+        except InvalidCredentials:
             auth.failed(address)
-            return jsonify({"error": str(error)}), 403
-        except ValueError as error:
+            return jsonify({"error": CREDENTIALS_REJECTED}), 403
+        except InvalidAccount as error:
+            # Intentional: these messages are written in validate_account() so the user learns which rule failed.
             return jsonify({"error": str(error)}), 400
+        except ValueError:
+            return jsonify({"error": "The account details could not be used."}), 400
         except (AccountUnavailable, OSError):
             return jsonify({"error": "Account could not be saved. The previous account is unchanged."}), 503
         finally:

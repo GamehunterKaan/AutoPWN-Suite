@@ -383,3 +383,16 @@ def test_sign_in_policy_is_strict_and_dashboard_policy_stays_same_origin(dashboa
     markup = client.get("/login").get_data(as_text=True)
     assert "<script>" not in markup and "<style" not in markup and " onclick=" not in markup
     assert 'method="post"' in markup  # no credentials in a URL if scripts fail to load
+
+
+def test_account_update_never_echoes_unexpected_error_text_but_keeps_validation_messages(dashboard_login):
+    client, csrf = logged_in(dashboard_login)
+    body = {"username": "admin", "current_password": dashboard_login.password, "new_password": "short"}
+    rule = client.put("/api/auth/account", json=body, headers={"X-CSRF-Token": csrf})
+    assert rule.status_code == 400 and "15" in rule.json["error"]  # the failed rule is shown to the user
+
+    with patch("modules.web_auth.AccountStore.change", side_effect=ValueError("INTERNAL-DETAIL /srv/path")):
+        leaked = client.put("/api/auth/account", json={**body, "new_password": "a-long-enough-new-password"},
+                            headers={"X-CSRF-Token": csrf})
+    assert leaked.status_code == 400
+    assert "INTERNAL-DETAIL" not in leaked.get_data(as_text=True) and "/srv/path" not in leaked.get_data(as_text=True)
