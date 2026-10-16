@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """End-to-end scan orchestration using real local CVEs and mocked Nmap only."""
 import importlib
 import io
@@ -6,7 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from tests.unit.test_vulnerability_db import feed_server  # Shared tiny, verified annual feeds.
+from tests.auth_helpers import authenticated_app
+from tests.unit.test_vulnerability_db import feed_server as feed_server  # Shared pytest fixture.
 
 
 @pytest.fixture
@@ -44,8 +47,9 @@ def test_python_api_scans_with_local_cves_and_no_http(local_database, monkeypatc
 
 
 def test_cli_offline_scan_has_no_online_side_effects(local_database, monkeypatch):
-    import autopwn
     from rich.console import Console
+
+    import autopwn
     monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
     monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(local_database),
                                     "-t", "192.168.1.10", "-y", "--skip-discovery"])
@@ -61,8 +65,9 @@ def test_cli_offline_scan_has_no_online_side_effects(local_database, monkeypatch
 
 
 def test_database_management_commands_do_not_start_a_scan(local_database, monkeypatch):
-    import autopwn
     from rich.console import Console
+
+    import autopwn
     monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
     scan = MagicMock()
     monkeypatch.setattr(autopwn, "StartScanning", scan)
@@ -81,7 +86,7 @@ def test_database_management_commands_do_not_start_a_scan(local_database, monkey
 
 
 def test_offline_discovery_disables_reverse_dns(monkeypatch):
-    from modules.scanner import TestArp, TestPing, DiscoverHosts
+    from modules.scanner import DiscoverHosts, TestArp, TestPing
     from modules.utils import ScanType
     scanner = importlib.import_module("modules.scanner")
     nm = nmap_observation()
@@ -117,7 +122,7 @@ def web(monkeypatch, tmp_path):
     monkeypatch.setattr(wu, "_database_update", {"running": False, "message": "", "current": 0, "total": 0, "error": None})
     monkeypatch.setattr(wu, "_profiles", {})
     monkeypatch.setattr(wu, "_PROFILES_FILE", tmp_path / "profiles.json")
-    app = wu._build_app(Path(wu.__file__).parent / "web_ui_static")
+    app = authenticated_app(wu, Path(wu.__file__).parent / "web_ui_static")
     app.config["TESTING"] = True
     return wu, app.test_client()
 

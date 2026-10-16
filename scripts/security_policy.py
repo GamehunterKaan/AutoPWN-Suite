@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Fail closed on dependency and static-analysis policy violations.
 
 Scanners run without installing application dependencies or executing project code.
@@ -5,15 +7,15 @@ The JSON reports are retained even when a finding blocks the change or release.
 """
 
 import argparse
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
-from pathlib import Path
 import re
 import subprocess
 import sys
-import tomllib
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
+import tomllib
 
 POLICY_ROOT = Path(__file__).resolve().parents[1] / ".security"
 ALLOWED_LICENSES = {
@@ -86,6 +88,11 @@ def evaluate_sca(report, version, root=POLICY_ROOT, expected=None, licenses=True
             identifiers = [vuln["id"], *vuln.get("aliases", [])]
             # A known malicious distribution is never exempted as unreachable.
             malware = any(identifier.startswith("MAL-") for identifier in identifiers)
+            # The project's dependencies are its Python requirements. Operating-system packages
+            # inherited from the base image stay in the inventory and reports but do not block;
+            # a known malicious package blocks in any ecosystem.
+            if package.get("ecosystem") != "PyPI" and not malware:
+                continue
             if malware or not any((identifier, purl) in exemptions for identifier in identifiers):
                 violations.append(f"{purl or package['name']}: {vuln['id']}")
         if licenses and package.get("ecosystem") == "PyPI":

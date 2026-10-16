@@ -188,5 +188,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          unzip -p "assets/autopwn-suite-$RELEASE_TAG-security.zip" release-notes.md > "$RUNNER_TEMP/release-notes.md"
           gh release upload "$RELEASE_TAG" assets/* --repo "$GITHUB_REPOSITORY"
-          gh release edit "$RELEASE_TAG" --notes-file assets/release-notes.md --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" --repo "$GITHUB_REPOSITORY"

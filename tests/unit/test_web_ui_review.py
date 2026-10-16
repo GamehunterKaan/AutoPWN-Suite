@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Offline regressions for profile and schedule lifecycle failures."""
 
 import importlib.util
@@ -8,6 +10,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+
+from tests.auth_helpers import authenticated_app
 
 
 @pytest.fixture
@@ -25,7 +29,7 @@ def wu_review(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client_review(wu_review):
-    app = wu_review._build_app(wu_review._STATIC_DIR)
+    app = authenticated_app(wu_review)
     app.config["TESTING"] = True
     return app.test_client()
 

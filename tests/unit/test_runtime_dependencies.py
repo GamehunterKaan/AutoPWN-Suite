@@ -1,13 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Keep both install paths complete and independent of the removed Nmap wrapper."""
 
 import ast
-from importlib.metadata import packages_distributions
-from pathlib import Path
 import re
 import sys
+from importlib.metadata import packages_distributions
+from pathlib import Path
 
 from packaging.requirements import Requirement
-
 
 ROOT = Path(__file__).resolve().parents[2]
 

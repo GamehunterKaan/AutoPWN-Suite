@@ -1,13 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Exercise the actual inline Actions scripts with GitHub API responses."""
 
 import json
-from pathlib import Path
 import shutil
 import subprocess
 import textwrap
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[2]
 SHA = "a" * 40

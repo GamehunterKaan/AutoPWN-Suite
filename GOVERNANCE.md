@@ -35,6 +35,24 @@ checks for the PR's current revision; it never checks out PR code or consumes
 PR artifacts. This refreshes approvals and dismissals without creating another
 required approval check.
 
+## Continuity and project direction
+
+The owner attests a bus factor of 2: a second maintainer account with write access
+to the repository, which also holds the successor arrangements. This cannot be
+verified from the repository itself. The [access continuity plan](docs/CONTINUITY.md) describes the access a successor needs
+(repository administration, the Docker Hub credentials listed in
+[Secrets](docs/SECRETS.md), the signing identity and the project domain), the
+succession and emergency-access procedure, how issues, reviews and releases can
+continue within one week without the owner, and the steps needed to reach a bus
+factor of 2. The plan is policy; the status table in that document records which
+arrangements are actually in place.
+
+Planned work and explicit non-goals for the next twelve months or more are in the
+[roadmap](docs/ROADMAP.md). The maintainer reviews it at least quarterly and at each
+stable release. Accessibility and internationalization policy are in
+[accessibility](docs/ACCESSIBILITY.md) and
+[internationalization](docs/INTERNATIONALIZATION.md).
+
 ## Responsibilities and decisions
 
 - The maintainer triages issues, decides scope, reviews implementation and tests,
@@ -47,6 +65,10 @@ required approval check.
 - The owner reviews credential access, rotates compromised credentials, and
   maintains the access list. Secrets belong in GitHub Actions secrets or protected
   local configuration, never in Git.
+
+Contributions are accepted under the Developer Certificate of Origin: every commit
+must carry a `Signed-off-by` line (see [CONTRIBUTING.md](.github/CONTRIBUTING.md#developer-certificate-of-origin-dco)).
+The maintainer does not merge pull requests whose commits lack it.
 
 All changes use pull requests, passing required checks and at least **one
 non-author human approval** before merging. The author and latest pusher cannot

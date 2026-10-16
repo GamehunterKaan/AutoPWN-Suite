@@ -15,6 +15,8 @@ venv/*
 modules/web_ui_profiles.json
 modules/web_ui_settings.json
 modules/web_ui_schedules.json
+**/web_ui_auth.json*
+**/.web_ui_auth.json.*.tmp
 vulnerabilities.sqlite3
 vulnerabilities.sqlite3.update-lock
 .nvd-*.sqlite3*
@@ -49,6 +51,7 @@ virtualenv/
 .pydevproject
 
 # Build artifacts
+.ruff_cache/
 build/
 dist/
 *.egg-info/

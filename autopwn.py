@@ -1,14 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 from datetime import datetime
 from time import sleep
 
 from rich.console import Console
 
 from modules.banners import print_banner
+from modules.daemon.daemon_installer import CreateConfig, InstallDaemon, UninstallDaemon
 from modules.getexploits import GetExploitsFromArray
 from modules.logger import Logger
+from modules.nist_search import VulnerabilityLookup
 from modules.report import InitializeReport
 from modules.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, ResolveScanHosts
 from modules.searchvuln import SearchSploits
+from modules.utils import (
+    CheckConnection as CheckConnection,
+)
 from modules.utils import (
     GetHostsToScan,
     InitArgsAPI,
@@ -23,15 +30,13 @@ from modules.utils import (
     ScanMode,
     UserConfirmation,
     WebScan,
-    CheckConnection,
     check_nmap,
     cli,
 )
-from modules.web.webvuln import web_endpoints, webvuln
-from modules.daemon.daemon_installer import InstallDaemon, UninstallDaemon, CreateConfig
-from modules.web_ui import start_server, FLASK_AVAILABLE
-from modules.nist_search import VulnerabilityLookup
 from modules.vulnerability_db import database_status, update_database
+from modules.web.webvuln import web_endpoints, webvuln
+from modules.web_ui import FLASK_AVAILABLE, reset_web_account, start_server
+
 
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, console, console2, log, lookup=None
@@ -89,7 +94,10 @@ def StartScanning(
         if ScanWeb:
             for resolved_host in web_targets:
                 for endpoint in web_endpoints(resolved_host, web_ports, web_scan_result):
-                    webvuln(endpoint, log, console)
+                    if getattr(args, "insecure_tls", False) is True:
+                        webvuln(endpoint, log, console, controls={"verify_tls": False})
+                    else:
+                        webvuln(endpoint, log, console)
 
     console.print(
         "{time} - Scan completed.".format(
@@ -99,8 +107,7 @@ def StartScanning(
 
 
 def main() -> None:
-    __author__ = "GamehunterKaan"
-    __version__ = "2.6.0"
+    __version__ = "2.6.1"
 
     args = cli()
     if args.no_color:
@@ -127,6 +134,14 @@ def main() -> None:
     if args.config:
         InitArgsConf(args, log)
 
+    if getattr(args, "web_reset_account", False) is True:
+        try:
+            reset_web_account()
+        except (OSError, RuntimeError) as exc:
+            log.logger("error", "Dashboard account could not be reset. Check access to AUTOPWN_DATA_DIR.")
+            raise SystemExit(1) from exc
+        return
+
     offline = getattr(args, "offline", False) is True or getattr(args, "vulnerability_source", None) == "offline"
     db_path = getattr(args, "vuln_db", None)
     if getattr(args, "update_vuln_db", False) is True:
@@ -149,14 +164,14 @@ def main() -> None:
             if not FLASK_AVAILABLE:
                 console.print("[red]Flask not found. Install it with: pip install flask flask-cors[/red]")
                 raise SystemExit(1)
-            web_host = getattr(args, "web_host", "0.0.0.0")
+            web_host = getattr(args, "web_host", "127.0.0.1")
             web_port = getattr(args, "web_port", 8080)
             print_banner(console)
             # start_server blocks until Ctrl+C
             start_server(host=web_host, port=web_port, version=__version__,
                          offline=offline, database=db_path)
         except KeyboardInterrupt:
-            raise SystemExit("\nWeb UI closed.")
+            raise SystemExit("\nWeb UI closed.") from None
         raise SystemExit
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -202,4 +217,4 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        raise SystemExit("Ctrl+C pressed. Exiting.")
+        raise SystemExit("Ctrl+C pressed. Exiting.") from None

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """
 Unit tests for the searchvuln module.
 """
@@ -7,8 +9,8 @@ import pytest
 
 from modules.searchvuln import (
     GenerateKeyword,
-    SearchKeyword,
     GenerateKeywords,
+    SearchKeyword,
     SearchSploits,
     VulnerableSoftware,
 )

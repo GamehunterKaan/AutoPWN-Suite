@@ -1,8 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """
 AutoPWN Suite - Embedded Web UI
 ================================
 Usage:
-    autopwn-suite --web [--web-host 0.0.0.0] [--web-port 8080]
+    autopwn-suite --web [--web-host 127.0.0.1] [--web-port 8080]
 
 Features:
   - Multiple concurrent scans (browser-launched)
@@ -46,29 +48,39 @@ from __future__ import annotations
 import html as _html
 import io
 import json
+import logging
+import math
 import os
 import queue
 import shutil
 import smtplib
+import ssl
 import threading
 import time
 import uuid
-import base64
-from copy import deepcopy
 from contextlib import contextmanager
-from functools import wraps
-from datetime import datetime, timedelta, timezone
+from copy import deepcopy
+from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from functools import wraps
 from pathlib import Path
 from typing import Optional
-import logging
-import math
-from modules.nmap_progress import ScanCancelled
+
+from modules.credential_files import (
+    NIST_API_KEY,
+    SMTP_PASSWORD,
+    WEBHOOK_URL,
+    CredentialFileError,
+    credential_from_environment,
+)
 from modules.nist_search import VulnerabilityLookup
-from modules.vulnerability_db import database_status, database_path, update_database
-from modules.web.options import CHECKS as WEB_CHECKS, normalize_options
+from modules.nmap_progress import ScanCancelled
+from modules.vulnerability_db import database_path, database_status, update_database
+from modules.web.options import CHECKS as WEB_CHECKS
+from modules.web.options import normalize_options
 from modules.web.runtime import redact_url
+from modules.web_auth import ACCOUNT_FILE, COOKIE, AccountStore, install_auth, show_credentials
 
 try:
     import requests as _requests
@@ -78,7 +90,6 @@ except ImportError:
 
 try:
     from flask import Flask, Response, jsonify, request, send_from_directory
-    from flask_cors import CORS
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -252,6 +263,20 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+# Credentials supplied through *_FILE variables override, and are never copied into,
+# the persisted settings, so they stay in their own owner-only files.
+_FILE_CREDENTIALS = {("nist_api_key",): NIST_API_KEY, ("email", "password"): SMTP_PASSWORD,
+                     ("webhook", "url"): WEBHOOK_URL}
+
+
+def _file_credential(path):
+    try:
+        return credential_from_environment(_FILE_CREDENTIALS[path])
+    except CredentialFileError as error:
+        logging.getLogger(__name__).error("%s", error)
+        return None
+
+
 def _get_setting(*keys):
     with _settings_lock:
         d = _settings
@@ -259,6 +284,16 @@ def _get_setting(*keys):
         d = d.get(k, {}) if isinstance(d, dict) else None
         if d is None:
             return None
+    if keys in _FILE_CREDENTIALS:
+        secret = _file_credential(keys)
+        return d if secret is None else secret
+    section = [path for path in _FILE_CREDENTIALS if path[:-1] == keys]
+    if section and isinstance(d, dict):
+        d = dict(d)
+        for path in section:
+            secret = _file_credential(path)
+            if secret is not None:
+                d[path[-1]] = secret
     return d
 
 
@@ -558,7 +593,7 @@ class ScanJob:
         with self._lock:
             hosts = deepcopy(list(self._hosts.values()))
             base_dict = self.to_dict()
-        
+
         structured_hosts = []
         for h in hosts:
             sh = {
@@ -587,12 +622,12 @@ class ScanJob:
                     "protocol": p.get("protocol", "tcp"),
                     "vulnerabilities": port_vulns
                 })
-            
+
             unmapped = [v for v in h.get("vulns", []) if v not in mapped_vulns]
             if unmapped:
                 sh["unmapped_vulnerabilities"] = unmapped
             structured_hosts.append(sh)
-            
+
         base_dict["hosts"] = structured_hosts
         base_dict["web_findings"] = self.web_findings(full=True)
         return base_dict
@@ -739,10 +774,12 @@ def _deliver_webhook(job: ScanJob) -> None:
 def _smtp_connection(cfg):
     port = int(cfg.get("smtp_port", 587))
     factory = smtplib.SMTP_SSL if port == 465 else smtplib.SMTP
-    with factory(cfg["smtp_host"], port, timeout=30) as srv:
+    context = ssl.create_default_context()
+    tls_options = {"context": context} if port == 465 else {}
+    with factory(cfg["smtp_host"], port, timeout=30, **tls_options) as srv:
         srv.ehlo()
         if port != 465:
-            srv.starttls()
+            srv.starttls(context=context)
             srv.ehlo()
         if cfg.get("username") and cfg.get("password"):
             srv.login(cfg["username"], cfg["password"])
@@ -780,7 +817,10 @@ def _deliver_email(job: ScanJob) -> None:
     subject = f"[AutoPWN] Scan {job.status.upper()} — {job.target}"
 
     c = job.config or {}
-    cmd_base = f"nmap {job.target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10" if c.get("mode") == "evade" else f"nmap {job.target} -sS -sV --host-timeout {c.get('host_timeout', 240)} -Pn -O -T {c.get('speed', 3)}"
+    if c.get("mode") == "evade":
+        cmd_base = f"nmap {job.target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10"
+    else:
+        cmd_base = f"nmap {job.target} -sS -sV --host-timeout {c.get('host_timeout', 240)} -Pn -O -T {c.get('speed', 3)}"
     flags = c.get("nmap_flags", "")
     if flags:
         if "-O" in cmd_base and "-O" in flags:
@@ -841,7 +881,9 @@ def _deliver_email(job: ScanJob) -> None:
     if hosts:
         for h in hosts:
             html += f"<h3>Host: {_e(h.get('ip', ''))}</h3>\n"
-            html += f'<div class="meta"><p><strong>MAC:</strong> {_e(h.get("mac") or "—")} &nbsp;|&nbsp; <strong>OS:</strong> {_e(h.get("os") or "—")} &nbsp;|&nbsp; <strong>Vendor:</strong> {_e(h.get("vendor") or "—")}</p></div>\n'
+            html += (f'<div class="meta"><p><strong>MAC:</strong> {_e(h.get("mac") or "—")} &nbsp;|&nbsp; '
+                     f'<strong>OS:</strong> {_e(h.get("os") or "—")} &nbsp;|&nbsp; '
+                     f'<strong>Vendor:</strong> {_e(h.get("vendor") or "—")}</p></div>\n')
             if h.get("ports"):
                 html += "<h4>Open Ports</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>\n"
                 for p in h.get("ports", []):
@@ -855,7 +897,8 @@ def _deliver_email(job: ScanJob) -> None:
                 html += "<h4>Vulnerabilities</h4><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>\n"
                 for v in vulns:
                     sev = _e(v.get("severity", "unknown").lower())
-                    html += f"<tr><td>{_e(v.get('cve',''))}</td><td class=\"sev-{sev}\">{_e(v.get('severity', '').upper())}</td><td>{_e(str(v.get('cvss', '—')))}</td><td>{_e(v.get('description',''))}</td></tr>\n"
+                    html += (f"<tr><td>{_e(v.get('cve',''))}</td><td class=\"sev-{sev}\">{_e(v.get('severity', '').upper())}</td>"
+                             f"<td>{_e(str(v.get('cvss', '—')))}</td><td>{_e(v.get('description',''))}</td></tr>\n")
                 html += "</table>\n"
             html += '<hr style="border:0; border-top:2px dashed #eee; margin:30px 0;">\n'
     else:
@@ -949,7 +992,9 @@ def _run_scan(job: ScanJob) -> None:
                 config["nmap_flags"] = nmap_flags
         if config.get("scan_web") and not scan_ports:
             from urllib.parse import urlsplit
+
             from rich.console import Console
+
             from modules.web.webvuln import target_urls
             endpoint = target_urls(target)[0]
             ip = urlsplit(endpoint).hostname
@@ -973,8 +1018,8 @@ def _run_scan(job: ScanJob) -> None:
             job.mark_error("nmap not found")
             return
 
+        from modules.scanner import DiscoverHosts, PortScan, ResolveScanHosts
         from modules.utils import ScanMode, ScanType, is_root
-        from modules.scanner import DiscoverHosts, PortScan, AnalyseScanResults, ResolveScanHosts
 
         # Scan mode
         scanmode = ScanMode.Normal
@@ -1181,9 +1226,9 @@ def _run_host_web(job, ip, endpoints, log, console, *, offline=False):
 
 def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, lookup=None) -> bool:
     """Record one actual host. Return whether its vulnerability lookup failed."""
+    from modules.nist_search import searchCVE
     from modules.scanner import AnalyseScanResults
     from modules.searchvuln import GenerateKeyword
-    from modules.nist_search import searchCVE
 
     h = job.get_or_create_host(ip)
     nm_host = nm[ip]
@@ -1382,9 +1427,12 @@ def _parse_interval_minutes(schedule: dict) -> Optional[int]:
             value = _integer_option(schedule.get("interval_value", 1), "interval_value", 1)
         except ValueError:
             return None
-        if unit == "minutes": return value
-        if unit == "hours":   return value * 60
-        if unit == "days":    return value * 1440
+        if unit == "minutes":
+            return value
+        if unit == "hours":
+            return value * 60
+        if unit == "days":
+            return value * 1440
     elif stype == "daily":
         return 1440   # checked daily; time matching done separately
     elif stype == "weekly":
@@ -1502,9 +1550,9 @@ def _scheduler_loop() -> None:
 
 # ── Flask application ─────────────────────────────────────────────────────────
 
-def _build_app(static_dir: Path) -> "Flask":
+def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     app = Flask(__name__, static_folder=str(static_dir), static_url_path="")
-    CORS(app)
+    auth = install_auth(app, static_dir, account_path or _DATA_DIR / ACCOUNT_FILE)
 
     @app.before_request
     def require_json_object():
@@ -1793,6 +1841,7 @@ def _build_app(static_dir: Path) -> "Flask":
 
     @app.route("/api/events")
     def api_events():
+        session_token = request.cookies.get(COOKIE)
         client_q = queue.Queue(maxsize=_MAX_LOG_HISTORY)
         with _log_history_lock:
             snapshot = list(_log_history)
@@ -1801,12 +1850,20 @@ def _build_app(static_dir: Path) -> "Flask":
         def generate():
             try:
                 for entry in snapshot:
+                    if not auth.stream_valid(session_token):
+                        return
                     yield f"data: {json.dumps(entry)}\n\n"
                 while True:
+                    if not auth.stream_valid(session_token):
+                        return
                     try:
-                        entry = client_q.get(timeout=25)
+                        entry = client_q.get(timeout=1)
+                        if not auth.stream_valid(session_token):
+                            return
                         yield f"data: {json.dumps(entry)}\n\n"
                     except queue.Empty:
+                        if not auth.stream_valid(session_token):
+                            return
                         yield ": ping\n\n"
             finally:
                 with _sse_subscribers_lock:
@@ -1823,6 +1880,8 @@ def _build_app(static_dir: Path) -> "Flask":
             data = json.loads(json.dumps(_settings))
         if data.get("email", {}).get("password"):
             data["email"]["password"] = "••••••••"
+        for key in ("auth", "account", "username", "password", "password_hash", "revision", "session_secret"):
+            data.pop(key, None)
         return jsonify(data)
 
     @app.route("/api/settings", methods=["PUT"])
@@ -1830,6 +1889,8 @@ def _build_app(static_dir: Path) -> "Flask":
         body = request.get_json(force=True, silent=True) or {}
         if not isinstance(body, dict):
             return jsonify({"error": "Settings must be an object"}), 400
+        if set(body) & {"auth", "account", "username", "password", "password_hash", "revision", "session_secret"}:
+            return jsonify({"error": "Use the account settings to change dashboard credentials."}), 400
         if any(k in body and not isinstance(body[k], dict) for k in ("email", "webhook")):
             return jsonify({"error": "email and webhook must be objects"}), 400
         if "offline_mode" in body and not isinstance(body["offline_mode"], bool):
@@ -2038,7 +2099,25 @@ def _build_app(static_dir: Path) -> "Flask":
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-def start_server(host: str = "0.0.0.0", port: int = 8080, version: str = "Unkown", *, offline=False, database=None) -> None:
+def reset_web_account():
+    """Local recovery only; rotate credentials and invalidate active sessions."""
+    store = AccountStore(Path(os.environ.get("AUTOPWN_DATA_DIR", str(_MODULE_DIR))) / ACCOUNT_FILE)
+    credentials = store.reset()
+    show_credentials(credentials, store.path)
+
+
+def _quiet_request_handler():
+    """Request handler that does not advertise the Werkzeug and Python versions in the Server header."""
+    from werkzeug.serving import WSGIRequestHandler
+
+    class QuietRequestHandler(WSGIRequestHandler):
+        def version_string(self):
+            return "AutoPWN-Suite"
+
+    return QuietRequestHandler
+
+
+def start_server(host: str = "127.0.0.1", port: int = 8080, version: str = "Unkown", *, offline=False, database=None) -> None:
     """Start the web UI server and block until Ctrl+C."""
     global __version__, _OFFLINE_ONLY, _VULNERABILITY_DB
     __version__ = version
@@ -2060,16 +2139,19 @@ def start_server(host: str = "0.0.0.0", port: int = 8080, version: str = "Unkown
     _load_profiles()
     _load_schedules()
 
-    # Start scheduler background thread
-    threading.Thread(target=_scheduler_loop, daemon=True).start()
-
     app = _build_app(_STATIC_DIR)
+
+    # Authentication must initialize successfully before scheduled work starts.
+    threading.Thread(target=_scheduler_loop, daemon=True).start()
 
     import logging as _logging
     _logging.getLogger("werkzeug").setLevel(_logging.ERROR)
 
-    display_host = "localhost" if host == "0.0.0.0" else host
-    print(f"\n  AutoPWN Suite — Web UI")
+    display_host = "localhost" if host in ("0.0.0.0", "127.0.0.1") else host
+    print("\n  AutoPWN Suite — Web UI")
     print(f"  http://{display_host}:{port}\n")
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        print("  Listening beyond localhost: remote clients must use HTTPS (terminate TLS in a reverse proxy\n"
+              "  and set AUTOPWN_WEB_SECURE_COOKIE=1) and the service should be firewalled.\n")
 
-    app.run(host=host, port=port, threaded=True, use_reloader=False)
+    app.run(host=host, port=port, threaded=True, use_reloader=False, request_handler=_quiet_request_handler())

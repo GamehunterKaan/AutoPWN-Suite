@@ -1,16 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Run the additional checks within an explicit endpoint/request budget."""
 
-from requests.exceptions import RequestException
 from urllib.parse import urlsplit, urlunsplit
+
+from requests.exceptions import RequestException
 
 from modules.web.boolean_sqli import BooleanSQLIScanner
 from modules.web.content import inspect_content
 from modules.web.http import ProbeClient, same_origin
+from modules.web.planning import prioritize_urls
 from modules.web.probes import check_cors, check_host_headers, check_methods, check_redirects
 from modules.web.query import query_parts
+from modules.web.runtime import enabled, options, run_task, stage, task_done
 from modules.web.tls import check_tls
-from modules.web.runtime import enabled, options, stage, run_task, task_done
-from modules.web.planning import prioritize_urls
 
 
 def _boolean_checks(client, endpoints, console, controls):

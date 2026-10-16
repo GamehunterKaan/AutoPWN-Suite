@@ -1,12 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Install checksum-pinned, upstream security tools on Linux CI runners."""
 
 import argparse
 import hashlib
 import io
-from pathlib import Path
 import tarfile
 import urllib.request
-
+from pathlib import Path
 
 TOOLS = {
     "osv-scanner": (

@@ -1,10 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 from dataclasses import dataclass
 from textwrap import wrap
 
 from modules.logger import banner
 from modules.nist_search import searchCVE
 from modules.utils import CheckConnection, get_terminal_width
-from rich.progress_bar import ProgressBar
 
 
 @dataclass
@@ -49,7 +50,7 @@ def GenerateKeywords(HostArray: list) -> list:
         version = str(port[4])
 
         keyword = GenerateKeyword(product, version)
-        if not keyword == "" and not keyword in keywords:
+        if not keyword == "" and keyword not in keywords:
             keywords.append(keyword)
 
     return keywords
@@ -120,7 +121,7 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
                 console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
 
                 wrapped_description = wrap(CVE.description, max(1, term_width - 50))
-                console.print(f"│\t\t[cyan]Description: [/cyan]")
+                console.print("│\t\t[cyan]Description: [/cyan]")
                 for line in wrapped_description:
                     console.print(f"│\t\t\t{line}")
                 console.print(

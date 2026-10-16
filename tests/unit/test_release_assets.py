@@ -1,14 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Release artifacts must bind reviewed tagged source, bytes and image digest."""
 
 import hashlib
 import importlib.util
 import json
-from pathlib import Path
 import subprocess
 import zipfile
+from pathlib import Path
 
 import pytest
-
 
 spec = importlib.util.spec_from_file_location(
     "release_assets", Path(__file__).resolve().parents[2] / "scripts/release_assets.py")
@@ -56,7 +57,13 @@ def test_archives_use_tag_and_manifest_binds_every_asset(source_repo, tmp_path):
                                       "docker.io/gamehunterkaan/autopwn-suite", digest)
     assert manifest["source_commit"] == commit
     assert manifest["container"]["digest"] == digest
-    assert len(manifest["assets"]) == 6
+    assert len(manifest["assets"]) == 3
+    assert len(manifest["supporting_archive"]["files"]) == 4
+    assert {p.name for p in output.iterdir()} == {
+        "autopwn-suite-v2.6.0.tar.gz", "autopwn-suite-v2.6.0.zip",
+        "autopwn-suite-v2.6.0-security.zip", "release-manifest.json",
+    }
+    assert_supporting_hashes(output, manifest)
     for asset in manifest["assets"]:
         assert asset["sha256"] == hashlib.sha256((output / asset["name"]).read_bytes()).hexdigest()
     assert json.loads((output / "release-manifest.json").read_text()) == manifest
@@ -149,12 +156,44 @@ def test_backfill_binds_original_images_and_keeps_findings(source_repo, tmp_path
     with pytest.raises(ValueError, match="Unexpected"):
         release.write_manifest(source_repo, "v2.6.0", output, release.OFFICIAL_IMAGE, digest)
     manifest = release.write_manifest(source_repo, "v2.6.0", output, release.OFFICIAL_IMAGE, digest, backfill=True)
-    assert len(manifest["assets"]) == 13
+    assert len(manifest["assets"]) == 3
+    assert len(manifest["supporting_archive"]["files"]) == 11
+    assert_supporting_hashes(output, manifest)
     assert manifest["publication"]["security_clearance"] is False
     assert manifest["publication"]["rebuilt"] is False
     assert all(r["policy_violations"] == ["Synthetic test finding"] for r in manifest["publication"]["platforms"])
     for asset in manifest["assets"]:
         assert asset["sha256"] == hashlib.sha256((output / asset["name"]).read_bytes()).hexdigest()
+
+
+def assert_supporting_hashes(output, manifest):
+    metadata = manifest["supporting_archive"]
+    with zipfile.ZipFile(output / metadata["name"]) as archive:
+        assert set(archive.namelist()) == {asset["name"] for asset in metadata["files"]}
+        for asset in metadata["files"]:
+            assert hashlib.sha256(archive.read(asset["name"])).hexdigest() == asset["sha256"]
+            assert not (output / asset["name"]).exists()
+
+
+def test_supporting_zip_is_stable_and_preserves_source_bytes(tmp_path):
+    archives = []
+    for index, order in enumerate([["notes.md", "report.json"], ["report.json", "notes.md"]]):
+        output = tmp_path / str(index)
+        output.mkdir()
+        data = {"autopwn-suite-v2.6.0.zip": b"source zip",
+                "autopwn-suite-v2.6.0.tar.gz": b"source tar",
+                "notes.md": b"Release notes\n", "report.json": b'{"findings":["example"]}\n'}
+        assets = []
+        for name in ["autopwn-suite-v2.6.0.zip", "autopwn-suite-v2.6.0.tar.gz", *order]:
+            (output / name).write_bytes(data[name])
+            assets.append({"name": name, "sha256": hashlib.sha256(data[name]).hexdigest()})
+        published, supporting = release.bundle_supporting(output, "v2.6.0", assets)
+        assert len(published) == 3
+        assert_supporting_hashes(output, {"supporting_archive": supporting})
+        assert (output / "autopwn-suite-v2.6.0.zip").read_bytes() == data["autopwn-suite-v2.6.0.zip"]
+        assert (output / "autopwn-suite-v2.6.0.tar.gz").read_bytes() == data["autopwn-suite-v2.6.0.tar.gz"]
+        archives.append((output / supporting["name"]).read_bytes())
+    assert archives[0] == archives[1]
 
 
 @pytest.mark.parametrize("field,value", [("Architecture", "arm64"), ("RepoDigests", []), ("Config", {"Labels": {}})])

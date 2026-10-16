@@ -1,12 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Security checks must reject findings, missing coverage and broad suppressions."""
 
-from datetime import datetime, timezone
 import importlib.util
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-
 
 spec = importlib.util.spec_from_file_location(
     "security_policy", Path(__file__).resolve().parents[2] / "scripts/security_policy.py")
@@ -47,6 +48,26 @@ def write_vex(root, *, version="2.6.0", component="pkg:pypi/example@1.0", timest
 def test_sca_blocks_all_known_vulnerabilities_and_malware(root):
     violations, count = policy.evaluate_sca(report(["CVE-TEST-1", "MAL-TEST-1"]), "2.6.0", root)
     assert count == 1 and len(violations) == 2
+
+
+def os_report(vulns=(), ecosystem="Debian:13"):
+    return {"results": [{"packages": [{"package": {
+        "name": "libc6", "version": "2.41", "ecosystem": ecosystem, "purl": "pkg:deb/debian/libc6@2.41",
+    }, "vulnerabilities": [{"id": v} for v in vulns]}]}]}
+
+
+def test_only_python_requirements_block_on_known_vulnerabilities(root):
+    # Operating-system packages from the base image are inventoried but do not block.
+    assert policy.evaluate_sca(os_report(["DEBIAN-CVE-TEST-1"]), "2.6.0", root) == ([], 1)
+    # The same finding in a Python requirement (including one installed in an image) blocks.
+    combined = {"results": os_report(["DEBIAN-CVE-TEST-1"])["results"] + report(["CVE-TEST-1"])["results"]}
+    violations, count = policy.evaluate_sca(combined, "2.6.0", root)
+    assert count == 2 and violations == ["pkg:pypi/example@1.0: CVE-TEST-1"]
+
+
+def test_known_malware_blocks_in_any_ecosystem(root):
+    violations, _ = policy.evaluate_sca(os_report(["MAL-TEST-1"]), "2.6.0", root)
+    assert violations == ["pkg:deb/debian/libc6@2.41: MAL-TEST-1"]
 
 
 def test_clean_inventory_passes_and_missing_package_fails(root):

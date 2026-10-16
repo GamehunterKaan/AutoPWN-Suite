@@ -20,6 +20,8 @@
   </div>
   <div class="sp"></div>
   <div id="scan-counter">Active scans: <span id="active-count">0</span></div>
+  <span id="auth-username"></span>
+  <button class="btn btn-ghost btn-sm" id="auth-logout" type="button">Sign out</button>
 </header>
 
 <!-- ── Left panel ── -->
@@ -233,6 +235,23 @@
   <!-- Settings -->
   <div id="tc-settings" class="tc">
     <div class="settings-body">
+      <div class="s-section">
+        <div class="s-section-title">Dashboard account</div>
+        <form id="account-form" method="post" action="/api/auth/account">
+          <div class="fl"><label for="account-username">Username</label></div>
+          <input id="account-username" autocomplete="username" maxlength="64" required>
+          <div class="fl"><label for="account-current-password">Current password</label></div>
+          <input id="account-current-password" type="password" autocomplete="current-password" maxlength="128" required>
+          <div class="row2">
+            <div><div class="fl"><label for="account-password">New password</label></div>
+              <input id="account-password" type="password" autocomplete="new-password" minlength="15" maxlength="128" placeholder="Leave blank to keep current password"></div>
+            <div><div class="fl"><label for="account-confirm-password">Confirm new password</label></div>
+              <input id="account-confirm-password" type="password" autocomplete="new-password" minlength="15" maxlength="128"></div>
+          </div>
+          <p id="account-message" role="status" aria-live="polite"></p>
+          <button class="btn btn-primary btn-sm" id="account-save" type="submit">Update account</button>
+        </form>
+      </div>
 
       <!-- NIST API Key -->
       <div class="s-section">
@@ -487,6 +506,7 @@
   </div>
 </dialog>
 
+<script src="/auth.js" defer></script>
 <script src="/web_security.js" defer></script>
 <script src="/app.js" defer></script>
 </body>

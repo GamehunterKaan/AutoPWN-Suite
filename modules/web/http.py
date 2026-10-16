@@ -1,21 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Bounded web requests that validate redirects before following them."""
 
 from copy import deepcopy
 from urllib.parse import urldefrag, urljoin, urlsplit
 
-from requests.exceptions import RequestException, TooManyRedirects
 from requests import request
-from requests.auth import AuthBase
+from requests.exceptions import RequestException, SSLError, TooManyRedirects
+
 from modules.web.options import LIMITS
-
-
-class AnonymousAuth(AuthBase):
-    """Suppress Requests' automatic .netrc authentication for diagnostic probes."""
-
-    def __call__(self, prepared):
-        for name in ("Authorization", "Cookie", "Proxy-Authorization"):
-            prepared.headers.pop(name, None)
-        return prepared
+from modules.web.transport import AnonymousAuth, RequestCancelled, read_response
 
 
 def bounded_request(call, *args, max_bytes=1_048_576, **kwargs):
@@ -26,27 +20,26 @@ def bounded_request(call, *args, max_bytes=1_048_576, **kwargs):
     if current:
         kwargs["timeout"] = current.options["timeout"]
         max_bytes = current.options["max_response_kb"] * 1024
+    # One policy for every target request: verify certificates unless the
+    # operator explicitly disabled it for this scan (--insecure-tls).
+    verifying = current.options["verify_tls"] if current else kwargs.get("verify", True) is not False
+    kwargs["verify"] = verifying
     try:
-        response = call(*args, stream=True, **kwargs)
+        response = read_response(call, *args, max_bytes=max_bytes,
+                                 should_stop=current.should_stop if current else None, **kwargs)
+    except RequestCancelled:
+        from modules.nmap_progress import ScanCancelled
+        raise ScanCancelled("Web scan stopped") from None
+    except SSLError:
+        if current and verifying and not current.discovery:
+            current.issue("A web request failed certificate verification; coverage is incomplete. "
+                          "Use --insecure-tls (or the dashboard's \"Accept untrusted certificates\" control) "
+                          "only for targets you trust, such as lab systems with self-signed certificates.")
+        raise
     except RequestException:
         if current and not current.discovery:
             current.issue("A web request failed; coverage is incomplete.")
         raise
-    body = bytearray()
-    response.autopwn_truncated = False
-    try:
-        for chunk in response.iter_content(chunk_size=8192):
-            if not chunk:
-                continue
-            remaining = max_bytes - len(body)
-            body.extend(chunk[:remaining])
-            if len(chunk) > remaining:
-                response.autopwn_truncated = True
-                break
-    finally:
-        response.close()
-    response._content = bytes(body)
-    response._content_consumed = True
     if current:
         method, url = (args[0], args[1]) if len(args) > 1 else ("GET", args[0])
         response.autopwn_observation = current.capture(response, method, url, kwargs.get("headers", {}), started)
@@ -85,7 +78,7 @@ class ProbeClient:
             if name.lower() in ("authorization", "cookie"):
                 del probe_headers[name]
         response = bounded_request(request, method, url, headers=probe_headers,
-                                   auth=AnonymousAuth(), verify=False, timeout=10, allow_redirects=False)
+                                   auth=AnonymousAuth(), timeout=10, allow_redirects=False)
         if response.autopwn_truncated and url not in self.truncated_urls:
             self.truncated_urls.add(url)
             self.log.logger("warning", f"Web response exceeded 1 MiB on {url}; content coverage is limited.")
@@ -149,7 +142,7 @@ def scoped_get(get, url, *, allow_upgrade=False, **kwargs):
         if current in visited:
             raise TooManyRedirects("Redirect loop in web scan")
         visited.add(current)
-        response = bounded_request(get, current, timeout=10, verify=False, allow_redirects=False, **kwargs)
+        response = bounded_request(get, current, timeout=10, allow_redirects=False, **kwargs)
         if context:
             exchanges.append(response.autopwn_observation)
         if response.status_code not in (301, 302, 303, 307, 308):

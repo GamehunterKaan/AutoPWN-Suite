@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2022-2026 Kaan Gültekin
 // ── State ──────────────────────────────────────────────────────────────────────
 let scans    = {};
 let hosts    = {};
@@ -26,9 +28,9 @@ function updateNmapPreview() {
   const tech = document.getElementById('f-scantech');
   const technique = (tech && tech.value) ? tech.value : '';
 
-  let base = _buildNmapBase(target, mode, speed, to, technique);
+  const base = _buildNmapBase(target, mode, speed, to, technique);
 
-  let flags = [];
+  const flags = [];
   const ports = document.getElementById('f-ports');
   if (ports && ports.value.trim()) flags.push('-p ' + ports.value.trim());
   const vint = document.getElementById('f-vint');
@@ -39,7 +41,7 @@ function updateNmapPreview() {
   const custom = document.getElementById('f-nmap-custom');
   if (custom && custom.value.trim()) flags.push(custom.value.trim());
 
-  let combinedFlags = flags.join(' ').trim();
+  const combinedFlags = flags.join(' ').trim();
   let previewCmd = base;
   if (combinedFlags) {
     let previewFlags = combinedFlags;
@@ -63,9 +65,9 @@ function updateProfilePreview() {
   const tech = document.getElementById('pf-scantech');
   const technique = (tech && tech.value) ? tech.value : '';
 
-  let base = _buildNmapBase('<target>', mode, speed, to, technique);
+  const base = _buildNmapBase('<target>', mode, speed, to, technique);
 
-  let flags = [];
+  const flags = [];
   const ports = document.getElementById('pf-ports');
   if (ports && ports.value.trim()) flags.push('-p ' + ports.value.trim());
   const vint = document.getElementById('pf-vint');
@@ -76,7 +78,7 @@ function updateProfilePreview() {
   const custom = document.getElementById('pf-nmap');
   if (custom && custom.value.trim()) flags.push(custom.value.trim());
 
-  let combinedFlags = flags.join(' ').trim();
+  const combinedFlags = flags.join(' ').trim();
   let previewCmd = base;
   if (combinedFlags) {
     let previewFlags = combinedFlags;
@@ -393,7 +395,7 @@ function downloadHostJson(ip) {
   const h = hosts[ip];
   if(!h) return;
   const portList = (h.ports||[]).map(p => {
-    const portVulns = (h.vulns||[]).filter(v => v.port == p.port && (v.protocol||'tcp') === (p.protocol||'tcp'));
+    const portVulns = (h.vulns||[]).filter(v => Number(v.port) === Number(p.port) && (v.protocol||'tcp') === (p.protocol||'tcp'));
     return {
       port: p.port,
       protocol: p.protocol||'tcp',
@@ -985,7 +987,7 @@ function renderProfiles(){
     <div class="item-card">
       <div class="item-card-info">
         <div class="item-card-name">${esc(p.name)}</div>
-        <div class="item-card-meta">Mode: ${p.config?.mode||'normal'} · Speed: ${p.config?.speed||3} · ${p.description||'No description'}</div>
+        <div class="item-card-meta">Mode: ${esc(p.config?.mode||'normal')} · Speed: ${esc(p.config?.speed??3)} · ${esc(p.description||'No description')}</div>
       </div>
       <div class="item-card-actions">
         <button class="btn btn-ghost btn-sm" data-action="edit-profile" data-id="${esc(p.id)}">Edit</button>
@@ -1082,7 +1084,6 @@ function renderSchedules(){
   const el=document.getElementById('schedules-list');
   const list=Object.values(schedules);
   if(!list.length){el.innerHTML='<div class="empty-list">No schedules yet.</div>';return;}
-  const typeLabel={interval:'Every',daily:'Daily at',weekly:'Weekly on'};
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   el.innerHTML=list.map(s=>{
     let when='';

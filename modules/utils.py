@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 try:
     from os import getuid
 
@@ -6,7 +8,8 @@ except ImportError:
     from ctypes import windll
 import os
 from argparse import ArgumentParser
-from configparser import ConfigParser, Error as ConfigError
+from configparser import ConfigParser
+from configparser import Error as ConfigError
 from datetime import datetime
 from enum import Enum
 from os import get_terminal_size
@@ -19,6 +22,13 @@ from sys import platform as sys_platform
 from requests import get
 from rich.text import Text
 
+from modules.credential_files import (
+    NIST_API_KEY,
+    SMTP_PASSWORD,
+    WEBHOOK_URL,
+    CredentialFileError,
+    credential_from_environment,
+)
 from modules.report import ReportMail, ReportType
 
 
@@ -303,7 +313,18 @@ def cli():
         metavar="WEBHOOK",
     )
 
+    argparser.add_argument(
+        "--insecure-tls",
+        help="Do not verify TLS certificates of scanned websites. Use only for targets you trust, "
+             "such as lab systems with self-signed certificates. (Default: verify certificates)",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+
     webuiargs = argparser.add_argument_group("Web UI", "Browser-based dashboard for controlling scans")
+    webuiargs.add_argument("--web-reset-account", action="store_true",
+                           help="Reset the dashboard account to admin with a new random password, print it, then exit.")
     webuiargs.add_argument(
         "--web",
         help="Start the web UI dashboard (scans are launched from the browser).",
@@ -313,8 +334,8 @@ def cli():
     )
     webuiargs.add_argument(
         "--web-host",
-        help="Web UI bind address. (Default: 0.0.0.0, env: AUTOPWN_WEB_HOST)",
-        default=os.environ.get("AUTOPWN_WEB_HOST", "0.0.0.0"),
+        help="Web UI bind address. Use 0.0.0.0 to listen on all interfaces; remote clients then require HTTPS. (Default: 127.0.0.1, env: AUTOPWN_WEB_HOST)",
+        default=os.environ.get("AUTOPWN_WEB_HOST", "127.0.0.1"),
         type=str,
         required=False,
         metavar="HOST",
@@ -339,7 +360,7 @@ class fake_logger:
 def is_root() -> bool:
     try:
         return getuid() == 0
-    except Exception as e:
+    except Exception:
         return windll.shell32.IsUserAnAdmin() == 1
 
 
@@ -425,9 +446,20 @@ def read_file_any_encoding(filepath: str) -> str:
         return f.readline().strip("\n")
 
 
+def _credential_file(variable, log):
+    """Credential named by an *_FILE variable, or None; a bad file is reported, never printed."""
+    try:
+        return credential_from_environment(variable)
+    except CredentialFileError as error:
+        log.logger("error", str(error))
+        return None
+
+
 def InitArgsAPI(args, log) -> str:
     if args.api:
         apiKey = args.api
+    elif (apiKey := _credential_file(NIST_API_KEY, log)) is not None:
+        pass
     else:
         apiKey = None
         try:
@@ -502,7 +534,7 @@ def InitArgsTarget(args, log):
                 try:
                     target = input("Enter target range to scan : ")
                 except KeyboardInterrupt:
-                    raise SystemExit("Ctrl+C pressed. Exiting.")
+                    raise SystemExit("Ctrl+C pressed. Exiting.") from None
 
     return target
 
@@ -540,7 +572,7 @@ def InitReport(args, log) -> tuple:
 
         if args.report_email_password:
             ReportMailPassword = args.report_email_password
-        else:
+        elif (ReportMailPassword := _credential_file(SMTP_PASSWORD, log)) is None:
             ReportMailPassword = input("Enter your email password : ")
 
         if args.report_email_to:
@@ -593,7 +625,7 @@ def InitReport(args, log) -> tuple:
         Method = ReportType.WEBHOOK
         if args.report_webhook:
             Webhook = args.report_webhook
-        else:
+        elif (Webhook := _credential_file(WEBHOOK_URL, log)) is None:
             Webhook = input("Enter your webhook URL : ")
 
         return Method, Webhook
@@ -620,7 +652,7 @@ def UserConfirmation(args) -> tuple[bool, bool, bool]:
         return True, True, False
     else:
         downloadexploits = Confirmation("Do you want to download exploits? [Y/n] : ")
-    
+
     return portscan, vulnscan, downloadexploits
 
 
@@ -658,7 +690,7 @@ def GetHostsToScan(hosts, console) -> list[str]:
     )
 
     while True:
-        host = input(f"────> ")
+        host = input("────> ")
         Targets = hosts
 
         if host in hosts:
@@ -719,6 +751,7 @@ def InitArgsConf(args, log) -> None:
                 ("skip_exploit_download", "skip_exploit_download", "bool"),
                 ("skip_discovery", "skip_discovery", "bool"),
                 ("offline", "offline", "bool"),
+                ("insecure_tls", "insecure_tls", "bool"),
                 ("vulnerability_source", "vulnerability_source", "lower"),
                 ("vuln_db", "vuln_db", "text"),
                 ("mode", "mode", "lower"),
@@ -779,13 +812,13 @@ def InitArgsConf(args, log) -> None:
 
     except FileNotFoundError:
         log.logger("error", "Config file not found!")
-        raise SystemExit
+        raise SystemExit from None
     except PermissionError:
         log.logger("error", "Permission denied while trying to read config file!")
-        raise SystemExit
+        raise SystemExit from None
     except (ConfigError, ValueError) as error:
         log.logger("error", f"Invalid config file: {error}")
-        raise SystemExit(1)
+        raise SystemExit(1) from error
 
 
 def install_nmap_linux(log) -> None:
@@ -866,7 +899,7 @@ def install_nmap_windows(log) -> None:
         raise SystemExit
     except CalledProcessError:
         log.logger("error", "Couldn't install nmap! (Windows)")
-        raise SystemExit
+        raise SystemExit from None
 
 
 def install_nmap_mac(log) -> None:
@@ -882,7 +915,7 @@ def check_nmap(log, *, offline=False) -> None:
     except (CalledProcessError, FileNotFoundError):
         log.logger("warning", "Nmap is not installed.")
         if offline:
-            raise SystemExit("Nmap must be installed before using offline mode.")
+            raise SystemExit("Nmap must be installed before using offline mode.") from None
         if DontAskForConfirmation:
             auto_install = True
         else:
@@ -898,10 +931,10 @@ def check_nmap(log, *, offline=False) -> None:
             elif platform_ == "darwin":
                 install_nmap_mac(log)
             else:
-                raise SystemExit("Unknown OS! Auto installation not supported!")
+                raise SystemExit("Unknown OS! Auto installation not supported!") from None
         else:
             log.logger("error", "Denied permission to install Nmap.")
-            raise SystemExit
+            raise SystemExit from None
 
 
 def ParamPrint(
@@ -922,20 +955,20 @@ def ParamPrint(
         )
 
     term_width = get_terminal_width()
-    
+
     msg = (
         "\n┌─[ Scanning with the following parameters ]\n"
-        + f"├"
+        + "├"
         + "─" * (term_width - 1)
         + "\n"
         + f"│\tTarget : {targetarg}\n"
         + f"│\t{'Output file' if args.output else 'Output folder'} : [yellow]{args.output if args.output else args.output_folder}[/yellow]\n"
-        + f"│\tAPI Key : {type(apiKey) == str}\n"
+        + f"│\tAPI Key : {type(apiKey) is str}\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
     )
 
     if args.skip_discovery:
-        msg += f"│\tSkip discovery: True\n"
+        msg += "│\tSkip discovery: True\n"
 
     if args.host_file:
         msg += f"│\tHostfile: {args.host_file}\n"
@@ -957,7 +990,7 @@ def ParamPrint(
     elif scanmode_name == ScanMode.Noise:
         msg += f"│\tScan mode : {scanmode_name.name}\n"
 
-    if not args.nmap_flags == None and not args.nmap_flags == "":
+    if args.nmap_flags is not None and args.nmap_flags != "":
         msg += f"│\tNmap flags : [blue]{args.nmap_flags}[/blue]\n"
 
     if args.report:

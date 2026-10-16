@@ -1,12 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Pre-PR regressions with mocked network clients and child processes only."""
 import importlib.util
 import io
-from pathlib import Path
 import threading
 from contextlib import contextmanager
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+
+from tests.auth_helpers import authenticated_app
 
 
 @pytest.fixture
@@ -47,7 +51,7 @@ def test_offline_mode_cannot_be_enabled_during_notification_preparation(review_w
     sender.start()
     assert preparing.wait(3)
     try:
-        app = wu._build_app(wu._STATIC_DIR)
+        app = authenticated_app(wu)
         app.config["TESTING"] = True
         response = app.test_client().put("/api/settings", json={"offline_mode": True})
         assert response.status_code == 409
@@ -81,7 +85,7 @@ def test_manual_notification_routes_reserve_the_offline_transition(review_web, m
         yield MagicMock()
     monkeypatch.setattr(wu._requests, "post", post)
     monkeypatch.setattr(wu, "_smtp_connection", smtp)
-    app = wu._build_app(wu._STATIC_DIR)
+    app = authenticated_app(wu)
     app.config["TESTING"] = True
     responses = []
     sender = threading.Thread(target=lambda: responses.append(app.test_client().post("/api/settings/test_" + channel).status_code))
@@ -105,8 +109,9 @@ def test_notification_operation_releases_its_reservation_on_failure(review_web):
 
 
 def test_cli_offline_ports_only_does_not_require_a_cve_database(tmp_path, monkeypatch):
-    import autopwn
     from rich.console import Console
+
+    import autopwn
     monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
     monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(tmp_path / "missing.sqlite3"),
                                     "--skip-discovery", "-t", "192.0.2.1", "--no-color"])

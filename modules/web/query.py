@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Build one-parameter probes without losing the page's other query inputs."""
 
 from urllib.parse import parse_qsl, quote, unquote, urlsplit, urlunsplit
@@ -19,8 +21,8 @@ def query_parts(url):
 
 def parameter_indexes(params, *, names=None):
     # A repeated name is a separate input; preserve its position and context.
-    from modules.web.runtime import ACTIVE, parameter_done
     from modules.web.planning import parameter_priority
+    from modules.web.runtime import ACTIVE, parameter_done
     current = ACTIVE.get()
     indexes = [index for index, param in enumerate(params) if param.split("=", 1)[0]]
     if names is not None:

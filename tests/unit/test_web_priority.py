@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Critical injection work must survive large crawls and limited request budgets."""
 
 from unittest.mock import MagicMock, patch
@@ -20,8 +22,8 @@ def test_file_inputs_and_diverse_endpoint_shapes_precede_query_variations():
 
 
 def test_file_input_is_not_lost_behind_low_priority_parameters():
-    from modules.web.runtime import ScanContext
     from modules.web.query import parameter_indexes
+    from modules.web.runtime import ScanContext
     params = ["sort=name", "limit=10", "offset=0", "view=list", "lang=en", "file=readme.txt"]
     context = ScanContext("http://example.test/", MagicMock(), controls={"max_parameters": 1})
     with context.activate():

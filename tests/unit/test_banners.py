@@ -1,7 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """
 Unit tests for the banners module.
 """
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 from rich.panel import Panel

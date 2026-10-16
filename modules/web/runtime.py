@@ -1,19 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Thread-local web scan budgets, cancellation, progress and redacted evidence."""
 
+import hashlib
+import json
+import re
+import time
 from collections import deque
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from datetime import datetime, timezone
-import hashlib
-import json
-import re
-import time
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from modules.nmap_progress import ScanCancelled
-from modules.web.options import CHECKS, TYPE_CHECK, normalize_options
-
+from modules.web.options import CHECKS as CHECKS
+from modules.web.options import TYPE_CHECK, normalize_options
 
 ACTIVE = ContextVar("web_scan_context", default=None)
 
@@ -170,6 +172,7 @@ class ScanContext:
         reproduction["requests"] = [public_request(row.get("method", "GET"), row["url"], row.get("headers"), row.get("role", "probe"))
                                     for row in reproduction.get("requests", [])[:12]]
         reproduction["target"] = redact_url(reproduction.get("target", self.target))
+        reproduction["verify_tls"] = self.options["verify_tls"]
         result["reproduction"] = reproduction
         result["observations"] = []
         used = set()

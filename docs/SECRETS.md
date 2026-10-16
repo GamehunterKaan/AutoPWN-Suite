@@ -17,18 +17,35 @@ quarterly, on role changes, and immediately after a suspected compromise.
   protection are enabled on the authoritative repository. Do not bypass an alert
   for a genuine credential. Exclude local secrets from Docker build contexts.
 - Runtime NVD keys, SMTP passwords and webhook URLs are operator-owned secrets.
-  The current dashboard stores them in **unencrypted** `web_ui_settings.json`;
-  CLI/daemon configuration and optional `api.txt` are also plaintext. Use a
+  The current dashboard stores values entered in its settings page in
+  **unencrypted** `web_ui_settings.json`; CLI/daemon configuration and optional
+  `api.txt` are also plaintext. Unreleased changes add credential files:
+  `AUTOPWN_NIST_API_KEY_FILE`, `AUTOPWN_SMTP_PASSWORD_FILE` and
+  `AUTOPWN_WEBHOOK_URL_FILE` each name a file holding exactly one non-empty
+  UTF-8 line of at most 4096 bytes. The CLI and dashboard read them at use time,
+  so a rotated secret takes effect without a restart. The dashboard overlays them
+  on the stored settings and never writes them into `web_ui_settings.json`, but a
+  value an operator also typed into settings stays stored in plaintext. Keep each
+  file owner-only (mode `0600`, or a mounted container secret); the application
+  does not check the file's permissions and reports a bad file without printing its
+  contents. Use a
   dedicated scanner account, an absolute `AUTOPWN_DATA_DIR` outside the checkout,
   directory mode `0700` and file mode `0600` (or equivalent owner-only Windows
   ACLs). The application does not enforce these modes or encrypt these files.
   Use host/disk encryption and encrypted, access-controlled backups. Protect
   caller-CWD configuration, exports, logs and downloaded evidence separately:
   `AUTOPWN_DATA_DIR` does not relocate every file.
-- Restrict dashboard ingress to authorized operators using an authenticated
-  proxy/VPN/firewall. The application has no login. Settings APIs can expose
-  integration values; host-file permissions alone do not protect the API.
-  Do not share the scanner account with unrelated applications or credentials.
+- Restrict dashboard ingress to authorized operators with the default loopback
+  bind or a firewall/VPN, and use HTTPS for any remote access. v2.6.0 has no
+  login. Unreleased changes require sign-in as a single administrator account
+  whose username and scrypt password hash are stored in `web_ui_auth.json`
+  (generated random password shown once at first launch; change it in Settings
+  or regenerate it with `--web-reset-account`). Treat that file like the other
+  dashboard files: owner-only storage and encrypted backups. It is one shared
+  account without MFA, and the password is not recoverable, only resettable on
+  the server. Settings APIs can still expose stored integration values to a
+  signed-in client; host-file permissions alone do not protect the API. Do not
+  share the scanner account with unrelated applications or credentials.
 - Do not print secrets in Actions output, reports, screenshots, issue bodies or
   command-line arguments. Masking is a backup control, not permission to log
   secrets. Review and redact evidence before sharing it. Store MFA recovery codes

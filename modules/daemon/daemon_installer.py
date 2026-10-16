@@ -1,14 +1,18 @@
-import re, os
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 import os
+import re
 import shutil
 import stat
 import subprocess
 import venv
+from configparser import ConfigParser
 from pathlib import Path
+from platform import system
+
 from modules.banners import print_banner
 from modules.utils import is_root
-from platform import system
-from configparser import ConfigParser
+
 
 def _get_menu_choice(console, prompt: str, options: dict, default: str = None) -> str:
     """
@@ -184,12 +188,12 @@ def CreateConfig(console, config_filename=""):
         else:
             os.remove(config_file)
             with open(config_file, 'w', encoding='utf-8') as configfile:
-                config.write(configfile)   
-        
+                config.write(configfile)
+
     except FileNotFoundError:
         with open(config_file, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
-        
+
 
     console.print(f"[green]Config file '{config_file}' created successfully![/green]")
     return True

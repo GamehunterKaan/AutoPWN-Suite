@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Directory discovery with randomized controls for catch-all responses."""
 
 from difflib import SequenceMatcher
@@ -9,8 +11,8 @@ from requests import get
 from requests.exceptions import RequestException
 
 from modules.random_user_agent import random_user_agent
-from modules.web.findings import emit, finding
 from modules.web.content import inspect_content
+from modules.web.findings import emit, finding
 from modules.web.http import bounded_request, resolve_url, same_origin
 from modules.web.runtime import enabled, run_task, task_done
 
@@ -58,7 +60,7 @@ def dirbust(target_url, console, log):
     try:
         for suffix in ("", ".php"):
             url = f"{target_url}__autopwn_missing_{token_hex(12)}{suffix}"
-            controls.append((url, bounded_request(get, url, headers=headers, verify=False, timeout=10, allow_redirects=False)))
+            controls.append((url, bounded_request(get, url, headers=headers, timeout=10, allow_redirects=False)))
     except RequestException:
         log.logger("error", "Directory baseline request failed.")
         log.logger("warning", "Directory discovery skipped: unable to establish a missing-path baseline.")
@@ -72,7 +74,7 @@ def dirbust(target_url, console, log):
     def check_directory(test_url):
         found = []
         try:
-            response = bounded_request(get, test_url, headers=headers, verify=False, timeout=10, allow_redirects=False)
+            response = bounded_request(get, test_url, headers=headers, timeout=10, allow_redirects=False)
         except RequestException:
             log.logger("error", f"Directory discovery request failed on {test_url}.")
             return found
@@ -95,7 +97,7 @@ def dirbust(target_url, console, log):
             try:
                 destination = urljoin(test_url, response.headers.get("Location", ""))
                 if same_origin(test_url, destination) and urlsplit(destination).path == urlsplit(test_url).path.rstrip("/") + "/":
-                    canonical = bounded_request(get, destination, headers=headers, verify=False, timeout=10, allow_redirects=False)
+                    canonical = bounded_request(get, destination, headers=headers, timeout=10, allow_redirects=False)
                     found.extend(inspect_content(destination, canonical, console))
             except (RequestException, ValueError):
                 log.logger("warning", f"Directory content check incomplete on {test_url}.")

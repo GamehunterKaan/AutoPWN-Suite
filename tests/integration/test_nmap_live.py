@@ -1,14 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Optional system-Nmap checks against temporary services bound only to loopback."""
 
-from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
-from pathlib import Path
 import shutil
 import socket
 import ssl
 import threading
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from unittest.mock import MagicMock
 from xml.etree import ElementTree
 
@@ -18,7 +20,6 @@ from api import AutoScanner
 from modules.nmap_backend import PortScanner
 from modules.scanner import AnalyseScanResults, PortScan, TestArp, TestPing
 from modules.web.webvuln import web_endpoints
-
 
 pytestmark = [pytest.mark.integration,
               pytest.mark.skipif(shutil.which("nmap") is None, reason="System Nmap is not installed")]

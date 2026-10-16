@@ -1,8 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Small, repeatable CORS, redirect, HTTP method and host-header probes."""
 
-from secrets import token_hex
 import re
-from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
+from secrets import token_hex
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
 from requests.exceptions import RequestException
@@ -10,7 +12,7 @@ from requests.exceptions import RequestException
 from modules.web.findings import emit, finding
 from modules.web.http import is_html
 from modules.web.query import parameter_indexes, probe_url, query_parts
-from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
+from modules.web.runtime import begin_parameter, finish_parameter, parameter_done
 
 
 def _publish(console, results):
@@ -28,7 +30,7 @@ def check_cors(client, url, console):
         if all(200 <= response.status_code < 300
                and response.headers.get("Access-Control-Allow-Origin", "").strip() == origin
                and response.headers.get("Access-Control-Allow-Credentials", "").strip() == "true"
-               for response, origin in zip(responses, origins)):
+               for response, origin in zip(responses, origins, strict=False)):
             results.append(finding("CORS", url, "Two arbitrary origins allowed with credentials; authenticated data exposure not verified", severity="medium",
                                    reproduction={"strategy": "cors", "requests": [{"url": url, "headers": {"Origin": origin}} for origin in origins]}))
         if any(response.headers.get("Access-Control-Allow-Origin", "").strip() == "*"

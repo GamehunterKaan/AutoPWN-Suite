@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Identify reflected payloads in active HTML contexts, without executing JS."""
 
 from random import choices
@@ -9,8 +11,8 @@ from requests.exceptions import RequestException
 
 from modules.web.findings import emit, finding
 from modules.web.http import is_html, scoped_get
-from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
 from modules.web.query import parameter_indexes, probe_url, query_parts
+from modules.web.runtime import begin_parameter, finish_parameter, parameter_done
 
 
 def reflection_context(response, payload, marker):

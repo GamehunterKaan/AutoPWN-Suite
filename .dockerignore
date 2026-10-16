@@ -18,6 +18,8 @@ autopwn-daemon.conf
 modules/web_ui_settings.json
 modules/web_ui_profiles.json
 modules/web_ui_schedules.json
+**/web_ui_auth.json*
+**/.web_ui_auth.json.*.tmp
 outputs
 exploits
 dist

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Response configuration advisories; these are not exploitability claims."""
 
 import ipaddress

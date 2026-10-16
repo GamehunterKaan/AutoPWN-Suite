@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """
 Unit tests for the utility functions in modules/utils.py.
 """
@@ -5,33 +7,32 @@ import argparse
 import os
 import sys
 from datetime import datetime
-from unittest.mock import MagicMock, patch, call
-from subprocess import CalledProcessError
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from modules.utils import (
-    InitAutomation,
-    InitArgsConf,
-    InitArgsScanType,
-    InitArgsTarget,
-    InitArgsMode,
-    InitReport,
-    ParamPrint,
-    GetHostsToScan,
+    DEVNULL,
+    CheckConnection,
     Confirmation,
     DetectIPRange,
-    UserConfirmation,
-    SaveOutput,
-    check_nmap,
+    GetHostsToScan,
     InitArgsAPI,
-    read_file_any_encoding,
-    CheckConnection,
-    ScanMode,
+    InitArgsConf,
+    InitArgsMode,
+    InitArgsScanType,
+    InitArgsTarget,
+    InitAutomation,
+    InitReport,
+    ParamPrint,
     ReportType,
-    DEVNULL,
+    SaveOutput,
+    ScanMode,
     ScanType,
+    UserConfirmation,
+    check_nmap,
     is_root,
+    read_file_any_encoding,
 )
 
 
@@ -351,7 +352,7 @@ def test_param_print(mock_width, mock_console):
     scanmode = ScanMode.Normal
     apiKey = "test-key"
     mock_log = MagicMock()
-    
+
     # Call InitAutomation to create the global variable that ParamPrint depends on
     InitAutomation(args)
 
@@ -607,7 +608,7 @@ class TestGetHostsToScan:
         """Verify it returns all hosts in automatic mode without asking for input."""
         monkeypatch.setattr("modules.utils.DontAskForConfirmation", True)
         hosts = ["192.168.1.1", "192.168.1.2"]
-        
+
         with patch("builtins.input") as mock_input:
             result = GetHostsToScan(hosts, mock_console)
             assert result == hosts
@@ -784,7 +785,7 @@ class TestInitReportInteractive:
         """Verify email report object is created from user input."""
         monkeypatch.setattr("modules.utils.DontAskForConfirmation", False)
         args = argparse.Namespace(report="email", report_email=None, report_email_password=None, report_email_to=None, report_email_from=None, report_email_server=None, report_email_server_port=None)
-        
+
         method, report_obj = InitReport(args, MagicMock())
 
         assert method == ReportType.EMAIL

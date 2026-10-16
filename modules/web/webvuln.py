@@ -1,25 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Run the web checks and return structured findings for callers."""
 
 import ipaddress
 from urllib.parse import urldefrag, urlsplit, urlunsplit
 
 from requests import get
-from requests.exceptions import RequestException
+from requests.exceptions import RequestException, SSLError
 
 from modules.logger import banner
 from modules.nmap_progress import ScanCancelled
 from modules.random_user_agent import random_user_agent
+from modules.web.additional import additional_checks, critical_checks
 from modules.web.crawler import crawl
 from modules.web.dirbust import dirbust
 from modules.web.http import origin, same_origin, scoped_get
 from modules.web.lfi import LFIScanner
 from modules.web.passive import inspect_response
+from modules.web.planning import prioritize_urls, skip_discovered_url
 from modules.web.query import query_parts
+from modules.web.runtime import ACTIVE, ScanContext, WebBudgetExceeded, allowed, enabled, options, run_task, stage, task_done
 from modules.web.sqli import SQLIScanner
 from modules.web.xss import XSSScanner
-from modules.web.additional import additional_checks, critical_checks
-from modules.web.planning import prioritize_urls, skip_discovered_url
-from modules.web.runtime import ACTIVE, ScanContext, WebBudgetExceeded, allowed, enabled, options, stage, run_task, task_done
 
 
 def target_urls(target):
@@ -80,9 +82,13 @@ def _execute_webvuln(target, log, console):
     current = ACTIVE.get()
     if current:
         current.discovery = True
+    untrusted = False
     for candidate in candidates:
         try:
             response = scoped_get(get, candidate, headers=headers, allow_upgrade=True)
+        except SSLError:
+            untrusted = True
+            continue
         except RequestException:
             continue
         target_url = response.url if isinstance(response.url, str) else candidate
@@ -90,7 +96,11 @@ def _execute_webvuln(target, log, console):
     if current:
         current.discovery = False
     if response is None:
-        log.logger("warning", f"No reachable in-scope web endpoint on {target}.")
+        if untrusted and options()["verify_tls"]:
+            log.logger("warning", f"{target} presented a certificate that could not be verified, so web checks were skipped. "
+                                  "Re-run with --insecure-tls only if you trust this target (for example a lab system with a self-signed certificate).")
+        else:
+            log.logger("warning", f"No reachable in-scope web endpoint on {target}.")
         return []
     banner(f"Testing web application on {target_url} ...", "purple", console)
     current = ACTIVE.get()
@@ -167,7 +177,8 @@ def webvuln(target, log, console, *, controls=None, should_stop=None, progress=N
     context = ScanContext(target, log, controls=controls, should_stop=should_stop, progress=progress, on_finding=on_finding, checkpoint=checkpoint)
     class ScanLog:
         def logger(self, level, message):
-            if level in ("warning", "error") and any(word in str(message).lower() for word in ("limited", "incomplete", "budget", "failed", "unable", "unavailable", "not checked", "no reachable", "connection error")):
+            coverage_words = ("limited", "incomplete", "budget", "failed", "unable", "unavailable", "not checked", "no reachable", "connection error")
+            if level in ("warning", "error") and any(word in str(message).lower() for word in coverage_words):
                 context.problem_revision += 1
                 if str(message) not in context.issues:
                     context.issues.append(str(message))

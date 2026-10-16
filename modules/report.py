@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
+import ssl
 from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -74,11 +77,12 @@ def SendEmail(email, password, email_to, email_from, server, port, log, report_p
 
     mail = None
     try:
+        context = ssl.create_default_context()
         if int(port) == 465:
-            mail = SMTP_SSL(server, port, timeout=30)
+            mail = SMTP_SSL(server, port, timeout=30, context=context)
         else:
             mail = SMTP(server, port, timeout=30)
-            mail.starttls()
+            mail.starttls(context=context)
         mail.login(email, password)
         text = msg.as_string()
         mail.sendmail(email, email_to, text)

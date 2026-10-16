@@ -5,13 +5,64 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 ![GitHub Top Language](https://img.shields.io/github/languages/top/GamehunterKaan/AutoPWN-Suite)
 ![Repo Size](https://img.shields.io/github/repo-size/GamehunterKaan/AutoPWN-Suite)
 [![Tests](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml/badge.svg)](https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml)
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/15518/baseline)](https://www.bestpractices.dev/en/projects/15518/baseline-3)
 ![GitHub Contributors](https://img.shields.io/github/contributors/GamehunterKaan/AutoPWN-Suite)
 ![GitHub Closed Pull Requests](https://img.shields.io/github/issues-pr-closed/GamehunterKaan/AutoPWN-Suite)
 ![GitHub Closed Issues](https://img.shields.io/github/issues-closed-raw/GamehunterKaan/AutoPWN-Suite)
 ![GitHub Repo Stars](https://img.shields.io/github/stars/GamehunterKaan/AutoPWN-Suite?style=social)
 ![License](https://img.shields.io/github/license/GamehunterKaan/AutoPWN-Suite)
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/15518/baseline)](https://www.bestpractices.dev/projects/15518/baseline-3)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15518/badge)](https://www.bestpractices.dev/projects/15518)
 ![Banner](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/banner.png)
 
+
+## Quick start
+
+1. Install [Nmap](https://nmap.org/download.html) and Python 3.10 or newer, then
+   get the source (see [Installation](#installation) for Linux, Docker and other options):
+
+   ```console
+   git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
+   cd AutoPWN-Suite
+   pip install -r requirements.txt
+   ```
+
+2. Scan a host or network **that you are authorized to test**:
+
+   ```console
+   python autopwn.py -t <target ip address>
+   ```
+
+3. Or start the [web dashboard](#web-ui), then sign in with the `admin` account whose
+   random password is printed once in the terminal on first launch:
+
+   ```console
+   python autopwn.py --web
+   ```
+
+Use `-h` for all options. Report problems through [support](SUPPORT.md) and
+vulnerabilities privately through the [security policy](SECURITY.md).
+
+### Security expectations
+
+AutoPWN Suite is an operator-controlled scanner that runs with your privileges and
+stores integration credentials in plaintext JSON. Scan only systems you are authorized
+to test, do not expose the dashboard to the public internet, keep it behind HTTPS and
+trusted network controls, and verify releases before use. See the
+[security policy](SECURITY.md) for reporting, response times and deployment guidance.
+
+## Achievements and project health
+
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15518/badge)](https://www.bestpractices.dev/projects/15518)
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/15518/baseline)](https://www.bestpractices.dev/en/projects/15518/baseline-3)
+
+The badges above show the live status that
+[OpenSSF Best Practices project 15518](https://www.bestpractices.dev/projects/15518)
+reports for the Best Practices levels and the
+[OpenSSF Baseline](https://www.bestpractices.dev/en/projects/15518/baseline-3) levels.
+They are updated by OpenSSF, not by this repository. The [roadmap](docs/ROADMAP.md) lists
+planned work and non-goals, and the [continuity plan](docs/CONTINUITY.md) describes
+maintainer succession.
 
 ## Features
 
@@ -21,7 +72,9 @@ Project documentation: [build from source](docs/BUILDING.md),
 [changelog](CHANGELOG.md), [release verification](docs/RELEASING.md), and
 [security policy](SECURITY.md), [support lifecycle](SUPPORT.md),
 [threat model](docs/THREAT_MODEL.md), [secret management](docs/SECRETS.md), and
-[security checks](docs/SECURITY_TESTING.md).
+[security checks](docs/SECURITY_TESTING.md), [roadmap](docs/ROADMAP.md),
+[access continuity](docs/CONTINUITY.md), [accessibility](docs/ACCESSIBILITY.md) and
+[internationalization](docs/INTERNATIONALIZATION.md).
 
 ### CLI
 - Fully [automatic](#usage) scanning and exploitation
@@ -47,6 +100,14 @@ Project documentation: [build from source](docs/BUILDING.md),
 AutoPWN Suite includes a built-in web dashboard for managing scans from your browser.
 
 ![Web UI Dashboard](images/screenshots/dashboard.png)
+
+**Signing in.** The dashboard requires a login. On first launch the server creates an `admin`
+account with a random password and prints both once in the terminal; only a scrypt hash of the
+password is stored in `web_ui_auth.json` (inside `AUTOPWN_DATA_DIR`, or the `modules` directory by
+default). Change the username and password after signing in under **Settings → Account**. If you
+forget the password, run `python autopwn.py --web-reset-account` on the server to restore `admin`
+with a new random password and sign out all sessions. Remote access requires HTTPS (or set
+`AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy); localhost works over plain HTTP.
 
 - **Multiple concurrent scans** - Launch and monitor several scans at the same time
 - **Live terminal output** - Watch nmap commands and results in real time via SSE
@@ -149,7 +210,11 @@ limited coverage. Response bodies are read as prefixes capped at 1 MiB and conne
 file contents are not written to disk. Testing guidance follows the
 [OWASP Web Security Testing Guide](https://wstg.owasp.org/v4.2/4-Web_Application_Security_Testing/).
 
-Requests have a 10-second timeout and at most three followed redirects. Redirects are checked
+Requests have a default 10-second network-I/O deadline and at most three followed redirects.
+The deadline interrupts slow response headers and bodies, including incomplete chunks;
+Stop also interrupts active reads. OS DNS resolution is outside this deadline.
+Diagnostic HTTP uses private anonymous sessions, ignoring `.netrc` and environment proxies;
+operator credentials and cookies are not attached. Redirects are checked
 before following them; injection probes cannot leave the target origin. Initial endpoint
 discovery also permits the same hostname's HTTP port 80 to upgrade to HTTPS port 443.
 Self-signed HTTPS targets remain supported for application probes; TLS findings report certificate
@@ -169,6 +234,22 @@ an ID, timestamp, detection/impact/remediation context, captured exchanges and a
 Sensitive query values and URL credentials are redacted. Captured exchanges include request roles,
 diagnostic headers, status, response-prefix hash/size, latency and truncation state; response bodies
 and cookie values are omitted. The CLI prints these results through its existing console/export flow.
+
+### TLS certificate verification
+
+Website checks verify the target's TLS certificate by default. A target with a self-signed, expired or
+otherwise untrusted certificate is skipped with a warning that explains why. For systems you trust, such as lab
+machines, opt out explicitly with `--insecure-tls` (or `insecure_tls = true` in the `[AUTOPWN]` configuration
+section, or **Accept untrusted certificates** in the dashboard's web controls). Proof-of-concept scripts record
+the choice made for the scan that produced them. The TLS check still reports the target's certificate problems.
+
+### Credential files
+
+NVD API keys, SMTP passwords and webhook URLs can be kept in their own files instead of command-line arguments,
+configuration or the dashboard settings file. Point the matching variable at a one-line, owner-readable file
+(Docker and Kubernetes secrets work directly): `AUTOPWN_NIST_API_KEY_FILE`, `AUTOPWN_SMTP_PASSWORD_FILE` and
+`AUTOPWN_WEBHOOK_URL_FILE`. Files are re-read when used, so a credential can be replaced without restarting or
+editing configuration; values from files are never written to the dashboard settings.
 
 ### Dashboard controls and verification
 
@@ -345,7 +426,7 @@ Edit `docker-compose.yml` to change host, port or data directory:
 ```yaml
 environment:
   - AUTOPWN_DATA_DIR=/data        # Where settings/profiles/schedules are stored
-  - AUTOPWN_WEB_HOST=0.0.0.0     # Listen address
+  - AUTOPWN_WEB_HOST=127.0.0.1   # Listen address (loopback by default)
   - AUTOPWN_WEB_PORT=8080        # Listen port
 ```
 
@@ -407,11 +488,13 @@ Launch the web dashboard:
 autopwn-suite --web
 ```
 
-With custom host and port:
+The dashboard listens on `127.0.0.1` by default. With a custom host and port:
 
 ```console
 autopwn-suite --web --web-host 0.0.0.0 --web-port 3000
 ```
+
+Listening beyond localhost exposes the sign-in page to the network. Remote clients must then use HTTPS (terminate TLS in a reverse proxy, set `AUTOPWN_WEB_SECURE_COOKIE=1`, and firewall the service). Inside containers, publish the port to loopback only (`-p 127.0.0.1:8080:8080`).
 
 ![Scan Running](images/screenshots/scan-running.png)
 
