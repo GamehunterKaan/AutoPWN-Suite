@@ -60,9 +60,7 @@ The badges above show the live status that
 [OpenSSF Best Practices project 15518](https://www.bestpractices.dev/projects/15518)
 reports for the Best Practices levels and the
 [OpenSSF Baseline](https://www.bestpractices.dev/en/projects/15518/baseline-3) levels.
-They are updated by OpenSSF, not by this repository; the preparation and evidence are in
-[Baseline evidence](docs/OPENSSF_BASELINE.md) and
-[Passing preparation](docs/OPENSSF_PASSING.md). The [roadmap](docs/ROADMAP.md) lists
+They are updated by OpenSSF, not by this repository. The [roadmap](docs/ROADMAP.md) lists
 planned work and non-goals, and the [continuity plan](docs/CONTINUITY.md) describes
 maintainer succession.
 
@@ -77,8 +75,6 @@ Project documentation: [build from source](docs/BUILDING.md),
 [security checks](docs/SECURITY_TESTING.md), [roadmap](docs/ROADMAP.md),
 [access continuity](docs/CONTINUITY.md), [accessibility](docs/ACCESSIBILITY.md) and
 [internationalization](docs/INTERNATIONALIZATION.md).
-[Passing badge preparation](docs/OPENSSF_PASSING.md) records proposed answers,
-maintainer confirmations and the remaining security-review items.
 
 ### CLI
 - Fully [automatic](#usage) scanning and exploitation

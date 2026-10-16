@@ -51,8 +51,7 @@ existing release summaries; they do not retroactively claim artifact signing.
 - Add documents for the [roadmap](docs/ROADMAP.md), [continuity](docs/CONTINUITY.md),
   [accessibility](docs/ACCESSIBILITY.md), [internationalization](docs/INTERNATIONALIZATION.md),
   [coding standards](docs/CODING_STANDARDS.md), the assurance case
-  (`docs/ASSURANCE_CASE.md`), the [regression-test ledger](docs/REGRESSION_LEDGER.md) and OpenSSF
-  [Silver](docs/OPENSSF_SILVER.md) and [Gold](docs/OPENSSF_GOLD.md) preparation records.
+  (`docs/ASSURANCE_CASE.md`) and the [regression-test ledger](docs/REGRESSION_LEDGER.md).
 - Add an SPDX license identifier and copyright notice to every source file.
 - Add an OWASP ZAP baseline scan of the running dashboard (unauthenticated and authenticated passes) that
   runs on pull requests and gates image publication, plus seeded fuzz tests for the parsers, validators

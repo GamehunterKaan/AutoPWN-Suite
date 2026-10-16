@@ -13,8 +13,7 @@ whenever a stable release is published; completed or abandoned items are recorde
 Sources for this plan: the open and locally fixed items in
 [Security advisories](SECURITY_ADVISORIES.md), the known gaps in the
 [threat model](THREAT_MODEL.md) and [secret management](SECRETS.md), the
-[OpenSSF evidence](OPENSSF_BASELINE.md) and [Passing preparation](OPENSSF_PASSING.md)
-documents, and the `Unreleased` section of the changelog. Contributions are welcome
+OpenSSF Best Practices criteria, and the `Unreleased` section of the changelog. Contributions are welcome
 for any item; see [CONTRIBUTING.md](../.github/CONTRIBUTING.md) and open an issue
 before starting large work.
 
