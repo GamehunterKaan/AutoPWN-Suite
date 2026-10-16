@@ -70,7 +70,7 @@ Each row argues the principle is applied, with inspectable evidence.
 | **Open design** | Controls do not depend on secrecy of the design: source, threat model and advisories are public. | This directory; [SECURITY.md](../SECURITY.md) |
 | **Psychological acceptability** | Secure behavior is the default and the escape hatch is explicit and explained: certificate failures print the exact flag and the risk; login and password reset have documented commands. | Warning text in `bounded_request` (`modules/web/http.py`); README "Signing in", "TLS certificate verification" |
 | **Allowlist validation** | Untrusted fields are checked against allowed patterns or schemas and rejected otherwise (see section 4, CWE-20/78). | `_validate_target`, `_validate_nmap_flags`, `normalize_options`, `validate_account` |
-| **Defense in depth** | Login is not the only gate: loopback default, HTTPS requirement for remote clients, Origin checks, `SameSite=Strict` cookies, and no-store/no-sniff/no-frame headers. | `install_auth` in `modules/web_auth.py`; test `test_remote_cleartext_login_is_rejected_and_forwarded_headers_cannot_override_it` |
+| **Defense in depth** | Login is not the only gate: loopback default, HTTPS requirement for remote clients, Origin checks, `SameSite=Strict` cookies, no-store/no-sniff/no-frame headers, a Content-Security-Policy (strict on the sign-in page), Permissions-Policy and cross-origin isolation headers, and no server-version disclosure. | `install_auth` in `modules/web_auth.py`; test `test_remote_cleartext_login_is_rejected_and_forwarded_headers_cannot_override_it` |
 
 ## 4. Common implementation weaknesses and how they are countered
 
@@ -110,6 +110,9 @@ case that hides them would not be an assurance case.
 
 - **One shared administrator account, no MFA, no per-user audit trail.** Dashboard
   access is all-or-nothing administrative authority.
+- **The dashboard's Content-Security-Policy still allows inline scripts and styles.** `index.html` uses inline
+  event handlers, so its policy limits content to the same origin but cannot forbid inline code; the sign-in page,
+  which has none, uses a strict policy. Removing the inline handlers would let the dashboard policy match it.
 - **Plaintext at rest.** Settings, profiles, schedules and, unless credential files
   are used, SMTP/API values are stored unencrypted; protection relies on host
   permissions and disk encryption ([SECRETS.md](SECRETS.md)).

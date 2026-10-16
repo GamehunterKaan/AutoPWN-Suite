@@ -133,7 +133,7 @@ Base URL for evidence: <https://github.com/GamehunterKaan/AutoPWN-Suite/blob/mai
 | `signed_releases` | MUST | **Met** | Release assets are signed with Sigstore keyless signing; the verification process and expected identity are documented; no long-lived private key exists. | `docs/RELEASING.md` |
 | `version_tags_signed` | SUGGESTED | **Unmet (justified)** | Tags are not cryptographically signed; signed release assets cover distribution. | `docs/RELEASING.md` |
 | `input_validation` | MUST | **Met** | Allowlist validation of targets, flags, options, replay plans, account fields and filenames, with tests; argued per boundary. | `docs/ASSURANCE_CASE.md` |
-| `hardening` | SHOULD | **Met, with limits** | Cookie flags, CSRF, Origin checks, no-store/no-sniff/no-frame headers, throttling and bounded requests; the container still runs as root. | `docs/ASSURANCE_CASE.md` |
+| `hardening` | SHOULD | **Met, with limits** | Cookie flags, CSRF, Origin checks, Content-Security-Policy and related security headers, throttling and bounded requests; the container still runs as root. | `docs/ASSURANCE_CASE.md` |
 | `assurance_case` | MUST | **Met** | Threat model, trust boundaries, secure-design argument, weakness countermeasures and residual risks. | `docs/ASSURANCE_CASE.md` |
 
 ### Analysis

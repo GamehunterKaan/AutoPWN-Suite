@@ -62,6 +62,16 @@ The aim is the strictest setting that is practical for each tool:
 - **Security analysis:** Bandit (SAST) and OSV-Scanner (SCA) run in the required
   `security.yml` job; GitHub CodeQL code scanning is enabled on the repository.
 
+## Assertions and input checking
+
+Production code does not use `assert` to validate input or enforce security properties,
+because Python removes assertions under `python -O`. Untrusted input is checked with
+explicit conditions that raise a documented exception (for example `ValueError`), and
+invariants are verified by the test suite, including the seeded fuzz tests in
+`tests/unit/test_fuzz_inputs.py`, which feed mutated input to the Nmap XML parser, the
+options schema, the target and flag allowlists, account validation and the login
+endpoints and require that only documented errors occur.
+
 ## Tests
 
 Major new functionality and every bug fix need automated tests; see

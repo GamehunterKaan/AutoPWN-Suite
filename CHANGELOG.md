@@ -54,6 +54,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   (`docs/ASSURANCE_CASE.md`), the [regression-test ledger](docs/REGRESSION_LEDGER.md) and OpenSSF
   [Silver](docs/OPENSSF_SILVER.md) and [Gold](docs/OPENSSF_GOLD.md) preparation records.
 - Add an SPDX license identifier and copyright notice to every source file.
+- Add an OWASP ZAP baseline scan of the running dashboard (unauthenticated and authenticated passes) that
+  runs on pull requests and gates image publication, plus seeded fuzz tests for the parsers, validators
+  and login endpoints. The first ZAP run found missing security headers, now fixed.
 - Limit the blocking vulnerability gate to Python requirements. Operating-system packages in
   the base image are still inventoried and reported but no longer block a release; known
   malicious packages still block in any ecosystem.
@@ -74,7 +77,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   `SameSite=Strict` cookie, per-session CSRF tokens on non-GET requests, same-origin
   `Origin` checks (CORS is no longer enabled), failed-login rate limiting with
   bounded hashing capacity, HTTPS required for non-loopback clients, and no-store,
-  nosniff and frame-deny response headers. Not released and not marked fixed in any
+  nosniff, frame-deny, Content-Security-Policy (strict on the sign-in page; same-origin with
+  inline code still allowed on the dashboard), Permissions-Policy and cross-origin isolation
+  response headers, with the server version no longer disclosed. Not released and not marked fixed in any
   published version; residual limits are one shared administrator account, no MFA,
   plaintext-at-rest settings and operator-provided HTTPS for remote access.
   The maintainer decided on 2026-10-16 that this closes the advisory; it applies to

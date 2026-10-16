@@ -122,6 +122,28 @@ described in [INTERNATIONALIZATION.md](../docs/INTERNATIONALIZATION.md). Changes
 Reviewers check these points for any change that affects the dashboard or
 user-visible text.
 
+## Good first contributions
+
+New or occasional contributors can pick any of these small, self-contained tasks. Each one
+is a single focused pull request that does not need deep knowledge of the scanner. Comment
+on (or open) an issue first so work is not duplicated; maintainers label starter issues
+`good first issue` and `help wanted`.
+
+| Task | Where to start | Skills |
+| --- | --- | --- |
+| Add real `<label>` elements for the scan-form fields that only have a caption `<div>` | `modules/web_ui_static/index.html`, gap list in [ACCESSIBILITY.md](../docs/ACCESSIBILITY.md) | HTML |
+| Add a "skip to main content" link and check keyboard tab order | `modules/web_ui_static/index.html` | HTML, CSS |
+| Honor `prefers-reduced-motion` for dashboard animations | `modules/web_ui_static/styles.css` | CSS |
+| Raise the contrast of the muted `--text3` text color to at least 4.5:1 | `modules/web_ui_static/styles.css` | CSS |
+| Add `aria-live` to toast messages so screen readers announce them | `modules/web_ui_static/app.js` (`toast`) | JavaScript |
+| Add tests for the uncovered lines of `modules/random_user_agent.py` (error and empty-file paths) | `tests/unit/`, `python -m pytest --cov=modules.random_user_agent` | Python, pytest |
+| Add tests for the uncovered branches of `modules/nist_search.py` | `tests/unit/test_nist_search.py` | Python, pytest |
+| Improve an unclear error message or help text in `modules/utils.py` (`cli()`), keeping the existing wording style | `modules/utils.py` | Python |
+| Fix a typo or unclear sentence in the documentation | `README.md`, `docs/` | Markdown |
+
+Before you start, read the [coding standards](../docs/CODING_STANDARDS.md) and the test
+policy below. Sign off your commits (`git commit -s`) as described in the DCO section.
+
 ## Code-quality warnings
 
 The full rules, rationale and exceptions are in the

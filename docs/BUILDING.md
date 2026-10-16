@@ -184,12 +184,14 @@ both `docker save` archives' layer tarballs and compare entries ignoring mtime.
 
 ### Honest limits
 
-- The local verification of this setup built one platform (linux/amd64) twice
-  on one machine with different source mtimes and got byte-identical image
-  archives. arm64 (built under QEMU in CI), builds on other hosts, and builds
-  on different days against the snapshot service have not been verified to be
-  identical; they should be, because the inputs are pinned, but check with the
-  procedure above before relying on it.
+- The local verification of this setup built each of linux/amd64 and
+  linux/arm64 (the latter under QEMU user-mode emulation) twice on one machine,
+  from two clean checkouts with different file modification times, and got
+  byte-identical image archives for each platform (the two platforms naturally
+  differ from each other). Builds on other hosts and builds on different days
+  against the snapshot service have not been verified to be identical; they
+  should be, because the inputs are pinned, but check with the procedure above
+  before relying on it.
 - The reproducibility depends on third-party availability: Docker Hub (digest),
   `snapshot.debian.org`, and PyPI file hosting must still serve the pinned
   content. A removed PyPI file or an unreachable snapshot fails the build
