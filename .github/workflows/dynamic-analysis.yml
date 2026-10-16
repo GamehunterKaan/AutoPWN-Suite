@@ -1,0 +1,175 @@
+name: Dynamic analysis
+
+# OpenSSF Gold `dynamic_analysis`: a dynamic analysis tool is applied to every
+# proposed production release before it is published. The tool is the OWASP ZAP
+# baseline scan (passive web application scanner plus spider) run against the
+# real dashboard process started from the exact source under test.
+#
+# publish-docker.yml calls this workflow (workflow_call) and its `push` job
+# needs it, so no image is pushed, signed or attached to a release unless the
+# scan below passed. It also runs on every pull request and push to main so
+# regressions are found before release time.
+#
+# What the scan covers, stated honestly:
+#   * Every dashboard route except /login, /login.js, /login.css, /favicon.ico
+#     and /api/auth/login requires a session, so an unauthenticated scan only
+#     exercises the pre-authentication attack surface (login page, redirects,
+#     static assets of the login page). That surface is what an attacker can
+#     reach first, and it is scanned as pass 1.
+#   * Pass 2 logs in with the one-time administrator password the dashboard
+#     prints on first start (a throwaway account in a temporary data directory),
+#     and hands the session cookie to ZAP so the dashboard, its scripts and its
+#     read-only API GET routes are spidered (traditional and AJAX spider). ZAP
+#     baseline is passive: it does not attack, fuzz or submit state-changing
+#     requests, and a failed login stops the job instead of silently skipping
+#     this pass.
+#   * It is a baseline, not an active scan: it will not find injection or
+#     logic flaws. Those are covered by the unit/integration tests and SAST.
+#
+# Gate: zap-baseline.py exits 0 only when no alert is FAIL or WARN. The rule
+# actions are in .github/zap/rules.tsv: confirmed findings are FAIL, harmless
+# ones are IGNORE with a written reason, and any alert not triaged there is a
+# WARN (exit 2) which also fails the job. Any non-zero exit blocks the release.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source-ref:
+        description: Validated release commit to scan
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    name: OWASP ZAP baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # ghcr.io/zaproxy/zaproxy:stable resolved to this multi-arch image index
+      # digest; update the digest deliberately, never float the tag.
+      ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6
+      DASHBOARD_URL: http://127.0.0.1:8080
+    steps:
+      - name: Validate optional release commit
+        env:
+          SOURCE_REF: ${{ inputs.source-ref }}
+        run: |
+          [[ -z "$SOURCE_REF" || "$SOURCE_REF" =~ ^[0-9a-f]{40}$ ]]
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - name: Install hash-pinned runtime dependencies
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --require-hashes -r requirements-locked.txt
+      - name: Start the dashboard on loopback with a throwaway data directory
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/dashboard-data" "$RUNNER_TEMP/zap-work"
+          # The ZAP container user is not the runner user and must write reports here.
+          chmod 777 "$RUNNER_TEMP/zap-work"
+          cp .github/zap/rules.tsv "$RUNNER_TEMP/zap-work/rules.tsv"
+          # Keep state out of the checkout; loopback is the only origin the
+          # dashboard accepts over plain HTTP.
+          AUTOPWN_DATA_DIR="$RUNNER_TEMP/dashboard-data" nohup "$RUNNER_TEMP/venv/bin/python" autopwn.py \
+            --web --web-host 127.0.0.1 --web-port 8080 > "$RUNNER_TEMP/dashboard.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/dashboard.pid"
+          for _ in $(seq 1 60); do
+            if curl --fail --silent --output /dev/null "$DASHBOARD_URL/login"; then exit 0; fi
+            kill -0 "$(cat "$RUNNER_TEMP/dashboard.pid")" 2>/dev/null || break
+            sleep 1
+          done
+          echo "Dashboard did not become ready; log follows with the password redacted." >&2
+          sed 's/^\(  Password: \).*/\1<redacted>/' "$RUNNER_TEMP/dashboard.log" >&2
+          exit 1
+      - name: Sign in with the generated administrator account
+        run: |
+          set -euo pipefail
+          # The password is printed once on first start by modules/web_auth.py.
+          password="$(sed -n 's/^  Password: //p' "$RUNNER_TEMP/dashboard.log" | head -n 1)"
+          [[ "$password" =~ ^[A-Za-z0-9_-]{20,}$ ]] || { echo "Generated dashboard password not found in the dashboard log." >&2; exit 1; }
+          echo "::add-mask::$password"
+          jar="$RUNNER_TEMP/cookies.txt"
+          csrf="$(curl --fail --silent --cookie-jar "$jar" "$DASHBOARD_URL/api/auth/login" | python -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')"
+          body="$(python -c 'import json,sys; print(json.dumps({"username": "admin", "password": sys.argv[1]}))' "$password")"
+          curl --fail --silent --output /dev/null --cookie "$jar" --cookie-jar "$jar" \
+            --header "X-CSRF-Token: $csrf" --header 'Content-Type: application/json' \
+            --data "$body" "$DASHBOARD_URL/api/auth/login"
+          # HttpOnly cookies are stored with a "#HttpOnly_" prefix on field 1.
+          token="$(awk '$6 == "autopwn_session" { print $7 }' "$jar")"
+          [[ "$token" =~ ^[A-Za-z0-9_-]{20,}$ ]] || { echo "Login did not yield a session cookie." >&2; exit 1; }
+          echo "::add-mask::$token"
+          # Prove the session works before ZAP relies on it.
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' --cookie "$jar" "$DASHBOARD_URL/")"
+          [ "$status" = 200 ] || { echo "Session cookie was not accepted (HTTP $status)." >&2; exit 1; }
+          printf '%s' "$token" > "$RUNNER_TEMP/session-token"
+          chmod 600 "$RUNNER_TEMP/session-token"
+      - name: Run ZAP baseline (unauthenticated and authenticated passes)
+        run: |
+          set -uo pipefail
+          work="$RUNNER_TEMP/zap-work"
+          token="$(cat "$RUNNER_TEMP/session-token")"
+          failed=0
+          zap() {
+            # $1 = report name; remaining arguments go to zap-baseline.py.
+            local name="$1"; shift
+            docker run --rm --network host --volume "$work:/zap/wrk:rw" "$ZAP_IMAGE" \
+              zap-baseline.py -t "$DASHBOARD_URL/" -c rules.tsv -m 2 -T 15 \
+              -J "$name.json" -w "$name.md" -r "$name.html" "$@" 2>&1 | tee "$work/$name.log"
+            return "${PIPESTATUS[0]}"
+          }
+          echo "::group::Pass 1: unauthenticated (login surface)"
+          zap zap-unauthenticated || { echo "Unauthenticated pass failed (see above)." >&2; failed=1; }
+          echo "::endgroup::"
+          echo "::group::Pass 2: authenticated (dashboard, scripts and API GET routes)"
+          # Replacer rule adds the session cookie to every request ZAP sends.
+          replacer="-config replacer.full_list(0).description=dashboard-session"
+          replacer="$replacer -config replacer.full_list(0).enabled=true"
+          replacer="$replacer -config replacer.full_list(0).matchtype=REQ_HEADER"
+          replacer="$replacer -config replacer.full_list(0).matchstr=Cookie"
+          replacer="$replacer -config replacer.full_list(0).regex=false"
+          replacer="$replacer -config replacer.full_list(0).replacement=autopwn_session=$token"
+          zap zap-authenticated -j -z "$replacer" || { echo "Authenticated pass failed (see above)." >&2; failed=1; }
+          echo "::endgroup::"
+          # Sanity check that the replacer really made ZAP authenticated: behind
+          # the login wall an unauthenticated crawl finds only a handful of URLs,
+          # so the authenticated crawl must have found strictly more.
+          unauth="$(sed -n 's/^Total of \([0-9]*\) URLs.*/\1/p' "$work/zap-unauthenticated.log" | head -n 1)"
+          auth="$(sed -n 's/^Total of \([0-9]*\) URLs.*/\1/p' "$work/zap-authenticated.log" | head -n 1)"
+          echo "URLs found: unauthenticated=${unauth:-?} authenticated=${auth:-?}"
+          if ! [[ "${unauth:-}" =~ ^[0-9]+$ && "${auth:-}" =~ ^[0-9]+$ ]] || [ "$auth" -le "$unauth" ]; then
+            echo "Authenticated pass did not reach more of the dashboard than the unauthenticated one; the session was not used." >&2
+            failed=1
+          fi
+          exit "$failed"
+      - name: Stop the dashboard
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/dashboard.pid" ]; then kill "$(cat "$RUNNER_TEMP/dashboard.pid")" 2>/dev/null || true; fi
+      - name: Retain ZAP reports including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zap-baseline-reports
+          path: |
+            ${{ runner.temp }}/zap-work/*.html
+            ${{ runner.temp }}/zap-work/*.json
+            ${{ runner.temp }}/zap-work/*.md
+            ${{ runner.temp }}/zap-work/*.log
+          if-no-files-found: error
+          retention-days: 90

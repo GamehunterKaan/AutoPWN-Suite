@@ -71,6 +71,14 @@ jobs:
     with:
       source-ref: ${{ needs.validate.outputs.commit }}
 
+  dynamic-analysis:
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dynamic-analysis.yml
+    with:
+      source-ref: ${{ needs.validate.outputs.commit }}
+
   build:
     needs: [validate, source-security]
     runs-on: ubuntu-latest
@@ -142,7 +150,7 @@ jobs:
           if-no-files-found: error
 
   push:
-    needs: [validate, build]
+    needs: [validate, build, dynamic-analysis]
     runs-on: ubuntu-latest
     permissions: {}
     outputs:
