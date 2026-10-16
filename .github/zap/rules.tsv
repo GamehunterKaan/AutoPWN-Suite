@@ -1,31 +1,28 @@
 # OWASP ZAP baseline rule actions for the AutoPWN Suite dashboard.
 #
 # Format: <rule id><TAB><IGNORE|INFO|WARN|FAIL><TAB><free-text comment>
-#   or:   <rule id><TAB>OUTOFSCOPE<TAB><URL regex>  (drops that rule's alerts for matching URLs only)
+#
 # .github/workflows/dynamic-analysis.yml treats ANY non-zero zap-baseline.py exit
 # status as a failed gate: FAIL (exit 1) and every rule that is not listed here
 # (reported as WARN, exit 2, i.e. "not triaged yet") both block the release.
-# Only IGNORE/OUTOFSCOPE entries below pass, and each one carries a written justification.
+# Only IGNORE entries below pass, and each one carries a written justification.
 # Rules that ZAP reports as PASS need no entry.
 #
 # Triaged against real scans of the unauthenticated surface (login page and
 # redirects) and an authenticated pass (dashboard, static assets, API GETs).
-# Re-triaged after the dashboard added CSP, Permissions-Policy, COOP/COEP/CORP headers
-# and a POST login form; a headless Firefox confirmed the dashboard still loads under them.
+# Re-triaged after the dashboard added CSP, Permissions-Policy, COOP/COEP/CORP headers,
+# a single Server header and POST forms; a headless Firefox confirmed it still loads under them.
 
 # --- Hardening rules that now PASS: kept as FAIL so a regression blocks the release ---
 10038	FAIL	Content-Security-Policy must be present on every response
 10063	FAIL	Permissions-Policy must be present
 90004	FAIL	COEP/COOP/CORP cross-origin isolation headers must be present
+10036	FAIL	Server header must not disclose Werkzeug/Python versions (the server now reports only AutoPWN-Suite)
 10024	FAIL	No credentials or other sensitive data in URLs; the sign-in form now uses method=post
 
-# --- Open true finding: do not ignore until fixed ---
-10036	FAIL	Server header still discloses Werkzeug/Python versions (Low, true finding): the response header set in after_request is sent in addition to the development server's own Server header, so two Server headers are emitted; override the server's version string instead
-
 # --- Informational or false positives, each justified ---
-10055	IGNORE	CSP unsafe-inline (script-src and style-src): accepted for now because modules/web_ui_static/index.html still has inline on* event handlers and style attributes that need it; the sign-in page (/login, /login.js, /login.css) keeps a strict policy with no unsafe-inline, and everything else is limited to same-origin with object-src 'none', base-uri 'none' and frame-ancestors 'none'. Remove this entry when the inline handlers are moved into app.js so the dashboard policy can be tightened
-10202	OUTOFSCOPE	^http://127\.0\.0\.1:8080/(login)?$
-# 10202 (Absence of Anti-CSRF Tokens) is scoped out only for the sign-in form served at / and /login: it is a no-script fallback that targets POST /login, which accepts only GET (405), so it changes no state. The real sign-in is a fetch POST to /api/auth/login that requires the X-CSRF-Token header bound to a challenge cookie, with SameSite=Strict cookies and an Origin check. Caveat: the URL scope cannot tell the sign-in page from the authenticated dashboard at /, so a future token-less HTML form on the dashboard page would not be reported; every other URL is still gated (an unlisted 10202 alert is a WARN)
+10055	IGNORE	CSP unsafe-inline (script-src and style-src): accepted for now because modules/web_ui_static/index.html still has inline on* event handlers and style attributes that need it; the sign-in page and every unauthenticated response (302/401/404) get a strict policy with no unsafe-inline, only authenticated dashboard pages get the lax one, and it is limited to same-origin with object-src 'none', base-uri 'none' and frame-ancestors 'none'. Remove this entry when the inline handlers are moved into app.js so the dashboard policy can be tightened
+10202	IGNORE	Absence of Anti-CSRF Tokens: false positive for this design; the dashboard has no form-token CSRF defence by design. Every non-GET request needs the X-CSRF-Token header (bound to the session or sign-in challenge), SameSite=Strict cookies and a same-origin Origin check, enforced in before_request in modules/web_auth.py (covered by tests/unit/test_web_auth.py). The HTML forms (sign-in, account) are no-script fallbacks and the real requests are fetch calls with that header; ZAP's own form submission to /api/auth/account was rejected with 403 in the authenticated crawl. Caveat: ZAP only looks for a token field, so this rule cannot catch a future form that bypasses the header check; rely on the CSRF unit tests for that
 2	IGNORE	Private IP Disclosure: false positive; 192.168.1.0 and 10.0.0.1 are example CIDR/target placeholders in the scan form and in web_security.js, not leaked addresses
 10027	IGNORE	Suspicious Comments: false positive; the matched word is "user" in ordinary explanatory comments in app.js and web_security.js
 10049	IGNORE	Non-Storable Content: intentional; every dashboard response sends Cache-Control: no-store because responses are private and per-session
