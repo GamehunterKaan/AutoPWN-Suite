@@ -18,6 +18,17 @@ ACCOUNT_FILE = "web_ui_auth.json"
 COOKIE = "autopwn_session"
 LOGIN_COOKIE = "autopwn_login"
 SESSION_SECONDS = 8 * 60 * 60
+LOGIN_ASSETS = frozenset({"/login", "/login.js", "/login.css"})
+# The sign-in page uses no inline script or style, so it gets a strict policy.
+LOGIN_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
+             "form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+# The dashboard still relies on inline event handlers and style attributes, so it must allow
+# 'unsafe-inline' for now; everything else is limited to the same origin. Removing the inline
+# handlers would let this become as strict as the sign-in policy.
+DASHBOARD_CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+                 "img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; form-action 'self'; "
+                 "base-uri 'none'; frame-ancestors 'none'")
+PERMISSIONS_POLICY = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=(), interest-cohort=()"
 _USERNAME = re.compile(r"[A-Za-z0-9_.@-]{1,64}")
 _HASH = re.compile(r"scrypt\$32768\$8\$3\$[0-9a-f]{32}\$[0-9a-f]{128}")
 
@@ -282,6 +293,13 @@ def install_auth(app, static_dir, account_path):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"
+        # Only an authenticated dashboard page needs the looser policy; sign-in, redirects and errors get the strict one.
+        signed_in = getattr(g, "dashboard_session", None) is not None
+        response.headers["Content-Security-Policy"] = DASHBOARD_CSP if signed_in and request.path not in LOGIN_ASSETS else LOGIN_CSP
+        response.headers["Permissions-Policy"] = PERMISSIONS_POLICY
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
         return response
 
     @app.get("/login")

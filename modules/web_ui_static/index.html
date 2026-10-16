@@ -237,7 +237,7 @@
     <div class="settings-body">
       <div class="s-section">
         <div class="s-section-title">Dashboard account</div>
-        <form id="account-form">
+        <form id="account-form" method="post" action="/api/auth/account">
           <div class="fl"><label for="account-username">Username</label></div>
           <input id="account-username" autocomplete="username" maxlength="64" required>
           <div class="fl"><label for="account-current-password">Current password</label></div>

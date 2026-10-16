@@ -2106,6 +2106,17 @@ def reset_web_account():
     show_credentials(credentials, store.path)
 
 
+def _quiet_request_handler():
+    """Request handler that does not advertise the Werkzeug and Python versions in the Server header."""
+    from werkzeug.serving import WSGIRequestHandler
+
+    class QuietRequestHandler(WSGIRequestHandler):
+        def version_string(self):
+            return "AutoPWN-Suite"
+
+    return QuietRequestHandler
+
+
 def start_server(host: str = "127.0.0.1", port: int = 8080, version: str = "Unkown", *, offline=False, database=None) -> None:
     """Start the web UI server and block until Ctrl+C."""
     global __version__, _OFFLINE_ONLY, _VULNERABILITY_DB
@@ -2143,4 +2154,4 @@ def start_server(host: str = "127.0.0.1", port: int = 8080, version: str = "Unko
         print("  Listening beyond localhost: remote clients must use HTTPS (terminate TLS in a reverse proxy\n"
               "  and set AUTOPWN_WEB_SECURE_COOKIE=1) and the service should be firewalled.\n")
 
-    app.run(host=host, port=port, threaded=True, use_reloader=False)
+    app.run(host=host, port=port, threaded=True, use_reloader=False, request_handler=_quiet_request_handler())

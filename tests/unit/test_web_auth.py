@@ -323,3 +323,63 @@ def test_explicit_https_proxy_configuration_sets_secure_cookie_and_checks_public
     response = client.get("/api/auth/login", headers={"Origin": "https://localhost"}, environ_overrides={"REMOTE_ADDR": "192.0.2.1"})
     assert response.status_code == 200 and "Secure" in response.headers["Set-Cookie"]
     assert client.get("/api/auth/login", headers={"Origin": "http://localhost"}).status_code == 403
+
+
+def test_responses_carry_hardening_headers_and_hide_server_versions(dashboard_login):
+    client = dashboard_login.app.test_client()
+    login_page = client.get("/login")
+    for response in (login_page, client.get("/login.js"), client.get("/api/auth/session"), client.get("/missing")):
+        headers = response.headers
+        assert headers["Cross-Origin-Opener-Policy"] == "same-origin"
+        assert headers["Cross-Origin-Embedder-Policy"] == "require-corp"
+        assert headers["Cross-Origin-Resource-Policy"] == "same-origin"
+        assert "camera=()" in headers["Permissions-Policy"] and "microphone=()" in headers["Permissions-Policy"]
+        assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
+        assert "base-uri 'none'" in headers["Content-Security-Policy"]
+        assert headers["X-Frame-Options"] == "DENY" and headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_real_server_sends_exactly_one_server_header_without_versions(dashboard_login):
+    import http.client
+    import threading
+
+    from werkzeug.serving import make_server
+
+    server = make_server("127.0.0.1", 0, dashboard_login.app, threaded=True,
+                         request_handler=dashboard_login.wu._quiet_request_handler())
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+        connection.request("GET", "/login")
+        response = connection.getresponse()
+        response.read()
+        servers = [value for name, value in response.getheaders() if name.lower() == "server"]
+        connection.close()
+    finally:
+        server.shutdown()
+        thread.join(5)
+        server.server_close()
+    assert servers == ["AutoPWN-Suite"]
+
+
+def test_unauthenticated_responses_get_the_strict_policy(dashboard_login):
+    client = dashboard_login.app.test_client()
+    for path in ("/", "/missing", "/api/scans"):
+        policy = client.get(path).headers["Content-Security-Policy"]
+        assert "default-src 'none'" in policy and "unsafe-inline" not in policy, path
+
+
+def test_sign_in_policy_is_strict_and_dashboard_policy_stays_same_origin(dashboard_login):
+    client, _ = logged_in(dashboard_login)
+    login_policy = client.get("/login").headers["Content-Security-Policy"]
+    assert "unsafe-inline" not in login_policy and "unsafe-eval" not in login_policy
+    assert "default-src 'none'" in login_policy and "script-src 'self'" in login_policy
+    dashboard = client.get("/")
+    policy = dashboard.headers["Content-Security-Policy"]
+    assert "default-src 'self'" in policy and "object-src 'none'" in policy
+    assert "unsafe-eval" not in policy and "http:" not in policy and "https:" not in policy and " *" not in policy
+    # The login page must not rely on inline code, or its strict policy would break it.
+    markup = client.get("/login").get_data(as_text=True)
+    assert "<script>" not in markup and "<style" not in markup and " onclick=" not in markup
+    assert 'method="post"' in markup  # no credentials in a URL if scripts fail to load
