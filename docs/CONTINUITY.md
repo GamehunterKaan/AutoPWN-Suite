@@ -107,6 +107,6 @@ assumed.
 | Second human reviewer able to approve owner-authored changes | Not configured |
 | GitHub account successor designation | In place per the owner's attestation of 2026-10-16; the person and mechanism are intentionally not recorded in the repository |
 | Password-manager emergency access or sealed-envelope escrow | Not recorded |
-| Docker Hub access for a second person, or a move to a multi-owner organization | Not recorded |
-| Registrar/DNS access plan for `kaangultekin.net` | Not recorded |
+| Docker Hub access for a second person, or a move to a multi-owner organization | In place per the owner's attestation of 2026-10-16; details held privately |
+| Registrar/DNS access plan for `kaangultekin.net` | In place per the owner's attestation of 2026-10-16; details held privately |
 | Last continuity review | Not yet performed |

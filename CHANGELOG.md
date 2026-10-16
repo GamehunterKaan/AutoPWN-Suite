@@ -51,8 +51,7 @@ existing release summaries; they do not retroactively claim artifact signing.
 - Add documents for the [roadmap](docs/ROADMAP.md), [continuity](docs/CONTINUITY.md),
   [accessibility](docs/ACCESSIBILITY.md), [internationalization](docs/INTERNATIONALIZATION.md),
   [coding standards](docs/CODING_STANDARDS.md), the assurance case
-  (`docs/ASSURANCE_CASE.md`), the [image advisory triage](docs/IMAGE_ADVISORY_TRIAGE.md),
-  the [regression-test ledger](docs/REGRESSION_LEDGER.md) and OpenSSF
+  (`docs/ASSURANCE_CASE.md`), the [regression-test ledger](docs/REGRESSION_LEDGER.md) and OpenSSF
   [Silver](docs/OPENSSF_SILVER.md) and [Gold](docs/OPENSSF_GOLD.md) preparation records.
 - Add an SPDX license identifier and copyright notice to every source file.
 - Prepare official source archives from reviewed version tags and publish

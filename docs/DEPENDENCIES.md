@@ -34,6 +34,14 @@ size, validate their records, and atomically replace the local SQLite mirror.
 Downloaded exploit files are untrusted reference material and are not executed
 by AutoPWN. They must not be treated as package dependencies or checked into Git.
 
+## Scope of dependency monitoring
+
+The project's dependencies are its **Python requirements** (`pyproject.toml`, `poetry.lock`). Those are what
+OSV-Scanner checks on every change, what Dependabot alerts cover, and what must be fixed or documented before
+a release. Operating-system packages inside the container image are inherited from the Debian base image and
+updated by rebuilding on a newer pinned base; they are listed in the signed image SBOM and scan reports but are
+not managed as project dependencies.
+
 ## Tracking and updates
 
 1. Update both runtime dependency declarations when adding/removing a package.

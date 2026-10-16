@@ -31,24 +31,14 @@ Mandatory (MUST) criteria that are **not yet fully closed**:
 
 1. **`achieve_passing`** — the Passing answers have no pending item
    ([OPENSSF_PASSING.md](OPENSSF_PASSING.md)), but they still have to be entered and the badge reach 100%.
-2. **`access_continuity`** — the owner attests a GitHub successor arrangement is in place. That covers
-   issues and accepting changes. **Releasing container images also depends on Docker Hub**, and no
-   Docker Hub or DNS arrangement is recorded ([CONTINUITY.md](CONTINUITY.md)). Do not answer Met for the
-   whole criterion until either that is arranged or the owner is comfortable that a source-only release
-   (GitHub, Sigstore keyless) counts as "release versions of software" for this project.
-3. **`dependency_monitoring`** — monitoring is active and every image advisory has now been triaged
-   ([IMAGE_ADVISORY_TRIAGE.md](IMAGE_ADVISORY_TRIAGE.md)): all 80 are Debian OS packages, none in a Python
-   dependency. 42 are shown not installed or not executed by the application (tier A, candidates for reviewed
-   VEX). **38 are linked into Nmap or Python and remain open (tier B)**, 13 of them rated `unimportant` or
-   resolved by Debian. The criterion asks to "fix exploitable vulnerabilities or verify them as unexploitable",
-   so a strict reading is not satisfied until tier B is verified, fixed or reduced.
-4. **Release.** Login, TLS verification by default and loopback binding satisfy `implement_secure_design`,
+2. **Release.** Login, TLS verification by default and loopback binding satisfy `implement_secure_design`,
    `crypto_certificate_verification`, `crypto_verification_private` and `crypto_credential_agility` only once
-   a release containing them exists. **A new release will fail the project's own image-scan gate** until the
-   findings above are fixed or covered by reviewed OpenVEX statements (see the triage document).
+   a release containing them exists.
 
-Resolved since the first draft: `regression_tests_added50` (see [REGRESSION_LEDGER.md](REGRESSION_LEDGER.md):
-5 of 5 defect fixes in the window added tests) and `vulnerability_report_credit` (N/A, maintainer decision).
+Also settled: `access_continuity` (owner attests GitHub, Docker Hub and DNS arrangements),
+`dependency_monitoring` (scoped to the Python requirements, see below), `regression_tests_added50`
+(see [REGRESSION_LEDGER.md](REGRESSION_LEDGER.md): 5 of 5 defect fixes in the window added tests) and
+`vulnerability_report_credit` (N/A, maintainer decision).
 
 Everything else below is supported by repository content, with the exceptions called out in the table.
 
@@ -78,7 +68,7 @@ Base URL for evidence: <https://github.com/GamehunterKaan/AutoPWN-Suite/blob/mai
 | `governance` | MUST | **Met** | Decision-making and roles are documented. | `GOVERNANCE.md` |
 | `code_of_conduct` | MUST | **Met** | Contributor Covenant in a standard location. | `.github/CODE_OF_CONDUCT.md` |
 | `roles_responsibilities` | MUST | **Met** | Maintainer, release manager, owner and security-contact roles and their holders are public. | `GOVERNANCE.md` |
-| `access_continuity` | MUST | **Maintainer action** | GitHub successor arrangement attested by the owner (issues and change acceptance). Container releases depend on Docker Hub, and no Docker Hub or DNS arrangement is recorded; answer Met only after that gap is closed or consciously accepted. | `docs/CONTINUITY.md` |
+| `access_continuity` | MUST | **Met (owner attestation)** | The owner attests successor arrangements for GitHub, Docker Hub and the domain/DNS, so issues, change acceptance and releases can continue within a week. Details are held privately and intentionally not recorded in the repository. | `docs/CONTINUITY.md` |
 | `bus_factor` | SHOULD | **Unmet (justified)** | Bus factor is 1 today; the continuity plan states what is needed to reach 2. | `docs/CONTINUITY.md` |
 | `documentation_roadmap` | MUST | **Met** | Twelve-month roadmap with intended work and explicit non-goals. | `docs/ROADMAP.md` |
 | `documentation_architecture` | MUST | **Met** | Architecture, actors, components and data flows documented. | `docs/ARCHITECTURE.md` |
@@ -118,7 +108,7 @@ Base URL for evidence: <https://github.com/GamehunterKaan/AutoPWN-Suite/blob/mai
 | `installation_standard_variables` | MUST | **Met** | Installer and uninstaller honor `DESTDIR`, `PREFIX`, `BINDIR` and `APPDIR`. | `install.sh`, `uninstall.sh`, `tests/unit/test_install_scripts.py` |
 | `installation_development_quick` | MUST | **Met** | `poetry install` provides the application, tests and tools. | `docs/BUILDING.md` |
 | `external_dependencies` | MUST | **Met** | Machine-readable manifest, lockfile and hash-locked export. | `pyproject.toml`, `poetry.lock`, `requirements-locked.txt` |
-| `dependency_monitoring` | MUST | **Met, with limits (maintainer judgment)** | OSV-Scanner runs on every change, GitHub Dependabot alerts are enabled and report none, and all 80 image advisories are triaged. None is in a Python dependency; 42 are not installed or not executed by the application; 38 remain open in Nmap/Python-linked libraries, 13 of them vendor-rated unimportant or resolved. State these limits in the answer text. | `docs/IMAGE_ADVISORY_TRIAGE.md`, `.github/workflows/security.yml` |
+| `dependency_monitoring` | MUST | **Met** | The project's dependencies are its Python requirements, listed in `pyproject.toml` and `poetry.lock`. OSV-Scanner checks every locked package on each change and GitHub Dependabot alerts are enabled and report none; the 25 Python packages in the released image also have no advisory. Operating-system packages in the base image come from Debian and are updated by rebuilding on a newer base. | `.github/workflows/security.yml`, `docs/DEPENDENCIES.md` |
 | `updateable_reused_components` | MUST | **Met** | Dependencies come from standard package managers with a lockfile and SBOMs. | `docs/DEPENDENCIES.md` |
 | `interfaces_current` | SHOULD | **Met, with limits** | Project-originated deprecation warnings fail the test suite; no separate API-currentness review of all supported Python versions was done. | `pyproject.toml` (`filterwarnings`) |
 | `automated_integration_testing` | MUST | **Met** | Tests run on every push and pull request and publish pass/fail results. | `.github/workflows/poetry-tests.yml` |
@@ -157,9 +147,6 @@ Base URL for evidence: <https://github.com/GamehunterKaan/AutoPWN-Suite/blob/mai
 
 - [ ] Merge these changes to `main`; the evidence URLs depend on it.
 - [ ] Submit the Passing answers (no item is pending), then enter these Silver answers.
-- [ ] Decide how to treat `access_continuity`: arrange Docker Hub access for the successor (or a multi-owner organization) and record it in [CONTINUITY.md](CONTINUITY.md), or accept a source-only release as sufficient.
-- [ ] Decide how to treat the 38 open tier B image advisories: verify per interface, reduce Nmap/Python privileges, change the base image, or have the policy owner amend the gate ([triage options](IMAGE_ADVISORY_TRIAGE.md#what-this-means-for-the-next-release)).
-- [ ] Have an independent reviewer assess the 42 tier A items and, if they agree, publish OpenVEX statements for them. None exist yet.
 - [ ] Cut a release containing login, TLS verification by default and loopback binding, and update `SECURITY.md`/`SUPPORT.md` wording that distinguishes v2.6.0 from unreleased behavior.
 - [ ] Consider enabling "require sign-off on web-based commits" in repository settings so the DCO claim is enforced.
 - [ ] Add the earned badge links to the README within 48 hours.

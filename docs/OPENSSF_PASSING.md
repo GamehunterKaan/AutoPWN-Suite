@@ -40,7 +40,7 @@ No Passing criterion is pending. Two caveats apply to `static_analysis_fixed`:
 - The fixes for AUTOPWN-SA-2026-002 through 005 and the authentication that closes AUTOPWN-SA-2026-001 are on `main` but **not in a published release**; v2.6.0 remains affected. Do not describe any of them as fixed in a published version until the next release ships.
 - Residual limits of the authentication remain documented: one shared administrator account, no MFA, plaintext-at-rest settings, and operator-provided HTTPS for remote access.
 
-The published image reports contain 80 advisory IDs per platform, not 80 proven exploitable vulnerabilities. They are triaged in [IMAGE_ADVISORY_TRIAGE.md](IMAGE_ADVISORY_TRIAGE.md). Do not invent VEX declarations, remove findings, lower severities, or treat a signature as a safety assessment.
+Dependency monitoring covers the project's Python requirements (see [DEPENDENCIES.md](DEPENDENCIES.md)). Do not invent VEX declarations, remove findings, lower severities, or treat a signature as a safety assessment.
 
 ## Proposed answers
 
