@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Own Nmap subprocesses, drain XML output and optionally stream task progress."""
 
 import math

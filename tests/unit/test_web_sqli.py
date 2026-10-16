@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlsplit
 

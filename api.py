@@ -1,11 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 from json import dumps
 from typing import Any, Dict, List, Type, Union
 
+from modules.nist_search import VulnerabilityLookup, searchCVE
 from modules.nmap_backend import PortScanner
-
-from modules.nist_search import searchCVE, VulnerabilityLookup
-from modules.searchvuln import GenerateKeyword
 from modules.scanner import InitHostInfo, ResolveScanHosts
+from modules.searchvuln import GenerateKeyword
 from modules.utils import fake_logger, is_root
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
@@ -125,7 +126,7 @@ class AutoScanner:
         debug: bool = False,
         *, lookup=None,
     ) -> JSON:
-        if type(target) == str:
+        if type(target) is str:
             target = [target]
 
         self.scan_results = {}

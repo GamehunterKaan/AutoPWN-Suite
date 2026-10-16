@@ -1,4 +1,5 @@
-from copy import deepcopy
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 import importlib
 import sys
 from unittest.mock import MagicMock, patch
@@ -8,6 +9,7 @@ import pytest
 from modules.nmap_progress import ScanCancelled
 from modules.web.options import normalize_options
 from modules.web.runtime import ScanContext, WebBudgetExceeded
+from tests.auth_helpers import authenticated_app
 
 
 @pytest.fixture
@@ -17,7 +19,7 @@ def dashboard(tmp_path, monkeypatch):
     wu = importlib.import_module("modules.web_ui")
     wu._settings = {}
     wu._scans.clear()
-    app = wu._build_app(wu._STATIC_DIR)
+    app = authenticated_app(wu)
     app.config["TESTING"] = True
     return wu, app.test_client()
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Consistent, reviewable web findings without treating probes as proof."""
 
 from rich.text import Text

@@ -1,7 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """One validated control schema for CLI, dashboard, profiles and schedules."""
 
 from copy import deepcopy
-
 
 CHECKS = {
     "headers": "Headers & cookies", "directories": "Directories & indexes",
@@ -30,9 +31,15 @@ def normalize_options(value=None, existing=None):
         raise ValueError("web_options must be an object")
     options = {name: bounds[0] for name, bounds in LIMITS.items()}
     options["checks"] = {name: True for name in CHECKS}
+    # Targets must present trusted certificates unless the operator opts out.
+    options["verify_tls"] = True
     for source in (existing or {}, value):
-        if set(source) - (set(LIMITS) | {"checks"}):
+        if set(source) - (set(LIMITS) | {"checks", "verify_tls"}):
             raise ValueError("Unknown web scan control")
+        if "verify_tls" in source:
+            if not isinstance(source["verify_tls"], bool):
+                raise ValueError("web verify_tls must be a boolean")
+            options["verify_tls"] = source["verify_tls"]
         for name in LIMITS:
             if name in source:
                 options[name] = source[name]

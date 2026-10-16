@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Recorded Nmap XML and simulated children; no network scans or third-party wrapper."""
 
 from unittest.mock import MagicMock
@@ -7,7 +9,6 @@ import pytest
 from modules import nmap_backend as backend
 from modules import nmap_progress as runner
 from tests.unit.test_nmap_progress import FakeProcess
-
 
 XML = '''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE nmaprun>

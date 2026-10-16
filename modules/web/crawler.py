@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Discover same-origin links and GET forms within configured crawl limits."""
 
 from collections import deque

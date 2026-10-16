@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Conservative boolean comparisons without timing probes or data extraction."""
 
 from difflib import SequenceMatcher
@@ -8,8 +10,8 @@ from urllib.parse import parse_qsl, quote, urlsplit
 from requests.exceptions import RequestException
 
 from modules.web.findings import emit, finding
-from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
 from modules.web.query import parameter_indexes, probe_url, query_parts
+from modules.web.runtime import begin_parameter, finish_parameter, parameter_done
 from modules.web.sqli import SQLIScanner
 
 

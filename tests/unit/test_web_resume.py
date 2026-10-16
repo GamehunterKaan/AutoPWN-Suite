@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Continuation must finish remaining work without erasing earlier evidence."""
 
 from collections import Counter
@@ -11,7 +13,7 @@ from modules.web.crawler import crawl
 from modules.web.options import CHECKS, normalize_options
 from modules.web.runtime import ScanContext
 from modules.web.webvuln import webvuln
-from tests.unit.test_web_dashboard import dashboard
+from tests.unit.test_web_dashboard import dashboard as dashboard
 
 
 def controls(*checks, **limits):
@@ -156,7 +158,7 @@ def test_redirect_batches_only_count_relevant_inputs(web_response):
 
 
 def test_findings_survive_request_budget_exit_and_successful_resume(web_response):
-    from modules.web.findings import finding, emit
+    from modules.web.findings import emit, finding
     from modules.web.runtime import ACTIVE, WebBudgetExceeded
     url = "http://example.com/?id=1"
     state, summaries, reported = {}, [], []

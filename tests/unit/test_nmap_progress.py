@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Nmap progress and child-process cleanup without executing Nmap."""
 import io
 import subprocess
@@ -6,7 +8,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules import nmap_progress as monitored
-
 
 XML = b'''<?xml version="1.0"?>
 <nmaprun>

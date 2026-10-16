@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Run the system Nmap executable and parse its documented XML format.
 
 This adapter implements the scan/result interface used by AutoPWN. Nmap remains

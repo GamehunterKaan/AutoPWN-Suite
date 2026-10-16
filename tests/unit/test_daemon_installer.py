@@ -1,10 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """
 Unit tests for the daemon installer in modules/daemon/daemon_installer.py.
 """
-import subprocess
-import sys
 import os
-from configparser import ConfigParser
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -100,7 +99,7 @@ class TestDaemonHelpers:
 @pytest.mark.unit
 class TestCreateConfig:
     """Tests for the CreateConfig function."""
-    
+
     @patch("modules.daemon.daemon_installer.open", new_callable=MagicMock)
     @patch("modules.daemon.daemon_installer.ConfigParser")
     def test_create_config_webhook_flow(self, mock_config_parser, mock_open, mock_console):
@@ -124,11 +123,11 @@ class TestCreateConfig:
             "my_config.conf",  # config_file name
             "y", # Overwrite existing file
         ]
- 
+
         # Mock ConfigParser instance
         mock_config_instance = MagicMock()
         mock_config_parser.return_value = mock_config_instance
- 
+
         # To test the overwrite logic, we need open() to succeed on the first check,
         # then succeed again on the write call. A simple mock does this.
         # To test the "file not found" path, we would do this:
@@ -137,7 +136,7 @@ class TestCreateConfig:
         #     FileNotFoundError, # First call to check existence
         #     mock_open()() # Second call to write the file
         # ]
- 
+
         CreateConfig(mock_console)
 
         # Verify that the config object was populated with the correct sections and data
@@ -163,7 +162,7 @@ class TestCreateConfig:
             'webhook': 'http://my.webhook.url'
         }
         mock_config_instance.__setitem__.assert_has_calls([call('AUTOPWN', expected_autopwn_section), call('REPORT', expected_report_section)], any_order=True)
- 
+
         # Verify the file was written
         mock_open.assert_any_call("my_config.conf", "w", encoding="utf-8")
         mock_config_instance.write.assert_called_once()
@@ -219,7 +218,7 @@ class TestCreateConfig:
         # After the user says 'y', it opens the file for writing ('w').
         # Due to the bug, the filename defaults to "autopwn.conf".
         expected_write_call = call("autopwn.conf", "w", encoding="utf-8")
-        
+
         # Verify the file was written
         assert expected_write_call in mock_open.call_args_list, \
             f"Expected call '{expected_write_call}' not found in call list: {mock_open.call_args_list}"
@@ -315,17 +314,23 @@ class TestCopyFiles:
         mock_cwd.__truediv__.side_effect = lambda p: path_mocks.get(p, MagicMock(name=f"path_unknown_{p}"))
 
         mock_install_path.exists.return_value = False
-        
+
         # Ensure the venv directory is reported as not existing, so it gets created.
         (mock_install_path / ".venv").exists.return_value = False
 
         # Configure the behavior of `src.exists()` and `src.is_dir()` for each file.
-        path_mocks["modules"].exists.return_value = True; path_mocks["modules"].is_dir.return_value = True
-        path_mocks["autopwn.py"].exists.return_value = True; path_mocks["autopwn.py"].is_dir.return_value = False
-        path_mocks["autopwn-daemon.conf"].exists.return_value = True; path_mocks["autopwn-daemon.conf"].is_dir.return_value = False
-        path_mocks["api.py"].exists.return_value = True; path_mocks["api.py"].is_dir.return_value = False
-        path_mocks["__init__.py"].exists.return_value = True; path_mocks["__init__.py"].is_dir.return_value = False
-        path_mocks["requirements.txt"].exists.return_value = True; path_mocks["requirements.txt"].is_dir.return_value = False
+        path_mocks["modules"].exists.return_value = True
+        path_mocks["modules"].is_dir.return_value = True
+        path_mocks["autopwn.py"].exists.return_value = True
+        path_mocks["autopwn.py"].is_dir.return_value = False
+        path_mocks["autopwn-daemon.conf"].exists.return_value = True
+        path_mocks["autopwn-daemon.conf"].is_dir.return_value = False
+        path_mocks["api.py"].exists.return_value = True
+        path_mocks["api.py"].is_dir.return_value = False
+        path_mocks["__init__.py"].exists.return_value = True
+        path_mocks["__init__.py"].is_dir.return_value = False
+        path_mocks["requirements.txt"].exists.return_value = True
+        path_mocks["requirements.txt"].is_dir.return_value = False
         path_mocks["modules/daemon/autopwn-daemon.sh"].exists.return_value = True
 
         CopyFiles(mock_console)

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 import ast
 import ipaddress
 import ssl
@@ -6,9 +8,9 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from modules.web.poc import browser_poc, build_plan, curl_poc, python_poc
-from modules.web.poc_runtime import validate_plan, verify_plan
-from tests.unit.test_web_dashboard import dashboard
-from tests.unit.test_web_tls import certificate_der
+from modules.web.poc_runtime import verify_plan
+from tests.unit.test_web_dashboard import dashboard as dashboard
+from tests.unit.test_web_tls import certificate_der as certificate_der
 
 
 def sample(kind="CORS", strategy="cors"):
@@ -77,9 +79,10 @@ def test_sql_poc_requires_baseline_difference_and_repeat(web_response):
 @pytest.mark.parametrize("kind", ["sqli", "lfi", "xss"])
 def test_redirected_findings_record_final_evidence_and_reproduce_without_redirects(web_response, kind):
     from urllib.parse import parse_qs, urlsplit, urlunsplit
+
+    from modules.web.lfi import LFIScanner
     from modules.web.runtime import ScanContext, redact_url
     from modules.web.sqli import SQLIScanner
-    from modules.web.lfi import LFIScanner
     from modules.web.xss import XSSScanner
     scanners = {"sqli": (SQLIScanner, "test_sqli"), "lfi": (LFIScanner, "test_lfi"), "xss": (XSSScanner, "test_xss")}
     url = "http://example.com/read?file=one&token=private"

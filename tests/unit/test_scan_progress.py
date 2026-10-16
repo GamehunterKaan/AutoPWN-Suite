@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Real worker progress with simulated discovery, ports and CVE results."""
 import importlib
 import importlib.util
@@ -5,6 +7,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+
+from tests.auth_helpers import authenticated_app
 
 
 @pytest.fixture
@@ -158,6 +162,6 @@ def test_scans_endpoint_exposes_progress_snapshot(progress_web):
     job = wu.ScanJob("api", "192.0.2.1", {})
     wu._register_scan(job)
     job.set_progress("vulnerabilities", "Querying nginx", percent=50, completed=1, total=2)
-    app = wu._build_app(wu._STATIC_DIR)
+    app = authenticated_app(wu)
     progress = app.test_client().get("/api/scans").json[0]["progress"]
     assert progress["phase"] == "vulnerabilities" and progress["percent"] == 50

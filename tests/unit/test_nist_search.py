@@ -1,12 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """
 Unit tests for the nist_search module.
 """
 from unittest.mock import MagicMock, patch
 
 import pytest
-from requests.exceptions import ConnectionError
 
-from modules.nist_search import searchCVE, Vulnerability, cache, FindVars
+from modules.nist_search import FindVars, Vulnerability, cache, searchCVE
 
 
 @pytest.mark.unit

@@ -1,9 +1,11 @@
-import os
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
+import shutil
 import sys
 import tempfile
-import shutil
 from pathlib import Path
 from unittest.mock import MagicMock, Mock
+
 import pytest
 
 # Add the project root to the Python path

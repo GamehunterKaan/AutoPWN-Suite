@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign in · AutoPWN Suite</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/login.css">
+  <script src="/login.js" defer></script>
+</head>
+<body>
+  <main class="login-card">
+    <div class="brand">AUTOPWN <span>SUITE</span></div>
+    <h1>Sign in</h1>
+    <p>Use your dashboard account to manage scans.</p>
+    <form id="login-form">
+      <label for="login-username">Username</label>
+      <input id="login-username" name="username" autocomplete="username" maxlength="64" required autofocus>
+      <label for="login-password">Password</label>
+      <input id="login-password" name="password" type="password" autocomplete="current-password" maxlength="128" required>
+      <p id="login-message" role="status" aria-live="polite"></p>
+      <button id="login-submit" type="submit" disabled>Sign in</button>
+    </form>
+    <p class="hint">First launch? Your account details are shown in the server terminal.</p>
+  </main>
+</body>
+</html>

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlsplit
 
@@ -122,6 +124,7 @@ def test_confirmed_cors_is_preserved_when_later_probes_hit_budget(web_response):
 @pytest.mark.unit
 def test_probe_auth_disables_ambient_netrc_and_strips_supplied_secrets():
     from requests import Request, Session
+
     from modules.web.http import AnonymousAuth
     with Session() as session, patch("requests.sessions.get_netrc_auth", return_value=("user", "secret")) as netrc:
         prepared = session.prepare_request(Request("TRACE", "http://example.com/", auth=AnonymousAuth(), headers={

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Offline regressions for configuration, actual Nmap results and NVD failures."""
 from argparse import Namespace
 from unittest.mock import ANY, MagicMock, patch

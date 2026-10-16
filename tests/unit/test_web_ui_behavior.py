@@ -1,11 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Run dashboard behavior with mocked HTTP/DOM, without a browser or server."""
 
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
-
 
 APP_JS = Path(__file__).resolve().parents[2] / "modules" / "web_ui_static" / "app.js"
 NODE = shutil.which("node")
@@ -36,6 +37,23 @@ vm.runInContext(source.slice(0, source.lastIndexOf('\n(async()=>{')), context);
 """
     result = subprocess.run([NODE, "-e", harness, str(APP_JS), script], text=True, capture_output=True, timeout=10)
     assert result.returncode == 0, result.stderr
+
+
+def test_profile_metadata_is_text_even_for_saved_markup_and_legacy_config():
+    run_js(r"""
+const payload='<img src=x onerror="alert(1)"><script>alert(2)</script>';
+profiles={one:{id:'one',name:'Office & lab',description:payload,
+  config:{mode:payload,speed:payload}}};
+renderProfiles();
+const html=nodes.get('profiles-list').innerHTML;
+assert.doesNotMatch(html,/<img|<script/);
+assert.equal((html.match(/&lt;img/g)||[]).length,3);
+assert.match(html,/Office &amp; lab/);
+profiles={two:{id:'two',name:'Normal',description:'Quotes " and <text>',config:{mode:'normal',speed:3}}};
+renderProfiles();
+assert.match(nodes.get('profiles-list').innerHTML,/Quotes &quot; and &lt;text&gt;/);
+assert.match(nodes.get('profiles-list').innerHTML,/Mode: normal · Speed: 3/);
+""")
 
 
 def test_database_controls_show_status_without_starting_a_download():

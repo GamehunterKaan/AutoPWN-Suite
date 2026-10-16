@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Exercise real OS pipes and child cleanup using local Python children as Nmap."""
 
 import subprocess
@@ -6,9 +8,8 @@ import threading
 
 import pytest
 
-from modules.nmap_backend import PortScanner
 from modules import nmap_progress as runner
-
+from modules.nmap_backend import PortScanner
 
 pytestmark = pytest.mark.integration
 

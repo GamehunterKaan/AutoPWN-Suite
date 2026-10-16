@@ -1,15 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 from dataclasses import dataclass
-from enum import Enum
 from multiprocessing import Process
 from time import sleep
 
-from modules.nmap_backend import PortScanner
 from rich import box
 from rich.table import Table
 
 from modules.logger import banner
+from modules.nmap_backend import PortScanner
+from modules.nmap_progress import ScanCancelled, scan_with_progress
 from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
-from modules.nmap_progress import scan_with_progress, ScanCancelled
 
 
 @dataclass()
@@ -129,7 +130,7 @@ def PortScan(
     except ScanCancelled:
         raise
     except Exception as e:
-        raise SystemExit(f"Error: {e}")
+        raise SystemExit(f"Error: {e}") from e
     else:
         return nm
 
@@ -143,7 +144,7 @@ def CreateNoise(target, offline=False) -> None:
             else:
                 nm.scan(hosts=target, arguments="-A -T 5" + (" -n" if offline else ""))
         except KeyboardInterrupt:
-            raise SystemExit("Ctr+C, aborting.")
+            raise SystemExit("Ctr+C, aborting.") from None
         else:
             break
 
@@ -179,7 +180,7 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *,
         raise SystemExit
     except KeyboardInterrupt:
         log.logger("error", "Noise scan interrupted!")
-        raise SystemExit
+        raise SystemExit from None
     finally:
         for P in NoisyProcesses:
             if P.is_alive():

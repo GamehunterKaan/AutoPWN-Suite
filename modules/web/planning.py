@@ -1,9 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Prefer injectable inputs and diverse paths over repeated query variations."""
 
-from collections import defaultdict, deque
 import re
+from collections import defaultdict, deque
 from urllib.parse import parse_qsl, unquote, urlsplit
-
 
 _FILE_INPUTS = {"file", "filename", "path", "include", "template", "document", "doc", "folder"}
 _ROUTING_INPUTS = {"page", "view", "module", "route"}
@@ -52,7 +53,8 @@ def prioritize_urls(urls, preferred=None):
         parts = urlsplit(url)
         names = tuple(name for name, _ in parse_qsl(parts.query, keep_blank_values=True))
         groups[(parts.scheme, parts.netloc, parts.path, names)].append(url)
-    rank = lambda url: (url != preferred, _priority(url), url)
+    def rank(url):
+        return (url != preferred, _priority(url), url)
     ordered = [deque(sorted(group, key=rank)) for group in groups.values()]
     ordered.sort(key=lambda group: rank(group[0]))
     result = []

@@ -1,10 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Inspect certificates and positively verify obsolete TLS support."""
 
-from datetime import datetime, timezone
 import ipaddress
 import socket
 import ssl
 import warnings
+from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from cryptography import x509
@@ -74,9 +76,11 @@ def inspect_certificate(url, der, *, now=None):
     if now > certificate.not_valid_after_utc:
         results.append(finding("TLS_CERTIFICATE", url, f"Certificate expired at {certificate.not_valid_after_utc.isoformat()}", severity="medium", confidence="observation", reproduction=reproduction))
     if now < certificate.not_valid_before_utc:
-        results.append(finding("TLS_CERTIFICATE", url, f"Certificate is not valid before {certificate.not_valid_before_utc.isoformat()}", severity="medium", confidence="observation", reproduction=reproduction))
+        results.append(finding("TLS_CERTIFICATE", url, f"Certificate is not valid before {certificate.not_valid_before_utc.isoformat()}",
+                               severity="medium", confidence="observation", reproduction=reproduction))
     if not _certificate_matches(certificate, hostname):
-        results.append(finding("TLS_CERTIFICATE", url, "No certificate subject alternative name matches the target hostname/IP", severity="medium", confidence="observation", reproduction=reproduction))
+        results.append(finding("TLS_CERTIFICATE", url, "No certificate subject alternative name matches the target hostname/IP",
+                               severity="medium", confidence="observation", reproduction=reproduction))
     return results
 
 

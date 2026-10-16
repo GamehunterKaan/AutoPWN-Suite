@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Baseline-aware Unix and Windows file inclusion checks."""
 
 import re
@@ -7,8 +9,8 @@ from requests.exceptions import RequestException
 
 from modules.web.findings import emit, finding
 from modules.web.http import scoped_get
-from modules.web.runtime import parameter_done, begin_parameter, finish_parameter
 from modules.web.query import parameter_indexes, probe_url, query_parts
+from modules.web.runtime import begin_parameter, finish_parameter, parameter_done
 
 
 def file_signatures(text):

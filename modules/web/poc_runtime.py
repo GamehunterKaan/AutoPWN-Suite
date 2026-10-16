@@ -1,18 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Portable evidence reproducer. Used by downloads and dashboard verification."""
 
-from datetime import datetime, timezone
-from difflib import SequenceMatcher
-from html import escape
-from html.parser import HTMLParser
 import hashlib
 import ipaddress
 import re
 import socket
 import ssl
 import warnings
+from datetime import datetime, timezone
+from difflib import SequenceMatcher
+from html import escape
+from html.parser import HTMLParser
 from urllib.parse import parse_qs, parse_qsl, quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
 
 import requests
+
+from modules.web.transport import read_response
 
 
 def _origin(url):
@@ -27,6 +31,8 @@ def _origin(url):
 
 def validate_plan(plan):
     scope = _origin(plan["target"])
+    if not isinstance(plan.get("verify_tls", True), bool):
+        raise ValueError("Invalid PoC TLS verification setting")
     rows = plan.get("requests", [])
     if not isinstance(rows, list) or len(rows) > 12:
         raise ValueError("PoC request limit exceeded")
@@ -90,7 +96,10 @@ class _Document(HTMLParser):
             self.heading.append(data)
         if self.marker and self.stack and self.stack[-1][0] == "script":
             attributes = self.stack[-1][1]
-            if not any(parent in ("textarea", "title", "style", "xmp", "noscript", "template") for parent, _ in self.stack[:-1]) and not attributes.get("src") and attributes.get("type", "").strip().lower() in ("", "module", "text/javascript", "application/javascript") and self.marker in data:
+            if (not any(parent in ("textarea", "title", "style", "xmp", "noscript", "template") for parent, _ in self.stack[:-1])
+                    and not attributes.get("src")
+                    and attributes.get("type", "").strip().lower() in ("", "module", "text/javascript", "application/javascript")
+                    and self.marker in data):
                 self.active = True
 
 
@@ -150,7 +159,8 @@ def _response_condition(plan, response):
         return response.status_code >= 500 and any(re.search(pattern, text, re.I) for pattern in patterns)
     if kind == "DEBUG_DISCLOSURE":
         php = 200 <= response.status_code < 300 and re.search(r"<title>\s*phpinfo\(\)", text, re.I) and "PHP Version" in text
-        django = (200 <= response.status_code < 300 or response.status_code >= 500) and 'id="summary"' in text and "Django" in text and ("DEBUG = True" in text or "You're seeing this error because" in text)
+        django = ((200 <= response.status_code < 300 or response.status_code >= 500) and 'id="summary"' in text and "Django" in text
+                  and ("DEBUG = True" in text or "You're seeing this error because" in text))
         return bool(is_html and (php or django))
     if kind == "EXPOSED_FILE":
         if not 200 <= response.status_code < 300 or (is_html and re.search(r"<(?:!doctype html|html|body)\b", text, re.I)):
@@ -216,14 +226,17 @@ def _check_http(plan, responses):
     if strategy == "boolean_sqli":
         if len(responses) != 6 or not 200 <= responses[0].status_code < 300 or len({(row.status_code, row.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()) for row in responses}) != 1:
             return False
-        texts = [_normalized(response, row, plan) for response, row in zip(responses, rows)]
-        similar = lambda a, b: SequenceMatcher(None, a, b).ratio()
-        return similar(texts[0], texts[1]) >= .98 and all(similar(texts[0], texts[index]) >= .98 for index in (2, 4)) and all(similar(texts[0], texts[index]) <= .85 for index in (3, 5)) and similar(texts[3], texts[5]) >= .98 and not any(_sql_errors(response.text) for response in responses)
+        texts = [_normalized(response, row, plan) for response, row in zip(responses, rows, strict=False)]
+        def similar(a, b):
+            return SequenceMatcher(None, a, b).ratio()
+        return (similar(texts[0], texts[1]) >= .98 and all(similar(texts[0], texts[index]) >= .98 for index in (2, 4))
+                and all(similar(texts[0], texts[index]) <= .85 for index in (3, 5)) and similar(texts[3], texts[5]) >= .98
+                and not any(_sql_errors(response.text) for response in responses))
     if strategy in ("cors", "cors_config"):
         return all(200 <= response.status_code < 300 and response.headers.get("Access-Control-Allow-Origin", "").strip() == ("*" if strategy == "cors_config" else row["headers"]["Origin"])
-                   and response.headers.get("Access-Control-Allow-Credentials", "").strip() == "true" for response, row in zip(responses, rows))
+                   and response.headers.get("Access-Control-Allow-Credentials", "").strip() == "true" for response, row in zip(responses, rows, strict=False))
     if strategy == "redirect":
-        for response, row in zip(responses, rows):
+        for response, row in zip(responses, rows, strict=False):
             values = parse_qs(urlsplit(row["url"]).query).get(plan["parameter"], [])
             if not values or response.status_code not in (301, 302, 303, 307, 308) or urlsplit(urljoin(row["url"], response.headers.get("Location", ""))).hostname != urlsplit(values[0]).hostname:
                 return False
@@ -232,9 +245,10 @@ def _check_http(plan, responses):
         return all(response.status_code == 200 and re.search(r"^TRACE \S+ HTTP/\d(?:\.\d)?\s*$", response.text, re.M)
                    and re.search(r"^X-Autopwn-Trace:\s*" + re.escape(plan["marker"]) + r"\s*$", response.text, re.I | re.M) for response in responses)
     if strategy == "methods":
-        return (200 <= responses[0].status_code < 300 or responses[0].status_code == 405) and bool(set(responses[0].headers.get("Allow", "").upper().replace(" ", "").split(",")) & {"PUT", "PATCH", "DELETE", "TRACE", "CONNECT"})
+        advertised = set(responses[0].headers.get("Allow", "").upper().replace(" ", "").split(","))
+        return (200 <= responses[0].status_code < 300 or responses[0].status_code == 405) and bool(advertised & {"PUT", "PATCH", "DELETE", "TRACE", "CONNECT"})
     if strategy == "host_header":
-        for response, row in zip(responses, rows):
+        for response, row in zip(responses, rows, strict=False):
             marker = row["headers"][plan["header"]]
             document = _Document()
             document.feed(response.text)
@@ -252,10 +266,11 @@ def _check_http(plan, responses):
         probe = responses[2]
         if not (200 <= probe.status_code < 400 or probe.status_code in (401, 403)):
             return False
-        for response, row in zip(responses[:2], rows[:2]):
+        for response, row in zip(responses[:2], rows[:2], strict=False):
             if response.status_code != probe.status_code:
                 continue
-            normalize = lambda value, url: value.replace(url, "{path}").replace(urlsplit(url).path, "{path}")
+            def normalize(value, url):
+                return value.replace(url, "{path}").replace(urlsplit(url).path, "{path}")
             if probe.status_code in (301, 302, 303, 307, 308):
                 if normalize(probe.headers.get("Location", ""), rows[2]["url"]) == normalize(response.headers.get("Location", ""), row["url"]):
                     return False
@@ -322,28 +337,14 @@ def verify_plan(plan, transport=None):
         if plan["strategy"] == "tls":
             matched = _check_tls(plan)
         else:
-            with requests.Session() as session:
-                session.trust_env = False
-                for row in plan["requests"]:
-                    session.cookies.clear()
-                    response = (transport or session.request)(row.get("method", "GET"), row["url"], headers=row.get("headers", {}),
-                        verify=False, timeout=10, allow_redirects=False, stream=True)
-                    body = bytearray()
-                    truncated = False
-                    try:
-                        for chunk in response.iter_content(8192):
-                            remaining = 1048576 - len(body)
-                            body.extend(chunk[:remaining])
-                            if len(chunk) > remaining:
-                                truncated = True
-                                break
-                    finally:
-                        response.close()
-                    response._content, response._content_consumed = bytes(body), True
-                    responses.append(response)
-                    observations.append({"method": row.get("method", "GET"), "url": _public_url(row["url"]), "role": row.get("role", "probe"),
-                        "status": response.status_code, "headers": _public_headers(response), "bytes_captured": len(body), "sha256": hashlib.sha256(body).hexdigest(), "truncated": truncated})
-                matched = None if any(row["truncated"] for row in observations) else _check_http(plan, responses)
+            for row in plan["requests"]:
+                response = read_response(transport, row.get("method", "GET"), row["url"], headers=row.get("headers", {}),
+                    verify=plan.get("verify_tls", True), timeout=10, allow_redirects=False)
+                responses.append(response)
+                observations.append({"method": row.get("method", "GET"), "url": _public_url(row["url"]), "role": row.get("role", "probe"),
+                    "status": response.status_code, "headers": _public_headers(response), "bytes_captured": len(response.content),
+                    "sha256": hashlib.sha256(response.content).hexdigest(), "truncated": response.autopwn_truncated})
+            matched = None if any(row["truncated"] for row in observations) else _check_http(plan, responses)
         status = "reproduced" if matched is True else "not_reproduced" if matched is False else "inconclusive"
     except (requests.RequestException, OSError, ValueError, KeyError, ImportError):
         status = "inconclusive"

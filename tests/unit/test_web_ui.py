@@ -1,15 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Tests for the web UI module."""
 import json
-import os
 import sys
-import threading
-import time
-import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+
+from tests.auth_helpers import authenticated_app
 
 # Ensure project root on path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -78,19 +78,17 @@ def app(wu):
     """Create a Flask test app."""
     # Ensure Flask globals are available in the re-imported module
     from flask import Flask, Response, jsonify, request, send_from_directory
-    from flask_cors import CORS
     wu.Flask = Flask
     wu.Response = Response
     wu.jsonify = jsonify
     wu.request = request
     wu.send_from_directory = send_from_directory
-    wu.CORS = CORS
     wu.FLASK_AVAILABLE = True
 
     wu._load_settings()
     static_dir = Path(__file__).parent.parent.parent / "modules" / "web_ui_static"
     wu.__version__ = "test"
-    flask_app = wu._build_app(static_dir)
+    flask_app = authenticated_app(wu, static_dir)
     flask_app.config["TESTING"] = True
     return flask_app
 

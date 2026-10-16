@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2022-2026 Kaan Gültekin
 /* Web controls and evidence inspector. Opening a report never replays probes. */
 (() => {
   'use strict';
@@ -69,7 +71,9 @@
         <div class="web-control-warning" id="${prefix}-web-warning" hidden></div>
         <details><summary>Select checks</summary><div class="web-preset-actions"><button data-web-action="preset" data-prefix="${prefix}" data-preset="all">All</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="light">Light</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="none">None</button></div>
           <div class="web-check-grid">${Object.entries(catalog.checks).map(([key,label]) => `<label><input type="checkbox" id="${prefix}-web-check-${escape(key)}">${escape(label)}</label>`).join('')}</div></details>
-        <details><summary>Speed, limits &amp; crawl</summary><div class="web-limit-grid">${limitFields(prefix)}</div><p class="web-small-note">Web speed sets the delay between requests; minimum request delay can slow it further.</p></details>
+        <details><summary>Speed, limits &amp; crawl</summary><div class="web-limit-grid">${limitFields(prefix)}</div><p class="web-small-note">Web speed sets the delay between requests; minimum request delay can slow it further.</p>
+          <label class="web-insecure-tls"><input type="checkbox" id="${prefix}-web-insecure-tls"> Accept untrusted certificates</label>
+          <p class="web-small-note">Certificates are verified by default. Enable this only for targets you trust, such as lab systems with self-signed certificates.</p></details>
       </div></div>`;
     setControls(prefix, pending[prefix] || {});
   }
@@ -81,6 +85,7 @@
     $(`${prefix}-web-scope`).value = config.scan_ports === false ? 'web' : 'network';
     Object.keys(catalog.checks).forEach(key => { $(`${prefix}-web-check-${key}`).checked = controls.checks?.[key] ?? catalog.defaults.checks[key]; });
     Object.keys(catalog.limits).forEach(key => { $(`${prefix}-web-limit-${key}`).value = controls[key] ?? catalog.defaults[key]; });
+    $(`${prefix}-web-insecure-tls`).checked = (controls.verify_tls ?? catalog.defaults.verify_tls) === false;
     syncControls(prefix);
   }
   function sourceOffline(prefix) { return offline || $(`${prefix}-vuln-source`)?.value === 'offline'; }
@@ -102,7 +107,7 @@
   function readControls(prefix) {
     if (!catalog || !$(`${prefix}-web-enabled`)) return {};
     const webOnly = $(`${prefix}-web-scope`).value === 'web';
-    const options = {checks:{}};
+    const options = {checks:{}, verify_tls: !$(`${prefix}-web-insecure-tls`).checked};
     Object.keys(catalog.checks).forEach(key => { options.checks[key] = $(`${prefix}-web-check-${key}`).checked; });
     Object.keys(catalog.limits).forEach(key => { options[key] = $(`${prefix}-web-limit-${key}`).value; });
     return {scan_web: $(`${prefix}-web-enabled`).checked && (prefix === 'pf' || !sourceOffline(prefix)),

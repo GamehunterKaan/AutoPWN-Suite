@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """
 Unit tests for the report module.
 """
@@ -5,7 +7,6 @@ import smtplib
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-from requests.exceptions import HTTPError
 
 from modules.report import (
     InitializeEmailReport,
@@ -76,7 +77,7 @@ class TestSendMail:
     @patch("modules.report.open", new_callable=mock_open, read_data="<h1>Test</h1>")
     def test_implicit_tls_uses_ssl_without_starttls(self, mock_file, mock_smtp_ssl):
         SendEmail("user", "pass", "to", "from", "server", 465, MagicMock())
-        mock_smtp_ssl.assert_called_once_with("server", 465, timeout=30)
+        mock_smtp_ssl.assert_called_once_with("server", 465, timeout=30, context=mock_smtp_ssl.call_args.kwargs["context"])
         mock_smtp_ssl.return_value.starttls.assert_not_called()
         mock_smtp_ssl.return_value.sendmail.assert_called_once()
 
@@ -133,7 +134,7 @@ class TestSendWebhook:
 
         # Verify the generic "failed to send" message is logged
         mock_log.logger.assert_any_call("error", "Webhook report failed to send.")
-        
+
         # Verify the exception itself was also logged by checking all calls
         exception_logged = any(isinstance(call.args[1], ConnectionError) for call in mock_log.logger.call_args_list)
         assert exception_logged, "ConnectionError was not logged"
@@ -173,9 +174,9 @@ class TestInitializeReport:
         """Verify InitializeReport does nothing for ReportType.NONE."""
         with patch("modules.report.InitializeEmailReport") as mock_init_email, \
              patch("modules.report.InitializeWebhookReport") as mock_init_webhook:
-            
+
             InitializeReport(ReportType.NONE, None, MagicMock(), mock_rich_console)
-            
+
             mock_init_email.assert_not_called()
             mock_init_webhook.assert_not_called()
 

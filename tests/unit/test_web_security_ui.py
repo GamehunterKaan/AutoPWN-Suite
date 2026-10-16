@@ -1,15 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Exercise dashboard controls, untrusted findings and explicit verification."""
 import json
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 from bs4 import BeautifulSoup
 
 from modules.web.options import CHECKS, LIMITS, normalize_options
 from tests.unit.test_web_ui_behavior import run_js as run_app_js
-
 
 NODE = shutil.which("node")
 SCRIPT = Path(__file__).resolve().parents[2] / "modules/web_ui_static/web_security.js"

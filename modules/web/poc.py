@@ -1,18 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 """Generate runnable PoCs from stored scanner evidence, never arbitrary code."""
 
-import html
 import json
-from pathlib import Path
 import shlex
+from pathlib import Path
 
-from modules.web.poc_runtime import validate_plan, verify_plan
+from modules.web.poc_runtime import validate_plan as validate_plan
+from modules.web.poc_runtime import verify_plan as verify_plan
 
 
 def build_plan(finding):
     reproduction = finding.get("reproduction", {})
     plan = {"strategy": reproduction.get("strategy", "response"), "target": reproduction.get("target", finding["endpoint"]),
             "requests": reproduction.get("requests", [{"url": finding["url"], "method": "GET"}]),
-            "kind": finding["type"], "evidence": finding["evidence"], "parameter": finding.get("parameter")}
+            "kind": finding["type"], "evidence": finding["evidence"], "parameter": finding.get("parameter"),
+            "verify_tls": reproduction.get("verify_tls", True) is not False}
     for field in ("marker", "payload", "header"):
         if field in reproduction:
             plan[field] = reproduction[field]
@@ -24,10 +27,13 @@ def build_plan(finding):
 def python_poc(finding):
     plan = build_plan(finding)
     runtime = Path(__file__).with_name("poc_runtime.py").read_text(encoding="utf-8")
+    transport = Path(__file__).with_name("transport.py").read_text(encoding="utf-8")
+    # Keep downloads standalone while sharing the scanner's exact transport.
+    runtime = runtime.replace("from modules.web.transport import read_response\n", "")
     serialized = repr(json.dumps(plan, ensure_ascii=True))
     return ("#!/usr/bin/env python3\n# Reproduce recorded evidence on the same origin.\n"
             "# Install: python -m pip install requests cryptography\n"
-            "# Replace REDACTED query values locally if present.\n" + runtime +
+            "# Replace REDACTED query values locally if present.\n" + transport + "\n" + runtime +
             f"\n\nif __name__ == '__main__':\n    import json\n    PLAN = json.loads({serialized})\n"
             "    try:\n        result = verify_plan(PLAN)\n    except ValueError as error:\n        result = {'status': 'needs_input', 'summary': str(error)}\n"
             "    print(json.dumps(result, indent=2))\n")
@@ -39,7 +45,10 @@ def curl_poc(finding):
         return "# Use the Python PoC for certificate and exact-version TLS verification.\n"
     rows = ["# Inspect headers without following redirects. Response bodies are discarded."]
     for request in plan["requests"]:
-        command = ["curl", "--max-time", "10", "--insecure", "--max-redirs", "0", "--request", request.get("method", "GET"), "--dump-header", "-", "--output", "/dev/null"]
+        command = ["curl", "--max-time", "10", "--max-redirs", "0", "--request", request.get("method", "GET"), "--dump-header", "-", "--output", "/dev/null"]
+        if not plan["verify_tls"]:
+            # Recorded from a scan the operator explicitly ran with --insecure-tls.
+            command.insert(3, "--insecure")
         for name, value in request.get("headers", {}).items():
             command += ["--header", f"{name}: {value}"]
         command += ["--url", request["url"]]

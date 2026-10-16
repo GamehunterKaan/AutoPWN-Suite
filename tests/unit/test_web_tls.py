@@ -1,13 +1,15 @@
-from datetime import datetime, timedelta, timezone
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 import ipaddress
 import ssl
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, call, patch
 
+import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
-import pytest
 
 from modules.web.tls import _context, _handshake, check_tls, inspect_certificate
 

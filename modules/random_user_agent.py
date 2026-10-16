@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 from json import loads
 from os.path import dirname
 from random import choice, randint
@@ -25,7 +27,7 @@ def random_user_agent(log) -> str:
                     user_agents.append(user_agent_)
         except FileNotFoundError:
             log.logger("error", "User agent database not found.")
-            raise SystemExit
+            raise SystemExit from None
         else:
             if not user_agents:
                 log.logger("error", "User agent database is empty.")

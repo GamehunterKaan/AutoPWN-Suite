@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
 from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
@@ -16,8 +18,8 @@ def print_banner(console) -> None:
  /_/  |_|\____/ \__/ \____//_/      |__/|__//_/ |_/   /____/ \____//_/ \__/ \___/
 """
 
-    banner_small = rf"""╔═╗┬ ┬┌┬┐┌─┐╔═╗╦ ╦╔╗╔  ╔═╗┬ ┬┬┌┬┐┌─┐
-╠═╣│ │ │ │ │╠═╝║║║║║║  ╚═╗│ ││ │ ├┤ 
+    banner_small = r"""╔═╗┬ ┬┌┬┐┌─┐╔═╗╦ ╦╔╗╔  ╔═╗┬ ┬┬┌┬┐┌─┐
+╠═╣│ │ │ │ │╠═╝║║║║║║  ╚═╗│ ││ │ ├┤
 ╩ ╩└─┘ ┴ └─┘╩  ╚╩╝╝╚╝  ╚═╝└─┘┴ ┴ └─┘
 """
 
