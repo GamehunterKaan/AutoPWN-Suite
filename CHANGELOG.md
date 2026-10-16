@@ -7,6 +7,8 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-10-16
+
 ### Functional changes
 
 - **Breaking:** require sign-in for the web dashboard. A single administrator account is
@@ -70,19 +72,18 @@ existing release summaries; they do not retroactively claim artifact signing.
   replay uses the same bounded transport, including standalone downloads.
   These fixes address AUTOPWN-SA-2026-002 through 005; dashboard access is covered by
   the next entries.
-- Mitigate AUTOPWN-SA-2026-001 (unauthenticated dashboard administration) in
-  unreleased changes: a loopback default bind, sign-in on every route by default,
+- Fix AUTOPWN-SA-2026-001 (unauthenticated dashboard administration) with
+  a loopback default bind, sign-in on every route by default,
   scrypt password hashing, server-side revocable 8-hour sessions in an `HttpOnly`,
   `SameSite=Strict` cookie, per-session CSRF tokens on non-GET requests, same-origin
   `Origin` checks (CORS is no longer enabled), failed-login rate limiting with
   bounded hashing capacity, HTTPS required for non-loopback clients, and no-store,
   nosniff, frame-deny, Content-Security-Policy (strict on the sign-in page; same-origin with
   inline code still allowed on the dashboard), Permissions-Policy and cross-origin isolation
-  response headers, with the server version no longer disclosed. Not released and not marked fixed in any
-  published version; residual limits are one shared administrator account, no MFA,
+  response headers, with the server version no longer disclosed. Residual limits are one shared administrator account, no MFA,
   plaintext-at-rest settings and operator-provided HTTPS for remote access.
-  The maintainer decided on 2026-10-16 that this closes the advisory; it applies to
-  v2.6.0 users only after the next release.
+  The maintainer decided on 2026-10-16 that this closes the advisory; v2.6.0 and
+  earlier remain affected.
 - Verify target certificates by default for core, crawl, directory, probe and
   evidence-replay web requests, which previously accepted any certificate. TLS
   diagnostics still inspect untrusted certificates and legacy protocols without
