@@ -21,7 +21,8 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
       <a href="https://www.bestpractices.dev/projects/15518"><img src="https://www.bestpractices.dev/badge_static/gold" alt="OpenSSF Best Practices Gold" height="20"></a><br>
       <a href="https://www.bestpractices.dev/projects/15518/baseline-1"><img src="https://www.bestpractices.dev/badge_static/baseline-1" alt="OpenSSF Baseline 1" height="20"></a>
       <a href="https://www.bestpractices.dev/projects/15518/baseline-2"><img src="https://www.bestpractices.dev/badge_static/baseline-2" alt="OpenSSF Baseline 2" height="20"></a>
-      <a href="https://www.bestpractices.dev/projects/15518/baseline-3"><img src="https://www.bestpractices.dev/badge_static/baseline-3" alt="OpenSSF Baseline 3" height="20"></a>
+      <a href="https://www.bestpractices.dev/projects/15518/baseline-3"><img src="https://www.bestpractices.dev/badge_static/baseline-3" alt="OpenSSF Baseline 3" height="20"></a><br>
+      <a href="https://scorecard.dev/viewer/?uri=github.com/GamehunterKaan/AutoPWN-Suite"><img src="https://api.securityscorecards.dev/projects/github.com/GamehunterKaan/AutoPWN-Suite/badge" alt="OpenSSF Scorecard" height="20"></a>
     </td>
   </tr>
 </table>
