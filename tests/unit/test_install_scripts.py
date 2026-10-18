@@ -6,9 +6,11 @@ import importlib.util
 import os
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -22,14 +24,24 @@ posix_only = pytest.mark.skipif(
 
 # A stand-in interpreter: `python -m venv DIR` creates a fake virtualenv whose
 # activate script defines deactivate() and whose pip only records its arguments,
-# so the test never touches the network or the real system.
+# so the test never touches the network or the real system. The two `-c` checks
+# install.sh makes before it touches anything pass unless FAKE_OLD_PYTHON or
+# FAKE_NO_ENSUREPIP is set; the fake pip fails when FAKE_PIP_FAILS is set and, when
+# FAKE_PIP_HANGS names a file, creates it and waits to be killed.
 FAKE_PYTHON = """#!/usr/bin/env bash
 set -e
+if [ "$1" = "-c" ]; then
+    case "$2" in
+        *version_info*) exit "${FAKE_OLD_PYTHON:-0}" ;;
+        *ensurepip*) exit "${FAKE_NO_ENSUREPIP:-0}" ;;
+    esac
+fi
 [ "$1" = "-m" ] && [ "$2" = "venv" ] || { echo "unexpected: $*" >&2; exit 1; }
 venv="$3"
 mkdir -p "$venv/bin"
 printf '%s\\n' 'export PATH="'"$venv"'/bin:$PATH"' 'deactivate() { :; }' > "$venv/bin/activate"
-printf '%s\\n' '#!/usr/bin/env bash' 'echo "$*" >> "$PIP_LOG"' > "$venv/bin/pip"
+printf '%s\\n' '#!/usr/bin/env bash' 'echo "$*" >> "$PIP_LOG"' \\
+    '[ -z "${FAKE_PIP_HANGS:-}" ] || { touch "$FAKE_PIP_HANGS"; sleep 60; }' '[ -z "${FAKE_PIP_FAILS:-}" ]' > "$venv/bin/pip"
 printf '%s\\n' '#!/usr/bin/env bash' 'exit 0' > "$venv/bin/python"
 chmod +x "$venv/bin/pip" "$venv/bin/python"
 """
@@ -155,6 +167,88 @@ def test_non_staged_install_creates_venv_without_sudo(source_tree, tmp_path):
     run_script(source_tree, "uninstall.sh", {"APPDIR": str(app), "BINDIR": str(bindir),
                                             "PATH": env["PATH"]})
     assert not app.exists() and not os.path.lexists(bindir / "autopwn-suite")
+
+
+def working_install(tmp_path):
+    """An existing install: a venv holding the command and a link to it, as install.sh leaves them."""
+    app, bindir = tmp_path / "live/app", tmp_path / "live/bin"
+    command = app / ".venv/bin/autopwn-suite"
+    command.parent.mkdir(parents=True)
+    command.write_text("#!/usr/bin/env bash\necho old\n")
+    command.chmod(0o755)
+    (app / ".venv/marker").write_text("working\n")
+    bindir.mkdir(parents=True)
+    (bindir / "autopwn-suite").symlink_to(command)
+    env = {
+        "APPDIR": str(app), "BINDIR": str(bindir), "SYSTEMDDIR": str(tmp_path / "no-systemd"),
+        "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(tmp_path / "pip.log"),
+    }
+    return app, bindir, env
+
+
+def assert_working_install_untouched(app, bindir):
+    assert (app / ".venv/marker").read_text() == "working\n"
+    assert (bindir / "autopwn-suite").resolve() == (app / ".venv/bin/autopwn-suite").resolve()
+    assert os.access(bindir / "autopwn-suite", os.X_OK)  # not a dangling link
+    assert sorted(path.name for path in app.iterdir()) == [".venv"]
+    assert sorted(path.name for path in (app / ".venv").iterdir()) == ["bin", "marker"]
+
+
+@posix_only
+@pytest.mark.parametrize("failure, message", [
+    ({"FAKE_OLD_PYTHON": "1"}, "3.10"),
+    ({"FAKE_NO_ENSUREPIP": "1"}, "python3-venv"),
+    ({"FAKE_PIP_FAILS": "1"}, "restoring the previous virtual environment"),
+], ids=["python-too-old", "no-venv-support", "pip-fails"])
+def test_failed_upgrade_leaves_the_working_install(source_tree, tmp_path, failure, message):
+    app, bindir, env = working_install(tmp_path)
+    result = run_script(source_tree, "install.sh", {**env, **failure}, expect=1)
+    assert message in result.stderr
+    assert_working_install_untouched(app, bindir)
+
+
+@posix_only
+def test_killed_upgrade_leaves_the_working_install(source_tree, tmp_path):
+    app, bindir, env = working_install(tmp_path)
+    started = tmp_path / "pip-started"
+    process = subprocess.Popen(
+        [BASH, str(source_tree / "install.sh")], env={**os.environ, **env, "FAKE_PIP_HANGS": str(started)},
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    try:
+        deadline = time.monotonic() + 60
+        while not started.exists():
+            assert process.poll() is None and time.monotonic() < deadline, "install.sh ended before pip ran"
+            time.sleep(0.05)
+        os.killpg(process.pid, signal.SIGTERM)  # the script and the pip it is waiting for
+        _, stderr = process.communicate(timeout=60)
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+    assert "restoring the previous virtual environment" in stderr
+    assert_working_install_untouched(app, bindir)
+
+
+@posix_only
+def test_upgrade_replaces_the_environment_and_removes_the_old_one(source_tree, tmp_path):
+    app, bindir, env = working_install(tmp_path)
+    result = run_script(source_tree, "install.sh", env)
+    assert "Installation complete!" in result.stdout
+    assert (app / ".venv/bin/python").is_file() and not (app / ".venv/marker").exists()
+    assert sorted(path.name for path in app.iterdir()) == [".venv"]  # nothing set aside is left behind
+    assert os.readlink(bindir / "autopwn-suite") == f"{app}/.venv/bin/autopwn-suite"
+
+
+@posix_only
+def test_environment_left_by_a_killed_upgrade_is_never_overwritten(source_tree, tmp_path):
+    app, bindir, env = working_install(tmp_path)
+    # A run that was killed mid-build left the working environment set aside and a half-built one in its place.
+    (app / ".venv").rename(app / ".venv.old")
+    (app / ".venv").mkdir()
+    (app / ".venv/marker").write_text("half-built\n")
+    result = run_script(source_tree, "install.sh", env, expect=1)
+    assert ".venv.old" in result.stderr
+    assert (app / ".venv.old/marker").read_text() == "working\n"
+    assert (app / ".venv/marker").read_text() == "half-built\n"
 
 
 LEGACY_UNIT = """[Service]
