@@ -1,0 +1,42 @@
+name: Install smoke tests
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+permissions:
+  contents: read
+
+jobs:
+  wheel:
+    name: Wheel on ${{ matrix.os }} / Python ${{ matrix.python }}
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.10", "3.14"]
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        persist-credentials: false
+    - name: Set up Python ${{ matrix.python }}
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      with:
+        python-version: ${{ matrix.python }}
+    - name: Build the wheel
+      run: python -m pip wheel . --no-deps --wheel-dir dist
+    - name: Install it into a clean virtual environment and start it
+      shell: bash
+      run: |
+        set -euo pipefail
+        python -m venv "$RUNNER_TEMP/venv"
+        bin="$RUNNER_TEMP/venv/bin"
+        [ -d "$bin" ] || bin="$RUNNER_TEMP/venv/Scripts"
+        "$bin/python" -m pip install dist/*.whl
+        version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
+        python scripts/smoke_install.py "$version" "$bin/autopwn-suite"
