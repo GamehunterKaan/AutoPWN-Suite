@@ -71,6 +71,14 @@ def _get_non_empty_input(console, prompt: str) -> str:
             return user_input
         console.print("[red]This field cannot be empty.[/red]")
 
+def _write_config(config, config_file):
+    """Write the configuration for its owner only: it can hold an SMTP password, an NVD key and a webhook URL.
+    The mode applies when the file is created, so it is never readable by others, not even briefly; Windows
+    has no POSIX modes and ignores the group and other bits."""
+    descriptor = os.open(config_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, 'w', encoding='utf-8') as configfile:
+        config.write(configfile)
+
 def CreateConfig(console, config_filename=""):
     console.print("Welcome to AutoPWN Suite Config Creator!")
 
@@ -189,12 +197,10 @@ def CreateConfig(console, config_filename=""):
             return False
         else:
             os.remove(config_file)
-            with open(config_file, 'w', encoding='utf-8') as configfile:
-                config.write(configfile)
+            _write_config(config, config_file)
 
     except FileNotFoundError:
-        with open(config_file, 'w', encoding='utf-8') as configfile:
-            config.write(configfile)
+        _write_config(config, config_file)
 
 
     console.print(f"[green]Config file '{config_file}' created successfully![/green]")
@@ -261,6 +267,8 @@ def CopyFiles(console):
             return
         if src.resolve() != dst.resolve():
             shutil.copy2(src, dst)
+        # The configuration can hold the SMTP password, NVD key and webhook URL; the unit runs as root, so only root reads it.
+        dst.chmod(0o600)
         console.print(f"[green]Configuration available at {dst}[/green]")
     except Exception as e:
         console.print(f"[red]Error copying {src} -> {dst}: {e}[/red]")

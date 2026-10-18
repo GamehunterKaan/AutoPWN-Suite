@@ -3,6 +3,7 @@
 """
 Unit tests for the daemon installer in autopwn_suite/daemon/daemon_installer.py.
 """
+import os
 import re
 import shlex
 import stat
@@ -110,7 +111,8 @@ class TestCreateConfig:
 
     @patch("autopwn_suite.daemon.daemon_installer.open", new_callable=MagicMock)
     @patch("autopwn_suite.daemon.daemon_installer.ConfigParser")
-    def test_create_config_webhook_flow(self, mock_config_parser, mock_open, mock_console):
+    @patch("autopwn_suite.daemon.daemon_installer._write_config")
+    def test_create_config_webhook_flow(self, mock_write_config, mock_config_parser, mock_open, mock_console):
         """Verify config creation with webhook notification."""
         # Simulate user inputs for a full config creation
         mock_console.input.side_effect = [
@@ -172,12 +174,12 @@ class TestCreateConfig:
         mock_config_instance.__setitem__.assert_has_calls([call('AUTOPWN', expected_autopwn_section), call('REPORT', expected_report_section)], any_order=True)
 
         # Verify the file was written
-        mock_open.assert_any_call("my_config.conf", "w", encoding="utf-8")
-        mock_config_instance.write.assert_called_once()
+        mock_write_config.assert_called_once_with(mock_config_instance, "my_config.conf")
 
     @patch("autopwn_suite.daemon.daemon_installer.open", new_callable=MagicMock)
     @patch("autopwn_suite.daemon.daemon_installer.ConfigParser")
-    def test_create_config_email_flow(self, mock_config_parser, mock_open, mock_console):
+    @patch("autopwn_suite.daemon.daemon_installer._write_config")
+    def test_create_config_email_flow(self, mock_write_config, mock_config_parser, mock_open, mock_console):
         """Verify config creation with email notification."""
         # Simulate user inputs for the email notification path
         mock_console.input.side_effect = [
@@ -223,15 +225,11 @@ class TestCreateConfig:
 
         # The function first tries to open the file for reading ('r') to see if it exists.
         # Since the mock doesn't raise FileNotFoundError, it then asks to overwrite.
-        # After the user says 'y', it opens the file for writing ('w').
+        # After the user says 'y', it writes the configuration.
         # Due to the bug, the filename defaults to "autopwn.conf".
-        expected_write_call = call("autopwn.conf", "w", encoding="utf-8")
 
         # Verify the file was written
-        assert expected_write_call in mock_open.call_args_list, \
-            f"Expected call '{expected_write_call}' not found in call list: {mock_open.call_args_list}"
-
-        mock_config_instance.write.assert_called_once()
+        mock_write_config.assert_called_once_with(mock_config_instance, "autopwn.conf")
 
     def test_create_config_keeps_percent_signs_in_a_webhook_url_and_api_key(self, mock_console, tmp_path):
         """A lone '%' is legal in a secret; the writer must accept what InitArgsConf reads."""
@@ -260,6 +258,42 @@ class TestCreateConfig:
         args = SimpleNamespace(config=str(config_path))
         InitArgsConf(args, MagicMock())
         assert args.report_email_password == "p%ssw0rd"
+
+    @staticmethod
+    def _webhook_answers():
+        """Answers for a webhook configuration with every optional prompt left empty."""
+        return ["0", "2", "https://hooks.example.test/h", "", "", "", "", "", "1", "", "1", "", ""]
+
+    def test_create_config_creates_the_file_for_its_owner_only(self, mock_console, tmp_path):
+        """The file holds the SMTP password, NVD key or webhook URL, so it is never created group/world readable."""
+        mock_console.input.side_effect = self._webhook_answers()
+        config_path = tmp_path / "autopwn-daemon.conf"
+
+        with patch.object(daemon_installer.os, "open", wraps=os.open) as opened:
+            assert CreateConfig(mock_console, str(config_path)) is True
+
+        modes = [c.args[2] for c in opened.call_args_list if c.args[0] == str(config_path)]
+        assert modes == [0o600]
+        assert "https://hooks.example.test/h" in config_path.read_text(encoding="utf-8")
+
+    @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX file modes")
+    @pytest.mark.parametrize("existing", [False, True])
+    def test_create_config_file_mode_is_0600_also_when_replacing_a_0644_file(self, mock_console, tmp_path, existing):
+        config_path = tmp_path / "autopwn-daemon.conf"
+        answers = self._webhook_answers()
+        if existing:
+            config_path.write_text("old", encoding="utf-8")
+            config_path.chmod(0o644)
+            answers.append("y")  # overwrite
+        mock_console.input.side_effect = answers
+
+        previous_umask = os.umask(0o022)
+        try:
+            assert CreateConfig(mock_console, str(config_path)) is True
+        finally:
+            os.umask(previous_umask)
+
+        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
 
 
 @pytest.mark.unit
@@ -361,6 +395,23 @@ class TestCopyFiles:
         assert "KillMode=control-group" in unit
         assert re.search(r"^ExecStart=.* -m autopwn_suite -c ", unit, re.MULTILINE)
         assert "autopwn.py" not in unit and ".venv" not in unit
+
+    @patch("autopwn_suite.daemon.daemon_installer.subprocess")
+    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer.Path")
+    @patch("autopwn_suite.daemon.daemon_installer.open")
+    def test_copy_files_leaves_the_installed_config_readable_by_its_owner_only(
+        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
+    ):
+        install, source, target = self._paths(mock_path)
+        order = []
+        mock_shutil.copy2.side_effect = lambda *args: order.append("copy")
+        target.chmod.side_effect = lambda mode: order.append(("chmod", mode))
+
+        CopyFiles(mock_console)
+
+        # The copy carries the SMTP password, NVD key and webhook URL: tighten it after copying, whatever the source mode was.
+        assert order == ["copy", ("chmod", 0o600)]
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
     @patch("autopwn_suite.daemon.daemon_installer.shutil")

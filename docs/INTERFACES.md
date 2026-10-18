@@ -17,7 +17,7 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `-h/--help`, `-v/--version` | Print usage or version and exit. |
 | `-nc/--no-color` | Disable colored terminal output. |
 | `-y/--yes-please` | Answer ordinary scanning confirmations automatically; it is not authorization to test another party's systems. |
-| `-c/--config`, `--create-config` | Read an INI file or interactively create configuration. Present INI values are applied after argument parsing and overwrite matching parsed settings. |
+| `-c/--config`, `--create-config` | Read an INI file or interactively create configuration. Present INI values are applied after argument parsing and overwrite matching parsed settings. A created file has mode `0600` (POSIX), because it can hold the SMTP password, NVD key or webhook URL. |
 | `--daemon-install`, `--daemon-uninstall` | Install/remove the Linux root systemd scanner service; privileged filesystem/service side effects. |
 | `-t/--target`, `-hf/--host-file` | Target IP/hostname/range/CIDR or newline-separated target file; explicit target takes precedence over the host file. |
 | `-sd/--skip-discovery`, `-st/--scan-type` | Skip discovery, or choose `arp`/`ping` discovery. Privileges limit available techniques. |
