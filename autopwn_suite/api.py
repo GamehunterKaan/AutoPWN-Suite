@@ -1,15 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
+import logging
 from json import dumps
 from typing import Any, Dict, List, Type, Union
 
 from autopwn_suite.nist_search import VulnerabilityLookup, searchCVE
 from autopwn_suite.nmap_backend import PortScanner
-from autopwn_suite.scanner import InitHostInfo, ResolveScanHosts
+from autopwn_suite.scanner import HostTimedOut, InitHostInfo, ResolveScanHosts
 from autopwn_suite.searchvuln import GenerateKeyword
 from autopwn_suite.utils import fake_logger, is_root
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
+
+logger = logging.getLogger(__name__)
 
 
 class AutoScanner:
@@ -148,6 +151,9 @@ class AutoScanner:
                 # equal TCP/UDP port numbers cannot overwrite one another.
                 if "udp" in host_data:
                     result["udp_ports"] = udp_scan
+                if HostTimedOut(host_data):
+                    result["timedout"] = True
+                    logger.warning("Nmap timed out on %s; port coverage is incomplete.", resolved_host)
                 self.scan_results[resolved_host] = result
 
                 if os_scan:

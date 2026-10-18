@@ -265,6 +265,11 @@ def ResolveScanHosts(nm, target=None) -> list[str]:
     return list(nm.all_hosts())
 
 
+def HostTimedOut(host) -> bool:
+    """Whether Nmap gave up on this host at --host-timeout, so its ports may be incomplete."""
+    return str(host.get("timedout", "false")).lower() == "true"
+
+
 def AnalyseScanResults(nm, log, console, target=None) -> list:
     """
     Analyse and print scan results.
@@ -304,8 +309,13 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     except KeyError:
         udp_ports = {}
 
+    timed_out = HostTimedOut(nm[target])
+    if timed_out:
+        log.logger("warning", f"Nmap timed out on {target}; port coverage is incomplete.")
+
     if len(tcp_ports) == 0 and len(udp_ports) == 0:
-        log.logger("warning", f"Target {target} seems to have no open ports.")
+        if not timed_out:
+            log.logger("warning", f"Target {target} seems to have no open ports.")
         return HostArray
 
     banner(f"Portscan results for {target}", "green", console)

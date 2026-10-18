@@ -12,6 +12,7 @@ from rich.console import Console
 from autopwn_suite.api import AutoScanner
 from autopwn_suite.cli import StartScanning, main
 from autopwn_suite.nist_search import FindVars, Vulnerability, cache, searchCVE
+from autopwn_suite.nmap_backend import PortScanner
 from autopwn_suite.scanner import AnalyseScanResults, InitHostInfo, InitPortInfo, NoiseScan, ResolveScanHosts
 from autopwn_suite.searchvuln import SearchSploits
 from autopwn_suite.utils import GetHostsToScan, InitArgsConf, InitArgsTarget, ScanMode, ScanType
@@ -308,3 +309,47 @@ def test_hostile_banner_text_is_printed_literally_instead_of_aborting_the_scan()
         assert text in output
     assert rows == [["192.0.2.1", 21, "[/service]", "[/bold]", "[/admin] 1.0"]]
 
+
+def timed_out_scan(timed_out=True, ports=""):
+    scan = PortScanner(nmap_path="unused")
+    scan.load_xml(f'<nmaprun><host timedout="{str(timed_out).lower()}"><status state="up" reason="syn-ack"/>'
+                  f'<address addr="192.0.2.1" addrtype="ipv4"/>{ports}</host>'
+                  '<runstats><finished exit="success"/><hosts up="1" down="0" total="1"/></runstats></nmaprun>')
+    scan.scan = MagicMock()
+    return scan
+
+
+def test_cli_reports_a_host_timeout_instead_of_no_open_ports():
+    log = MagicMock()
+    assert AnalyseScanResults(timed_out_scan(), log, MagicMock(), "192.0.2.1") == []
+    messages = [call.args[1] for call in log.logger.call_args_list]
+    assert messages == ["Nmap timed out on 192.0.2.1; port coverage is incomplete."]
+    assert log.logger.call_args.args[0] == "warning"
+
+
+def test_cli_keeps_partial_ports_of_a_timed_out_host_and_still_warns():
+    log = MagicMock()
+    ports = '<ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports>'
+    rows = AnalyseScanResults(timed_out_scan(ports=ports), log, Console(file=io.StringIO()), "192.0.2.1")
+    assert rows == [["192.0.2.1", 22, "ssh", "Unknown", "Unknown"]]
+    log.logger.assert_called_once_with("warning", "Nmap timed out on 192.0.2.1; port coverage is incomplete.")
+
+
+def test_cli_still_reports_no_open_ports_for_a_host_that_finished():
+    log = MagicMock()
+    assert AnalyseScanResults(timed_out_scan(False), log, MagicMock(), "192.0.2.1") == []
+    log.logger.assert_called_once_with("warning", "Target 192.0.2.1 seems to have no open ports.")
+
+
+def test_api_flags_a_host_that_hit_the_host_timeout(caplog):
+    with patch("autopwn_suite.api.PortScanner", return_value=timed_out_scan()), caplog.at_level("WARNING", logger="autopwn_suite.api"):
+        result = AutoScanner().scan("192.0.2.1", host_timeout=3, scan_vulns=False)
+    assert result == {"192.0.2.1": {"ports": {}, "timedout": True}}
+    assert "Nmap timed out on 192.0.2.1; port coverage is incomplete" in caplog.text
+
+
+def test_api_result_shape_is_unchanged_for_a_host_that_finished(caplog):
+    with patch("autopwn_suite.api.PortScanner", return_value=timed_out_scan(False)), caplog.at_level("WARNING", logger="autopwn_suite.api"):
+        result = AutoScanner().scan("192.0.2.1", host_timeout=3, scan_vulns=False)
+    assert result == {"192.0.2.1": {"ports": {}}}
+    assert caplog.text == ""

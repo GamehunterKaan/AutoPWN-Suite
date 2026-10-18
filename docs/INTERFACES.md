@@ -60,7 +60,9 @@ vulnerability_source="auto", vuln_db=None)` is synchronous. `target` is a string
 or list of target strings; `nmap_args` is operator-selected Nmap arguments.
 It returns a mapping keyed by resolved host addresses. Each host contains `ports`
 (TCP port mapping), optional `udp_ports`, optional OS data and `vulns` grouped
-by product/CVE. Vulnerability records include description, severity, score,
+by product/CVE. A host that hit `host_timeout` also has `timedout: True` (the key
+is absent otherwise) and the call logs a warning: its ports and vulnerabilities
+are incomplete. Vulnerability records include description, severity, score,
 reference URL, exploitability, data source and database update time. They are
 version-based candidates. Failures may raise scanner/database exceptions;
 callers must handle them and protect output paths and sensitive results.
