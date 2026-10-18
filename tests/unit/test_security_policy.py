@@ -106,9 +106,9 @@ def test_a_scan_that_misses_a_pinned_build_tool_is_rejected(root):
 
 def test_packaging_requirement_files_are_hash_pinned_and_match_their_inputs():
     root = Path(__file__).resolve().parents[2]
-    for stem in ("build", "publish"):
-        inputs = (root / f"packaging/requirements-{stem}.in").read_text(encoding="utf-8")
-        compiled = (root / f"packaging/requirements-{stem}.txt").read_text(encoding="utf-8")
+    for stem in ("packaging/requirements-build", "packaging/requirements-publish", ".security/requirements-bandit"):
+        inputs = (root / f"{stem}.in").read_text(encoding="utf-8")
+        compiled = (root / f"{stem}.txt").read_text(encoding="utf-8")
         wanted = dict(re.findall(r"^([A-Za-z0-9._-]+)==(\S+)$", inputs, re.MULTILINE))
         pinned = {name.lower(): version for name, version in policy.re.findall(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;\\]+)", compiled, re.MULTILINE)}
         assert wanted and all(pinned.get(name.lower()) == version for name, version in wanted.items())

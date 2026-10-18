@@ -23,9 +23,11 @@ ALLOWED_LICENSES = {
     "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "MIT-0", "MPL-2.0", "PSF-2.0",
     "0BSD", "Unlicense",
 }
-# Hash-pinned tools that build the release artifacts. They are not shipped, so only known vulnerabilities
-# (not licenses) gate them; PyInstaller, for example, is GPL-2.0-or-later with a bootloader exception.
-BUILD_REQUIREMENTS = ("packaging/requirements-build.txt", "packaging/requirements-publish.txt")
+# Hash-pinned tools that build the release artifacts or run the policy's own static analysis. They are not
+# shipped, so only known vulnerabilities (not licenses) gate them; PyInstaller, for example, is
+# GPL-2.0-or-later with a bootloader exception.
+BUILD_REQUIREMENTS = ("packaging/requirements-build.txt", "packaging/requirements-publish.txt",
+                      ".security/requirements-bandit.txt")
 JUSTIFICATIONS = {
     "component_not_present", "vulnerable_code_not_present",
     "vulnerable_code_not_in_execute_path", "vulnerable_code_cannot_be_controlled_by_adversary",

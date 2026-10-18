@@ -45,7 +45,8 @@ not managed as project dependencies.
 The tools that build the release artifacts are pinned separately and are not shipped: PyInstaller and its helpers
 (`packaging/requirements-build.in` and the hash-pinned `.txt` generated from it) and `build` with `poetry-core`
 (`packaging/requirements-publish.in`/`.txt`, the same `poetry-core` version as `[build-system]` in
-`pyproject.toml`). The security policy scans both files with OSV-Scanner on every change and release and blocks on
+`pyproject.toml`). `.security/requirements-bandit.txt` pins the static-analysis tool the same way. The security policy
+scans all three files with OSV-Scanner on every change and release and blocks on
 known vulnerabilities; their licenses are not gated because nothing from them is distributed (PyInstaller is
 GPL-2.0-or-later with an exception that allows distributing the frozen program under the project's own license).
 Tests check that each `.txt` is hash-pinned and agrees with its `.in`. The packages frozen into each standalone binary

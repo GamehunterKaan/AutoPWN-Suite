@@ -46,6 +46,9 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Security changes
 
+- Require `cryptography>=50.0.0` (it was `>=46.0.0`): earlier releases have known vulnerabilities,
+  including the OpenSSL bundled in older wheels, and a plain `pip install` of the package or
+  `requirements.txt` could keep an old copy. The locked version was already 50.0.2.
 - Keep dashboard credentials and the CVE database out of the installed package directory, which is
   shared or read-only for a system installation and is discarded by single-file binaries. The
   per-user data directory is created readable only by its owner where the platform supports it.
@@ -66,7 +69,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   after the same security and dynamic-analysis workflows as the container release. The wheel and
   source distribution are built twice from a pinned backend (`poetry-core==2.5.0`) and hash-pinned
   tools and are published only if both builds are byte-identical.
-- Scan the pinned release build tools (PyInstaller and the wheel build tools) for known
+- Install the policy's static-analysis tool (`bandit`) from a hash-pinned requirements file, and scan
+  the pinned release build tools (PyInstaller, the wheel build tools and bandit) for known
   vulnerabilities in the security policy, and bundle `LICENSE`, `NOTICE` and the metadata of every
   packaged dependency in the standalone binaries.
 

@@ -1,14 +1,15 @@
 name: Build binaries
 
-# Reusable: builds the standalone single-file binaries from one commit and smoke-tests each of them on the
-# runner that built it. Pull requests run it through install-smoke.yml; the release workflow publishes its output.
+# Reusable: builds the standalone single-file binaries and smoke-tests each of them on the runner that built
+# it. Pull requests build the triggering commit through install-smoke.yml; the release workflow passes the
+# artifact holding the exact source archive its validation job produced and publishes the output.
 on:
   workflow_call:
     inputs:
-      ref:
-        description: Commit to build
-        required: true
+      source-artifact:
+        description: Artifact with the validated release source archive; empty builds the triggering commit
         type: string
+        default: ''
 
 permissions:
   contents: read
@@ -40,16 +41,23 @@ jobs:
       TARGET: ${{ matrix.target }}
       SUFFIX: ${{ matrix.suffix }}
     steps:
-      - name: Require a full commit hash
-        shell: bash
-        env:
-          REF: ${{ inputs.ref }}
-        run: |
-          [[ "$REF" =~ ^[0-9a-f]{40}$ ]] || { echo "ref must be a 40-character commit hash" >&2; exit 1; }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: inputs.source-artifact == ''
         with:
-          ref: ${{ inputs.ref }}
           persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: inputs.source-artifact != ''
+        with:
+          name: ${{ inputs.source-artifact }}
+          path: ${{ runner.temp }}/release-source
+      - name: Extract the exact source archive produced by release validation
+        if: inputs.source-artifact != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Relative archive name: GNU tar reads "D:\..." on Windows as a remote host.
+          cd "$RUNNER_TEMP/release-source"
+          tar --extract --gzip --file autopwn-suite-v*.tar.gz --strip-components=1 --directory "$GITHUB_WORKSPACE"
       - name: Set up Python 3.13
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:

@@ -46,8 +46,8 @@ remain read-only. Third-party actions/tools are pinned. These checks apply to
 historical rebuilds too; an old tag does not waive current security policy.
 
 The standalone binaries (linux-amd64, linux-arm64, windows-amd64, macos-arm64)
-are built from Python 3.13 by the reusable `build-binary.yml` from the validated
-release commit, with the hash-pinned `requirements-locked.txt` and
+are built from Python 3.13 by the reusable `build-binary.yml` from the exact source
+archive that release validation produced (the same handoff the image build uses), with the hash-pinned `requirements-locked.txt` and
 `packaging/requirements-build.txt`. Each binary is smoke-tested on the runner that
 built it (`scripts/smoke_install.py`: version check, then the dashboard serves its
 sign-in page), and `scripts/binary_sbom.py` writes a CycloneDX SBOM of that
@@ -61,7 +61,8 @@ certificate identity stays the `publish-docker.yml` workflow.
 
 `publish-pypi.yml` runs on the same release event. It validates the tag with the
 same `release_assets.py` checks, calls the same security and dynamic-analysis
-workflows, builds the wheel and source distribution twice from hash-pinned tools
+workflows, extracts the validated source archive and builds the wheel and source
+distribution from it twice with hash-pinned tools
 (`packaging/requirements-publish.txt`, backend `poetry-core==2.5.0`) and requires
 identical bytes, installs the wheel in a clean environment and starts it, and only
 then lets the final job publish through PyPI trusted publishing. PyPI uploads are

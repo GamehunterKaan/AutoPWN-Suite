@@ -46,5 +46,3 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/build-binary.yml
-    with:
-      ref: ${{ github.sha }}

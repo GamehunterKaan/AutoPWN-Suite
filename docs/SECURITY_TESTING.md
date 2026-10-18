@@ -104,7 +104,7 @@ On a Linux x86-64 machine with Python 3.11+, Git and network access:
 ```sh
 python -m venv .venv-security
 . .venv-security/bin/activate
-python -m pip install bandit==1.9.4
+python -m pip install --require-hashes --only-binary=:all: --no-deps -r .security/requirements-bandit.txt
 python scripts/install_security_tools.py --directory /tmp/autopwn-security-tools
 python scripts/security_policy.py --repo . --output /tmp/autopwn-security-reports --osv /tmp/autopwn-security-tools/osv-scanner
 ```
