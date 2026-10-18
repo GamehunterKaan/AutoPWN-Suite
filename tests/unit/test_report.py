@@ -124,6 +124,21 @@ class TestSendWebhook:
 
         mock_log.logger.assert_any_call("error", "Webhook report failed to send.")
 
+    @patch("autopwn_suite.report.post")
+    @patch("autopwn_suite.report.open", new_callable=mock_open, read_data="report content")
+    def test_send_webhook_http_error_reports_the_status_but_never_the_response_body(self, mock_file, mock_post, capsys):
+        """The body is server controlled: it often echoes the request path (the secret) and can carry terminal escapes."""
+        mock_post.return_value = MagicMock(status_code=404, text="Not Found: /hook/SECRETTOKEN \x1b[2J")
+        mock_log = MagicMock()
+
+        SendWebhook("https://hooks.example.invalid/hook/SECRETTOKEN", mock_log)
+
+        captured = capsys.readouterr()
+        assert captured.out == "" and captured.err == ""
+        logged = " ".join(str(call.args[1]) for call in mock_log.logger.call_args_list)
+        assert "HTTP 404" in logged
+        assert "SECRETTOKEN" not in logged and "\x1b" not in logged
+
     @patch("autopwn_suite.report.post", side_effect=ConnectionError("Test connection error"))
     @patch("autopwn_suite.report.open", new_callable=mock_open, read_data="report content")
     def test_send_webhook_connection_error(self, mock_file, mock_post):

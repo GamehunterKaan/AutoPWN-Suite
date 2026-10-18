@@ -126,8 +126,9 @@ def SendWebhook(url, log, report_path="report.log") -> None:
             if 200 <= req.status_code < 300:
                 log.logger("success", "Webhook report sent succesfully.")
             else:
+                # The response body is server controlled and often echoes the request path, which is the secret.
+                log.logger("error", f"Webhook delivery failed: HTTP {req.status_code}")
                 log.logger("error", "Webhook report failed to send.")
-                print(req.text)
         except Exception as e:
             log.logger("error", f"Webhook delivery failed: {delivery_error_summary(e)}")
             log.logger("error", "Webhook report failed to send.")

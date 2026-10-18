@@ -927,7 +927,7 @@ def _deliver_email(job: ScanJob) -> None:
         _broadcast({
             "scan_id": job.id, "level": "warning",
             "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
-            "msg": f"[*] Email notification failed: {e}",
+            "msg": f"[*] Email notification failed: {delivery_error_summary(e)}",
         })
 
 

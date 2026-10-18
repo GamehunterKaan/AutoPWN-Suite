@@ -641,6 +641,25 @@ class TestEmail:
         with patch("smtplib.SMTP", side_effect=Exception("conn refused")):
             wu._send_email(job)  # Should broadcast warning, not raise
 
+    def test_email_failure_is_logged_as_the_class_only(self, wu):
+        """SMTP replies and host names reach every dashboard client through the log, so only the class name is shown."""
+        import smtplib
+        wu._load_settings()
+        wu._settings["email"] = {
+            "enabled": True, "smtp_host": "smtp.test.com", "smtp_port": 587,
+            "username": "u", "password": "p", "from_addr": "f@t.com",
+            "to_addr": "t@t.com",
+            "on_complete": True, "on_error": False, "on_vuln_found": False,
+        }
+        job = wu.ScanJob("id1", "target", {})
+        job.mark_done()
+        reply = b"5.7.8 Authentication failed for u at mx7.internal.example SECRETDETAIL"
+        with patch("smtplib.SMTP", side_effect=smtplib.SMTPAuthenticationError(535, reply)):
+            wu._send_email(job)
+        messages = [entry["msg"] for entry in wu._log_history]
+        assert "[*] Email notification failed: SMTPAuthenticationError" in messages
+        assert not any("SECRETDETAIL" in message or "internal.example" in message for message in messages)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flask API endpoints
