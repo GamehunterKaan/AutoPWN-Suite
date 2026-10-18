@@ -46,6 +46,11 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Security changes
 
+- Stop writing the webhook URL, which is a credential, into logs and reports when a delivery fails
+  (AUTOPWN-SA-2026-006, affects v2.6.0 and v2.6.1). The CLI console and saved reports, the dashboard log
+  history (`/api/log`, `/api/events`) and the server log now carry only the exception class and HTTP
+  status instead of the `requests` message that quotes the full URL. Rotate a webhook URL that has
+  appeared in a log or report.
 - Require `cryptography>=50.0.0` (it was `>=46.0.0`): earlier releases have known vulnerabilities,
   including the OpenSSL bundled in older wheels, and a plain `pip install` of the package or
   `requirements.txt` could keep an old copy. The locked version was already 50.0.2.

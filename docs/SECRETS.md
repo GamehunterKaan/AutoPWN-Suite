@@ -50,7 +50,8 @@ quarterly, on role changes, and immediately after a suspected compromise.
   share the scanner account with unrelated applications or credentials.
 - Do not print secrets in Actions output, reports, screenshots, issue bodies or
   command-line arguments. Masking is a backup control, not permission to log
-  secrets. Review and redact evidence before sharing it. Store MFA recovery codes
+  secrets. Notification failures therefore log the error class and HTTP status, not
+  the exception text, which can quote a webhook URL. Review and redact evidence before sharing it. Store MFA recovery codes
   in the owner's password manager, outside the repository and CI.
 
 ## Rotation, revocation and incidents

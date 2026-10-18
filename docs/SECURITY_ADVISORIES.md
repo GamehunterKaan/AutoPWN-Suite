@@ -126,6 +126,32 @@ assessment. They do not claim that any remediation has shipped.
   outside this network-I/O deadline. Loopback regressions are in
   `tests/unit/test_web_transport_security.py`; this is not a DNS timeout guarantee.
 
+## AUTOPWN-SA-2026-006 — Webhook URL written to logs and reports on delivery failure
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed locally, awaiting release** (2026-10-18). Fixed released version: none.
+- CWE-532; low, requiring a failed webhook delivery and access to the resulting
+  log, report or server log.
+- Impact: a webhook URL is a credential (for Slack, Discord and similar services
+  anyone holding it can post to the channel). `requests` quotes the full URL in
+  its error messages, and three failure paths logged that text: the CLI wrote it
+  to the console, which is saved into report files and can be sent by email; the
+  dashboard added it to the in-memory log history served by `GET /api/log` and
+  replayed to every `/api/events` stream; the test-webhook endpoint wrote it with
+  a traceback to the server log.
+- Mitigation: rotate a webhook URL that appeared in a log or report, and keep
+  report files, dashboard access and server logs private. A `*_FILE` credential
+  file keeps the URL out of settings but does not stop this leak.
+- Source: `SendWebhook` in `autopwn_suite/report.py`; `_deliver_webhook` and
+  `api_test_webhook` in `autopwn_suite/web_ui.py`.
+- Local fix: delivery failures report only the exception class and, when the
+  server answered, the HTTP status (`delivery_error_summary` in
+  `autopwn_suite/credential_files.py`). Regressions use a synthetic URL and fail
+  on the previous code: `tests/unit/test_report.py`, `tests/unit/test_web_ui.py`
+  and `tests/unit/test_credential_files.py`.
+- Found 2026-10-18 during a review of the repository documentation; it is not part
+  of the 2026-10-15 assessment.
+
 ## Local fix validation — 2026-10-16
 
 `python -m pytest -q --tb=short`: **986 passed, 2 platform-specific skips**.
@@ -150,7 +176,8 @@ pass locally. These are local results, not CI or release evidence.
 
 ## Record maintenance
 
-Assessment date: **2026-10-15**; local remediation update: **2026-10-16**. Publication
+Assessment date: **2026-10-15**; local remediation update: **2026-10-16**;
+AUTOPWN-SA-2026-006 added **2026-10-18**. Publication
 occurs when this document is merged into the public repository. Update affected
 and fixed versions, mitigations and references as validation or fixes progress.
 See [assessment scope and limitations](SECURITY_ASSESSMENT.md); this list does

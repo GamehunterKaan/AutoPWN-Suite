@@ -73,6 +73,7 @@ from autopwn_suite.credential_files import (
     WEBHOOK_URL,
     CredentialFileError,
     credential_from_environment,
+    delivery_error_summary,
 )
 from autopwn_suite.nist_search import VulnerabilityLookup
 from autopwn_suite.nmap_progress import ScanCancelled
@@ -767,7 +768,7 @@ def _deliver_webhook(job: ScanJob) -> None:
         _broadcast({
             "scan_id": job.id, "level": "warning",
             "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
-            "msg": f"[*] Webhook delivery failed: {e}",
+            "msg": f"[*] Webhook delivery failed: {delivery_error_summary(e)}",
         })
 
 
@@ -1958,8 +1959,8 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             }, timeout=10)
             r.raise_for_status()
             return jsonify({"ok": True, "status_code": r.status_code})
-        except Exception:
-            logging.exception("Failed to send test webhook")
+        except Exception as error:
+            logging.error("Failed to send test webhook: %s", delivery_error_summary(error))
             return jsonify({"error": "Failed to send test webhook"}), 500
 
     # ── Profiles ──

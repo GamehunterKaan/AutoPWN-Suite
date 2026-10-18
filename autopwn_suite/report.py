@@ -11,6 +11,8 @@ from tempfile import TemporaryDirectory
 
 from requests import post
 
+from autopwn_suite.credential_files import delivery_error_summary
+
 
 class ReportType(Enum):
     """
@@ -127,7 +129,7 @@ def SendWebhook(url, log, report_path="report.log") -> None:
                 log.logger("error", "Webhook report failed to send.")
                 print(req.text)
         except Exception as e:
-            log.logger("error", e)
+            log.logger("error", f"Webhook delivery failed: {delivery_error_summary(e)}")
             log.logger("error", "Webhook report failed to send.")
 
 

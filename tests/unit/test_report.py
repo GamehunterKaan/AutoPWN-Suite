@@ -135,9 +135,24 @@ class TestSendWebhook:
         # Verify the generic "failed to send" message is logged
         mock_log.logger.assert_any_call("error", "Webhook report failed to send.")
 
-        # Verify the exception itself was also logged by checking all calls
-        exception_logged = any(isinstance(call.args[1], ConnectionError) for call in mock_log.logger.call_args_list)
-        assert exception_logged, "ConnectionError was not logged"
+        # The error class is logged; its text is not, because requests quotes the webhook URL (a credential).
+        logged = [str(call.args[1]) for call in mock_log.logger.call_args_list]
+        assert any("ConnectionError" in text for text in logged), "the error class was not logged"
+        assert not any("Test connection error" in text for text in logged)
+
+    @patch("autopwn_suite.report.open", new_callable=mock_open, read_data="report content")
+    def test_send_webhook_failure_never_logs_the_secret_url(self, mock_file):
+        """A failed delivery must not put the webhook URL, which is a credential, into the console or report."""
+        from requests.exceptions import ConnectionError as RequestsConnectionError
+
+        url = "https://hooks.example.invalid/services/T000/B000/SECRETTOKEN"
+        error = RequestsConnectionError(f"HTTPSConnectionPool(host='hooks.example.invalid', port=443): Max retries exceeded with url: {url}")
+        mock_log = MagicMock()
+        with patch("autopwn_suite.report.post", side_effect=error):
+            SendWebhook(url, mock_log)
+        logged = " ".join(str(call.args[1]) for call in mock_log.logger.call_args_list)
+        assert "SECRETTOKEN" not in logged
+        assert "Webhook report failed to send." in logged
 
     @pytest.mark.parametrize("status", [201, 202, 204])
     @patch("autopwn_suite.report.post")

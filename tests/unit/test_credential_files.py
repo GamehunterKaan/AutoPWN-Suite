@@ -2,9 +2,12 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Runtime credentials can live in owner-managed files apart from configuration."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import HTTPError
 
 from autopwn_suite import utils, web_ui
 from autopwn_suite.credential_files import (
@@ -13,8 +16,24 @@ from autopwn_suite.credential_files import (
     WEBHOOK_URL,
     CredentialFileError,
     credential_from_environment,
+    delivery_error_summary,
     read_credential_file,
 )
+
+WEBHOOK_SECRET_URL = "https://hooks.example.invalid/services/T000/B000/SECRETTOKEN"
+
+
+@pytest.mark.parametrize("error,expected", [
+    (HTTPError(f"404 Client Error: Not Found for url: {WEBHOOK_SECRET_URL}", response=SimpleNamespace(status_code=404)), "HTTPError (HTTP 404)"),
+    (RequestsConnectionError("HTTPSConnectionPool(host='hooks.example.invalid', port=443): Max retries exceeded with url: /services/T000/B000/SECRETTOKEN"), "ConnectionError"),
+    (ValueError(WEBHOOK_SECRET_URL), "ValueError"),
+    (HTTPError("boom", response=SimpleNamespace(status_code="not a number")), "HTTPError"),
+    (HTTPError("boom", response=None), "HTTPError"),
+])
+def test_delivery_failures_are_summarized_without_the_message_that_quotes_the_webhook_url(error, expected):
+    summary = delivery_error_summary(error)
+    assert summary == expected
+    assert "SECRETTOKEN" not in summary and "hooks.example.invalid" not in summary
 
 
 def test_credential_file_strips_only_the_line_ending(tmp_path):

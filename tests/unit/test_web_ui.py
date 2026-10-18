@@ -1606,6 +1606,24 @@ def test_webhook_http_failure_is_reported(client, wu):
     assert any("Webhook delivery failed" in entry["msg"] for entry in wu._log_history)
 
 
+def test_webhook_failures_do_not_leak_the_url_into_the_log_api_or_server_log(client, wu, caplog):
+    """The webhook URL is a credential and requests quotes it in its error messages."""
+    from requests.exceptions import HTTPError
+    url = "https://hooks.example.invalid/services/T000/B000/SECRETTOKEN"
+    wu._settings["webhook"] = {"enabled": True, "url": url, "on_complete": True}
+    job = wu.ScanJob("hook", "192.0.2.1", {})
+    job.mark_done()
+    error = HTTPError(f"404 Client Error: Not Found for url: {url}", response=Mock(status_code=404))
+    with patch.object(wu._requests, "post", side_effect=error), caplog.at_level("DEBUG"):
+        wu._send_webhook(job)
+        assert client.post("/api/settings/test_webhook").status_code == 500
+    served = client.get("/api/log").get_data(as_text=True)
+    assert "Webhook delivery failed: HTTPError (HTTP 404)" in served
+    assert "SECRETTOKEN" not in served
+    assert "Failed to send test webhook: HTTPError (HTTP 404)" in caplog.text
+    assert "SECRETTOKEN" not in caplog.text and "Traceback" not in caplog.text
+
+
 def test_ssl_email_uses_bounded_connection_for_notification_and_test(client, wu):
     wu._settings["email"] = {"enabled": True, "smtp_host": "mail.example.invalid", "smtp_port": 465,
                              "to_addr": "to@example.invalid", "from_addr": "from@example.invalid", "on_complete": True}

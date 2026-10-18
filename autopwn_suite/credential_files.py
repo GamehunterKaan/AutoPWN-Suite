@@ -47,3 +47,14 @@ def credential_from_environment(variable):
     """Return the credential named by ``variable``, or None when it is not configured."""
     path = os.environ.get(variable, "").strip()
     return read_credential_file(path) if path else None
+
+
+def delivery_error_summary(error):
+    """Describe a failed notification delivery without the exception text.
+
+    ``requests`` quotes the full request URL in its messages, and a webhook URL is itself a credential,
+    so only the exception class and, when the server answered, the HTTP status are safe to log.
+    """
+    status = getattr(getattr(error, "response", None), "status_code", None)
+    name = type(error).__name__
+    return f"{name} (HTTP {status})" if isinstance(status, int) else name
