@@ -21,7 +21,7 @@ quarterly, on role changes, and immediately after a suspected compromise.
 - Runtime NVD keys, SMTP passwords and webhook URLs are operator-owned secrets.
   The current dashboard stores values entered in its settings page in
   **unencrypted** `web_ui_settings.json`; CLI/daemon configuration and optional
-  `api.txt` are also plaintext. Unreleased changes add credential files:
+  `api.txt` are also plaintext. Since v2.6.1, credential files are supported:
   `AUTOPWN_NIST_API_KEY_FILE`, `AUTOPWN_SMTP_PASSWORD_FILE` and
   `AUTOPWN_WEBHOOK_URL_FILE` each name a file holding exactly one non-empty
   UTF-8 line of at most 4096 bytes. The CLI and dashboard read them at use time,
@@ -39,7 +39,7 @@ quarterly, on role changes, and immediately after a suspected compromise.
   `AUTOPWN_DATA_DIR` does not relocate every file.
 - Restrict dashboard ingress to authorized operators with the default loopback
   bind or a firewall/VPN, and use HTTPS for any remote access. v2.6.0 has no
-  login. Unreleased changes require sign-in as a single administrator account
+  login. Since v2.6.1 the dashboard requires sign-in as a single administrator account
   whose username and scrypt password hash are stored in `web_ui_auth.json`
   (generated random password shown once at first launch; change it in Settings
   or regenerate it with `--web-reset-account`). Treat that file like the other

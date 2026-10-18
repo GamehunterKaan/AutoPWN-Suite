@@ -2,7 +2,7 @@
 
 This describes the CLI, Python API, HTTP API, configuration, persistent
 formats and outbound integrations of the current source tree. Items marked
-*unreleased* are not in v2.6.0. [Architecture](ARCHITECTURE.md) explains the
+*since v2.6.1* are not in v2.6.0. [Architecture](ARCHITECTURE.md) explains the
 actors and trust boundaries. These interfaces are operator/admin capabilities,
 not isolated accounts or a public multi-tenant service.
 
@@ -23,19 +23,19 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `-sd/--skip-discovery`, `-st/--scan-type` | Skip discovery, or choose `arp`/`ping` discovery. Privileges limit available techniques. |
 | `-nf/--nmap-flags` | Trusted operator Nmap arguments; pass a single argument such as `-nf="-p 80,443"`. These expose native Nmap capabilities, not a restricted remote job language. |
 | `-s/--speed`, `-ht/--host-timeout` | Nmap speed 0–5 (default 3) and per-host timeout in seconds (default 240). |
-| `-a/--api` | Optional NVD API key. Keep it out of committed files and shell history where possible. When omitted, `AUTOPWN_NIST_API_KEY_FILE` (unreleased) names a one-line key file that is read at use time, before `api.txt`. |
+| `-a/--api` | Optional NVD API key. Keep it out of committed files and shell history where possible. When omitted, `AUTOPWN_NIST_API_KEY_FILE` (since v2.6.1) names a one-line key file that is read at use time, before `api.txt`. |
 | `-m/--mode`, `-nt/--noise-timeout` | `normal`, `evade`, or `noise`; optional noise duration. Raw-packet features depend on host privileges. |
 | `-sed/--skip-exploit-download` | Suppress optional exploit reference downloads. Downloading does not execute the files. |
 | `--offline`, `--vuln-source`, `--vuln-db` | Force offline integration policy; select `auto`/`online`/`offline` CVE source; choose SQLite database path. Offline mode still sends requested Nmap target traffic. |
 | `--update-vuln-db`, `--vuln-db-status` | Explicitly update the official local NVD mirror or print database readiness/freshness and exit. |
 | `-o/--output`, `-of/--output-folder`, `-ot/--output-type` | Explicit output path or generated file under an output directory; `html`, `txt`, or `svg`. Output defaults to `outputs/` relative to the working directory. |
-| `-rp/--report`, `-rpw/--report-webhook` | Select `email`/`webhook` notification and webhook destination. When no destination is given, `AUTOPWN_WEBHOOK_URL_FILE` (unreleased) names a one-line file holding it, before the interactive prompt. |
-| `-rpe/--report-email`, `-rpep/--report-email-password` | SMTP username and password. When no password is given, `AUTOPWN_SMTP_PASSWORD_FILE` (unreleased) names a one-line password file, before the interactive prompt. |
+| `-rp/--report`, `-rpw/--report-webhook` | Select `email`/`webhook` notification and webhook destination. When no destination is given, `AUTOPWN_WEBHOOK_URL_FILE` (since v2.6.1) names a one-line file holding it, before the interactive prompt. |
+| `-rpe/--report-email`, `-rpep/--report-email-password` | SMTP username and password. When no password is given, `AUTOPWN_SMTP_PASSWORD_FILE` (since v2.6.1) names a one-line password file, before the interactive prompt. |
 | `-rpet/--report-email-to`, `-rpef/--report-email-from` | Report recipient and From address. |
 | `-rpes/--report-email-server`, `-rpesp/--report-email-server-port` | SMTP host and port; 465 selects implicit TLS, other ports use STARTTLS. Both validate the certificate chain and hostname before authentication; invalid certificates fail delivery. |
-| `--insecure-tls` | Unreleased. Do not verify TLS certificates of scanned websites (INI `insecure_tls`). By default web scan requests verify target certificates, so scans of self-signed targets need this option; use it only for targets you trust. TLS diagnostics are unaffected. |
-| `--web`, `--web-host`, `--web-port` | Start the dashboard; default listener `127.0.0.1:8080` (unreleased; v2.6.0 defaulted to `0.0.0.0`). `--web-host 0.0.0.0` listens on all interfaces, and non-loopback clients then require HTTPS. |
-| `--web-reset-account` | Unreleased. Reset the dashboard account to `admin` with a new random password, print it once, invalidate existing sessions and exit. Run it on the server with the same `AUTOPWN_DATA_DIR`. |
+| `--insecure-tls` | Since v2.6.1. Do not verify TLS certificates of scanned websites (INI `insecure_tls`). By default web scan requests verify target certificates, so scans of self-signed targets need this option; use it only for targets you trust. TLS diagnostics are unaffected. |
+| `--web`, `--web-host`, `--web-port` | Start the dashboard; default listener `127.0.0.1:8080` (since v2.6.1; v2.6.0 defaulted to `0.0.0.0`). `--web-host 0.0.0.0` listens on all interfaces, and non-loopback clients then require HTTPS. |
+| `--web-reset-account` | Since v2.6.1. Reset the dashboard account to `admin` with a new random password, print it once, invalidate existing sessions and exit. Run it on the server with the same `AUTOPWN_DATA_DIR`. |
 
 The CLI prints progress, discoveries and candidate findings and writes the
 selected report. Normal completion returns process status zero; unhandled/startup
@@ -76,8 +76,8 @@ Other implementation helpers are internal and are not a compatibility promise.
 ## HTTP API
 
 Base URL is the configured dashboard listener. v2.6.0 has no built-in
-authentication; the entire API needed trusted access or protected ingress. In the
-unreleased source, every route except the sign-in page and its assets
+authentication; the entire API needed trusted access or protected ingress. Since v2.6.1,
+every route except the sign-in page and its assets
 (`/login`, `/login.js`, `/login.css`, `/favicon.ico`) and `/api/auth/login`
 requires an authenticated session: the `HttpOnly`, `SameSite=Strict`
 `autopwn_session` cookie (8 hours, server-side, revocable). Non-GET requests also
@@ -99,12 +99,12 @@ updates return 202.
 | --- | --- | --- |
 | `GET /`, `/favicon.ico`, static assets | Asset path | HTML, JavaScript, CSS or icon; static assets are served from the application static directory. |
 | `GET /api/version` | None | `{version}`. |
-| `GET /login`, `/login.js`, `/login.css` | None | Unreleased. Sign-in page assets, public. |
-| `GET /api/auth/login` | None | Unreleased. Starts a sign-in challenge: `{csrf_token}` and a 5-minute `autopwn_login` cookie. |
-| `POST /api/auth/login` | `{username,password}` plus the challenge `X-CSRF-Token` | Unreleased. `{username,csrf_token}` and the session cookie; 401 for wrong credentials, 429 when rate limited. |
-| `GET /api/auth/session` | None | Unreleased. `{username,csrf_token}` for the current session. |
-| `POST /api/auth/logout` | None | Unreleased. `{ok}`; revokes the session. |
-| `PUT /api/auth/account` | `{username,current_password,new_password}` (new password optional, 15-128 characters) | Unreleased. Changes the username/password after verifying the current password; returns a fresh session and signs out others; 403 for a wrong current password. |
+| `GET /login`, `/login.js`, `/login.css` | None | Since v2.6.1. Sign-in page assets, public. |
+| `GET /api/auth/login` | None | Since v2.6.1. Starts a sign-in challenge: `{csrf_token}` and a 5-minute `autopwn_login` cookie. |
+| `POST /api/auth/login` | `{username,password}` plus the challenge `X-CSRF-Token` | Since v2.6.1. `{username,csrf_token}` and the session cookie; 401 for wrong credentials, 429 when rate limited. |
+| `GET /api/auth/session` | None | Since v2.6.1. `{username,csrf_token}` for the current session. |
+| `POST /api/auth/logout` | None | Since v2.6.1. `{ok}`; revokes the session. |
+| `PUT /api/auth/account` | `{username,current_password,new_password}` (new password optional, 15-128 characters) | Since v2.6.1. Changes the username/password after verifying the current password; returns a fresh session and signs out others; 403 for a wrong current password. |
 | `GET /api/scans` | None | Array of job summaries including config, status, timestamps, counts, hosts, progress, web findings/coverage. |
 | `GET /api/scans/<scan_id>` | Job ID | One job summary; 404 if absent. |
 | `GET /api/scans/<scan_id>/download` | Job ID | JSON attachment with complete serializable job/results. Private resume checkpoints are excluded. |
@@ -148,8 +148,8 @@ falls back to normal in the dashboard. Job statuses are `running`, `stopping`,
 
 `web_options.checks` maps catalog check names to booleans. Other controls are
 `speed`, `min_delay_ms`, `timeout`, `request_budget`, `max_pages`, `max_urls`,
-`max_depth`, `max_endpoints`, `max_parameters`, and `max_response_kb`. The
-unreleased source adds boolean `verify_tls` (default `true`): target certificates
+`max_depth`, `max_endpoints`, `max_parameters`, and `max_response_kb`. Since v2.6.1
+the controls also include boolean `verify_tls` (default `true`): target certificates
 are verified unless it is `false` ("Accept untrusted certificates" in the
 dashboard), and the value is recorded with each finding's reproduction.
 Use `/api/web/catalog` for authoritative current defaults/bounds. Results report
@@ -161,7 +161,7 @@ credentials. Each response is isolated from cookies set by previous responses.
 ### Settings and schedules
 
 Settings contain `nist_api_key`, boolean `offline_mode`, and `email`/`webhook`
-objects. In the unreleased source, `AUTOPWN_NIST_API_KEY_FILE`,
+objects. Since v2.6.1, `AUTOPWN_NIST_API_KEY_FILE`,
 `AUTOPWN_SMTP_PASSWORD_FILE` and `AUTOPWN_WEBHOOK_URL_FILE` override the
 corresponding stored values at use time and are never written to the settings
 file. Email keys are `enabled,smtp_host,smtp_port,username,password,from_addr,
@@ -180,7 +180,7 @@ Schedules use the selected profile when firing and must satisfy offline policy.
 ## Files, configuration and integrations
 
 - Environment: `AUTOPWN_WEB_HOST` (default `127.0.0.1`), `AUTOPWN_WEB_PORT`,
-  `AUTOPWN_DATA_DIR`, and (unreleased) `AUTOPWN_WEB_SECURE_COOKIE=1` for a
+  `AUTOPWN_DATA_DIR`, and (since v2.6.1) `AUTOPWN_WEB_SECURE_COOKIE=1` for a
   TLS-terminating proxy plus `AUTOPWN_NIST_API_KEY_FILE`,
   `AUTOPWN_SMTP_PASSWORD_FILE` and `AUTOPWN_WEBHOOK_URL_FILE`, each naming a
   one-line UTF-8 file of at most 4096 bytes. See [Secrets](SECRETS.md).
@@ -189,7 +189,7 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   the parser in `autopwn_suite/utils.py` for the accepted keys. Do not commit generated
   configuration or key files `api.txt`/`lapi.txt`.
 - JSON state files contain settings and dictionaries of profiles/schedules keyed
-  by their IDs. The unreleased dashboard also keeps `web_ui_auth.json` (plaintext
+  by their IDs. Since v2.6.1 the dashboard also keeps `web_ui_auth.json` (plaintext
   username, scrypt password hash and a revision) beside them; do not edit it by
   hand, use the account settings or `--web-reset-account`. They are implementation-managed state, not a stable migration
   API. SQLite schema/readiness is versioned internally. Export before moving
@@ -199,7 +199,7 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   optional downloaded bytes. Explicit NVD mirror maintenance uses annual
   JSON/gzip feeds with metadata checksums.
 - Web checks send bounded HTTP probes and TLS diagnostic handshakes to selected
-  targets. Unreleased builds verify target certificates for the HTTP probes and
+  targets. Releases since v2.6.1 verify target certificates for the HTTP probes and
   replay unless `verify_tls` is false; diagnostic handshakes deliberately inspect
   untrusted certificates and legacy protocols without trusting them. Server replay
   is explicit. Generated Python/curl/HTML/JSON PoCs are

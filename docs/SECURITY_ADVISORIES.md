@@ -5,18 +5,17 @@ alongside [GitHub Security Advisories](https://github.com/GamehunterKaan/AutoPWN
 Use [private reporting](../SECURITY.md) for new issues and coordinated disclosure.
 Local `AUTOPWN-SA-*` identifiers below are project tracking identifiers, **not
 CVE or GHSA identifiers**. These entries summarize the 2026-10-15 source
-assessment. They do not claim that any remediation has shipped.
+assessment. Each entry states its status and, once a fix has shipped, the
+release that contains it.
 
 ## AUTOPWN-SA-2026-001 — Unauthenticated dashboard administration
 
 - Assessed affected version: **2.6.0** (`c24c1d4`). Earlier versions not assessed.
-- Status: **fixed in unreleased changes; v2.6.0 remains affected.** On 2026-10-16
+- Status: **fixed in v2.6.1; v2.6.0 remains affected.** On 2026-10-16
   the maintainer decided that the dashboard authentication below closes this
   advisory (superseding the earlier request to leave it unchanged for
-  trusted-operator deployments). Fixed released version: **none until the next
-  release is published**; this advisory must not be described as fixed in any
-  published version before then. Residual limits remain documented under the
-  mitigation.
+  trusted-operator deployments). Fixed released version: **2.6.1**. Residual
+  limits remain documented under the mitigation.
 - CWE-306; medium under conditional network exposure.
 - Prerequisite: an untrusted client can reach the dashboard. In v2.6.0 the default
   listener is `0.0.0.0:8080`; the localhost display does not restrict network binding.
@@ -26,7 +25,7 @@ assessment. They do not claim that any remediation has shipped.
 - Mitigation: restrict network access to trusted operators, explicitly bind
   loopback where possible, and put remote access behind authenticated ingress.
   Do not expose it to the public internet. Treat all API access as administrative.
-- Unreleased mitigation (not in v2.6.0 or any published version): the dashboard
+- Mitigation in v2.6.1 (not in v2.6.0): the dashboard
   requires sign-in as a single administrator account stored in `web_ui_auth.json`
   (plaintext username, scrypt hash, revision). A random `admin` password is
   generated and printed once at first launch, can be changed under Settings ->
@@ -40,20 +39,20 @@ assessment. They do not claim that any remediation has shipped.
   bind is now `127.0.0.1` (the supplied Compose file sets it explicitly; the
   Dockerfile still sets `0.0.0.0` inside the container, so publish the port to
   loopback only).
-- Residual after the unreleased mitigation: one shared administrator account with
+- Residual after the v2.6.1 mitigation: one shared administrator account with
   no MFA or per-user roles, settings still stored as plaintext at rest unless
   `*_FILE` credential files are used, and HTTPS for remote access is the
   operator's responsibility. The exposure severity above describes v2.6.0 and is
   not re-rated here.
 - Source: `autopwn_suite/web_ui.py` application construction and administrative routes;
   `autopwn_suite/nmap_progress.py` native option processing; `autopwn_suite/web_auth.py`
-  (unreleased authentication, tests in `tests/unit/test_web_auth.py` and
+  (authentication added in v2.6.1, tests in `tests/unit/test_web_auth.py` and
   `tests/unit/test_web_auth_ui.py`).
 
 ## AUTOPWN-SA-2026-002 — Stored script injection in profile descriptions
 
 - Assessed affected version: **2.6.0**. Earlier versions not assessed.
-- Status: **fixed locally, awaiting release** (2026-10-16). Fixed released version: none.
+- Status: **fixed in v2.6.1** (2026-10-16). Fixed released version: **2.6.1**.
 - CWE-79; medium, requiring profile modification and an operator page view.
 - Impact: saved descriptions are inserted as HTML in the dashboard, allowing
   script execution in its origin when a profile list is rendered.
@@ -61,14 +60,14 @@ assessment. They do not claim that any remediation has shipped.
   browser context. A code fix must render descriptions as text/escaped content.
 - Source: profile POST/PUT handlers in `autopwn_suite/web_ui.py` and `renderProfiles`
   in `autopwn_suite/web_ui_static/app.js`.
-- Local fix: escape description, mode and speed at the HTML rendering boundary,
+- Fix in v2.6.1: escape description, mode and speed at the HTML rendering boundary,
   including legacy saved configuration; ordinary text and form editing remain supported.
   Regression: `tests/unit/test_web_ui_behavior.py` profile metadata test.
 
 ## AUTOPWN-SA-2026-003 — SMTP server certificates are not validated
 
 - Assessed affected version: **2.6.0**. Earlier versions not assessed.
-- Status: **fixed locally, awaiting release** (2026-10-16). Fixed released version: none.
+- Status: **fixed in v2.6.1** (2026-10-16). Fixed released version: **2.6.1**.
 - CWE-295; medium, requiring an active network intermediary or forged endpoint.
 - Impact: implicit-TLS/STARTTLS connections use an unverified standard-library
   default before SMTP login, permitting disclosure of credentials/report data.
@@ -76,7 +75,7 @@ assessment. They do not claim that any remediation has shipped.
   protected transport. Merely selecting port 465/STARTTLS is not a fix.
 - Source: email delivery in `autopwn_suite/report.py` and `_smtp_connection` in
   `autopwn_suite/web_ui.py`. A fix must supply a validating SSL context on both paths.
-- Local fix: both implicit TLS and STARTTLS use `ssl.create_default_context()`
+- Fix in v2.6.1: both implicit TLS and STARTTLS use `ssl.create_default_context()`
   before authentication. Invalid chains and hostname mismatches fail before
   credentials or reports are sent. Regression: `tests/unit/test_smtp_security.py`
   covers CLI/dashboard, untrusted and mismatched peers, and trusted delivery.
@@ -84,7 +83,7 @@ assessment. They do not claim that any remediation has shipped.
 ## AUTOPWN-SA-2026-004 — Ambient credentials in core web requests
 
 - Assessed affected version: **2.6.0**. Earlier versions not assessed.
-- Status: **fixed locally, awaiting release** (2026-10-16). Fixed released version: none.
+- Status: **fixed in v2.6.1** (2026-10-16). Fixed released version: **2.6.1**.
 - CWE-522; medium, requiring a matching/default `.netrc` credential entry in the
   scanner account. No real credential files were accessed during assessment.
 - Impact: core discovery/crawl/injection/directory HTTP paths may implicitly
@@ -92,13 +91,13 @@ assessment. They do not claim that any remediation has shipped.
   and unchecked target TLS can expose them to an intermediary as well.
 - Mitigation: use a dedicated scanner account with no ambient `.netrc`
   credentials. Stronger anonymity in additional diagnostic probes and replay
-  does not currently protect every core request.
+  does not protect every core request in v2.6.0.
 - Source: `autopwn_suite/web/http.py`, `webvuln.py` and `dirbust.py` request consumers.
-- Local fix: all diagnostic HTTP uses private sessions with environment trust
+- Fix in v2.6.1: all diagnostic HTTP uses private sessions with environment trust
   disabled and authentication/cookie headers removed. `.netrc`, environment
   proxies and their credentials are not imported. Synthetic-credential regressions
   cover core, scoped, additional probes and evidence replay.
-- Related unreleased change (not part of this fix): web scan requests, including
+- Related change in v2.6.1 (not part of this fix): web scan requests, including
   replay, now verify target certificates by default (`--insecure-tls`,
   INI `insecure_tls` or the dashboard's "Accept untrusted certificates" option
   opt out and are recorded with findings), where v2.6.0 did not verify them. TLS
@@ -108,7 +107,7 @@ assessment. They do not claim that any remediation has shipped.
 ## AUTOPWN-SA-2026-005 — Unbounded slow HTTP response duration
 
 - Assessed affected version: **2.6.0**. Earlier versions not assessed.
-- Status: **fixed locally, awaiting release** (2026-10-16). Fixed released version: none.
+- Status: **fixed in v2.6.1** (2026-10-16). Fixed released version: **2.6.1**.
 - CWE-400; medium, requiring a hostile selected HTTP target.
 - Impact: trickled response bytes can retain scan/verification workers despite
   configured inactivity timeouts and an operator Stop request. Response byte
@@ -118,7 +117,7 @@ assessment. They do not claim that any remediation has shipped.
   export needed results first. A code fix needs deadline-aware transport reads.
 - Source: `bounded_request` in `autopwn_suite/web/http.py` and streaming replay in
   `autopwn_suite/web/poc_runtime.py`.
-- Local fix: scans and standalone Python replay share deadline-aware transport.
+- Fix in v2.6.1: scans and standalone Python replay share deadline-aware transport.
   Nonblocking TCP connects share one deadline across resolved addresses and honor
   Stop. An owned socket duplicate allows a joined watchdog to interrupt active HTTP/TLS
   reads during headers, bodies, incomplete chunks and trailers; scan Stop raises
@@ -129,7 +128,7 @@ assessment. They do not claim that any remediation has shipped.
 ## AUTOPWN-SA-2026-006 — Webhook URL written to logs and reports on delivery failure
 
 - Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
-- Status: **fixed locally, awaiting release** (2026-10-18). Fixed released version: none.
+- Status: **fixed in v2.7.0** (2026-10-18). Fixed released version: **2.7.0**.
 - CWE-532; low, requiring a failed webhook delivery and access to the resulting
   log, report or server log.
 - Impact: a webhook URL is a credential (for Slack, Discord and similar services
@@ -144,7 +143,7 @@ assessment. They do not claim that any remediation has shipped.
   file keeps the URL out of settings but does not stop this leak.
 - Source: `SendWebhook` in `autopwn_suite/report.py`; `_deliver_webhook` and
   `api_test_webhook` in `autopwn_suite/web_ui.py`.
-- Local fix: delivery failures report only the exception class and, when the
+- Fix in v2.7.0: delivery failures report only the exception class and, when the
   server answered, the HTTP status (`delivery_error_summary` in
   `autopwn_suite/credential_files.py`). Regressions use a synthetic URL and fail
   on the previous code: `tests/unit/test_report.py`, `tests/unit/test_web_ui.py`
@@ -168,7 +167,7 @@ candidate review identified the TCP-connect cancellation gap, which was correcte
 and covered by deterministic tests. No external targets, real credentials,
 published releases or repository protection settings were changed.
 
-Later local run (unreleased tree, Windows): `python -m pytest tests/unit -q`
+Later local run (Windows, before the v2.6.1 release): `python -m pytest tests/unit -q`
 reports **1062 passed, 11 platform-specific skips** with 91.93% statement and
 87.93% branch coverage (90.67% combined). `ruff check .`, `node --check` on all
 four dashboard scripts, ESLint and `scripts/export_locked_requirements.py --check`

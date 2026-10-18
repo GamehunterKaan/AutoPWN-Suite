@@ -7,9 +7,8 @@ where they are **not** met or not yet shipped. It supports the OpenSSF Best Prac
 [advisories](SECURITY_ADVISORIES.md) and [security policy](../SECURITY.md).
 
 **Status of the evidence.** Statements about login, TLS verification by default,
-loopback binding and credential files describe changes in the repository that are
-**not yet in a published release** (the latest release, v2.6.0, lacks them). Treat
-them as claims about the next release until it ships. An argument is not a
+loopback binding and credential files describe changes first released in v2.6.1
+(v2.6.0 and earlier lack them). An argument is not a
 guarantee: every row names the evidence a reviewer can inspect, and the final
 section lists known counter-evidence.
 
@@ -78,7 +77,7 @@ Each row argues the principle is applied, with inspectable evidence.
 | --- | --- |
 | **Command/argument injection** (CWE-78, CWE-88) | Nmap runs with an argument vector and `shell=False`; dashboard targets and flags must match restrictive allowlist regexes and may not contain shell metacharacters. `autopwn_suite/nmap_progress.py` (`subprocess.Popen(..., shell=False)`); `_validate_target`, `_validate_nmap_flags` in `autopwn_suite/web_ui.py` |
 | **SQL injection** (CWE-89) | The vulnerability database uses parameterized queries and read-only snapshots; updates are staged and validated before replacement. `autopwn_suite/vulnerability_db.py`; `tests/unit/test_vulnerability_db.py` |
-| **Cross-site scripting** (CWE-79) | Dashboard values are escaped before insertion into markup (`escape()` in `web_security.js`, `html.escape` in report generation). Profile metadata injection was fixed (AUTOPWN-SA-2026-002, unreleased). `tests/unit/test_web_ui_review.py`, `tests/unit/test_web_security_ui.py` |
+| **Cross-site scripting** (CWE-79) | Dashboard values are escaped before insertion into markup (`escape()` in `web_security.js`, `html.escape` in report generation). Profile metadata injection was fixed in v2.6.1 (AUTOPWN-SA-2026-002). `tests/unit/test_web_ui_review.py`, `tests/unit/test_web_security_ui.py` |
 | **Cross-site request forgery** (CWE-352) | Per-session CSRF tokens on all non-GET requests plus same-origin checks and `SameSite=Strict` cookies. `tests/unit/test_web_auth.py` |
 | **Broken authentication / weak password storage** (CWE-287, CWE-916) | Random 24-byte-entropy initial password, scrypt (N=32768, r=8, p=3) with a per-account random salt, constant-time comparison, throttled failures with bounded concurrent hashing, revocable server-side sessions invalidated on password change or reset. `autopwn_suite/web_auth.py`; `test_login_throttling_cannot_be_bypassed_by_new_challenges`, `test_account_change_requires_current_password_rotates_sessions_and_persists` |
 | **Improper certificate validation** (CWE-295) | Scan requests, replay and SMTP validate certificates by default; the opt-out is per scan and recorded in each finding and generated PoC. TLS diagnostics intentionally inspect untrusted certificates but send no HTTP data or credentials. `autopwn_suite/web/http.py`, `autopwn_suite/report.py`, `autopwn_suite/web/poc.py`; `tests/unit/test_web_transport_security.py`, `tests/unit/test_smtp_security.py` |
@@ -118,8 +117,8 @@ case that hides them would not be an assurance case.
   permissions and disk encryption ([SECRETS.md](SECRETS.md)).
 - **HTTPS is the operator's responsibility** for any non-loopback access. The
   application does not terminate TLS itself.
-- **Unreleased changes.** Login, TLS verification by default and loopback binding
-  protect only deployments running the next release. These are breaking changes for
+- **Releases before v2.6.1.** Login, TLS verification by default and loopback binding
+  protect only deployments running v2.6.1 or later. These are breaking changes for
   scans of self-signed targets (`--insecure-tls`) and for remote dashboard use.
 - **Scanner functionality that handles untrusted targets by design:** legacy-protocol
   and invalid-certificate inspection, and active injection probes against targets the
@@ -142,5 +141,5 @@ case that hides them would not be an assurance case.
 - **Process limits.** The project has a single maintainer today
   ([continuity plan](CONTINUITY.md)); independent human review is configured but its
   strength depends on a second reviewer being available.
-- **Open advisory.** AUTOPWN-SA-2026-001 is mitigated by the unreleased login system;
-  its disposition awaits maintainer confirmation and a release.
+- **Closed advisory.** AUTOPWN-SA-2026-001 was fixed in v2.6.1 by the login system; the
+  maintainer decided on 2026-10-16 that this closes it. v2.6.0 and earlier remain affected.

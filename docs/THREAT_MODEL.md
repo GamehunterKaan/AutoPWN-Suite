@@ -1,7 +1,8 @@
 # AutoPWN Suite threat model and attack surface
 
-Assessed 2026-10-15. Runtime scope is v2.6.0; the model also covers proposed
-Baseline 2/3 CI and release automation on `security/openssf-baseline-2`.
+Assessed 2026-10-15. Runtime scope is v2.6.0; the model also covers the
+Baseline 2/3 CI and release automation proposed on `security/openssf-baseline-2`,
+which shipped in v2.6.1.
 An independent, fresh-context source review mapped runtime resources; the parent
 verified material consumers and reconciled the subsequently separated release
 jobs. This is static architecture analysis, not a penetration test or a new
@@ -14,20 +15,20 @@ trusted default-branch handler, avoiding duplicate required approval checks.
 New publication staging bundles supporting reports and notes into one ZIP;
 the signed manifest binds the ZIP and each member hash while source downloads
 remain separate. Existing published releases are not repackaged by this change.
-Local Passing preparation adds a pinned correctness-lint profile and frontend
+Passing preparation, shipped in v2.6.1, adds a pinned correctness-lint profile and frontend
 syntax checks to the existing read-only test job. Warning cleanup preserves
-public re-exports and shared fixtures. A separate local remediation update
+public re-exports and shared fixtures. A separate remediation update
 fixes findings 002-005: escaped profile metadata, authenticated SMTP TLS,
 anonymous diagnostic HTTP and deadline/cancellation-aware transport shared
-with standalone replay. These fixes have not shipped in v2.6.0.
-Further local, unreleased changes add dashboard sign-in (one administrator
+with standalone replay. These fixes shipped in v2.6.1, not in v2.6.0.
+Further changes, also shipped in v2.6.1, add dashboard sign-in (one administrator
 account, server-side revocable sessions, CSRF and same-origin checks, HTTPS
 required for non-loopback clients), a loopback default dashboard bind, default
 certificate verification for web scan requests (`--insecure-tls` opts out),
 `*_FILE` credential files, a hash-pinned repeatable container build and
-relocatable installer staging. Finding 001 is therefore **mitigated in
-unreleased changes**, not fixed in a published version; the maintainer's
-disposition of it still needs confirmation, and the residual limits are a single
+relocatable installer staging. Finding 001 is therefore **fixed in v2.6.1**;
+the maintainer decided on 2026-10-16 that the dashboard authentication closes
+the advisory, and the residual limits are a single
 shared account, no MFA, plaintext-at-rest settings and operator-supplied HTTPS
 for remote access. Source references below name functions where line numbers
 move frequently.
@@ -39,7 +40,7 @@ dashboard select targets/options, run native Nmap, query online NVD or a local
 mirror, optionally probe web services and produce observations/exports.
 Dashboard settings, profiles and schedules persist; scan jobs/checkpoints remain
 in process memory. There is no multi-tenant identity or object-ownership model:
-in the unreleased changes the dashboard has one shared administrator account, and
+since v2.6.1 the dashboard has one shared administrator account, and
 whoever holds it controls every scan, profile, schedule and setting.
 
 | Component | Entry point or consumer |
@@ -85,7 +86,7 @@ flowchart LR
   AS --> G
 ```
 
-In the unreleased changes the dashboard authenticates its own clients
+Since v2.6.1 the dashboard authenticates its own clients
 (`autopwn_suite/web_auth.py`): every route is private by default through one
 `before_request` handler, except the login page and its assets and the sign-in
 endpoint. Sessions are server-side, revocable and last 8 hours; the cookie is
@@ -194,7 +195,7 @@ operator browser, credential confidentiality, settings/schedule integrity,
 database integrity and release identity. An untrusted target controls responses,
 HTML, redirects, certificates and timing; it does not start with operator or
 release authority. In v2.6.0 a reachable dashboard client receives administrative
-API power without an application login; the unreleased changes require sign-in as
+API power without an application login; v2.6.1 and later require sign-in as
 the single administrator first. A profile writer can also affect later
 browser rendering. A network intermediary needs an applicable transport and
 credential/report flow. A contributor can propose changes and exercise the test
@@ -238,7 +239,7 @@ protocols without trusting them and send no HTTP request or credentials; that
 is scanner functionality, not a trust decision. Atomic JSON
 replacement is not encryption or user isolation. A saved profile is not a saved
 job checkpoint. Displayed localhost URLs are not access control, and neither was
-the CORS middleware that v2.6.0 enabled; the unreleased dashboard no longer
+the CORS middleware that v2.6.0 enabled; the dashboard since v2.6.1 no longer
 enables CORS and rejects mismatched `Origin` headers.
 Tag ancestry is not proof of human review. A configured signing/SBOM workflow is
 not evidence that historical artifacts were signed or inventoried. No private
@@ -251,12 +252,12 @@ remaining rows are threat scenarios and control analysis, not new findings.
 
 | Priority | Scenario and capability gain | Prerequisites | Impact | Existing controls | Mitigation | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| Medium / mitigated in unreleased changes; maintainer disposition pending | Reachable client gains dashboard administrative operations | Untrusted client reaches the listener and then obtains the shared administrator password or a session; v2.6.0 needed no credential | Read/change integrations/jobs, invoke native scanner authority | Unreleased only: loopback default bind; sign-in on every route by default; scrypt password hash; 8-hour server-side revocable `HttpOnly`/`SameSite=Strict` sessions; per-session CSRF token on non-GET requests; `Origin` check; failed-login throttling with bounded hashing slots; HTTPS required for non-loopback clients; no-store/nosniff/frame-deny headers | Keep the default loopback bind, provide HTTPS and a firewall/VPN for remote access, protect the printed first password, rotate with `--web-reset-account`. Residual: one shared account, no MFA, plaintext-at-rest settings, operator-provided HTTPS; not released | `install_auth` in `autopwn_suite/web_auth.py`, `_build_app` in `autopwn_suite/web_ui.py`, `tests/unit/test_web_auth.py`, `tests/unit/test_web_auth_ui.py`; advisory AUTOPWN-SA-2026-001 |
-| Medium / fixed locally, unreleased | Profile description becomes operator-origin script | Profile writer + later operator view | Browser-origin authority | Name, description, mode, speed and IDs escaped on rendering | Publish fix; retain trusted dashboard access | `autopwn_suite/web_ui_static/app.js:988`; AUTOPWN-SA-2026-002 |
-| Medium / fixed locally, unreleased | SMTP intermediary captures login/report | Email enabled + active intermediary/forged endpoint | Credential/report disclosure | Validating SSL context on implicit TLS and STARTTLS before login | Publish fix; trust private SMTP CAs explicitly | `autopwn_suite/report.py:78`, `_smtp_connection` in `autopwn_suite/web_ui.py`; AUTOPWN-SA-2026-003 |
-| Medium / fixed locally, unreleased | Core web probe sends ambient credentials | Applicable matching/default credential entry | Credential disclosure | Private sessions ignore environment and strip auth/cookie headers across core, probes and replay | Publish fix; preserve anonymous diagnostic transport | `bounded_request` in `autopwn_suite/web/http.py`, `autopwn_suite/web/transport.py:190`; AUTOPWN-SA-2026-004 |
-| Medium / fixed locally, unreleased | Trickle response retains workers despite Stop | Selected hostile target streams below inactivity timeout | Worker/verification-slot exhaustion | One network-I/O deadline, pollable TCP/TLS establishment, owned socket shutdown, joined watchdog, resumable timeout state | Publish fix; DNS remains OS-controlled | `autopwn_suite/web/transport.py:190`, `verify_plan` in `autopwn_suite/web/poc_runtime.py`; AUTOPWN-SA-2026-005 |
-| Default change, unreleased | Web scan accepts a forged or untrusted target certificate | Active intermediary or a target with an expired/self-signed certificate | v2.6.0 web requests did not verify certificates, so certificate checks could not reveal an altered connection | `verify_tls` defaults to true for core, crawl, directory, probe and replay requests; verification failures are reported as incomplete coverage; the explicit opt-out is recorded with findings and honored by generated Python/curl PoCs | Use `--insecure-tls` only for trusted lab targets; this is a breaking default for existing self-signed scans. TLS diagnostics intentionally inspect untrusted certificates without trusting them | `bounded_request` in `autopwn_suite/web/http.py`, `autopwn_suite/web/options.py`, `verify_plan` in `autopwn_suite/web/poc_runtime.py`, `autopwn_suite/web/poc.py` |
+| Medium / fixed in v2.6.1 | Reachable client gains dashboard administrative operations | Untrusted client reaches the listener and then obtains the shared administrator password or a session; v2.6.0 needed no credential | Read/change integrations/jobs, invoke native scanner authority | Since v2.6.1: loopback default bind; sign-in on every route by default; scrypt password hash; 8-hour server-side revocable `HttpOnly`/`SameSite=Strict` sessions; per-session CSRF token on non-GET requests; `Origin` check; failed-login throttling with bounded hashing slots; HTTPS required for non-loopback clients; no-store/nosniff/frame-deny headers | Keep the default loopback bind, provide HTTPS and a firewall/VPN for remote access, protect the printed first password, rotate with `--web-reset-account`. Residual: one shared account, no MFA, plaintext-at-rest settings, operator-provided HTTPS | `install_auth` in `autopwn_suite/web_auth.py`, `_build_app` in `autopwn_suite/web_ui.py`, `tests/unit/test_web_auth.py`, `tests/unit/test_web_auth_ui.py`; advisory AUTOPWN-SA-2026-001 |
+| Medium / fixed in v2.6.1 | Profile description becomes operator-origin script | Profile writer + later operator view | Browser-origin authority | Name, description, mode, speed and IDs escaped on rendering | Upgrade to v2.6.1 or later; retain trusted dashboard access | `autopwn_suite/web_ui_static/app.js:988`; AUTOPWN-SA-2026-002 |
+| Medium / fixed in v2.6.1 | SMTP intermediary captures login/report | Email enabled + active intermediary/forged endpoint | Credential/report disclosure | Validating SSL context on implicit TLS and STARTTLS before login | Upgrade to v2.6.1 or later; trust private SMTP CAs explicitly | `autopwn_suite/report.py:78`, `_smtp_connection` in `autopwn_suite/web_ui.py`; AUTOPWN-SA-2026-003 |
+| Medium / fixed in v2.6.1 | Core web probe sends ambient credentials | Applicable matching/default credential entry | Credential disclosure | Private sessions ignore environment and strip auth/cookie headers across core, probes and replay | Upgrade to v2.6.1 or later; preserve anonymous diagnostic transport | `bounded_request` in `autopwn_suite/web/http.py`, `autopwn_suite/web/transport.py:190`; AUTOPWN-SA-2026-004 |
+| Medium / fixed in v2.6.1 | Trickle response retains workers despite Stop | Selected hostile target streams below inactivity timeout | Worker/verification-slot exhaustion | One network-I/O deadline, pollable TCP/TLS establishment, owned socket shutdown, joined watchdog, resumable timeout state | Upgrade to v2.6.1 or later; DNS remains OS-controlled | `autopwn_suite/web/transport.py:190`, `verify_plan` in `autopwn_suite/web/poc_runtime.py`; AUTOPWN-SA-2026-005 |
+| Default change in v2.6.1 | Web scan accepts a forged or untrusted target certificate | Active intermediary or a target with an expired/self-signed certificate | v2.6.0 web requests did not verify certificates, so certificate checks could not reveal an altered connection | `verify_tls` defaults to true for core, crawl, directory, probe and replay requests; verification failures are reported as incomplete coverage; the explicit opt-out is recorded with findings and honored by generated Python/curl PoCs | Use `--insecure-tls` only for trusted lab targets; this is a breaking default for existing self-signed scans. TLS diagnostics intentionally inspect untrusted certificates without trusting them | `bounded_request` in `autopwn_suite/web/http.py`, `autopwn_suite/web/options.py`, `verify_plan` in `autopwn_suite/web/poc_runtime.py`, `autopwn_suite/web/poc.py` |
 | High-impact hypothesis | Malicious dependency/action executes during privileged publication | Compromised dependency or approved automation; actual job authority needed | Distribution compromise | Read-only PR jobs, pinned tools/actions, secret-free builds, separate push/sign/upload | Review provenance, require all gates and non-author human; inspect artifacts | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:71`, `.github/workflows/human-review.yml:21` |
 | Review-refresh boundary | An untrusted review notification tries to gain write authority | Fork review events can supply candidate metadata but no trusted code or artifacts | Unauthorized workflow rerun or false approval | Fixed approval workflow, GitHub-resolved PR/head checks, trusted default-branch API-only handler; rerun retains original read-only permissions and revalidates actual human reviews | Keep Actions-write code outside PR execution and never accept artifact paths or workflow IDs from notifications | `.github/workflows/human-review-refresh.yml:26`, `.github/workflows/human-review.yml:21` |
 | High-impact hypothesis | Forged/replaced artifact trusted by consumer | Distribution channel compromise; verifier omits expected identity/digest | Execute substituted release | Signed hashes/digest and exact issuer/workflow verification design | Follow release verification; never trust mutable tags alone | `scripts/release_assets.py:201`, `docs/RELEASING.md:1` |
@@ -295,7 +296,7 @@ actual credentials, deployed ACLs and completed signed publication remain
 unverified. The snapshot below hashes non-Markdown source/configuration inputs
 in sorted repository-path order as path-NUL-bytes-NUL, excluding ignored files.
 It identifies the inspected architecture inputs, not a signed software release.
-It was computed before the later unreleased changes described in the
+It was computed before the later changes (shipped in v2.6.1) described in the
 introduction and has not been recomputed for them.
 
 Repository: target_sha256_f4729301817a49c0c92d2ef33ffd0bd514e1296e7084a6d623842b3beb1924f8

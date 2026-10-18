@@ -100,7 +100,7 @@ It starts `python autopwn.py --web`. Do not expose the administrative dashboard
 to untrusted clients. The dashboard requires sign-in with a single administrator
 account and listens on `127.0.0.1` by default (the image itself sets
 `AUTOPWN_WEB_HOST=0.0.0.0` inside the container, so publish its port to loopback
-only); provide HTTPS for any remote access. These are unreleased changes.
+only); provide HTTPS for any remote access. Sign-in and the loopback default were introduced in v2.6.1.
 
 For a multi-platform image with a configured Buildx builder:
 
