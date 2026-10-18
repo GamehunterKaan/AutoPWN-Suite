@@ -1,0 +1,77 @@
+name: Build binaries
+
+# Reusable: builds the standalone single-file binaries from one commit and smoke-tests each of them on the
+# runner that built it. Pull requests run it through install-smoke.yml; the release workflow publishes its output.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to build
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    permissions:
+      contents: read
+    # Oldest runner images that are still supported, so the Linux binaries run on older glibc versions.
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64
+            runner: ubuntu-22.04
+            suffix: ""
+          - target: linux-arm64
+            runner: ubuntu-22.04-arm
+            suffix: ""
+          - target: windows-amd64
+            runner: windows-2022
+            suffix: ".exe"
+          - target: macos-arm64
+            runner: macos-14
+            suffix: ""
+    env:
+      TARGET: ${{ matrix.target }}
+      SUFFIX: ${{ matrix.suffix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+      - name: Install hash-pinned dependencies and PyInstaller
+        shell: bash
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: --no-deps \
+            -r requirements-locked.txt -r packaging/requirements-build.txt
+      - name: Build
+        shell: bash
+        run: pyinstaller --clean --noconfirm packaging/autopwn-suite.spec
+      - name: Smoke test the binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
+          python scripts/smoke_install.py "$version" "dist/autopwn-suite$SUFFIX"
+      - name: Give the binary its release name
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
+          mkdir binaries
+          cp "dist/autopwn-suite$SUFFIX" "binaries/autopwn-suite-v${version}-${TARGET}${SUFFIX}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: binaries/*
+          if-no-files-found: error
+          retention-days: 7

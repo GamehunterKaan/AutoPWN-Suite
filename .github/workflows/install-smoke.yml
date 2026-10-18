@@ -40,3 +40,11 @@ jobs:
         "$bin/python" -m pip install dist/*.whl
         version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
         python scripts/smoke_install.py "$version" "$bin/autopwn-suite"
+
+  binaries:
+    name: Standalone binaries
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-binary.yml
+    with:
+      ref: ${{ github.sha }}

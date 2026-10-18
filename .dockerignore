@@ -27,3 +27,4 @@ build
 tests
 **/vulnerabilities.sqlite3*
 **/.nvd-*.sqlite3*
+packaging
