@@ -5,12 +5,15 @@ Unit tests for the daemon installer in autopwn_suite/daemon/daemon_installer.py.
 """
 import re
 import shlex
+import stat
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from autopwn_suite.daemon import daemon_installer
 from autopwn_suite.daemon.daemon_installer import (
     CopyFiles,
     CreateConfig,
@@ -281,6 +284,10 @@ class TestInstallDaemon:
 class TestCopyFiles:
     """Tests for the CopyFiles function."""
 
+    @pytest.fixture(autouse=True)
+    def root_controlled(self, monkeypatch):
+        monkeypatch.setattr(daemon_installer, "_service_files_are_root_controlled", lambda install_path: True)
+
     @staticmethod
     def _paths(mock_path, config_exists=True, same_file=False):
         """Mock Path so the install directory, service file and log file are distinguishable."""
@@ -344,6 +351,23 @@ class TestCopyFiles:
     @patch("autopwn_suite.daemon.daemon_installer.shutil")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
+    def test_copy_files_refuses_a_service_that_an_unprivileged_user_could_modify(
+        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console, monkeypatch
+    ):
+        self._paths(mock_path)
+        monkeypatch.setattr(daemon_installer, "_service_files_are_root_controlled", lambda install_path: False)
+
+        CopyFiles(mock_console)
+
+        mock_shutil.copy2.assert_not_called()
+        mock_subprocess.check_call.assert_not_called()
+        mock_open.assert_not_called()
+        assert any("Refusing to install the daemon" in str(c) for c in mock_console.print.call_args_list)
+
+    @patch("autopwn_suite.daemon.daemon_installer.subprocess")
+    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer.Path")
+    @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_stops_when_the_config_is_missing(
         self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
     ):
@@ -358,6 +382,69 @@ class TestCopyFiles:
 
 
 CONFIG = str(Path("/opt/autopwn-suite") / "autopwn-daemon.conf")
+
+
+@pytest.mark.unit
+class TestRootControlled:
+    """The root service must not execute or read anything an unprivileged user can replace."""
+
+    @staticmethod
+    def table(monkeypatch, entries):
+        monkeypatch.setattr(daemon_installer.os.path, "realpath", lambda path: str(path))
+
+        def lstat(part):
+            uid, mode = entries[Path(part).as_posix()]
+            return SimpleNamespace(st_uid=uid, st_mode=mode)
+
+        return lstat
+
+    DIR_755 = stat.S_IFDIR | 0o755
+
+    def chain(self, **overrides):
+        entries = {"/": (0, self.DIR_755), "/opt": (0, self.DIR_755), "/opt/autopwn-suite": (0, self.DIR_755),
+                   "/opt/autopwn-suite/python": (0, stat.S_IFREG | 0o755)}
+        entries.update(overrides)
+        return entries
+
+    def test_root_owned_unwritable_chain_is_accepted(self, monkeypatch):
+        lstat = self.table(monkeypatch, self.chain())
+        assert daemon_installer._root_controlled("/opt/autopwn-suite/python", lstat)
+
+    @pytest.mark.parametrize("override", [
+        {"/opt/autopwn-suite": (1000, DIR_755)},  # directory owned by a user
+        {"/opt/autopwn-suite": (0, stat.S_IFDIR | 0o775)},  # group-writable directory
+        {"/opt": (0, stat.S_IFDIR | 0o757)},  # world-writable parent
+        {"/opt/autopwn-suite/python": (1000, stat.S_IFREG | 0o755)},  # user-owned file
+        {"/opt/autopwn-suite/python": (0, stat.S_IFREG | 0o777)},  # world-writable file
+    ])
+    def test_anything_a_user_could_replace_is_rejected(self, monkeypatch, override):
+        lstat = self.table(monkeypatch, self.chain(**override))
+        assert not daemon_installer._root_controlled("/opt/autopwn-suite/python", lstat)
+
+    def test_symlink_is_judged_by_owner_not_by_its_always_open_mode(self, monkeypatch):
+        link = stat.S_IFLNK | 0o777
+        assert daemon_installer._root_controlled(
+            "/opt/autopwn-suite/python", self.table(monkeypatch, self.chain(**{"/opt/autopwn-suite/python": (0, link)})))
+        assert not daemon_installer._root_controlled(
+            "/opt/autopwn-suite/python", self.table(monkeypatch, self.chain(**{"/opt/autopwn-suite/python": (1000, link)})))
+
+    def test_service_check_covers_interpreter_config_directory_and_package(self, monkeypatch):
+        checked = []
+        monkeypatch.setattr(daemon_installer, "_root_controlled", lambda path: checked.append(Path(path)) or True)
+        assert daemon_installer._service_files_are_root_controlled(Path("/opt/autopwn-suite"))
+        assert Path(sys.executable) in checked and Path("/opt/autopwn-suite") in checked
+        assert any(path.name == "autopwn_suite" for path in checked)
+
+    def test_a_frozen_binary_has_no_separate_package_directory(self, monkeypatch):
+        checked = []
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(daemon_installer, "_root_controlled", lambda path: checked.append(Path(path)) or True)
+        daemon_installer._service_files_are_root_controlled(Path("/opt/autopwn-suite"))
+        assert not any(path.name == "autopwn_suite" for path in checked)
+
+    def test_one_unsafe_location_fails_the_whole_check(self, monkeypatch):
+        monkeypatch.setattr(daemon_installer, "_root_controlled", lambda path: Path(path) != Path("/opt/autopwn-suite"))
+        assert not daemon_installer._service_files_are_root_controlled(Path("/opt/autopwn-suite"))
 
 
 @pytest.mark.unit

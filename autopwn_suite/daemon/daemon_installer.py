@@ -4,6 +4,7 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 from configparser import ConfigParser
@@ -198,6 +199,29 @@ def CreateConfig(console, config_filename=""):
     console.print(f"[green]Config file '{config_file}' created successfully![/green]")
     return True
 
+def _root_controlled(path, lstat=os.lstat):
+    """True when `path` and every parent directory, also after resolving symlinks, belong to root and
+    cannot be changed by group or others. The daemon runs as root, so anything it executes or reads
+    as configuration must not be replaceable by an unprivileged user."""
+    for candidate in {Path(path), Path(os.path.realpath(path))}:
+        for part in (candidate, *candidate.parents):
+            info = lstat(part)
+            if info.st_uid != 0:
+                return False
+            # A symlink's own mode bits are meaningless (always rwxrwxrwx); its owner is what counts.
+            if not stat.S_ISLNK(info.st_mode) and info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+                return False
+    return True
+
+
+def _service_files_are_root_controlled(install_path):
+    """Everything the root service would start or read: the interpreter or binary, the package, the config directory."""
+    locations = [sys.executable, install_path]
+    if not getattr(sys, "frozen", False):
+        locations.append(Path(__file__).resolve().parents[1])
+    return all(_root_controlled(location) for location in locations)
+
+
 def _exec_start(install_path):
     """Command line systemd runs: the interpreter that installed the service, or the frozen binary itself."""
     command = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, "-m", "autopwn_suite"]
@@ -215,6 +239,16 @@ def CopyFiles(console):
         DAEMON_INSTALL_PATH.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         console.print(f"[red]Failed to create install directory {DAEMON_INSTALL_PATH}: {e}[/red]")
+        return
+
+    if not _service_files_are_root_controlled(DAEMON_INSTALL_PATH):
+        console.print(
+            "[red]Refusing to install the daemon: it runs as root, but the interpreter, the package or "
+            f"{DAEMON_INSTALL_PATH} can be modified by another user.[/red]"
+        )
+        console.print("[yellow]Install AutoPWN Suite as root (for example with 'sudo bash install.sh' or a "
+                      "standalone binary kept in a root-owned directory) and run --daemon-install from that "
+                      "installation.[/yellow]")
         return
 
     # The service runs the installed program; only the configuration written by CreateConfig is placed here.
