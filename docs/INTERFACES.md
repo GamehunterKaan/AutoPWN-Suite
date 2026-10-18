@@ -86,7 +86,12 @@ requires an authenticated session: the `HttpOnly`, `SameSite=Strict`
 need the session's `X-CSRF-Token` header, and a present `Origin` header must
 match the request origin. Peers that are not loopback must use HTTPS (or the
 operator sets `AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy); other
-requests get 403. Unauthenticated API requests get 401, and an unreadable account
+requests get 403. The peer is the address the connection comes from: a port published
+from a Docker bridge network (even `-p 127.0.0.1:8080:8080`) reaches the dashboard from
+the bridge gateway, which is not loopback, so plain-HTTP sign-in there needs host
+networking with `AUTOPWN_WEB_HOST=127.0.0.1` (as `docker-compose.yml` uses). With
+`AUTOPWN_WEB_SECURE_COOKIE=1` the `Origin` check expects `https` and the request's
+`Host`, so the proxy must keep `Host` and the browser must reach it over HTTPS. Unauthenticated API requests get 401, and an unreadable account
 file gets 503. The account is one shared administrator, so any signed-in
 client still has the full API authority below.
 POST/PUT inputs use `Content-Type: application/json` and JSON objects. Responses

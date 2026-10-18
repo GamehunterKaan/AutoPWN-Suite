@@ -114,8 +114,12 @@ host's configuration. The image installs runtime Python dependencies and Nmap.
 It starts `python autopwn.py --web`. Do not expose the administrative dashboard
 to untrusted clients. The dashboard requires sign-in with a single administrator
 account and listens on `127.0.0.1` by default (the image itself sets
-`AUTOPWN_WEB_HOST=0.0.0.0` inside the container, so publish its port to loopback
-only); provide HTTPS for any remote access. Sign-in and the loopback default were introduced in v2.6.1.
+`AUTOPWN_WEB_HOST=0.0.0.0` inside the container, which is why the example above
+uses host networking with `AUTOPWN_WEB_HOST=127.0.0.1`: a port published with `-p`,
+even as `-p 127.0.0.1:8080:8080`, reaches the dashboard from the bridge gateway,
+which is not loopback, so sign-in over plain HTTP is refused; put a TLS reverse
+proxy that keeps the `Host` header in front and set `AUTOPWN_WEB_SECURE_COOKIE=1`
+instead); provide HTTPS for any remote access. Sign-in and the loopback default were introduced in v2.6.1.
 
 For a multi-platform image with a configured Buildx builder:
 

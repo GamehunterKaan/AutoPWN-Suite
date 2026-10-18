@@ -38,7 +38,8 @@ release that contains it.
   `AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy). The default
   bind is now `127.0.0.1` (the supplied Compose file sets it explicitly; the
   Dockerfile still sets `0.0.0.0` inside the container, so publish the port to
-  loopback only).
+  loopback only; a bridge-published port is not loopback to the dashboard, so
+  signing in through it needs HTTPS or host networking, as README.md explains).
 - Residual after the v2.6.1 mitigation: one shared administrator account with
   no MFA or per-user roles, settings still stored as plaintext at rest unless
   `*_FILE` credential files are used, and HTTPS for remote access is the

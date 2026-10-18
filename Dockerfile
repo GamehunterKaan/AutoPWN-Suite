@@ -57,8 +57,11 @@ RUN pip install --no-compile --require-hashes --only-binary=:all: -r requirement
 COPY . .
 
 # Inside a container the dashboard must listen on the container interface so that
-# a published port can reach it. Publish it to loopback only (-p 127.0.0.1:8080:8080)
-# or override this with AUTOPWN_WEB_HOST=127.0.0.1 when using host networking.
+# a published port can reach it. -p 127.0.0.1:8080:8080 keeps that port off the network,
+# but a bridge-published port reaches the dashboard from the bridge gateway, which is not
+# loopback, so sign-in over plain HTTP is refused. For plain-HTTP sign-in use host networking
+# and override this with AUTOPWN_WEB_HOST=127.0.0.1 (as docker-compose.yml does), or put a
+# TLS reverse proxy that keeps the Host header in front and set AUTOPWN_WEB_SECURE_COOKIE=1.
 ENV AUTOPWN_WEB_HOST=0.0.0.0
 ENV AUTOPWN_WEB_PORT=8080
 

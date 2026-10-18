@@ -328,6 +328,47 @@ def test_explicit_https_proxy_configuration_sets_secure_cookie_and_checks_public
     assert client.get("/api/auth/login", headers={"Origin": "http://localhost"}).status_code == 403
 
 
+def test_docker_bridge_peer_is_not_loopback_so_plain_http_sign_in_needs_host_networking(dashboard_login, monkeypatch):
+    # `docker run -p 127.0.0.1:8080:8080` reaches the dashboard from the bridge gateway (172.17.0.1), not from loopback.
+    d = dashboard_login
+
+    def sign_in_from(app, peer, host, origin):
+        client = app.test_client()
+        where = {"base_url": f"http://{host}", "environ_overrides": {"REMOTE_ADDR": peer}}
+        challenge = client.get("/api/auth/login", **where)
+        if challenge.status_code != 200:
+            return challenge
+        return client.post("/api/auth/login", json={"username": "admin", "password": d.password}, **where,
+                           headers={"Origin": origin, "X-CSRF-Token": challenge.json["csrf_token"]})
+
+    refused = sign_in_from(d.app, "172.17.0.1", "localhost:8080", "http://localhost:8080")
+    assert refused.status_code == 403 and "HTTPS" in refused.json["error"]
+    # Host networking with AUTOPWN_WEB_HOST=127.0.0.1 (docker-compose.yml): the peer is loopback.
+    assert sign_in_from(d.app, "127.0.0.1", "localhost:8080", "http://localhost:8080").status_code == 200
+
+    monkeypatch.setenv("AUTOPWN_WEB_SECURE_COOKIE", "1")
+    proxied = d.wu._build_app(d.wu._STATIC_DIR)
+    # The setting alone does not help a browser on http://localhost:8080: its Origin is no longer the expected https one.
+    refused = sign_in_from(proxied, "172.17.0.1", "localhost:8080", "http://localhost:8080")
+    assert refused.status_code == 403 and "Cross-origin" in refused.json["error"]
+    # A TLS proxy that keeps Host: the browser's https Origin matches the Host it sent.
+    assert sign_in_from(proxied, "172.17.0.1", "autopwn.example.test", "https://autopwn.example.test").status_code == 200
+
+
+def test_every_document_that_says_to_publish_the_container_port_to_loopback_explains_the_bridge_limit():
+    root = Path(__file__).resolve().parents[2]
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    assert "network_mode: host" in compose and "AUTOPWN_WEB_HOST=127.0.0.1" in compose  # the setup the documents point to
+    instruction = re.compile(r"publish (?:its |the )?(?:port|it) to loopback|127\.0\.0\.1:8080:8080")
+    giving = []
+    for path in ("Dockerfile", "README.md", "AGENTS.md", *sorted(p.relative_to(root).as_posix() for p in (root / "docs").glob("*.md"))):
+        text = re.sub(r"\s*\n\s*(?:#\s*)?", " ", (root / path).read_text(encoding="utf-8"))
+        if instruction.search(text):
+            giving.append(path)
+            assert "bridge" in text and ("not loopback" in text or "non-loopback" in text), f"{path} says to publish to loopback without the bridge caveat"
+    assert len(giving) >= 6, f"the instruction check found only {giving}; the wording changed shape"
+
+
 def test_responses_carry_hardening_headers_and_hide_server_versions(dashboard_login):
     client = dashboard_login.app.test_client()
     login_page = client.get("/login")

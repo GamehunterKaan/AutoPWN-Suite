@@ -479,7 +479,7 @@ environment:
   - AUTOPWN_WEB_PORT=8080        # Listen port
 ```
 
-> **Note:** Host networking (`network_mode: host`) is required for nmap to discover and scan devices on your local network.
+> **Note:** Host networking (`network_mode: host`) is required for nmap to discover and scan devices on your local network. It is also why you can sign in over plain HTTP at `http://localhost:8080`: replacing it with a published port (`ports:` or `docker run -p 127.0.0.1:8080:8080`) makes the dashboard see the bridge gateway instead of loopback and refuse sign-in without HTTPS (explained under Usage, Web UI).
 
 You can also run the CLI via Docker:
 ```bash
@@ -559,7 +559,7 @@ The dashboard listens on `127.0.0.1` by default. With a custom host and port:
 autopwn-suite --web --web-host 0.0.0.0 --web-port 3000
 ```
 
-Listening beyond localhost exposes the sign-in page to the network. Remote clients must then use HTTPS (terminate TLS in a reverse proxy, set `AUTOPWN_WEB_SECURE_COOKIE=1`, and firewall the service). Inside containers, publish the port to loopback only (`-p 127.0.0.1:8080:8080`).
+Listening beyond localhost exposes the sign-in page to the network. Remote clients must then use HTTPS (terminate TLS in a reverse proxy, set `AUTOPWN_WEB_SECURE_COOKIE=1`, and firewall the service). Inside containers, `-p 127.0.0.1:8080:8080` keeps the published port off the network, but a port published from Docker's bridge network reaches the dashboard from the bridge gateway, which is not loopback, so sign-in over plain HTTP is refused. For plain-HTTP sign-in on the Docker host use host networking with `AUTOPWN_WEB_HOST=127.0.0.1` (as `docker-compose.yml` does); otherwise put a TLS reverse proxy that keeps the `Host` header in front and set `AUTOPWN_WEB_SECURE_COOKIE=1`.
 
 ![Scan Running](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/scan-running.png)
 
