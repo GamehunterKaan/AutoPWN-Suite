@@ -2,6 +2,7 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Run dashboard behavior with mocked HTTP/DOM, without a browser or server."""
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -201,6 +202,68 @@ fetch=async (url,opts)=>{sent=JSON.parse(opts.body);return {ok:false,json:async(
 await startScan();
 assert.equal(sent.vulnerability_source,'offline');
 assert.equal(sent.target,'192.168.1.10');
+""")
+
+
+@pytest.mark.parametrize("target,outcome,message,requests", [
+    ("   ", {}, "Please enter a target.", 0),
+    ("bad;target", {"body": {"error": "Invalid target"}}, "Invalid target", 1),
+    ("192.0.2.1", {"body": {}}, "Failed to start scan.", 1),
+    ("192.0.2.1", {"unreachable": "offline"}, "Cannot reach server: offline", 1),
+])
+def test_scan_start_failures_are_toasted_as_well_as_logged(target, outcome, message, requests):
+    run_js(f"const target={json.dumps(target)}, outcome={json.dumps(outcome)}, message={json.dumps(message)}, "
+           f"expectedRequests={requests};" + """
+document.getElementById('f-target').value=target;
+let requests=0;
+fetch=async()=>{requests++;
+  if(outcome.unreachable) throw new Error(outcome.unreachable);
+  return {ok:false,status:400,json:async()=>outcome.body};};
+await startScan();
+assert.equal(requests,expectedRequests);
+assert.equal(document.getElementById('toast-el').textContent,message);
+assert.equal(document.getElementById('toast-el').className,'toast err');
+assert.equal(nodes.get('term').children.length,1);
+assert.ok(nodes.get('term').children[0].innerHTML.includes(message));
+""")
+
+
+def test_accepted_scan_start_shows_no_error_toast():
+    run_js("""
+document.getElementById('f-target').value='192.0.2.1';
+fetch=async()=>({ok:true,json:async()=>({ok:true,scan_id:'0123456789abcdef'})});
+await startScan();
+assert.equal(document.getElementById('toast-el').textContent,'');
+assert.equal(nodes.get('f-target').value,'');
+""")
+
+
+@pytest.mark.parametrize("status,body,message", [
+    (404, {"error": "Scan not found"}, "Scan not found"),
+    (400, {"ok": False, "message": "Scan is not running"}, "Scan is not running"),
+    (500, {}, "Failed to stop scan."),
+])
+def test_failed_stop_is_toasted_and_logged(status, body, message):
+    run_js(f"const status={status}, body={json.dumps(body)}, message={json.dumps(message)};" + """
+const calls=[];
+fetch=async(url,opts)=>{calls.push([url,JSON.parse(opts.body)]);return {ok:false,status,json:async()=>body}};
+await stopScan('0123456789abcdef');
+assert.deepEqual(calls,[['/api/scan/stop',{scan_id:'0123456789abcdef'}]]);
+assert.equal(document.getElementById('toast-el').textContent,message);
+assert.equal(document.getElementById('toast-el').className,'toast err');
+assert.ok(nodes.get('term').children[0].innerHTML.includes(message));
+""")
+
+
+def test_stop_reports_unreachable_server_and_success_stays_quiet():
+    run_js("""
+fetch=async()=>{throw new Error('offline')};
+await stopScan('0123456789abcdef');
+assert.equal(document.getElementById('toast-el').textContent,'Cannot reach server: offline');
+document.getElementById('toast-el').textContent='';
+fetch=async()=>({ok:true,json:async()=>({ok:true})});
+await stopScan('0123456789abcdef');
+assert.equal(document.getElementById('toast-el').textContent,'');
 """)
 
 

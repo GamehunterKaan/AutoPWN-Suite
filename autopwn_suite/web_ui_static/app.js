@@ -501,9 +501,13 @@ function refreshProfileSelects(){
 }
 
 // ── Start scan ────────────────────────────────────────────────────────────────
+// The Terminal tab is rarely the one in view, so a failed start or stop is toasted as well as logged.
+function reportScanError(message){ addLog(null,message,'error'); toast(message,false); }
+function reportUnreachable(e){ reportScanError(`Cannot reach server: ${e.message}`); }
+
 async function startScan(){
   const target = document.getElementById('f-target').value.trim();
-  if(!target){ addLog(null,'Please enter a target.','error'); return; }
+  if(!target){ reportScanError('Please enter a target.'); return; }
   const webError = window.webSecurity?.validateControls('f');
   if(webError){ toast(webError, false); return; }
 
@@ -522,16 +526,22 @@ async function startScan(){
   try{
     const r = await fetch('/api/scan/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d = await r.json();
-    if(!r.ok){ addLog(null,d.error||'Failed to start scan.','error'); return; }
+    if(!r.ok){ reportScanError(d.error||'Failed to start scan.'); return; }
     document.getElementById('f-target').value='';
     addTermFilterOption(d.scan_id, target);
     if(body.scan_web && body.scan_ports === false) switchTab('web', document.getElementById('web-tab-button'));
     else switchTab('scans', document.querySelector('.tab'));
-  }catch(e){ addLog(null,'Cannot reach server: '+e.message,'error'); }
+  }catch(e){ reportUnreachable(e); }
 }
 
 async function stopScan(scanId){
-  await fetch('/api/scan/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scan_id:scanId})});
+  try{
+    const r = await fetch('/api/scan/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scan_id:scanId})});
+    if(!r.ok){
+      const d = await r.json().catch(()=>({}));
+      reportScanError(d.error||d.message||'Failed to stop scan.');
+    }
+  }catch(e){ reportUnreachable(e); }
 }
 
 // ── SSE ────────────────────────────────────────────────────────────────────────
