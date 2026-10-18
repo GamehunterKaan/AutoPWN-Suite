@@ -31,7 +31,7 @@ def test_runtime_manifests_agree_and_exclude_nmap_wrapper():
 
 
 def test_every_runtime_import_has_a_declared_python_dependency():
-    sources = [ROOT / "api.py", ROOT / "autopwn.py", ROOT / "__init__.py", *sorted((ROOT / "modules").rglob("*.py"))]
+    sources = [ROOT / "api.py", ROOT / "autopwn.py", *sorted((ROOT / "autopwn_suite").rglob("*.py"))]
     imports = set()
     for source in sources:
         for node in ast.walk(ast.parse(source.read_text(encoding="utf-8-sig"))):
@@ -39,7 +39,7 @@ def test_every_runtime_import_has_a_declared_python_dependency():
                 imports.update(alias.name.split(".")[0] for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
                 imports.add(node.module.split(".")[0])
-    external = imports - sys.stdlib_module_names - {"api", "autopwn", "modules"}
+    external = imports - sys.stdlib_module_names - {"api", "autopwn", "autopwn_suite"}
     distributions = packages_distributions()
     declared = required_packages()
     missing = {name for name in external if not any(normalized(distribution) in declared

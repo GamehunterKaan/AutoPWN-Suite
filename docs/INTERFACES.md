@@ -10,7 +10,7 @@ not isolated accounts or a public multi-tenant service.
 
 Run `python autopwn.py --help` from a source checkout for the generated option
 reference, types and defaults. `autopwn-suite` is also available after the Linux
-installer creates its wrapper. Arguments are parsed in `modules/utils.py`.
+installer creates its wrapper. Arguments are parsed in `autopwn_suite/utils.py`.
 
 | Options | Input and effect |
 | --- | --- |
@@ -67,7 +67,7 @@ callers must handle them and protect output paths and sensitive results.
 `save_to_file(filename="autopwn.json")` overwrites the selected file with JSON.
 
 The web-check module additionally exposes
-`modules.web.webvuln.webvuln(target, log, console)`, returning structured finding
+`autopwn_suite.web.webvuln.webvuln(target, log, console)`, returning structured finding
 dictionaries. Targets may be hostname, host:port, IPv6 or an HTTP(S) URL. Findings
 include type, URL, parameter, severity/confidence, evidence, reproduction plan,
 timestamps and remediation/impact context. See the README for check semantics.
@@ -186,7 +186,7 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   one-line UTF-8 file of at most 4096 bytes. See [Secrets](SECRETS.md).
   `--vuln-db` selects an explicit database separately. INI configuration sections
   are `AUTOPWN`, `REPORT` and `WEBUI`; use `--create-config` and
-  the parser in `modules/utils.py` for the accepted keys. Do not commit generated
+  the parser in `autopwn_suite/utils.py` for the accepted keys. Do not commit generated
   configuration or key files `api.txt`/`lapi.txt`.
 - JSON state files contain settings and dictionaries of profiles/schedules keyed
   by their IDs. The unreleased dashboard also keeps `web_ui_auth.json` (plaintext
@@ -206,7 +206,7 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   downloads; running one is a separate operator action.
 - CLI webhook delivery sends its report payload; dashboard webhook delivery
   sends JSON scan/test events. SMTP delivers MIME scan reports/test messages to
-  configured recipients. Inspect `modules/report.py` and dashboard notification
+  configured recipients. Inspect `autopwn_suite/report.py` and dashboard notification
   functions for payload details; only send to destinations you control/trust.
 - Distribution interfaces are GitHub releases/source and the Docker Hub image.
   [Releasing](RELEASING.md) defines signed artifact formats and verification.

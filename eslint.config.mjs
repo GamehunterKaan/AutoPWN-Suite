@@ -15,7 +15,7 @@ const browser = Object.fromEntries([
 const shared = {toast: "readonly", poll: "readonly"};
 
 export default [{
-  files: ["modules/web_ui_static/**/*.js"],
+  files: ["autopwn_suite/web_ui_static/**/*.js"],
   languageOptions: {ecmaVersion: 2022, sourceType: "script", globals: browser},
   linterOptions: {reportUnusedDisableDirectives: "error"},
   rules: {
@@ -32,6 +32,6 @@ export default [{
     "no-global-assign": "error", "no-delete-var": "error", "no-octal": "error", "require-yield": "error",
   },
 }, {
-  files: ["modules/web_ui_static/web_security.js"],
+  files: ["autopwn_suite/web_ui_static/web_security.js"],
   languageOptions: {globals: shared},
 }];

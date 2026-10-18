@@ -7,14 +7,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from autopwn import StartScanning, main
+from autopwn_suite.cli import StartScanning, main
 
 
 @pytest.mark.unit
 class TestMainExecution:
     """Tests for the main function in autopwn.py."""
 
-    @patch("autopwn.cli")
+    @patch("autopwn_suite.cli.cli")
     def test_main_version_flag(self, mock_cli, capsys):
         """Verify that the -v flag prints the version and exits."""
         # Mock the CLI arguments to simulate '-v'
@@ -29,20 +29,20 @@ class TestMainExecution:
         captured = capsys.readouterr()
         assert "AutoPWN Suite v" in captured.out
 
-    @patch("autopwn.SaveOutput")
-    @patch("autopwn.InitializeReport")
-    @patch("autopwn.StartScanning")
-    @patch("autopwn.ParamPrint")
-    @patch("autopwn.InitReport")
-    @patch("autopwn.InitArgsAPI")
-    @patch("autopwn.InitArgsMode")
-    @patch("autopwn.InitArgsScanType")
-    @patch("autopwn.InitArgsTarget")
-    @patch("autopwn.InitAutomation")
-    @patch("autopwn.InitArgsConf")
-    @patch("autopwn.CheckConnection")
-    @patch("autopwn.print_banner")
-    @patch("autopwn.cli")
+    @patch("autopwn_suite.cli.SaveOutput")
+    @patch("autopwn_suite.cli.InitializeReport")
+    @patch("autopwn_suite.cli.StartScanning")
+    @patch("autopwn_suite.cli.ParamPrint")
+    @patch("autopwn_suite.cli.InitReport")
+    @patch("autopwn_suite.cli.InitArgsAPI")
+    @patch("autopwn_suite.cli.InitArgsMode")
+    @patch("autopwn_suite.cli.InitArgsScanType")
+    @patch("autopwn_suite.cli.InitArgsTarget")
+    @patch("autopwn_suite.cli.InitAutomation")
+    @patch("autopwn_suite.cli.InitArgsConf")
+    @patch("autopwn_suite.cli.CheckConnection")
+    @patch("autopwn_suite.cli.print_banner")
+    @patch("autopwn_suite.cli.cli")
     def test_main_basic_scan_flow(self, mock_cli, mock_banner, mock_check_connection, mock_init_conf, mock_init_auto, mock_init_target, mock_init_scantype, mock_init_mode, mock_init_api, mock_init_report, *other_mocks):
         """Verify the main orchestration flow of the application."""
         mock_args = MagicMock()
@@ -81,20 +81,20 @@ class TestMainExecution:
                 continue
             func.assert_called_once()
 
-    @patch("autopwn.SaveOutput")
-    @patch("autopwn.InitializeReport")
-    @patch("autopwn.StartScanning")
-    @patch("autopwn.ParamPrint")
-    @patch("autopwn.InitReport")
-    @patch("autopwn.InitArgsAPI")
-    @patch("autopwn.InitArgsMode")
-    @patch("autopwn.InitArgsScanType")
-    @patch("autopwn.InitArgsTarget")
-    @patch("autopwn.InitAutomation")
-    @patch("autopwn.InitArgsConf")
-    @patch("autopwn.CheckConnection")
-    @patch("autopwn.print_banner")
-    @patch("autopwn.cli")
+    @patch("autopwn_suite.cli.SaveOutput")
+    @patch("autopwn_suite.cli.InitializeReport")
+    @patch("autopwn_suite.cli.StartScanning")
+    @patch("autopwn_suite.cli.ParamPrint")
+    @patch("autopwn_suite.cli.InitReport")
+    @patch("autopwn_suite.cli.InitArgsAPI")
+    @patch("autopwn_suite.cli.InitArgsMode")
+    @patch("autopwn_suite.cli.InitArgsScanType")
+    @patch("autopwn_suite.cli.InitArgsTarget")
+    @patch("autopwn_suite.cli.InitAutomation")
+    @patch("autopwn_suite.cli.InitArgsConf")
+    @patch("autopwn_suite.cli.CheckConnection")
+    @patch("autopwn_suite.cli.print_banner")
+    @patch("autopwn_suite.cli.cli")
     def test_main_with_config_file(self, mock_cli, mock_banner, mock_check_connection, mock_init_conf, mock_init_auto, mock_init_target, mock_init_scantype, mock_init_mode, mock_init_api, mock_init_report, *other_mocks):
         """Verify that InitArgsConf is called when a config file is provided."""
         mock_args = MagicMock()
@@ -119,11 +119,11 @@ class TestMainExecution:
         # Specifically check that InitArgsConf was called because a config was provided
         mock_init_conf.assert_called_once()
 
-    @patch("autopwn.InstallDaemon")
-    @patch("autopwn.cli")
-    @patch("autopwn.print_banner") # Patch functions that should NOT be called
-    @patch("autopwn.CheckConnection")
-    @patch("autopwn.InitArgsConf")
+    @patch("autopwn_suite.cli.InstallDaemon")
+    @patch("autopwn_suite.cli.cli")
+    @patch("autopwn_suite.cli.print_banner") # Patch functions that should NOT be called
+    @patch("autopwn_suite.cli.CheckConnection")
+    @patch("autopwn_suite.cli.InitArgsConf")
     def test_main_daemon_install_flow(self, mock_init_conf, mock_check_connection, mock_print_banner, mock_cli, mock_install_daemon):
         """Verify that the --daemon-install flag correctly triggers the installer and exits."""
         mock_args = MagicMock()
@@ -152,40 +152,40 @@ class TestMainExecution:
 
 
 @pytest.mark.unit
-@patch("autopwn.check_nmap")
+@patch("autopwn_suite.cli.check_nmap")
 class TestStartScanning:
     """Tests for the StartScanning function."""
 
     @patch("builtins.input")
-    @patch("autopwn.NoiseScan")
+    @patch("autopwn_suite.cli.NoiseScan")
     def test_start_scanning_noise_mode(self, mock_noise_scan, mock_input, mock_check_nmap):
         """Verify that only NoiseScan is called in Noise mode."""
         args = MagicMock(yes_please=False)
         # NoiseScan is designed to exit the program. We simulate this behavior.
         mock_noise_scan.side_effect = SystemExit
 
-        from autopwn import InitAutomation
-        from modules.utils import ScanMode, ScanType
+        from autopwn_suite.cli import InitAutomation
+        from autopwn_suite.utils import ScanMode, ScanType
         InitAutomation(args) # Set up the global state
         with pytest.raises(SystemExit):
             StartScanning(args, "target", ScanType.Ping, ScanMode.Noise, "apiKey", MagicMock(), MagicMock(), MagicMock())
         mock_noise_scan.assert_called_once()
 
-    @patch("autopwn.webvuln")
-    @patch("autopwn.GetExploitsFromArray")
-    @patch("autopwn.SearchSploits")
-    @patch("autopwn.AnalyseScanResults")
-    @patch("autopwn.PortScan")
-    @patch("autopwn.WebScan", return_value=True)
-    @patch("autopwn.UserConfirmation", return_value=(True, True, True))
-    @patch("autopwn.GetHostsToScan", return_value=["192.168.1.1"])
-    @patch("autopwn.DiscoverHosts")
+    @patch("autopwn_suite.cli.webvuln")
+    @patch("autopwn_suite.cli.GetExploitsFromArray")
+    @patch("autopwn_suite.cli.SearchSploits")
+    @patch("autopwn_suite.cli.AnalyseScanResults")
+    @patch("autopwn_suite.cli.PortScan")
+    @patch("autopwn_suite.cli.WebScan", return_value=True)
+    @patch("autopwn_suite.cli.UserConfirmation", return_value=(True, True, True))
+    @patch("autopwn_suite.cli.GetHostsToScan", return_value=["192.168.1.1"])
+    @patch("autopwn_suite.cli.DiscoverHosts")
     def test_full_scan_flow(self, mock_discover, mock_get_hosts, mock_user_confirm, mock_web_scan, mock_port_scan, mock_analyse, mock_search_vulns, mock_get_exploits, mock_webvuln, mock_check_nmap):
         """Verify all scanning functions are called when user confirms all."""
         args = MagicMock(skip_discovery=False, yes_please=False)
-        from autopwn import InitAutomation
+        from autopwn_suite.cli import InitAutomation
         InitAutomation(args)
-        from modules.utils import ScanMode
+        from autopwn_suite.utils import ScanMode
 
         # Mock return values to allow the chain to complete
         mock_port_scan.return_value = MagicMock()
@@ -200,20 +200,20 @@ class TestStartScanning:
         mock_get_exploits.assert_called_once()
         mock_webvuln.assert_called_once()
 
-    @patch("autopwn.webvuln")
-    @patch("autopwn.GetExploitsFromArray")
-    @patch("autopwn.SearchSploits", return_value=[])
-    @patch("autopwn.AnalyseScanResults", return_value=[["192.168.1.1", 443, "https", "nginx", "1"]])
-    @patch("autopwn.PortScan")
-    @patch("autopwn.WebScan", return_value=True)
-    @patch("autopwn.UserConfirmation", return_value=(True, False, False))
-    @patch("autopwn.GetHostsToScan", return_value=["192.168.1.1"])
-    @patch("autopwn.DiscoverHosts")
+    @patch("autopwn_suite.cli.webvuln")
+    @patch("autopwn_suite.cli.GetExploitsFromArray")
+    @patch("autopwn_suite.cli.SearchSploits", return_value=[])
+    @patch("autopwn_suite.cli.AnalyseScanResults", return_value=[["192.168.1.1", 443, "https", "nginx", "1"]])
+    @patch("autopwn_suite.cli.PortScan")
+    @patch("autopwn_suite.cli.WebScan", return_value=True)
+    @patch("autopwn_suite.cli.UserConfirmation", return_value=(True, False, False))
+    @patch("autopwn_suite.cli.GetHostsToScan", return_value=["192.168.1.1"])
+    @patch("autopwn_suite.cli.DiscoverHosts")
     def test_insecure_tls_flag_reaches_web_checks_only_when_requested(
             self, mock_discover, mock_get_hosts, mock_user_confirm, mock_web_scan, mock_port_scan, mock_analyse,
             mock_search_vulns, mock_get_exploits, mock_webvuln, mock_check_nmap):
-        from autopwn import InitAutomation
-        from modules.utils import ScanMode
+        from autopwn_suite.cli import InitAutomation
+        from autopwn_suite.utils import ScanMode
         for insecure, controls in ((True, {"verify_tls": False}), (False, None)):
             args = MagicMock(skip_discovery=False, yes_please=False, insecure_tls=insecure)
             InitAutomation(args)
@@ -221,20 +221,20 @@ class TestStartScanning:
             StartScanning(args, "target", "scantype", ScanMode.Normal, "apiKey", MagicMock(), MagicMock(), MagicMock())
             assert mock_webvuln.call_args.kwargs.get("controls") == controls
 
-    @patch("autopwn.webvuln")
-    @patch("autopwn.GetExploitsFromArray")
-    @patch("autopwn.SearchSploits")
-    @patch("autopwn.AnalyseScanResults")
-    @patch("autopwn.PortScan")
-    @patch("autopwn.WebScan", return_value=False)
-    @patch("autopwn.UserConfirmation", return_value=(True, False, False)) # User says NO to vuln scan
-    @patch("autopwn.GetHostsToScan", return_value=["192.168.1.1"])
-    @patch("autopwn.DiscoverHosts")
+    @patch("autopwn_suite.cli.webvuln")
+    @patch("autopwn_suite.cli.GetExploitsFromArray")
+    @patch("autopwn_suite.cli.SearchSploits")
+    @patch("autopwn_suite.cli.AnalyseScanResults")
+    @patch("autopwn_suite.cli.PortScan")
+    @patch("autopwn_suite.cli.WebScan", return_value=False)
+    @patch("autopwn_suite.cli.UserConfirmation", return_value=(True, False, False)) # User says NO to vuln scan
+    @patch("autopwn_suite.cli.GetHostsToScan", return_value=["192.168.1.1"])
+    @patch("autopwn_suite.cli.DiscoverHosts")
     def test_partial_scan_flow(self, mock_discover, mock_get_hosts, mock_user_confirm, mock_web_scan, mock_port_scan, mock_analyse, mock_search_vulns, mock_get_exploits, mock_webvuln, mock_check_nmap):
         """Verify vuln scan and exploit download are skipped if user says no."""
         args = MagicMock(skip_discovery=False, yes_please=False)
-        from autopwn import InitAutomation
-        from modules.utils import ScanMode
+        from autopwn_suite.cli import InitAutomation
+        from autopwn_suite.utils import ScanMode
         InitAutomation(args)
         StartScanning(args, "target", "scantype", ScanMode.Normal, "apiKey", MagicMock(), MagicMock(), MagicMock())
 
@@ -243,16 +243,16 @@ class TestStartScanning:
         mock_get_exploits.assert_not_called()
 
     @patch("builtins.input")
-    @patch("autopwn.DiscoverHosts")
+    @patch("autopwn_suite.cli.DiscoverHosts")
     def test_skip_discovery(self, mock_discover, mock_input, mock_check_nmap):
         """Verify DiscoverHosts is not called when skip_discovery is True."""
         args = MagicMock(skip_discovery=True, yes_please=False)
-        from autopwn import InitAutomation
-        from modules.utils import ScanMode
+        from autopwn_suite.cli import InitAutomation
+        from autopwn_suite.utils import ScanMode
         InitAutomation(args)
         # Mock UserConfirmation and WebScan to prevent the scan from proceeding into slow network calls
-        with patch("autopwn.UserConfirmation", return_value=(False, False, False)), \
-             patch("autopwn.WebScan", return_value=False):
+        with patch("autopwn_suite.cli.UserConfirmation", return_value=(False, False, False)), \
+             patch("autopwn_suite.cli.WebScan", return_value=False):
             StartScanning(args, "target", "scantype", ScanMode.Normal, "apiKey", MagicMock(), MagicMock(), MagicMock())
 
         mock_discover.assert_not_called()

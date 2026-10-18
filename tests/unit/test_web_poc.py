@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from modules.web.poc import browser_poc, build_plan, curl_poc, python_poc
-from modules.web.poc_runtime import verify_plan
+from autopwn_suite.web.poc import browser_poc, build_plan, curl_poc, python_poc
+from autopwn_suite.web.poc_runtime import verify_plan
 from tests.unit.test_web_dashboard import dashboard as dashboard
 from tests.unit.test_web_tls import certificate_der as certificate_der
 
@@ -60,7 +60,7 @@ def test_cors_poc_reproduces_headers_without_following_redirects(web_response):
 def test_invalid_or_redacted_plans_are_rejected_before_any_request(mutate):
     plan = build_plan(sample())
     mutate(plan)
-    with patch("modules.web.poc_runtime.requests.Session") as session, pytest.raises(ValueError):
+    with patch("autopwn_suite.web.poc_runtime.requests.Session") as session, pytest.raises(ValueError):
         verify_plan(plan)
     session.assert_not_called()
 
@@ -80,10 +80,10 @@ def test_sql_poc_requires_baseline_difference_and_repeat(web_response):
 def test_redirected_findings_record_final_evidence_and_reproduce_without_redirects(web_response, kind):
     from urllib.parse import parse_qs, urlsplit, urlunsplit
 
-    from modules.web.lfi import LFIScanner
-    from modules.web.runtime import ScanContext, redact_url
-    from modules.web.sqli import SQLIScanner
-    from modules.web.xss import XSSScanner
+    from autopwn_suite.web.lfi import LFIScanner
+    from autopwn_suite.web.runtime import ScanContext, redact_url
+    from autopwn_suite.web.sqli import SQLIScanner
+    from autopwn_suite.web.xss import XSSScanner
     scanners = {"sqli": (SQLIScanner, "test_sqli"), "lfi": (LFIScanner, "test_lfi"), "xss": (XSSScanner, "test_xss")}
     url = "http://example.com/read?file=one&token=private"
     def site(requested, **kwargs):
@@ -101,7 +101,7 @@ def test_redirected_findings_record_final_evidence_and_reproduce_without_redirec
         return web_response(body, url=requested)
     context = ScanContext(url, MagicMock(), controls={"speed": 5})
     scanner, method = scanners[kind]
-    with context.activate(), patch(f"modules.web.{kind}.get", side_effect=site):
+    with context.activate(), patch(f"autopwn_suite.web.{kind}.get", side_effect=site):
         result = getattr(scanner(MagicMock(), MagicMock()), method)(url)[0]
     result["endpoint"] = redact_url(url)
     assert "private" not in str(result)
@@ -151,7 +151,7 @@ def test_downloads_are_read_only_and_work_in_offline_mode(dashboard):
     job.add_web_finding("example.com", "http://example.com/", sample())
     wu._register_scan(job)
     wu._settings["offline_mode"] = True
-    with patch("modules.web.poc_runtime.requests.Session") as session:
+    with patch("autopwn_suite.web.poc_runtime.requests.Session") as session:
         response = client.get("/api/web/findings/job/finding/poc?format=python")
         assert response.status_code == 200
         assert "attachment" in response.headers["Content-Disposition"]
@@ -169,7 +169,7 @@ def test_verification_has_explicit_post_and_stores_result(dashboard):
     wu._register_scan(job)
     def thread(**kwargs):
         return MagicMock(start=lambda: kwargs["target"]())
-    with patch.object(wu.threading, "Thread", side_effect=thread), patch("modules.web.poc_runtime.verify_plan", return_value={"status": "reproduced", "impact_verified": False}) as verify:
+    with patch.object(wu.threading, "Thread", side_effect=thread), patch("autopwn_suite.web.poc_runtime.verify_plan", return_value={"status": "reproduced", "impact_verified": False}) as verify:
         assert client.get("/api/web/findings/job/finding/verify").status_code in (404, 405)
         assert client.post("/api/web/findings/job/finding/verify", json={"url": "http://external.com/"}).status_code == 400
         assert client.post("/api/web/findings/job/finding/verify", json={}).status_code == 202
@@ -237,7 +237,7 @@ def test_tls_poc_never_uses_http_transport():
     result["evidence"] = "Server negotiated obsolete TLSv1.1"
     result["reproduction"]["target"] = "https://example.com/"
     transport = MagicMock()
-    with patch("modules.web.poc_runtime._check_tls", return_value=True):
+    with patch("autopwn_suite.web.poc_runtime._check_tls", return_value=True):
         assert verify_plan(build_plan(result), transport=transport)["status"] == "reproduced"
     transport.assert_not_called()
 
@@ -250,8 +250,8 @@ def test_legacy_tls_poc_only_checks_the_exact_negotiated_version(label, version)
     context = MagicMock()
     secure = context.wrap_socket.return_value.__enter__.return_value
     secure.version.return_value = label
-    with patch("modules.web.poc_runtime.ssl.create_default_context", return_value=context), \
-         patch("modules.web.poc_runtime.socket.create_connection") as connect:
+    with patch("autopwn_suite.web.poc_runtime.ssl.create_default_context", return_value=context), \
+         patch("autopwn_suite.web.poc_runtime.socket.create_connection") as connect:
         assert verify_plan(build_plan(result))["status"] == "reproduced"
     assert context.minimum_version == context.maximum_version == version
     assert secure.method_calls == [call.version()]
@@ -335,7 +335,7 @@ def test_tls_certificate_poc_checks_actual_certificate_metadata(certificate_der,
     result["reproduction"]["target"] = target
     context = MagicMock()
     context.wrap_socket.return_value.__enter__.return_value.getpeercert.return_value = certificate_der(**options)
-    with patch("modules.web.poc_runtime.ssl.create_default_context", return_value=context), patch("modules.web.poc_runtime.socket.create_connection"):
+    with patch("autopwn_suite.web.poc_runtime.ssl.create_default_context", return_value=context), patch("autopwn_suite.web.poc_runtime.socket.create_connection"):
         assert verify_plan(build_plan(result))["status"] == expected
     assert context.verify_mode == ssl.CERT_NONE
 
@@ -345,7 +345,7 @@ def test_tls_poc_distinguishes_untrusted_certificates_from_connection_failures()
     result = sample("TLS_TRUST")
     result["reproduction"]["target"] = "https://example.com/"
     context = MagicMock()
-    with patch("modules.web.poc_runtime.ssl.create_default_context", return_value=context), patch("modules.web.poc_runtime.socket.create_connection"):
+    with patch("autopwn_suite.web.poc_runtime.ssl.create_default_context", return_value=context), patch("autopwn_suite.web.poc_runtime.socket.create_connection"):
         context.wrap_socket.side_effect = ssl.SSLCertVerificationError("untrusted")
         assert verify_plan(build_plan(result))["status"] == "reproduced"
         context.wrap_socket.side_effect = OSError("unreachable")

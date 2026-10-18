@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules import nmap_progress as monitored
+from autopwn_suite import nmap_progress as monitored
 
 XML = b'''<?xml version="1.0"?>
 <nmaprun>
@@ -176,7 +176,7 @@ def test_stderr_is_preserved_for_the_xml_parser(fake_spawn):
 
 
 def test_streaming_preserves_host_and_service_results(fake_spawn):
-    from modules.nmap_backend import PortScanner
+    from autopwn_suite.nmap_backend import PortScanner
     xml = b'''<nmaprun args="nmap -sV 192.0.2.1">
       <scaninfo type="syn" protocol="tcp" numservices="1" services="22"/>
       <taskprogress task="Service scan" time="2" percent="75.00"/>

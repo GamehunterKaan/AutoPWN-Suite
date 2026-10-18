@@ -15,9 +15,9 @@ venv
 api.txt
 lapi.txt
 autopwn-daemon.conf
-modules/web_ui_settings.json
-modules/web_ui_profiles.json
-modules/web_ui_schedules.json
+autopwn_suite/web_ui_settings.json
+autopwn_suite/web_ui_profiles.json
+autopwn_suite/web_ui_schedules.json
 **/web_ui_auth.json*
 **/.web_ui_auth.json.*.tmp
 outputs

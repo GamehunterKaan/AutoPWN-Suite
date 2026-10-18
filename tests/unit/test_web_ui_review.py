@@ -17,8 +17,8 @@ from tests.auth_helpers import authenticated_app
 @pytest.fixture
 def wu_review(tmp_path, monkeypatch):
     monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
-    path = Path(__file__).parents[2] / "modules" / "web_ui.py"
-    spec = importlib.util.spec_from_file_location("modules.web_ui", path)
+    path = Path(__file__).parents[2] / "autopwn_suite" / "web_ui.py"
+    spec = importlib.util.spec_from_file_location("autopwn_suite.web_ui", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     module.__version__ = "test"

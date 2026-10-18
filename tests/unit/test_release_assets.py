@@ -5,6 +5,7 @@
 import hashlib
 import importlib.util
 import json
+import shutil
 import subprocess
 import zipfile
 from pathlib import Path
@@ -29,7 +30,8 @@ def source_repo(tmp_path):
     command(repo, "config", "user.name", "Release Test")
     command(repo, "config", "user.email", "release@example.test")
     (repo / "pyproject.toml").write_text('[tool.poetry]\nversion = "2.6.0"\n')
-    (repo / "autopwn.py").write_text('__version__ = "2.6.0"\n')
+    (repo / "autopwn_suite").mkdir()
+    (repo / "autopwn_suite" / "__init__.py").write_text('__version__ = "2.6.0"\n')
     (repo / "source.txt").write_text("reviewed source")
     command(repo, "add", ".")
     command(repo, "-c", "commit.gpgsign=false", "commit", "-m", "Reviewed source")
@@ -95,13 +97,24 @@ def test_notes_must_describe_functional_and_security_changes():
 
 
 def test_runtime_version_must_match(source_repo):
-    (source_repo / "autopwn.py").write_text('__version__ = "2.5.0"\n')
+    (source_repo / "autopwn_suite" / "__init__.py").write_text('__version__ = "2.5.0"\n')
     command(source_repo, "add", ".")
     command(source_repo, "-c", "commit.gpgsign=false", "commit", "-m", "Mismatched runtime")
     command(source_repo, "tag", "-f", "v2.6.0")
     command(source_repo, "update-ref", "refs/remotes/origin/main", "HEAD")
     with pytest.raises(ValueError, match="runtime version"):
         release.release_commit(source_repo, "v2.6.0")
+
+
+def test_release_before_the_package_layout_keeps_its_version_in_autopwn_py(source_repo):
+    """Backfilling signatures for old tags still finds the runtime version."""
+    shutil.rmtree(source_repo / "autopwn_suite")
+    (source_repo / "autopwn.py").write_text('__version__ = "2.6.0"\n')
+    command(source_repo, "add", "-A")
+    command(source_repo, "-c", "commit.gpgsign=false", "commit", "-m", "Legacy layout")
+    command(source_repo, "tag", "-f", "v2.6.0")
+    command(source_repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert release.release_commit(source_repo, "v2.6.0") == command(source_repo, "rev-parse", "HEAD")
 
 
 @pytest.mark.parametrize("image,digest", [
@@ -240,8 +253,8 @@ def test_current_version_has_matching_release_notes_and_runtime_version():
     """Catch a version bump without its changelog section at PR time, not in the release run."""
     root = Path(__file__).resolve().parents[2]
     version = release.re.search(r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(encoding="utf-8"), release.re.MULTILINE)[1]
-    runtime = release.re.findall(r'^\s*__version__\s*=\s*"([^"]+)"', (root / "autopwn.py").read_text(encoding="utf-8"), release.re.MULTILINE)
-    assert runtime == [version], "autopwn.py __version__ must equal the pyproject version"
+    runtime = release.re.findall(r'^\s*__version__\s*=\s*"([^"]+)"', (root / "autopwn_suite" / "__init__.py").read_text(encoding="utf-8"), release.re.MULTILINE)
+    assert runtime == [version], "autopwn_suite.__version__ must equal the pyproject version"
     # Needs a '## [<version>]' section with non-empty Functional and Security notes, as the release workflow does.
     notes = release.release_notes((root / "CHANGELOG.md").read_text(encoding="utf-8"), f"v{version}")
     assert notes.startswith(f"# AutoPWN Suite v{version}")

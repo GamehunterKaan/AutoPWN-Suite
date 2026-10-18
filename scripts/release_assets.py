@@ -105,7 +105,15 @@ def release_commit(repo, tag, reviewed_ref="refs/remotes/origin/main"):
     version = re.search(r'^version\s*=\s*"([^"]+)"', source, re.MULTILINE)
     if not version or version[1] != tag[1:]:
         raise ValueError("Release tag does not match the source package version")
-    runtime = git(repo, "show", f"{commit}:autopwn.py")
+    # Releases before 2.7.0 kept the runtime version in autopwn.py.
+    for runtime_path in ("autopwn_suite/__init__.py", "autopwn.py"):
+        try:
+            runtime = git(repo, "show", f"{commit}:{runtime_path}")
+            break
+        except subprocess.CalledProcessError:
+            continue
+    else:
+        raise ValueError("Release source has no runtime version file")
     runtime_versions = re.findall(r'^\s*__version__\s*=\s*"([^"]+)"', runtime, re.MULTILINE)
     if runtime_versions != [tag[1:]]:
         raise ValueError("Release tag does not match the runtime version")

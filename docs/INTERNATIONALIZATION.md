@@ -6,12 +6,12 @@ AutoPWN Suite is **English-only**. There is no translation framework, no message
 catalog and no language selection. User-facing text is written directly in the
 source:
 
-- CLI and daemon messages in the Python modules (`autopwn.py`, `modules/*.py`),
+- CLI and daemon messages in the Python modules (`autopwn_suite/cli.py`, `autopwn_suite/*.py`),
   rendered through `rich`.
-- Dashboard text in `modules/web_ui_static/index.html`, `login.html`, `app.js`,
+- Dashboard text in `autopwn_suite/web_ui_static/index.html`, `login.html`, `app.js`,
   `auth.js`, `login.js` and `web_security.js`; both HTML pages declare `lang="en"`.
 - Reports, notification e-mails, web-check findings and remediation text generated in
-  Python (for example `modules/report.py` and `modules/web/`).
+  Python (for example `autopwn_suite/report.py` and `autopwn_suite/web/`).
 - Documentation, issues and pull-request discussion are in English
   (OpenSSF criterion `english`).
 

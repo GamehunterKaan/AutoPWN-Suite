@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 """
-Unit tests for the daemon installer in modules/daemon/daemon_installer.py.
+Unit tests for the daemon installer in autopwn_suite/daemon/daemon_installer.py.
 """
 import os
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from modules.daemon.daemon_installer import (
+from autopwn_suite.daemon.daemon_installer import (
     CopyFiles,
     CreateConfig,
     InstallDaemon,
@@ -100,8 +100,8 @@ class TestDaemonHelpers:
 class TestCreateConfig:
     """Tests for the CreateConfig function."""
 
-    @patch("modules.daemon.daemon_installer.open", new_callable=MagicMock)
-    @patch("modules.daemon.daemon_installer.ConfigParser")
+    @patch("autopwn_suite.daemon.daemon_installer.open", new_callable=MagicMock)
+    @patch("autopwn_suite.daemon.daemon_installer.ConfigParser")
     def test_create_config_webhook_flow(self, mock_config_parser, mock_open, mock_console):
         """Verify config creation with webhook notification."""
         # Simulate user inputs for a full config creation
@@ -167,8 +167,8 @@ class TestCreateConfig:
         mock_open.assert_any_call("my_config.conf", "w", encoding="utf-8")
         mock_config_instance.write.assert_called_once()
 
-    @patch("modules.daemon.daemon_installer.open", new_callable=MagicMock)
-    @patch("modules.daemon.daemon_installer.ConfigParser")
+    @patch("autopwn_suite.daemon.daemon_installer.open", new_callable=MagicMock)
+    @patch("autopwn_suite.daemon.daemon_installer.ConfigParser")
     def test_create_config_email_flow(self, mock_config_parser, mock_open, mock_console):
         """Verify config creation with email notification."""
         # Simulate user inputs for the email notification path
@@ -230,11 +230,11 @@ class TestCreateConfig:
 class TestInstallDaemon:
     """Tests for the InstallDaemon function."""
 
-    @patch("modules.daemon.daemon_installer.CopyFiles")
-    @patch("modules.daemon.daemon_installer.CreateConfig")
-    @patch("modules.daemon.daemon_installer.print_banner")
-    @patch("modules.daemon.daemon_installer.system", return_value="Linux")
-    @patch("modules.daemon.daemon_installer.is_root", return_value=True)
+    @patch("autopwn_suite.daemon.daemon_installer.CopyFiles")
+    @patch("autopwn_suite.daemon.daemon_installer.CreateConfig")
+    @patch("autopwn_suite.daemon.daemon_installer.print_banner")
+    @patch("autopwn_suite.daemon.daemon_installer.system", return_value="Linux")
+    @patch("autopwn_suite.daemon.daemon_installer.is_root", return_value=True)
     def test_install_daemon_success_path(
         self, mock_is_root, mock_system, mock_banner, mock_create_config, mock_copy_files, mock_console
     ):
@@ -244,8 +244,8 @@ class TestInstallDaemon:
         mock_create_config.assert_called_once_with(mock_console, "autopwn-daemon.conf")
         mock_copy_files.assert_called_once_with(mock_console)
 
-    @patch("modules.daemon.daemon_installer.system", return_value="Windows")
-    @patch("modules.daemon.daemon_installer.is_root", return_value=True)
+    @patch("autopwn_suite.daemon.daemon_installer.system", return_value="Windows")
+    @patch("autopwn_suite.daemon.daemon_installer.is_root", return_value=True)
     def test_install_daemon_wrong_os(self, mock_is_root, mock_system, mock_console):
         """Verify it aborts on non-Linux systems."""
         InstallDaemon(mock_console)
@@ -253,18 +253,18 @@ class TestInstallDaemon:
             "Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"
         )
 
-    @patch("modules.daemon.daemon_installer.CopyFiles")
-    @patch("modules.daemon.daemon_installer.CreateConfig", return_value=False)
-    @patch("modules.daemon.daemon_installer.print_banner")
-    @patch("modules.daemon.daemon_installer.system", return_value="Linux")
-    @patch("modules.daemon.daemon_installer.is_root", return_value=True)
+    @patch("autopwn_suite.daemon.daemon_installer.CopyFiles")
+    @patch("autopwn_suite.daemon.daemon_installer.CreateConfig", return_value=False)
+    @patch("autopwn_suite.daemon.daemon_installer.print_banner")
+    @patch("autopwn_suite.daemon.daemon_installer.system", return_value="Linux")
+    @patch("autopwn_suite.daemon.daemon_installer.is_root", return_value=True)
     def test_install_cancellation_does_not_use_old_configuration(self, mock_root, mock_system,
             mock_banner, mock_config, mock_copy, mock_console):
         InstallDaemon(mock_console)
         mock_copy.assert_not_called()
 
-    @patch("modules.daemon.daemon_installer.system", return_value="Linux")
-    @patch("modules.daemon.daemon_installer.is_root", return_value=False)
+    @patch("autopwn_suite.daemon.daemon_installer.system", return_value="Linux")
+    @patch("autopwn_suite.daemon.daemon_installer.is_root", return_value=False)
     def test_install_daemon_not_root(self, mock_is_root, mock_system, mock_console):
         """Verify it aborts if not run as root."""
         InstallDaemon(mock_console)
@@ -277,11 +277,11 @@ class TestInstallDaemon:
 class TestCopyFiles:
     """Tests for the CopyFiles function."""
 
-    @patch("modules.daemon.daemon_installer.subprocess")
-    @patch("modules.daemon.daemon_installer.venv")
-    @patch("modules.daemon.daemon_installer.shutil")
-    @patch("modules.daemon.daemon_installer.Path")
-    @patch("modules.daemon.daemon_installer.open")
+    @patch("autopwn_suite.daemon.daemon_installer.subprocess")
+    @patch("autopwn_suite.daemon.daemon_installer.venv")
+    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer.Path")
+    @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_success_path(
         self, mock_open, mock_path, mock_shutil, mock_venv, mock_subprocess, mock_console
     ):
@@ -305,11 +305,11 @@ class TestCopyFiles:
         mock_path.cwd.return_value = mock_cwd
 
         # Configure the behavior of the `/` operator on our mock_cwd object.
-        # This handles paths created like `cwd / "modules"`.
+        # This handles paths created like `cwd / "autopwn_suite"`.
         # We return a new MagicMock for each path component to avoid recursion.
         path_mocks = {
             item: MagicMock(name=f"path_{item}")
-            for item in ["modules", "autopwn.py", "autopwn-daemon.conf", "api.py", "__init__.py", "requirements.txt", "modules/daemon/autopwn-daemon.sh"]
+            for item in ["autopwn_suite", "autopwn.py", "autopwn-daemon.conf", "api.py", "__init__.py", "requirements.txt", "autopwn_suite/daemon/autopwn-daemon.sh"]
         }
         mock_cwd.__truediv__.side_effect = lambda p: path_mocks.get(p, MagicMock(name=f"path_unknown_{p}"))
 
@@ -319,8 +319,8 @@ class TestCopyFiles:
         (mock_install_path / ".venv").exists.return_value = False
 
         # Configure the behavior of `src.exists()` and `src.is_dir()` for each file.
-        path_mocks["modules"].exists.return_value = True
-        path_mocks["modules"].is_dir.return_value = True
+        path_mocks["autopwn_suite"].exists.return_value = True
+        path_mocks["autopwn_suite"].is_dir.return_value = True
         path_mocks["autopwn.py"].exists.return_value = True
         path_mocks["autopwn.py"].is_dir.return_value = False
         path_mocks["autopwn-daemon.conf"].exists.return_value = True
@@ -331,7 +331,7 @@ class TestCopyFiles:
         path_mocks["__init__.py"].is_dir.return_value = False
         path_mocks["requirements.txt"].exists.return_value = True
         path_mocks["requirements.txt"].is_dir.return_value = False
-        path_mocks["modules/daemon/autopwn-daemon.sh"].exists.return_value = True
+        path_mocks["autopwn_suite/daemon/autopwn-daemon.sh"].exists.return_value = True
 
         CopyFiles(mock_console)
 
@@ -350,11 +350,11 @@ class TestCopyFiles:
         unit = mock_open.return_value.__enter__.return_value.write.call_args.args[0]
         assert "KillMode=control-group" in unit
 
-    @patch("modules.daemon.daemon_installer.subprocess")
-    @patch("modules.daemon.daemon_installer.venv")
-    @patch("modules.daemon.daemon_installer.shutil")
-    @patch("modules.daemon.daemon_installer.Path")
-    @patch("modules.daemon.daemon_installer.open")
+    @patch("autopwn_suite.daemon.daemon_installer.subprocess")
+    @patch("autopwn_suite.daemon.daemon_installer.venv")
+    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer.Path")
+    @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_skips_missing_source(
         self, mock_open, mock_path, mock_shutil, mock_venv, mock_subprocess, mock_console
     ):
@@ -375,14 +375,14 @@ class TestCopyFiles:
         mock_install_path.exists.return_value = False
 
         # Configure most files to exist, but one to be missing
-        (mock_cwd / "modules").exists.return_value = True
+        (mock_cwd / "autopwn_suite").exists.return_value = True
         (mock_cwd / "autopwn.py").exists.return_value = True
         (mock_cwd / "api.py").exists.return_value = False  # The missing file
 
         CopyFiles(mock_console)
 
         # Verify the warning was printed for the missing file
-        mock_console.print.assert_any_call(f"[yellow]Warning: {mock_cwd / 'api.py'} does not exist — skipping[/yellow]")
+        mock_console.print.assert_any_call(f"[yellow]Warning: {mock_cwd / 'autopwn_suite.api.py'} does not exist — skipping[/yellow]")
 
 
 @pytest.mark.unit

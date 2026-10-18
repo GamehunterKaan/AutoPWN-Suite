@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from modules.scanner import (
+from autopwn_suite.scanner import (
     AnalyseScanResults,
     DiscoverHosts,
     InitHostInfo,
@@ -18,13 +18,13 @@ from modules.scanner import (
     TestArp,
     TestPing,
 )
-from modules.utils import ScanMode, ScanType
+from autopwn_suite.utils import ScanMode, ScanType
 
 
 @pytest.fixture
 def mock_port_scanner():
     """Fixture for the project's Nmap adapter."""
-    with patch("modules.scanner.PortScanner") as mock_scanner_class:
+    with patch("autopwn_suite.scanner.PortScanner") as mock_scanner_class:
         mock_instance = MagicMock()
         mock_scanner_class.return_value = mock_instance
         yield mock_instance
@@ -44,7 +44,7 @@ class TestDiscoveryFunctions:
         mock_port_scanner.scan.assert_called_once_with(hosts=target, arguments="-sn")
         assert hosts == [target]
 
-    @patch("modules.scanner.is_root", return_value=True)
+    @patch("autopwn_suite.scanner.is_root", return_value=True)
     def test_test_arp_evade_mode(self, mock_is_root, mock_port_scanner):
         """Verify TestArp calls nmap with correct arguments in evade mode."""
         target = "192.168.1.0/24"
@@ -54,8 +54,8 @@ class TestDiscoveryFunctions:
             hosts=target, arguments="-sn -PR -T 2 -f -g 53 --data-length 10"
         )
 
-    @patch("modules.scanner.TestArp")
-    @patch("modules.scanner.TestPing")
+    @patch("autopwn_suite.scanner.TestArp")
+    @patch("autopwn_suite.scanner.TestPing")
     def test_discover_hosts_uses_arp(self, mock_test_ping, mock_test_arp):
         """Verify DiscoverHosts calls TestArp when specified."""
         target = "192.168.1.0/24"
@@ -70,7 +70,7 @@ class TestDiscoveryFunctions:
 class TestPortScan:
     """Tests for the PortScan function."""
 
-    @patch("modules.scanner.is_root", return_value=True)
+    @patch("autopwn_suite.scanner.is_root", return_value=True)
     def test_port_scan_as_root(self, mock_is_root, mock_port_scanner):
         """Verify PortScan uses sudo arguments when run as root."""
         target = "127.0.0.1"
@@ -85,7 +85,7 @@ class TestPortScan:
         assert "-T 4" in kwargs["arguments"]
         assert "-A" in kwargs["arguments"]
 
-    @patch("modules.scanner.is_root", return_value=False)
+    @patch("autopwn_suite.scanner.is_root", return_value=False)
     def test_port_scan_as_non_root(self, mock_is_root, mock_port_scanner):
         """Verify PortScan does not use sudo arguments when not root."""
         target = "127.0.0.1"
@@ -179,7 +179,7 @@ class TestResultParsing:
         # Ensure no table was printed
         mock_rich_console.print.assert_not_called()
 
-    @patch("modules.scanner.is_root", return_value=True)
+    @patch("autopwn_suite.scanner.is_root", return_value=True)
     def test_analyse_scan_results_localhost_detection(self, mock_is_root, mock_nmap_result, mock_rich_console):
         """Verify it logs a message when scanning the local host."""
         mock_log = MagicMock()
@@ -198,7 +198,7 @@ class TestResultParsing:
 
         mock_log.logger.assert_any_call("info", f"Target {target_ip} seems to be us.")
 
-    @patch("modules.scanner.Table")
+    @patch("autopwn_suite.scanner.Table")
     def test_analyse_scan_results_table_content(self, mock_table_class, mock_nmap_result, mock_rich_console):
         """Verify the content of the results table is correct."""
         mock_log = MagicMock()
@@ -278,9 +278,9 @@ class TestResultParsing:
 class TestNoiseScan:
     """Tests for the NoiseScan function."""
 
-    @patch("modules.scanner.sleep")
-    @patch("modules.scanner.Process")
-    @patch("modules.scanner.TestPing", return_value=["192.168.1.1", "192.168.1.2"])
+    @patch("autopwn_suite.scanner.sleep")
+    @patch("autopwn_suite.scanner.Process")
+    @patch("autopwn_suite.scanner.TestPing", return_value=["192.168.1.1", "192.168.1.2"])
     def test_noise_scan_creates_processes(self, mock_test_ping, mock_process, mock_sleep):
         """Verify that NoiseScan creates a process for each discovered host."""
         mock_log = MagicMock()
@@ -298,9 +298,9 @@ class TestNoiseScan:
         assert mock_process.call_count == 2
         mock_process.return_value.start.assert_called()
 
-    @patch("modules.scanner.sleep")
-    @patch("modules.scanner.Process")
-    @patch("modules.scanner.TestPing", return_value=["192.168.1.1"])
+    @patch("autopwn_suite.scanner.sleep")
+    @patch("autopwn_suite.scanner.Process")
+    @patch("autopwn_suite.scanner.TestPing", return_value=["192.168.1.1"])
     def test_noise_scan_with_timeout(self, mock_test_ping, mock_process, mock_sleep):
         """Verify that sleep is called with the correct timeout."""
         mock_log = MagicMock()

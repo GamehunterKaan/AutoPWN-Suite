@@ -3,7 +3,7 @@
 ## Maintainer procedure
 
 1. Review source, dependencies and known advisories. Update the runtime version
-   in `autopwn.py` and package version in `pyproject.toml` consistently.
+   in `autopwn_suite/__init__.py` and package version in `pyproject.toml` consistently.
    Give every release a unique `vMAJOR.MINOR.PATCH` tag (optional prerelease).
 2. Add a `## [VERSION] - YYYY-MM-DD` changelog entry with descriptive
    `### Functional changes` and `### Security changes`. Describe security impact

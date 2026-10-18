@@ -16,9 +16,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from modules.nmap_backend import parse_nmap_xml
-from modules.web.options import normalize_options
-from modules.web_auth import ACCOUNT_FILE, password_matches, validate_account
+from autopwn_suite.nmap_backend import parse_nmap_xml
+from autopwn_suite.web.options import normalize_options
+from autopwn_suite.web_auth import ACCOUNT_FILE, password_matches, validate_account
 
 SEED = 20261016
 VALID_XML = (
@@ -105,8 +105,8 @@ def test_web_option_schema_only_raises_value_error():
 @pytest.fixture
 def web_ui(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
-    sys.modules.pop("modules.web_ui", None)
-    module = importlib.import_module("modules.web_ui")
+    sys.modules.pop("autopwn_suite.web_ui", None)
+    module = importlib.import_module("autopwn_suite.web_ui")
     module._load_settings()
     app = module._build_app(module._STATIC_DIR)
     app.config["TESTING"] = True

@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules import utils, web_ui
-from modules.credential_files import (
+from autopwn_suite import utils, web_ui
+from autopwn_suite.credential_files import (
     NIST_API_KEY,
     SMTP_PASSWORD,
     WEBHOOK_URL,

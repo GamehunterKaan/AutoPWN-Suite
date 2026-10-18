@@ -49,7 +49,7 @@ not managed as project dependencies.
 2. Run `poetry lock` with Poetry 2.5.1 and commit `pyproject.toml` and
    `poetry.lock` together. Use `poetry update PACKAGE` for an intentional package
    update; review the resulting transitive changes.
-3. Run `poetry check --lock` and `poetry run test`. CI includes tests checking
+3. Run `poetry check --lock` and `poetry run pytest`. CI includes tests checking
    manifest agreement and undeclared runtime imports.
 4. Review GitHub dependency alerts and Dependabot security-update pull requests.
    Check whether an advisory affects our reachable use and prioritize exploitable

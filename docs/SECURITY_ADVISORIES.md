@@ -45,8 +45,8 @@ assessment. They do not claim that any remediation has shipped.
   `*_FILE` credential files are used, and HTTPS for remote access is the
   operator's responsibility. The exposure severity above describes v2.6.0 and is
   not re-rated here.
-- Source: `modules/web_ui.py` application construction and administrative routes;
-  `modules/nmap_progress.py` native option processing; `modules/web_auth.py`
+- Source: `autopwn_suite/web_ui.py` application construction and administrative routes;
+  `autopwn_suite/nmap_progress.py` native option processing; `autopwn_suite/web_auth.py`
   (unreleased authentication, tests in `tests/unit/test_web_auth.py` and
   `tests/unit/test_web_auth_ui.py`).
 
@@ -59,8 +59,8 @@ assessment. They do not claim that any remediation has shipped.
   script execution in its origin when a profile list is rendered.
 - Mitigation: restrict profile writers and dashboard access; use an isolated
   browser context. A code fix must render descriptions as text/escaped content.
-- Source: profile POST/PUT handlers in `modules/web_ui.py` and `renderProfiles`
-  in `modules/web_ui_static/app.js`.
+- Source: profile POST/PUT handlers in `autopwn_suite/web_ui.py` and `renderProfiles`
+  in `autopwn_suite/web_ui_static/app.js`.
 - Local fix: escape description, mode and speed at the HTML rendering boundary,
   including legacy saved configuration; ordinary text and form editing remain supported.
   Regression: `tests/unit/test_web_ui_behavior.py` profile metadata test.
@@ -74,8 +74,8 @@ assessment. They do not claim that any remediation has shipped.
   default before SMTP login, permitting disclosure of credentials/report data.
 - Mitigation: disable email notifications or use a separately authenticated
   protected transport. Merely selecting port 465/STARTTLS is not a fix.
-- Source: email delivery in `modules/report.py` and `_smtp_connection` in
-  `modules/web_ui.py`. A fix must supply a validating SSL context on both paths.
+- Source: email delivery in `autopwn_suite/report.py` and `_smtp_connection` in
+  `autopwn_suite/web_ui.py`. A fix must supply a validating SSL context on both paths.
 - Local fix: both implicit TLS and STARTTLS use `ssl.create_default_context()`
   before authentication. Invalid chains and hostname mismatches fail before
   credentials or reports are sent. Regression: `tests/unit/test_smtp_security.py`
@@ -93,7 +93,7 @@ assessment. They do not claim that any remediation has shipped.
 - Mitigation: use a dedicated scanner account with no ambient `.netrc`
   credentials. Stronger anonymity in additional diagnostic probes and replay
   does not currently protect every core request.
-- Source: `modules/web/http.py`, `webvuln.py` and `dirbust.py` request consumers.
+- Source: `autopwn_suite/web/http.py`, `webvuln.py` and `dirbust.py` request consumers.
 - Local fix: all diagnostic HTTP uses private sessions with environment trust
   disabled and authentication/cookie headers removed. `.netrc`, environment
   proxies and their credentials are not imported. Synthetic-credential regressions
@@ -116,8 +116,8 @@ assessment. They do not claim that any remediation has shipped.
 - Mitigation: isolate scanning from other services and enforce process-level
   time limits. Terminating the dashboard loses in-memory jobs/checkpoints, so
   export needed results first. A code fix needs deadline-aware transport reads.
-- Source: `bounded_request` in `modules/web/http.py` and streaming replay in
-  `modules/web/poc_runtime.py`.
+- Source: `bounded_request` in `autopwn_suite/web/http.py` and streaming replay in
+  `autopwn_suite/web/poc_runtime.py`.
 - Local fix: scans and standalone Python replay share deadline-aware transport.
   Nonblocking TCP connects share one deadline across resolved addresses and honor
   Stop. An owned socket duplicate allows a joined watchdog to interrupt active HTTP/TLS

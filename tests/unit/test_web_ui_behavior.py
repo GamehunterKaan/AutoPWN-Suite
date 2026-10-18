@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-APP_JS = Path(__file__).resolve().parents[2] / "modules" / "web_ui_static" / "app.js"
+APP_JS = Path(__file__).resolve().parents[2] / "autopwn_suite" / "web_ui_static" / "app.js"
 NODE = shutil.which("node")
 pytestmark = [pytest.mark.unit, pytest.mark.skipif(not NODE, reason="Node.js is unavailable")]
 

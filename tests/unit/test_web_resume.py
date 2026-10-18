@@ -8,11 +8,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.nmap_progress import ScanCancelled
-from modules.web.crawler import crawl
-from modules.web.options import CHECKS, normalize_options
-from modules.web.runtime import ScanContext
-from modules.web.webvuln import webvuln
+from autopwn_suite.nmap_progress import ScanCancelled
+from autopwn_suite.web.crawler import crawl
+from autopwn_suite.web.options import CHECKS, normalize_options
+from autopwn_suite.web.runtime import ScanContext
+from autopwn_suite.web.webvuln import webvuln
 from tests.unit.test_web_dashboard import dashboard as dashboard
 
 
@@ -27,7 +27,7 @@ def test_crawl_resumes_uncrawled_pages_and_retains_links_hidden_by_limits():
     def links(url, log):
         calls.append(url)
         return graph[url]
-    with patch("modules.web.crawler.link_finder", side_effect=links):
+    with patch("autopwn_suite.web.crawler.link_finder", side_effect=links):
         with ScanContext(root, MagicMock(), checkpoint=state).activate():
             assert crawl(root, MagicMock(), max_pages=1, max_urls=2, max_depth=0) == {root}
         for _ in range(3):
@@ -47,8 +47,8 @@ def test_http_crawl_failure_stays_pending_and_resume_discovers_recovered_links(w
             return web_response("Unavailable", status=status, url=url, headers={"Content-Type": "application/json"})
         body = '<a href="/page">page</a>' if url == root else '<a href="/leaf">leaf</a>' if url == page else "Done"
         return web_response(body, url=url)
-    with patch("modules.web.webvuln.get", side_effect=lambda url, **kw: web_response(url=url)), \
-         patch("modules.web.crawler.get", side_effect=fetch):
+    with patch("autopwn_suite.web.webvuln.get", side_effect=lambda url, **kw: web_response(url=url)), \
+         patch("autopwn_suite.web.crawler.get", side_effect=fetch):
         webvuln(root, MagicMock(), MagicMock(), controls=controls("sqli"), checkpoint=state, on_complete=summaries.append)
         assert summaries[0]["status"] == "partial"
         assert any(f"HTTP {status}" in issue for issue in summaries[0]["issues"])
@@ -64,7 +64,7 @@ def test_missing_crawl_pages_are_terminal_observations(web_response, status):
     state, summary = {}, {}
     def fetch(url, **kwargs):
         return web_response('<a href="/missing">missing</a>', url=url) if url == root else web_response(status=status, url=url)
-    with patch("modules.web.webvuln.get", return_value=web_response(url=root)), patch("modules.web.crawler.get", side_effect=fetch):
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response(url=root)), patch("autopwn_suite.web.crawler.get", side_effect=fetch):
         webvuln(root, MagicMock(), MagicMock(), controls=controls("sqli"), checkpoint=state, on_complete=summary.update)
     assert summary["status"] == "completed" and not summary["issues"]
     assert state["crawl"][page] == []
@@ -74,9 +74,9 @@ def test_endpoint_batches_reach_completed_without_retesting_finished_checks(web_
     root = "http://example.com/"
     urls = {root + f"page?id={i}" for i in range(6)}
     state, summaries = {}, []
-    with patch("modules.web.webvuln.get", return_value=web_response(url=root)), \
-         patch("modules.web.webvuln.crawl", return_value=urls), \
-         patch("modules.web.webvuln.SQLIScanner") as sql, patch("modules.web.webvuln.XSSScanner") as xss:
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response(url=root)), \
+         patch("autopwn_suite.web.webvuln.crawl", return_value=urls), \
+         patch("autopwn_suite.web.webvuln.SQLIScanner") as sql, patch("autopwn_suite.web.webvuln.XSSScanner") as xss:
         sql.return_value.test_sqli.return_value = []
         xss.return_value.test_xss.return_value = []
         for _ in range(3):
@@ -91,9 +91,9 @@ def test_endpoint_batches_reach_completed_without_retesting_finished_checks(web_
 def test_small_request_budget_progresses_between_parameters(web_response):
     url = "http://example.com/?file=one&path=two&include=three"
     state, summaries = {}, []
-    with patch("modules.web.webvuln.get", side_effect=lambda *a, **kw: web_response(url=url)), \
-         patch("modules.web.lfi.get", side_effect=lambda requested, **kw: web_response(url=requested)) as get, \
-         patch("modules.web.webvuln.crawl", return_value={url}):
+    with patch("autopwn_suite.web.webvuln.get", side_effect=lambda *a, **kw: web_response(url=url)), \
+         patch("autopwn_suite.web.lfi.get", side_effect=lambda requested, **kw: web_response(url=requested)) as get, \
+         patch("autopwn_suite.web.webvuln.crawl", return_value={url}):
         for _ in range(2):
             webvuln(url, MagicMock(), MagicMock(), controls=controls("lfi", request_budget=20),
                     checkpoint=state, on_complete=summaries.append)
@@ -111,13 +111,13 @@ def test_failed_check_is_retried_while_successful_check_is_kept(web_response):
     url = "http://example.com/?id=1"
     state, summaries = {}, []
     def xss(url):
-        from modules.web.runtime import ACTIVE
+        from autopwn_suite.web.runtime import ACTIVE
         if len(summaries) == 0:
             ACTIVE.get().issue("A web request failed; coverage is incomplete.")
         return []
-    with patch("modules.web.webvuln.get", return_value=web_response(url=url)), \
-         patch("modules.web.webvuln.crawl", return_value={url}), \
-         patch("modules.web.webvuln.SQLIScanner") as sql, patch("modules.web.webvuln.XSSScanner") as scanner:
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response(url=url)), \
+         patch("autopwn_suite.web.webvuln.crawl", return_value={url}), \
+         patch("autopwn_suite.web.webvuln.SQLIScanner") as sql, patch("autopwn_suite.web.webvuln.XSSScanner") as scanner:
         sql.return_value.test_sqli.return_value = []
         scanner.return_value.test_xss.side_effect = xss
         for _ in range(2):
@@ -130,9 +130,9 @@ def test_failed_check_is_retried_while_successful_check_is_kept(web_response):
 def test_parameter_limit_batches_continue_to_remaining_inputs(web_response):
     url = "http://example.com/?file=one&path=two&include=three"
     state, summaries = {}, []
-    with patch("modules.web.webvuln.get", side_effect=lambda *a, **kw: web_response(url=url)), \
-         patch("modules.web.lfi.get", side_effect=lambda requested, **kw: web_response(url=requested)) as get, \
-         patch("modules.web.webvuln.crawl", return_value={url}):
+    with patch("autopwn_suite.web.webvuln.get", side_effect=lambda *a, **kw: web_response(url=url)), \
+         patch("autopwn_suite.web.lfi.get", side_effect=lambda requested, **kw: web_response(url=requested)) as get, \
+         patch("autopwn_suite.web.webvuln.crawl", return_value={url}):
         for _ in range(3):
             webvuln(url, MagicMock(), MagicMock(), controls=controls("lfi", max_parameters=1),
                     checkpoint=state, on_complete=summaries.append)
@@ -142,8 +142,8 @@ def test_parameter_limit_batches_continue_to_remaining_inputs(web_response):
 
 
 def test_redirect_batches_only_count_relevant_inputs(web_response):
-    from modules.web.probes import check_redirects
-    from modules.web.runtime import run_task
+    from autopwn_suite.web.probes import check_redirects
+    from autopwn_suite.web.runtime import run_task
     url = "http://example.com/?file=a&path=b&next=one&redirect=two"
     state, issues = {}, []
     client = MagicMock()
@@ -158,8 +158,8 @@ def test_redirect_batches_only_count_relevant_inputs(web_response):
 
 
 def test_findings_survive_request_budget_exit_and_successful_resume(web_response):
-    from modules.web.findings import emit, finding
-    from modules.web.runtime import ACTIVE, WebBudgetExceeded
+    from autopwn_suite.web.findings import emit, finding
+    from autopwn_suite.web.runtime import ACTIVE, WebBudgetExceeded
     url = "http://example.com/?id=1"
     state, summaries, reported = {}, [], []
     def sql(url):
@@ -171,9 +171,9 @@ def test_findings_survive_request_budget_exit_and_successful_resume(web_response
             ACTIVE.get().issue("Request budget reached; coverage is limited.")
             raise WebBudgetExceeded()
         return []
-    with patch("modules.web.webvuln.get", return_value=web_response(url=url)), \
-         patch("modules.web.webvuln.crawl", return_value={url}), \
-         patch("modules.web.webvuln.SQLIScanner") as scanner, patch("modules.web.webvuln.XSSScanner") as xss_scanner:
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response(url=url)), \
+         patch("autopwn_suite.web.webvuln.crawl", return_value={url}), \
+         patch("autopwn_suite.web.webvuln.SQLIScanner") as scanner, patch("autopwn_suite.web.webvuln.XSSScanner") as xss_scanner:
         scanner.return_value.test_sqli.side_effect = sql
         xss_scanner.return_value.test_xss.side_effect = xss
         first = webvuln(url, MagicMock(), MagicMock(), controls=controls("sqli", "xss"), checkpoint=state,
@@ -204,9 +204,9 @@ def test_stopped_web_scan_resumes_without_skipping_unfinished_host(dashboard):
         assert kwargs["checkpoint"]["saved"]
         kwargs["on_complete"]({"status": "completed", "issues": [], "requests": 2})
         return []
-    with patch.object(wu.shutil, "which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm) as scan, \
-         patch("modules.nist_search.searchCVE", return_value=[]) as lookup, \
-         patch("modules.web.webvuln.webvuln", side_effect=web), patch.object(wu, "_notify"), patch.object(wu.threading, "Thread"):
+    with patch.object(wu.shutil, "which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm) as scan, \
+         patch("autopwn_suite.nist_search.searchCVE", return_value=[]) as lookup, \
+         patch("autopwn_suite.web.webvuln.webvuln", side_effect=web), patch.object(wu, "_notify"), patch.object(wu.threading, "Thread"):
         wu._run_scan(job)
         assert job.status == "stopped"
         assert client.post("/api/scans/job/resume", json={}).status_code == 200
@@ -219,14 +219,14 @@ def test_stopped_web_scan_resumes_without_skipping_unfinished_host(dashboard):
 
 
 def test_directory_resume_continues_after_budget_without_repeating_paths(web_response):
-    from modules.web.dirbust import dirbust
-    from modules.web.runtime import WebBudgetExceeded
+    from autopwn_suite.web.dirbust import dirbust
+    from autopwn_suite.web.runtime import WebBudgetExceeded
     state, summaries = {}, []
     urls = []
     def response(url, **kwargs):
         urls.append(url)
         return web_response("Missing", status=404, url=url)
-    with patch("modules.web.dirbust.get", side_effect=response):
+    with patch("autopwn_suite.web.dirbust.get", side_effect=response):
         for _ in range(20):
             context = ScanContext("http://example.com/", MagicMock(), controls=controls("directories", request_budget=20), checkpoint=state)
             with context.activate():
@@ -336,8 +336,8 @@ def test_resume_network_reuses_nmap_and_only_retries_failed_cve_lookups(dashboar
     wu._register_scan(job)
     cve = SimpleNamespace(CVEID="CVE-2026-0001", severity="medium", description="Example", severity_score=5,
                           data_source="test", database_updated_at="")
-    with patch.object(wu.shutil, "which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm) as scan, \
-         patch("modules.nist_search.searchCVE", side_effect=[RuntimeError("Unavailable"), [cve], [cve]]) as lookup, \
+    with patch.object(wu.shutil, "which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm) as scan, \
+         patch("autopwn_suite.nist_search.searchCVE", side_effect=[RuntimeError("Unavailable"), [cve], [cve]]) as lookup, \
          patch.object(wu, "_notify"), patch.object(wu.threading, "Thread"):
         wu._run_scan(job)
         assert job.status == "partial"
@@ -350,7 +350,7 @@ def test_resume_network_reuses_nmap_and_only_retries_failed_cve_lookups(dashboar
 
 @pytest.mark.parametrize("mixed", [False, True])
 def test_resume_retries_nmap_timeouts_instead_of_caching_empty_success(dashboard, mixed):
-    from modules.nmap_backend import PortScanner
+    from autopwn_suite.nmap_backend import PortScanner
     wu, client = dashboard
     def observation(timed_out):
         nm = PortScanner(nmap_path="unused")
@@ -366,7 +366,7 @@ def test_resume_retries_nmap_timeouts_instead_of_caching_empty_success(dashboard
     job = wu.ScanJob("job", target, config)
     wu._register_scan(job)
     with patch.object(wu.shutil, "which", return_value="nmap"), \
-         patch("modules.scanner.PortScan", side_effect=[observation(True), observation(False)]) as scan, \
+         patch("autopwn_suite.scanner.PortScan", side_effect=[observation(True), observation(False)]) as scan, \
          patch.object(wu, "_notify"), patch.object(wu.threading, "Thread"):
         wu._run_scan(job)
         assert job.status == "partial" and job.to_dict()["can_resume"]
@@ -384,8 +384,8 @@ def test_pacing_uses_speed_and_minimum_delay_and_is_cancellable():
     now = [0.0]
     def sleep(seconds):
         now[0] += seconds
-    with patch("modules.web.runtime.time.monotonic", side_effect=lambda: now[0]), \
-         patch("modules.web.runtime.time.sleep", side_effect=sleep):
+    with patch("autopwn_suite.web.runtime.time.monotonic", side_effect=lambda: now[0]), \
+         patch("autopwn_suite.web.runtime.time.sleep", side_effect=sleep):
         context = ScanContext("http://example.com/", MagicMock(), controls={"speed": 4, "request_delay_ms": 200})
         context.before()
         context.before()
@@ -393,6 +393,6 @@ def test_pacing_uses_speed_and_minimum_delay_and_is_cancellable():
     stop = [False]
     context = ScanContext("http://example.com/", MagicMock(), should_stop=lambda: stop[0])
     context.before()
-    with patch("modules.web.runtime.time.sleep", side_effect=lambda seconds: stop.__setitem__(0, True)), pytest.raises(ScanCancelled):
+    with patch("autopwn_suite.web.runtime.time.sleep", side_effect=lambda seconds: stop.__setitem__(0, True)), pytest.raises(ScanCancelled):
         context.before()
     assert context.requests == 1

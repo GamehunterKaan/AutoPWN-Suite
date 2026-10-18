@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.nist_search import FindVars, Vulnerability, cache, searchCVE
+from autopwn_suite.nist_search import FindVars, Vulnerability, cache, searchCVE
 
 
 @pytest.mark.unit
@@ -25,7 +25,7 @@ class TestSearchCVE:
         """Fixture for a mocked logger."""
         return MagicMock()
 
-    @patch("modules.nist_search.get")
+    @patch("autopwn_suite.nist_search.get")
     def test_search_cve_success(self, mock_get, mock_log, clear_cache):
         """Verify a successful API call is parsed correctly."""
         mock_response = MagicMock()
@@ -60,7 +60,7 @@ class TestSearchCVE:
         assert cve.severity_score == 9.8
         assert cve.exploitability == 3.9
 
-    @patch("modules.nist_search.get")
+    @patch("autopwn_suite.nist_search.get")
     def test_search_cve_no_results(self, mock_get, mock_log, clear_cache):
         """Verify it returns an empty list when no vulnerabilities are found."""
         mock_response = MagicMock()
@@ -70,7 +70,7 @@ class TestSearchCVE:
         results = searchCVE("keyword", mock_log, "test-api-key")
         assert results == []
 
-    @patch("modules.nist_search.get")
+    @patch("autopwn_suite.nist_search.get")
     def test_search_cve_rate_limit(self, mock_get, mock_log, clear_cache):
         """Verify it handles a 403 rate-limit error."""
         mock_response_403 = MagicMock()
@@ -90,7 +90,7 @@ class TestSearchCVE:
             "error", "Requests are being rate limited by NIST API, please get a NIST API key to prevent this."
         )
 
-    @patch("modules.nist_search.get")
+    @patch("autopwn_suite.nist_search.get")
     def test_search_cve_connection_error(self, mock_get, mock_log, clear_cache):
         """Verify it handles a connection error gracefully."""
         # To work around the UnboundLocalError bug, we simulate failure on the

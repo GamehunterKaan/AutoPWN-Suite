@@ -14,14 +14,14 @@ from tests.unit.test_vulnerability_db import feed_server as feed_server  # Share
 
 @pytest.fixture
 def local_database(feed_server, monkeypatch):
-    from modules.vulnerability_db import update_database
+    from autopwn_suite.vulnerability_db import update_database
     path = feed_server[3]
     update_database(path)
     # Reads and offline scans must not even instantiate a downloader.
     monkeypatch.setattr("requests.Session", lambda: pytest.fail("Offline scan tried HTTP"))
-    monkeypatch.setattr("modules.nist_search.get", lambda *a, **k: pytest.fail("Offline scan contacted NVD"))
+    monkeypatch.setattr("autopwn_suite.nist_search.get", lambda *a, **k: pytest.fail("Offline scan contacted NVD"))
     monkeypatch.setattr("requests.sessions.Session.request", lambda *a, **k: pytest.fail("Test tried a real HTTP request"))
-    monkeypatch.setattr("modules.nmap_backend.PortScanner.__init__", lambda *a, **k: pytest.fail("Test tried real Nmap"))
+    monkeypatch.setattr("autopwn_suite.nmap_backend.PortScanner.__init__", lambda *a, **k: pytest.fail("Test tried real Nmap"))
     return path
 
 
@@ -35,7 +35,7 @@ def nmap_observation():
 
 
 def test_python_api_scans_with_local_cves_and_no_http(local_database, monkeypatch):
-    import api
+    import autopwn_suite.api as api
     nm = nmap_observation()
     monkeypatch.setattr(api, "PortScanner", lambda: nm)
     scanner = api.AutoScanner()
@@ -49,7 +49,7 @@ def test_python_api_scans_with_local_cves_and_no_http(local_database, monkeypatc
 def test_cli_offline_scan_has_no_online_side_effects(local_database, monkeypatch):
     from rich.console import Console
 
-    import autopwn
+    import autopwn_suite.cli as autopwn
     monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
     monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(local_database),
                                     "-t", "192.168.1.10", "-y", "--skip-discovery"])
@@ -67,7 +67,7 @@ def test_cli_offline_scan_has_no_online_side_effects(local_database, monkeypatch
 def test_database_management_commands_do_not_start_a_scan(local_database, monkeypatch):
     from rich.console import Console
 
-    import autopwn
+    import autopwn_suite.cli as autopwn
     monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
     scan = MagicMock()
     monkeypatch.setattr(autopwn, "StartScanning", scan)
@@ -86,9 +86,9 @@ def test_database_management_commands_do_not_start_a_scan(local_database, monkey
 
 
 def test_offline_discovery_disables_reverse_dns(monkeypatch):
-    from modules.scanner import DiscoverHosts, TestArp, TestPing
-    from modules.utils import ScanType
-    scanner = importlib.import_module("modules.scanner")
+    from autopwn_suite.scanner import DiscoverHosts, TestArp, TestPing
+    from autopwn_suite.utils import ScanType
+    scanner = importlib.import_module("autopwn_suite.scanner")
     nm = nmap_observation()
     monkeypatch.setattr(scanner, "PortScanner", lambda: nm)
     TestPing("192.168.1.10", offline=True)
@@ -100,7 +100,7 @@ def test_offline_discovery_disables_reverse_dns(monkeypatch):
 
 
 def test_offline_missing_nmap_never_attempts_install(monkeypatch):
-    utils = importlib.import_module("modules.utils")
+    utils = importlib.import_module("autopwn_suite.utils")
     monkeypatch.setattr(utils, "check_call", MagicMock(side_effect=FileNotFoundError))
     installer = MagicMock()
     for name in ("install_nmap_windows", "install_nmap_linux", "install_nmap_mac"):
@@ -113,7 +113,7 @@ def test_offline_missing_nmap_never_attempts_install(monkeypatch):
 @pytest.fixture
 def web(monkeypatch, tmp_path):
     pytest.importorskip("flask")
-    wu = importlib.import_module("modules.web_ui")
+    wu = importlib.import_module("autopwn_suite.web_ui")
     monkeypatch.setattr(wu, "_VULNERABILITY_DB", tmp_path / "vulnerabilities.sqlite3")
     monkeypatch.setattr(wu, "_OFFLINE_ONLY", False)
     monkeypatch.setattr(wu, "_settings", {})
@@ -131,7 +131,7 @@ def test_web_offline_job_uses_database_and_skips_notifications(web, local_databa
     wu, client = web
     monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
     monkeypatch.setattr(wu.shutil, "which", lambda name: "nmap")
-    scanner = importlib.import_module("modules.scanner")
+    scanner = importlib.import_module("autopwn_suite.scanner")
     monkeypatch.setattr(scanner, "PortScan", MagicMock(return_value=nmap_observation()))
     monkeypatch.setattr(scanner, "AnalyseScanResults", lambda *a: [["192.168.1.10", 22, "ssh", "OpenSSH", "8.2p1", "tcp"]])
     notifications = MagicMock()

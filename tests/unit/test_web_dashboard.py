@@ -6,17 +6,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.nmap_progress import ScanCancelled
-from modules.web.options import normalize_options
-from modules.web.runtime import ScanContext, WebBudgetExceeded
+from autopwn_suite.nmap_progress import ScanCancelled
+from autopwn_suite.web.options import normalize_options
+from autopwn_suite.web.runtime import ScanContext, WebBudgetExceeded
 from tests.auth_helpers import authenticated_app
 
 
 @pytest.fixture
 def dashboard(tmp_path, monkeypatch):
     monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
-    sys.modules.pop("modules.web_ui", None)
-    wu = importlib.import_module("modules.web_ui")
+    sys.modules.pop("autopwn_suite.web_ui", None)
+    wu = importlib.import_module("autopwn_suite.web_ui")
     wu._settings = {}
     wu._scans.clear()
     app = authenticated_app(wu)
@@ -65,7 +65,7 @@ def test_offline_policy_rejects_web_launch_and_skips_scheduled_web(dashboard):
         assert client.post("/api/scan/start", json={"target": "example.com", "scan_web": True, "scan_ports": False}).status_code == 409
     launch.assert_not_called()
     job = wu.ScanJob("job", "example.com", {"scan_web": True, "vulnerability_source": "offline"})
-    with patch("modules.web.webvuln.webvuln") as web:
+    with patch("autopwn_suite.web.webvuln.webvuln") as web:
         assert wu._run_host_web(job, "example.com", ["example.com"], MagicMock(), MagicMock()) is False
     web.assert_not_called()
     assert job.hosts_list()[0]["web_status"] == "skipped_offline"
@@ -81,7 +81,7 @@ def test_web_only_runs_without_nmap_and_exports_findings(dashboard):
         kwargs["on_finding"](result)
         kwargs["on_complete"]({"status": "completed", "requests": 3, "target": endpoint, "issues": []})
         return [result]
-    with patch("modules.web.webvuln.webvuln", side_effect=scan), patch.object(wu.shutil, "which", return_value=None), patch.object(wu, "_notify"):
+    with patch("autopwn_suite.web.webvuln.webvuln", side_effect=scan), patch.object(wu.shutil, "which", return_value=None), patch.object(wu, "_notify"):
         wu._register_scan(job)
         wu._run_scan(job)
     assert job.status == "completed"
@@ -114,9 +114,9 @@ def test_successful_web_checks_do_not_erase_failed_cve_coverage(dashboard):
     def scan(endpoint, log, console, **kwargs):
         kwargs["on_complete"]({"status": "completed", "requests": 1, "target": endpoint, "issues": []})
         return []
-    with patch.object(wu.shutil, "which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm), \
-         patch("modules.nist_search.searchCVE", side_effect=RuntimeError("NVD unavailable")), \
-         patch("modules.web.webvuln.webvuln", side_effect=scan), patch.object(wu, "_notify"):
+    with patch.object(wu.shutil, "which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm), \
+         patch("autopwn_suite.nist_search.searchCVE", side_effect=RuntimeError("NVD unavailable")), \
+         patch("autopwn_suite.web.webvuln.webvuln", side_effect=scan), patch.object(wu, "_notify"):
         wu._run_scan(job)
     host = job.hosts_list()[0]
     assert job.status == "partial"
@@ -127,12 +127,12 @@ def test_successful_web_checks_do_not_erase_failed_cve_coverage(dashboard):
 
 @pytest.mark.unit
 def test_selected_header_only_check_makes_one_request_and_records_redacted_evidence(web_response):
-    from modules.web.webvuln import webvuln
+    from autopwn_suite.web.webvuln import webvuln
     controls = normalize_options()
     controls["checks"] = {name: name == "headers" for name in controls["checks"]}
     found, summary = [], {}
     url = "http://example.com/?token=private-token"
-    with patch("modules.web.webvuln.get", return_value=web_response("<html>Home</html>", url=url)) as get, patch("modules.web.webvuln.crawl") as crawl, patch("modules.web.webvuln.dirbust") as dirs:
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response("<html>Home</html>", url=url)) as get, patch("autopwn_suite.web.webvuln.crawl") as crawl, patch("autopwn_suite.web.webvuln.dirbust") as dirs:
         results = webvuln(url, MagicMock(), MagicMock(), controls=controls, on_finding=found.append, on_complete=summary.update)
     get.assert_called_once()
     crawl.assert_not_called()

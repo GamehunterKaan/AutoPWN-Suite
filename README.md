@@ -142,7 +142,7 @@ with a new random password and sign out all sessions. Remote access requires HTT
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of software running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of keywords to search the [NIST vulnerability database.](https://www.nist.gov/)
 
-The CLI, Python API and dashboard use the project's `modules/nmap_backend.py` adapter
+The CLI, Python API and dashboard use the project's `autopwn_suite/nmap_backend.py` adapter
 to run the system Nmap executable directly and parse its
 [XML output](https://nmap.org/book/output-formats-xml-output.html) with Python's standard library.
 Install Nmap and make sure `nmap` is on `PATH`; no Python Nmap wrapper is required.
@@ -235,7 +235,7 @@ Offline mode continues to disable web probes.
 Module callers can supply a host, `host:port`, IPv6 address or explicit application URL:
 
 ```python
-from modules.web.webvuln import webvuln
+from autopwn_suite.web.webvuln import webvuln
 
 findings = webvuln("https://example.com:8443/app/", log, console)
 ```
@@ -372,7 +372,7 @@ and overrides the source for all new and scheduled scans. It also blocks downloa
 Turn it off when you want to download updates. Finish or stop active online scans and let any database
 update or pending notification finish before turning it on. A server started with `--offline` keeps offline mode enforced.
 
-The default file is `modules/vulnerabilities.sqlite3`, or `AUTOPWN_DATA_DIR/vulnerabilities.sqlite3`
+The default file is `autopwn_suite/vulnerabilities.sqlite3`, or `AUTOPWN_DATA_DIR/vulnerabilities.sqlite3`
 when that environment variable is set. Copy this single file to the airgapped machine's data
 directory, or select its location explicitly:
 
@@ -568,19 +568,19 @@ that the lockfile matches the project; CI runs the same check before installatio
 #### Running Tests
 ```console
 # Run all tests with coverage
-poetry run test
+poetry run pytest
 
 # Run tests without coverage
-poetry run test --no-cov
+poetry run pytest --no-cov
 
 # Run only unit tests
-poetry run test -m unit
+poetry run pytest -m unit
 
 # Run only integration tests
-poetry run test -m integration
+poetry run pytest -m integration
 
 # Run tests excluding slow tests
-poetry run test -m "not slow"
+poetry run pytest -m "not slow"
 ```
 
 #### Running with Docker (Development)

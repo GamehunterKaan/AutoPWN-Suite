@@ -19,12 +19,12 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from modules.nmap_progress import ScanCancelled
-from modules.web.http import ProbeClient, bounded_request, scoped_get
-from modules.web.poc import python_poc
-from modules.web.poc_runtime import verify_plan
-from modules.web.runtime import ScanContext
-from modules.web.transport import RequestCancelled, read_response
+from autopwn_suite.nmap_progress import ScanCancelled
+from autopwn_suite.web.http import ProbeClient, bounded_request, scoped_get
+from autopwn_suite.web.poc import python_poc
+from autopwn_suite.web.poc_runtime import verify_plan
+from autopwn_suite.web.runtime import ScanContext
+from autopwn_suite.web.transport import RequestCancelled, read_response
 
 # Several tests deliberately disable certificate verification against a loopback server.
 pytestmark = pytest.mark.filterwarnings("ignore:Unverified HTTPS request:urllib3.exceptions.InsecureRequestWarning")
@@ -192,7 +192,7 @@ def test_downloaded_poc_is_standalone_and_obeys_its_network_deadline(diagnostic_
         finding = {"type": "WEB_CONFIG", "url": url, "endpoint": url, "evidence": "X-Content-Type-Options is missing or is not nosniff"}
         namespace = {"__name__": "downloaded_poc"}
         code = python_poc(finding)
-        assert "from modules." not in code
+        assert "from autopwn_suite." not in code
         exec(compile(code, "downloaded_poc.py", "exec"), namespace)
         # Same generated implementation, shortened local deadline keeps CI fast.
         original = namespace["_RequestDeadline"]
@@ -225,7 +225,7 @@ def test_pollable_tls_preserves_certificate_and_hostname_validation(diagnostic_s
 
 @pytest.mark.parametrize("cancel", [False, True])
 def test_pending_tcp_connect_uses_one_deadline_and_honors_stop(monkeypatch, cancel):
-    import modules.web.transport as transport
+    import autopwn_suite.web.transport as transport
     stop = threading.Event()
     sockets = []
     original_socket = socket.socket
@@ -261,7 +261,7 @@ def test_pending_tcp_connect_uses_one_deadline_and_honors_stop(monkeypatch, canc
 def test_unsupported_address_family_still_falls_back_to_working_address(diagnostic_server, monkeypatch):
     from urllib.parse import urlsplit
 
-    import modules.web.transport as transport
+    import autopwn_suite.web.transport as transport
     original_socket = socket.socket
     def create(family, kind, protocol=0, **kwargs):
         if family == socket.AF_INET6:
@@ -294,7 +294,7 @@ def test_insecure_tls_option_is_an_explicit_per_scan_opt_out(diagnostic_server):
 
 
 def test_verify_tls_control_is_validated_and_defaults_to_verification():
-    from modules.web.options import normalize_options
+    from autopwn_suite.web.options import normalize_options
     assert normalize_options()["verify_tls"] is True
     assert normalize_options({"verify_tls": False})["verify_tls"] is False
     # A later resume that omits the control keeps the original choice.
@@ -305,8 +305,8 @@ def test_verify_tls_control_is_validated_and_defaults_to_verification():
 
 
 def test_poc_plans_and_curl_commands_keep_the_recorded_tls_policy():
-    from modules.web.poc import build_plan, curl_poc
-    from modules.web.poc_runtime import validate_plan
+    from autopwn_suite.web.poc import build_plan, curl_poc
+    from autopwn_suite.web.poc_runtime import validate_plan
     finding = {"endpoint": "https://example.test/", "url": "https://example.test/", "type": "CORS", "evidence": "x",
                "reproduction": {"strategy": "response", "target": "https://example.test/",
                                 "requests": [{"url": "https://example.test/", "method": "GET"}]}}

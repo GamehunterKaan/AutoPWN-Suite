@@ -14,14 +14,14 @@ from tests.auth_helpers import authenticated_app
 @pytest.fixture
 def progress_web(tmp_path, monkeypatch):
     monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
-    path = Path(__file__).parents[2] / "modules" / "web_ui.py"
+    path = Path(__file__).parents[2] / "autopwn_suite" / "web_ui.py"
     spec = importlib.util.spec_from_file_location("progress_web", path)
     wu = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(wu)
     monkeypatch.setattr(wu, "_notify", MagicMock())
     monkeypatch.setattr(wu.shutil, "which", lambda _: "nmap")
     monkeypatch.setattr("requests.sessions.Session.request", lambda *a, **k: pytest.fail("Unexpected HTTP"))
-    monkeypatch.setattr("modules.nmap_backend.PortScanner.__init__", lambda *a, **k: pytest.fail("Unexpected real Nmap"))
+    monkeypatch.setattr("autopwn_suite.nmap_backend.PortScanner.__init__", lambda *a, **k: pytest.fail("Unexpected real Nmap"))
     return wu
 
 
@@ -33,12 +33,12 @@ def nmap_result(ip):
 
 
 def test_dashboard_worker_accepts_parsed_adapter_results(progress_web, monkeypatch):
-    from modules.nmap_backend import PortScanner
+    from autopwn_suite.nmap_backend import PortScanner
     from tests.unit.test_nmap_backend import XML
     nm = PortScanner.__new__(PortScanner)  # Recorded XML needs no executable.
     nm.load_xml(XML.replace(b'state="open|filtered"', b'state="open"'))
-    monkeypatch.setattr("modules.scanner.PortScan", lambda *a, **k: nm)
-    monkeypatch.setattr("modules.scanner.is_root", lambda: True)
+    monkeypatch.setattr("autopwn_suite.scanner.PortScan", lambda *a, **k: nm)
+    monkeypatch.setattr("autopwn_suite.scanner.is_root", lambda: True)
     job = progress_web.ScanJob("adapter", "192.0.2.10", {
         "target": "192.0.2.10", "skip_discovery": True, "scan_vulns": False})
     progress_web._run_scan(job)
@@ -57,7 +57,7 @@ def rows(ip):
 
 def test_worker_progress_follows_nmap_tasks_and_actual_lookup_counts(progress_web, monkeypatch):
     wu = progress_web
-    scanner = importlib.import_module("modules.scanner")
+    scanner = importlib.import_module("autopwn_suite.scanner")
     job = wu.ScanJob("progress", "192.0.2.0/24", {"target": "192.0.2.0/24"})
     events = []
     monkeypatch.setattr(wu, "_broadcast", lambda event: events.append(event))
@@ -112,7 +112,7 @@ def test_terminal_jobs_keep_last_measured_progress(progress_web, status):
 
 def test_cancelled_nmap_keeps_progress_and_never_starts_lookups(progress_web, monkeypatch):
     wu = progress_web
-    scanner = importlib.import_module("modules.scanner")
+    scanner = importlib.import_module("autopwn_suite.scanner")
     job = wu.ScanJob("stop", "192.0.2.1", {"target": "192.0.2.1", "skip_discovery": True})
     provider = MagicMock(source="online", local=None)
     monkeypatch.setattr(wu, "VulnerabilityLookup", lambda *args: provider)
@@ -130,7 +130,7 @@ def test_cancelled_nmap_keeps_progress_and_never_starts_lookups(progress_web, mo
 
 def test_failed_lookup_is_counted_and_finishes_with_partial_coverage(progress_web, monkeypatch):
     wu = progress_web
-    scanner = importlib.import_module("modules.scanner")
+    scanner = importlib.import_module("autopwn_suite.scanner")
     job = wu.ScanJob("partial", "192.0.2.1", {"target": "192.0.2.1", "skip_discovery": True})
     monkeypatch.setattr(scanner, "PortScan", lambda ip, *a, **k: nmap_result(ip))
     monkeypatch.setattr(scanner, "AnalyseScanResults", lambda *a: rows("192.0.2.1"))

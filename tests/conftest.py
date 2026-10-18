@@ -166,7 +166,7 @@ def reset_sys_modules():
     yield
     modules_after = set(sys.modules.keys())
     for module in modules_after - modules_before:
-        if module.startswith(("modules.", "api", "autopwn")):
+        if module.startswith("autopwn_suite.") or module in {"api", "autopwn"}:
             sys.modules.pop(module, None)
 
 

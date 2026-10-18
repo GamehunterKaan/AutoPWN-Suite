@@ -7,12 +7,12 @@ from unittest.mock import ANY, MagicMock, patch
 import pytest
 from requests.exceptions import ConnectionError, HTTPError
 
-from api import AutoScanner
-from autopwn import StartScanning, main
-from modules.nist_search import FindVars, Vulnerability, cache, searchCVE
-from modules.scanner import AnalyseScanResults, InitHostInfo, InitPortInfo, NoiseScan, ResolveScanHosts
-from modules.searchvuln import SearchSploits
-from modules.utils import GetHostsToScan, InitArgsConf, InitArgsTarget, ScanMode, ScanType
+from autopwn_suite.api import AutoScanner
+from autopwn_suite.cli import StartScanning, main
+from autopwn_suite.nist_search import FindVars, Vulnerability, cache, searchCVE
+from autopwn_suite.scanner import AnalyseScanResults, InitHostInfo, InitPortInfo, NoiseScan, ResolveScanHosts
+from autopwn_suite.searchvuln import SearchSploits
+from autopwn_suite.utils import GetHostsToScan, InitArgsConf, InitArgsTarget, ScanMode, ScanType
 
 
 def nmap_result(hosts):
@@ -28,8 +28,8 @@ def port(product="DNS", version="1.0", state="open"):
 
 @pytest.fixture(autouse=True)
 def offline_state(monkeypatch):
-    monkeypatch.setattr("modules.scanner.is_root", lambda: True)
-    monkeypatch.setattr("modules.nist_search.sleep", lambda seconds: None)
+    monkeypatch.setattr("autopwn_suite.scanner.is_root", lambda: True)
+    monkeypatch.setattr("autopwn_suite.nist_search.sleep", lambda seconds: None)
     cache.clear()
     yield
     cache.clear()
@@ -90,9 +90,9 @@ def test_config_can_select_web_mode_before_scan_initialization(tmp_path):
     config.write_text("[WEBUI]\nenabled = yes\nhost = 127.0.0.1\nport = 9090\n", encoding="utf-8")
     args = Namespace(version=False, no_color=True, daemon_install=False,
                      daemon_uninstall=False, create_config=False, config=str(config), web=False)
-    with patch("autopwn.cli", return_value=args), patch("autopwn.start_server") as server, \
-         patch("autopwn.FLASK_AVAILABLE", True), patch("autopwn.print_banner"), \
-         patch("autopwn.CheckConnection") as check:
+    with patch("autopwn_suite.cli.cli", return_value=args), patch("autopwn_suite.cli.start_server") as server, \
+         patch("autopwn_suite.cli.FLASK_AVAILABLE", True), patch("autopwn_suite.cli.print_banner"), \
+         patch("autopwn_suite.cli.CheckConnection") as check:
         with pytest.raises(SystemExit):
             main()
     server.assert_called_once_with(host="127.0.0.1", port=9090, version=ANY, offline=False, database=None)
@@ -104,9 +104,9 @@ def test_config_can_select_web_mode_before_scan_initialization(tmp_path):
 def test_skip_discovery_scans_host_file_entries_individually():
     args = Namespace(skip_discovery=True, speed=3, host_timeout=30, nmap_flags="")
     hosts = ["192.0.2.1", "192.0.2.2"]
-    with patch("autopwn.check_nmap"), patch("autopwn.UserConfirmation", return_value=(True, False, False)), \
-         patch("autopwn.WebScan", return_value=False), patch("autopwn.PortScan") as scan, \
-         patch("autopwn.AnalyseScanResults", return_value=[]):
+    with patch("autopwn_suite.cli.check_nmap"), patch("autopwn_suite.cli.UserConfirmation", return_value=(True, False, False)), \
+         patch("autopwn_suite.cli.WebScan", return_value=False), patch("autopwn_suite.cli.PortScan") as scan, \
+         patch("autopwn_suite.cli.AnalyseScanResults", return_value=[]):
         StartScanning(args, hosts, ScanType.Ping, ScanMode.Normal, None,
                       MagicMock(), MagicMock(), MagicMock())
     assert [call.args[0] for call in scan.call_args_list] == hosts
@@ -117,11 +117,11 @@ def test_cli_range_vuln_and_web_phases_use_each_actual_host():
     scan = nmap_result({"192.0.2.1": {}, "192.0.2.2": {}})
     rows = [["192.0.2.1", 53, "domain", "DNS", "1", "udp"],
             ["192.0.2.2", 80, "http", "HTTP", "2"]]
-    with patch("autopwn.check_nmap"), patch("autopwn.UserConfirmation", return_value=(True, True, True)), \
-         patch("autopwn.WebScan", return_value=True), patch("autopwn.PortScan", return_value=scan), \
-         patch("autopwn.AnalyseScanResults", return_value=rows), \
-         patch("autopwn.SearchSploits", return_value=["vuln"]) as lookup, \
-         patch("autopwn.GetExploitsFromArray") as downloads, patch("autopwn.webvuln") as web:
+    with patch("autopwn_suite.cli.check_nmap"), patch("autopwn_suite.cli.UserConfirmation", return_value=(True, True, True)), \
+         patch("autopwn_suite.cli.WebScan", return_value=True), patch("autopwn_suite.cli.PortScan", return_value=scan), \
+         patch("autopwn_suite.cli.AnalyseScanResults", return_value=rows), \
+         patch("autopwn_suite.cli.SearchSploits", return_value=["vuln"]) as lookup, \
+         patch("autopwn_suite.cli.GetExploitsFromArray") as downloads, patch("autopwn_suite.cli.webvuln") as web:
         StartScanning(args, "192.0.2.0/30", ScanType.Ping, ScanMode.Normal, None,
                       MagicMock(), MagicMock(), MagicMock())
     assert [call.args[0] for call in lookup.call_args_list] == [[rows[0]], [rows[1]]]
@@ -130,7 +130,7 @@ def test_cli_range_vuln_and_web_phases_use_each_actual_host():
 
 
 def test_selecting_host_address_returns_without_another_prompt(monkeypatch):
-    monkeypatch.setattr("modules.utils.DontAskForConfirmation", False)
+    monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
     with patch("builtins.input", side_effect=["192.0.2.1"]) as prompt:
         assert GetHostsToScan(["192.0.2.1", "192.0.2.2"], MagicMock()) == ["192.0.2.1"]
     prompt.assert_called_once()
@@ -146,7 +146,7 @@ def test_host_file_ignores_blank_and_comment_lines(tmp_path):
 def test_empty_host_file_fails_without_detecting_a_different_network(tmp_path):
     host_file = tmp_path / "hosts.txt"
     host_file.write_text("\n# no hosts yet\n", encoding="utf-8")
-    with patch("modules.utils.DetectIPRange") as detect:
+    with patch("autopwn_suite.utils.DetectIPRange") as detect:
         with pytest.raises(SystemExit):
             InitArgsTarget(Namespace(target=None, host_file=str(host_file)), MagicMock())
     detect.assert_not_called()
@@ -176,7 +176,7 @@ def test_api_handles_resolved_udp_hosts_offline_and_resets_previous_results():
     scanner = AutoScanner()
     first = nmap_result({"192.0.2.1": {"udp": {53: port()}}})
     offline = nmap_result({})
-    with patch("api.PortScanner", side_effect=[first, offline]), \
+    with patch("autopwn_suite.api.PortScanner", side_effect=[first, offline]), \
          patch.object(scanner, "SearchVuln", return_value={"CVE-TEST": {}}) as lookup:
         results = scanner.scan("office.example")
         assert results["192.0.2.1"]["ports"] == {}
@@ -191,7 +191,7 @@ def test_api_only_searches_open_services_and_merges_same_product_cves():
     scan = nmap_result({"192.0.2.1": {"tcp": {80: port("HTTP", "1"),
                                                     443: port("HTTP", "2"),
                                                     25: port("Mail", "1", "closed")}}})
-    with patch("api.PortScanner", return_value=scan), \
+    with patch("autopwn_suite.api.PortScanner", return_value=scan), \
          patch.object(scanner, "SearchVuln", side_effect=[{"CVE-A": {}}, {"CVE-B": {}}]) as lookup:
         result = scanner.scan("192.0.2.1")
     assert lookup.call_count == 2
@@ -203,9 +203,9 @@ def test_api_honors_slowest_scan_speed():
 
 
 def test_noise_scan_stops_and_joins_children_after_unexpected_error():
-    with patch("modules.scanner.TestPing", return_value=["192.0.2.1"]), \
-         patch("modules.scanner.Process") as process, \
-         patch("modules.scanner.sleep", side_effect=OSError("timer failure")):
+    with patch("autopwn_suite.scanner.TestPing", return_value=["192.0.2.1"]), \
+         patch("autopwn_suite.scanner.Process") as process, \
+         patch("autopwn_suite.scanner.sleep", side_effect=OSError("timer failure")):
         with pytest.raises(OSError, match="timer failure"):
             NoiseScan("192.0.2.1", MagicMock(), MagicMock(), ScanType.Ping, 5)
     process.return_value.terminate.assert_called_once()
@@ -213,7 +213,7 @@ def test_noise_scan_stops_and_joins_children_after_unexpected_error():
 
 
 def test_noise_scan_with_no_hosts_exits_before_waiting():
-    with patch("modules.scanner.TestPing", return_value=[]), patch("modules.scanner.sleep") as sleep:
+    with patch("autopwn_suite.scanner.TestPing", return_value=[]), patch("autopwn_suite.scanner.sleep") as sleep:
         with pytest.raises(SystemExit):
             NoiseScan("192.0.2.99", MagicMock(), MagicMock(), ScanType.Ping)
     sleep.assert_not_called()
@@ -227,7 +227,7 @@ def response(data):
 
 @pytest.mark.parametrize("failure", [ConnectionError("offline"), HTTPError("forbidden")])
 def test_strict_lookup_raises_and_does_not_cache_failed_response(failure):
-    with patch("modules.nist_search.get", side_effect=failure) as fetch:
+    with patch("autopwn_suite.nist_search.get", side_effect=failure) as fetch:
         with pytest.raises(RuntimeError, match="NVD lookup failed"):
             searchCVE("test", MagicMock(), strict=True)
     assert fetch.call_count == 3
@@ -235,14 +235,14 @@ def test_strict_lookup_raises_and_does_not_cache_failed_response(failure):
 
 
 def test_api_lookup_failure_is_reported_to_the_caller():
-    with patch("modules.nist_search.get", side_effect=ConnectionError("offline")):
+    with patch("autopwn_suite.nist_search.get", side_effect=ConnectionError("offline")):
         with pytest.raises(RuntimeError, match="NVD lookup failed"):
             AutoScanner().SearchVuln(port())
 
 
 @pytest.mark.parametrize("data", [{"message": "API error"}, {"vulnerabilities": None}, {"vulnerabilities": [{}]}])
 def test_strict_lookup_rejects_malformed_data(data):
-    with patch("modules.nist_search.get", return_value=response(data)):
+    with patch("autopwn_suite.nist_search.get", return_value=response(data)):
         with pytest.raises(RuntimeError):
             searchCVE("test", MagicMock(), strict=True)
     assert "test" not in cache
@@ -253,7 +253,7 @@ def test_lookup_collects_all_pages_and_only_caches_complete_success():
                       "vulnerabilities": [{"cve": {"id": "CVE-A"}}]})
     second = response({"startIndex": 1, "totalResults": 2,
                        "vulnerabilities": [{"cve": {"id": "CVE-B"}}]})
-    with patch("modules.nist_search.get", side_effect=[first, second]) as fetch:
+    with patch("autopwn_suite.nist_search.get", side_effect=[first, second]) as fetch:
         results = searchCVE("test", MagicMock(), strict=True)
     assert [v.CVEID for v in results] == ["CVE-A", "CVE-B"]
     assert fetch.call_args.kwargs["params"]["startIndex"] == 1
@@ -265,7 +265,7 @@ def test_lookup_collects_all_pages_and_only_caches_complete_success():
 def test_failed_later_page_does_not_cache_partial_results():
     first = response({"startIndex": 0, "totalResults": 2,
                       "vulnerabilities": [{"cve": {"id": "CVE-A"}}]})
-    with patch("modules.nist_search.get", side_effect=[first, ConnectionError("offline"),
+    with patch("autopwn_suite.nist_search.get", side_effect=[first, ConnectionError("offline"),
                                                      ConnectionError("offline"), ConnectionError("offline")]):
         with pytest.raises(RuntimeError):
             searchCVE("test", MagicMock(), strict=True)
@@ -286,9 +286,9 @@ def test_findvars_prefers_english_primary_metric_and_preserves_zero_score():
 def test_searchsploits_handles_empty_input_and_narrow_terminal():
     assert SearchSploits([], MagicMock(), MagicMock(), MagicMock()) == []
     vuln = Vulnerability("DNS", "CVE-A", "Long description", "HIGH", 7.5, "url", 2)
-    with patch("modules.searchvuln.CheckConnection", return_value=True), \
-         patch("modules.searchvuln.SearchKeyword", return_value=[vuln]), \
-         patch("modules.searchvuln.get_terminal_width", return_value=40):
+    with patch("autopwn_suite.searchvuln.CheckConnection", return_value=True), \
+         patch("autopwn_suite.searchvuln.SearchKeyword", return_value=[vuln]), \
+         patch("autopwn_suite.searchvuln.get_terminal_width", return_value=40):
         result = SearchSploits([["192.0.2.1", 53, "domain", "DNS", "1"]],
                               MagicMock(), MagicMock(), MagicMock())
     assert result[0].CVEs == ["CVE-A"]

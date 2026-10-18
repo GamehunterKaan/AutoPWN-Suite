@@ -3,7 +3,7 @@
 This document states what accessibility support the web dashboard and the project
 documentation actually provide, lists known gaps, and sets requirements for
 contributors. It is based on a manual review of the dashboard source in
-`modules/web_ui_static/` on 2026-10-16. **The project makes no claim of conformance
+`autopwn_suite/web_ui_static/` on 2026-10-16. **The project makes no claim of conformance
 with WCAG 2.x or any other accessibility standard**, and no automated or assistive-
 technology audit has been performed. The CLI, Python API and REST API need no visual
 interface and are usable from a terminal or screen reader as text.
@@ -12,7 +12,7 @@ interface and are usable from a terminal or screen reader as text.
 
 | Surface | Notes |
 | --- | --- |
-| CLI (`autopwn.py`) | Text output through `rich`. Colors are used for emphasis; the text itself carries the meaning. Scan results can be exported as JSON/HTML/text reports. |
+| CLI (`autopwn-suite`) | Text output through `rich`. Colors are used for emphasis; the text itself carries the meaning. Scan results can be exported as JSON/HTML/text reports. |
 | Web dashboard (`index.html`, `app.js`, `web_security.js`, `styles.css`) | Single-page application with a left scan form, a main tabbed area and a right detail panel. Dark theme only. |
 | Sign-in page (`login.html`, `login.css`, `login.js`) | A small separate form page. |
 | Documentation (`README.md`, `docs/*.md`, `.github/*.md`) | Markdown rendered by GitHub, which provides headings, links and responsive layout. |

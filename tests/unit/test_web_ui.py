@@ -29,7 +29,7 @@ def _isolate_web_ui_state(tmp_path, monkeypatch):
         if "web_ui" in mod_name:
             del sys.modules[mod_name]
 
-    import modules.web_ui as wu
+    import autopwn_suite.web_ui as wu
 
     # Reset global state
     wu._scans.clear()
@@ -86,7 +86,7 @@ def app(wu):
     wu.FLASK_AVAILABLE = True
 
     wu._load_settings()
-    static_dir = Path(__file__).parent.parent.parent / "modules" / "web_ui_static"
+    static_dir = Path(__file__).parent.parent.parent / "autopwn_suite" / "web_ui_static"
     wu.__version__ = "test"
     flask_app = authenticated_app(wu, static_dir)
     flask_app.config["TESTING"] = True
@@ -694,7 +694,7 @@ class TestAPIScans:
                            content_type="application/json")
         assert resp.status_code == 400
 
-    @patch("modules.web_ui._launch_scan")
+    @patch("autopwn_suite.web_ui._launch_scan")
     def test_start_scan_success(self, mock_launch, client, wu):
         mock_job = wu.ScanJob("test-id", "192.168.1.1", {})
         mock_launch.return_value = mock_job
@@ -1267,10 +1267,10 @@ class TestRunScan:
         job = wu.ScanJob("id1", "target", {"target": "192.168.1.1", "mode": "normal", "speed": 3, "host_timeout": 240})
         wu._register_scan(job)
         with patch("shutil.which", return_value="/usr/bin/nmap"), \
-             patch("modules.web_ui.is_root", return_value=False, create=True), \
-             patch("modules.scanner.DiscoverHosts", return_value=[]):
+             patch("autopwn_suite.web_ui.is_root", return_value=False, create=True), \
+             patch("autopwn_suite.scanner.DiscoverHosts", return_value=[]):
             # Need to mock the imports that happen inside _run_scan
-            import modules.utils as mu
+            import autopwn_suite.utils as mu
             with patch.object(mu, "is_root", return_value=False, create=True):
                 wu._run_scan(job)
         assert job.status == "completed"
@@ -1307,8 +1307,8 @@ class TestRunScan:
         })
         wu._register_scan(job)
         with patch("shutil.which", return_value="/usr/bin/nmap"), \
-             patch("modules.scanner.PortScan", return_value=mock_nm), \
-             patch("modules.scanner.AnalyseScanResults", return_value=[]):
+             patch("autopwn_suite.scanner.PortScan", return_value=mock_nm), \
+             patch("autopwn_suite.scanner.AnalyseScanResults", return_value=[]):
             wu._run_scan(job)
         assert job.status == "completed"
 
@@ -1320,7 +1320,7 @@ class TestRunScan:
         })
         wu._register_scan(job)
         with patch("shutil.which", return_value="/usr/bin/nmap"), \
-             patch("modules.scanner.PortScan", side_effect=Exception("nmap error")):
+             patch("autopwn_suite.scanner.PortScan", side_effect=Exception("nmap error")):
             wu._run_scan(job)
         assert job.status == "partial"
         assert job.hosts_list()[0]["scan_status"] == "error"
@@ -1334,7 +1334,7 @@ class TestRunScan:
         })
         wu._register_scan(job)
         with patch("shutil.which", return_value="/usr/bin/nmap"), \
-             patch("modules.scanner.PortScan", side_effect=SystemExit("nmap not installed")):
+             patch("autopwn_suite.scanner.PortScan", side_effect=SystemExit("nmap not installed")):
             wu._run_scan(job)
         assert job.status == "partial"
 
@@ -1362,10 +1362,10 @@ class TestRunScan:
         })
         wu._register_scan(job)
         with patch("shutil.which", return_value="/usr/bin/nmap"), \
-             patch("modules.scanner.PortScan", return_value=mock_nm), \
-             patch("modules.scanner.AnalyseScanResults", return_value=port_array), \
-             patch("modules.searchvuln.GenerateKeyword", return_value="nginx 1.0"), \
-             patch("modules.nist_search.searchCVE", return_value=[mock_cve]):
+             patch("autopwn_suite.scanner.PortScan", return_value=mock_nm), \
+             patch("autopwn_suite.scanner.AnalyseScanResults", return_value=port_array), \
+             patch("autopwn_suite.searchvuln.GenerateKeyword", return_value="nginx 1.0"), \
+             patch("autopwn_suite.nist_search.searchCVE", return_value=[mock_cve]):
             wu._run_scan(job)
 
         assert job.status == "completed"
@@ -1391,7 +1391,7 @@ class TestRunScan:
         })
         wu._register_scan(job)
         with patch("shutil.which", return_value="/usr/bin/nmap"), \
-             patch("modules.scanner.DiscoverHosts", side_effect=Exception("fail")):
+             patch("autopwn_suite.scanner.DiscoverHosts", side_effect=Exception("fail")):
             wu._run_scan(job)
         # Should fall back to scanning target directly
         assert job.status == "partial"
@@ -1499,7 +1499,7 @@ def test_hostname_or_range_scan_records_actual_ips(wu):
             for ip in nm.all_hosts.return_value}
     nm.__getitem__ = Mock(side_effect=lambda ip: data[ip])
     job = wu.ScanJob("range", "10.0.0.0/24", {"target": "10.0.0.0/24", "skip_discovery": True, "scan_vulns": False})
-    with patch("shutil.which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm), patch.object(wu, "_notify"):
+    with patch("shutil.which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm), patch.object(wu, "_notify"):
         wu._run_scan(job)
     assert job.status == "completed"
     assert {h["ip"] for h in job.hosts_list()} == set(data)
@@ -1511,8 +1511,8 @@ def test_vulnerability_lookup_failure_is_partial_not_clean(wu):
     nm.all_hosts.return_value = ["10.0.0.1"]
     nm.__getitem__ = Mock(return_value={"addresses": {}, "tcp": {80: {"state": "open", "name": "http", "product": "nginx", "version": "1.0"}}})
     job = wu.ScanJob("lookup", "10.0.0.1", {"target": "10.0.0.1", "skip_discovery": True})
-    with patch("shutil.which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm), \
-         patch("modules.nist_search.searchCVE", side_effect=RuntimeError("NVD unavailable")), patch.object(wu, "_notify"):
+    with patch("shutil.which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm), \
+         patch("autopwn_suite.nist_search.searchCVE", side_effect=RuntimeError("NVD unavailable")), patch.object(wu, "_notify"):
         wu._run_scan(job)
     assert job.status == "partial"
     assert job.hosts_list()[0]["lookup_status"] == "partial"
@@ -1523,7 +1523,7 @@ def test_no_observation_is_partial(wu):
     nm.all_hosts.return_value = []
     nm.__getitem__ = Mock(side_effect=KeyError)
     job = wu.ScanJob("empty", "10.0.0.1", {"target": "10.0.0.1", "skip_discovery": True})
-    with patch("shutil.which", return_value="nmap"), patch("modules.scanner.PortScan", return_value=nm), patch.object(wu, "_notify"):
+    with patch("shutil.which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm), patch.object(wu, "_notify"):
         wu._run_scan(job)
     assert job.status == "partial"
     assert job.hosts_list()[0]["scan_status"] == "not_observed"

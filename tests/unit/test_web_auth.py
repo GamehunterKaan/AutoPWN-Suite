@@ -15,14 +15,14 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from modules.web_auth import ACCOUNT_FILE, COOKIE, LOGIN_COOKIE, AccountStore, AccountUnavailable, password_matches
+from autopwn_suite.web_auth import ACCOUNT_FILE, COOKIE, LOGIN_COOKIE, AccountStore, AccountUnavailable, password_matches
 
 
 @pytest.fixture
 def dashboard_login(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
-    sys.modules.pop("modules.web_ui", None)
-    wu = importlib.import_module("modules.web_ui")
+    sys.modules.pop("autopwn_suite.web_ui", None)
+    wu = importlib.import_module("autopwn_suite.web_ui")
     wu._load_settings()
     app = wu._build_app(wu._STATIC_DIR)
     app.config["TESTING"] = True
@@ -216,7 +216,7 @@ def test_cli_reset_from_another_process_revokes_running_sessions_and_changes_pas
 
 
 def test_cli_reset_does_not_scan_and_initialization_does_not_overwrite_corruption(dashboard_login, monkeypatch, capsys):
-    import autopwn
+    import autopwn_suite.cli as autopwn
     d = dashboard_login
     d.path.write_text("{broken", encoding="utf-8")
     with pytest.raises(AccountUnavailable):
@@ -253,7 +253,7 @@ def test_failed_account_write_preserves_login_and_original_file(dashboard_login)
     d = dashboard_login
     client, csrf = logged_in(d)
     original = d.path.read_bytes()
-    with patch("modules.web_auth.os.replace", side_effect=OSError("disk unavailable")):
+    with patch("autopwn_suite.web_auth.os.replace", side_effect=OSError("disk unavailable")):
         response = client.put("/api/auth/account", json={"username": "renamed", "current_password": d.password, "new_password": ""}, headers={"X-CSRF-Token": csrf})
     assert response.status_code == 503
     assert d.path.read_bytes() == original
@@ -266,7 +266,7 @@ def test_login_throttling_cannot_be_bypassed_by_new_challenges(dashboard_login):
     client = d.app.test_client()
     for _ in range(5):
         assert sign_in(client, "incorrect-password").status_code == 401
-    with patch("modules.web_auth.password_matches") as verify:
+    with patch("autopwn_suite.web_auth.password_matches") as verify:
         assert sign_in(client, d.password).status_code == 429
         verify.assert_not_called()
     assert sign_in(d.app.test_client(), d.password, environ_overrides={"REMOTE_ADDR": "127.0.0.2"}).status_code == 200
@@ -391,7 +391,7 @@ def test_account_update_never_echoes_unexpected_error_text_but_keeps_validation_
     rule = client.put("/api/auth/account", json=body, headers={"X-CSRF-Token": csrf})
     assert rule.status_code == 400 and "15" in rule.json["error"]  # the failed rule is shown to the user
 
-    with patch("modules.web_auth.AccountStore.change", side_effect=ValueError("INTERNAL-DETAIL /srv/path")):
+    with patch("autopwn_suite.web_auth.AccountStore.change", side_effect=ValueError("INTERNAL-DETAIL /srv/path")):
         leaked = client.put("/api/auth/account", json={**body, "new_password": "a-long-enough-new-password"},
                             headers={"X-CSRF-Token": csrf})
     assert leaked.status_code == 400

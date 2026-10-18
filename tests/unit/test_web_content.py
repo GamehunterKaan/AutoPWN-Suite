@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from modules.web.content import inspect_content
-from modules.web.dirbust import dirbust
+from autopwn_suite.web.content import inspect_content
+from autopwn_suite.web.dirbust import dirbust
 
 
 @pytest.mark.unit
@@ -68,7 +68,7 @@ def test_canonical_directory_redirect_is_inspected_without_external_follow(web_r
         if url.endswith("/backup"):
             return web_response(status=301, url=url, headers={"Location": "/backup/"})
         return web_response('<title>Index of /backup/</title><a href="a.zip">A</a><a href="b.zip">B</a>', url=url)
-    with patch("modules.web.dirbust.open", mock_open(read_data="backup")), patch("modules.web.dirbust.get", side_effect=respond) as get:
+    with patch("autopwn_suite.web.dirbust.open", mock_open(read_data="backup")), patch("autopwn_suite.web.dirbust.get", side_effect=respond) as get:
         result = dirbust("http://example.com/", MagicMock(), MagicMock())
     assert [item["type"] for item in result] == ["DIR", "DIR_LISTING"]
     assert get.call_count == 4

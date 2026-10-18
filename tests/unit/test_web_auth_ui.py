@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from bs4 import BeautifulSoup
 
-ROOT = Path(__file__).resolve().parents[2] / "modules" / "web_ui_static"
+ROOT = Path(__file__).resolve().parents[2] / "autopwn_suite" / "web_ui_static"
 NODE = shutil.which("node")
 pytestmark = [pytest.mark.unit, pytest.mark.skipif(not NODE, reason="Node.js is unavailable")]
 

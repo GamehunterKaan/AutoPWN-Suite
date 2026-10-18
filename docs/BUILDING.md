@@ -46,9 +46,9 @@ pipx install poetry==2.5.1
 poetry install
 poetry check --lock
 poetry run ruff check .
-node --check modules/web_ui_static/app.js
-node --check modules/web_ui_static/web_security.js
-poetry run test
+node --check autopwn_suite/web_ui_static/app.js
+node --check autopwn_suite/web_ui_static/web_security.js
+poetry run pytest
 poetry build
 ```
 

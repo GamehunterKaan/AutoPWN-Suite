@@ -100,7 +100,7 @@ jobs:
       - name: Sign in with the generated administrator account
         run: |
           set -euo pipefail
-          # The password is printed once on first start by modules/web_auth.py.
+          # The password is printed once on first start by autopwn_suite/web_auth.py.
           password="$(sed -n 's/^  Password: //p' "$RUNNER_TEMP/dashboard.log" | head -n 1)"
           [[ "$password" =~ ^[A-Za-z0-9_-]{20,}$ ]] || { echo "Generated dashboard password not found in the dashboard log." >&2; exit 1; }
           echo "::add-mask::$password"
