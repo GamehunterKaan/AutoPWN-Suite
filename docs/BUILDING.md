@@ -177,7 +177,8 @@ needs network access that packaging build roots often lack). The link refers to 
 final path (for example `/usr/lib/autopwn-suite/.venv/bin/autopwn-suite`), never the
 `DESTDIR` path. The script prints the three commands to run on the target system
 (typically from a package post-install step) to create `$APPDIR/.venv`, install the
-dependencies and install the staged source.
+dependencies and install the staged source. A `DESTDIR` inside the checkout (the
+`$PWD/pkgroot` example above, or `debian/tmp`) is left out of the staged copy of the source.
 `uninstall.sh` must be given the same `PREFIX`/`BINDIR`/`APPDIR` (and optional
 `SYSTEMDDIR`, default `/etc/systemd/system`) that were used to install.
 

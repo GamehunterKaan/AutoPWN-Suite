@@ -107,6 +107,19 @@ def test_destdir_stages_the_source_and_links_to_the_final_path(source_tree, tmp_
 
 
 @posix_only
+@pytest.mark.parametrize("destdir", ["pkgroot", "debian/tmp"])
+def test_destdir_inside_the_checkout_is_not_copied_into_itself(source_tree, destdir):
+    # The documented `DESTDIR="$PWD/pkgroot"` and Debian's debian/tmp both sit inside the source tree.
+    stage = source_tree / destdir
+    for _ in range(2):  # the second run stages over the first
+        run_script(source_tree, "install.sh", {"DESTDIR": str(stage), "PREFIX": "/usr"}, cwd=source_tree)
+    staged = stage / "usr/lib/autopwn-suite/src"
+    assert (staged / "autopwn.py").is_file() and (staged / "autopwn_suite/tool.py").is_file()
+    assert not (staged / destdir).exists()
+    assert os.readlink(stage / "usr/bin/autopwn-suite") == "/usr/lib/autopwn-suite/.venv/bin/autopwn-suite"
+
+
+@posix_only
 def test_default_layout_is_unchanged_under_destdir(source_tree, tmp_path):
     stage = tmp_path / "stage"
     run_script(source_tree, "install.sh", {"DESTDIR": str(stage)})

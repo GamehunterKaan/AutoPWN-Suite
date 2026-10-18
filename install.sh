@@ -137,7 +137,12 @@ if [ -n "$DESTDIR" ]; then
     echo "[1/3] Staging source in $STAGE_TARGET_DIR/src ..."
     run_for "$STAGE_TARGET_DIR/src" rm -rf "$STAGE_TARGET_DIR/src"
     run_for "$STAGE_TARGET_DIR/src" mkdir -p "$STAGE_TARGET_DIR/src"
-    (cd "$REPO_DIR" && tar -cf - --exclude='.venv' --exclude='./.git' .)         | (cd "$STAGE_TARGET_DIR/src" && tar -xpf - --no-same-owner)
+    stage_excludes=(--exclude='.venv' --exclude='./.git')
+    case "$DESTDIR" in
+        # A DESTDIR inside the checkout (pkgroot, debian/tmp) is not staged into itself.
+        "$REPO_DIR"/*) stage_excludes+=(--exclude=".${DESTDIR#"$REPO_DIR"}") ;;
+    esac
+    (cd "$REPO_DIR" && tar -cf - "${stage_excludes[@]}" .)         | (cd "$STAGE_TARGET_DIR/src" && tar -xpf - --no-same-owner)
     echo "[2/3] Skipping virtualenv and package installation (DESTDIR is set)."
 else
     echo "[1/3] Creating virtual environment at $VENV_DIR ..."
