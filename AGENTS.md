@@ -68,7 +68,7 @@ Update these in the same change:
 - Partial test runs fail the coverage gate: add `--no-cov`. The full suite takes about three minutes.
 - `tests/conftest.py` points `AUTOPWN_DATA_DIR` (dashboard account, settings, CVE database) at a temporary directory; otherwise it is a per-user directory. Outputs, exploits and `api.txt` use the working directory.
 - `SyntaxWarning` anywhere and `DeprecationWarning` or `FutureWarning` from `autopwn_suite` fail pytest.
-- Python, JavaScript, shell, Dockerfile and `.spec` files start with the SPDX and copyright header (copy a neighbour's, after any shebang); nothing enforces it.
+- Python, JavaScript, HTML, CSS, shell, Dockerfile and `.spec` files start with the SPDX and copyright header (copy a neighbour's, after any shebang); nothing enforces it.
 - `README.md` is the PyPI project description, and a published description cannot be edited: link documents and images with absolute URLs (`https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/...`, images from `raw.githubusercontent.com`); `tests/unit/test_readme_links.py` fails on a relative target.
 - A Windows working tree can hold CRLF files while the index is LF; keep each file's line endings when editing.
 - `tests/unit/test_install_scripts.py` runs its install-script cases only with bash and tar (9 of 13 skip on Windows); `tests/integration/test_nmap_live.py` needs Nmap; four test modules skip without Node.

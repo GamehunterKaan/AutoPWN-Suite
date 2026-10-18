@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright 2022-2026 Kaan Gültekin */
 :root{color-scheme:dark;font-family:'Segoe UI',Arial,sans-serif;background:#080c0f;color:#c8dde8}
 *{box-sizing:border-box}
 body{min-height:100vh;margin:0;display:grid;place-items:center;padding:24px}
