@@ -7,7 +7,7 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ## [Unreleased]
 
-## [2.7.0] - 2026-10-19
+## [2.7.0] - 2026-10-18
 
 ### Functional changes
 
