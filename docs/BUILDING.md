@@ -228,6 +228,10 @@ which is not an input of the build; a changed interpreter archive, requirement o
 version gives different bytes on purpose; and the identical-bytes claim covers the build, not the
 runtime behavior of the dependencies.
 
+Checked on the v2.7.0 pull request builds: the Linux x86-64 binary rebuilt on Ubuntu 24.04 and the Windows
+binary rebuilt on Windows 11 were byte-identical to the files the GitHub-hosted runners built from the same
+source archive. The Linux arm64 and macOS binaries are verified by the build-twice check on their runners.
+
 Container inputs that are pinned:
 
 - **Base image**: `ARG BASE_IMAGE` in the `Dockerfile` is `tag@sha256:<index digest>`.
