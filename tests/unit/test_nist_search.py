@@ -3,11 +3,28 @@
 """
 Unit tests for the nist_search module.
 """
+import sys
+from threading import Thread
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from autopwn_suite.nist_search import FindVars, Vulnerability, cache, searchCVE
+from autopwn_suite.nist_search import CACHE_LIFETIME, FindVars, Vulnerability, cache, searchCVE
+
+
+class Clock:
+    """A settable stand-in for time.monotonic."""
+
+    now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+def nvd_response(*cve_ids):
+    response = MagicMock()
+    response.json.return_value = {"vulnerabilities": [{"cve": {"id": cve_id}} for cve_id in cve_ids]}
+    return response
 
 
 @pytest.mark.unit
@@ -106,6 +123,68 @@ class TestSearchCVE:
 
         results = searchCVE("keyword", mock_log, "test-api-key")
         assert results == []
+
+    @patch("autopwn_suite.nist_search.get")
+    def test_cached_result_expires_so_long_lived_scans_see_new_cves(self, mock_get, mock_log, clear_cache):
+        """A dashboard or scheduled scan must not keep reporting the first NVD answer forever."""
+        clock = Clock()
+        mock_get.side_effect = [nvd_response("CVE-2024-0001"), nvd_response("CVE-2024-0001", "CVE-2024-0002")]
+
+        with patch("autopwn_suite.nist_search.monotonic", clock):
+            first = searchCVE("OpenSSH 8.2p1", mock_log, "test-api-key", strict=True)
+            clock.now += CACHE_LIFETIME - 1
+            assert searchCVE("OpenSSH 8.2p1", mock_log, "test-api-key", strict=True) is first
+            assert mock_get.call_count == 1
+            clock.now += 1
+            refreshed = searchCVE("OpenSSH 8.2p1", mock_log, "test-api-key", strict=True)
+
+        assert [cve.CVEID for cve in first] == ["CVE-2024-0001"]
+        assert [cve.CVEID for cve in refreshed] == ["CVE-2024-0001", "CVE-2024-0002"]
+        assert mock_get.call_count == 2
+
+    @patch("autopwn_suite.nist_search.get")
+    def test_expired_entries_are_dropped_when_a_new_result_is_stored(self, mock_get, mock_log, clear_cache):
+        """Keywords that are never looked up again must not stay in memory for the life of the process."""
+        clock = Clock()
+        mock_get.return_value = nvd_response("CVE-2024-0001")
+
+        with patch("autopwn_suite.nist_search.monotonic", clock):
+            searchCVE("one", mock_log, "test-api-key")
+            searchCVE("two", mock_log, "test-api-key")
+            clock.now += CACHE_LIFETIME
+            searchCVE("three", mock_log, "test-api-key")
+
+        assert set(cache) == {"three"}
+
+    @patch("autopwn_suite.nist_search.sleep")
+    def test_concurrent_scans_share_the_cache_without_errors(self, mock_sleep, mock_log, clear_cache):
+        """Dashboard scans run in parallel threads; entries expire and are stored while others read."""
+        clock = Clock()
+        errors = []
+
+        def worker(index):
+            try:
+                for step in range(300):
+                    clock.now += CACHE_LIFETIME / 3
+                    results = searchCVE(f"keyword {(index + step) % 7}", mock_log, "test-api-key", strict=True)
+                    assert [cve.CVEID for cve in results] == ["CVE-2024-0001"]
+            except Exception as error:  # reported to the main thread below
+                errors.append(error)
+
+        switch_interval = sys.getswitchinterval()
+        sys.setswitchinterval(1e-6)  # interleave the threads as often as possible
+        try:
+            with patch("autopwn_suite.nist_search.get", new=lambda *args, **kwargs: nvd_response("CVE-2024-0001")), \
+                 patch("autopwn_suite.nist_search.monotonic", clock):
+                threads = [Thread(target=worker, args=(index,)) for index in range(6)]
+                for thread in threads:
+                    thread.start()
+                for thread in threads:
+                    thread.join()
+        finally:
+            sys.setswitchinterval(switch_interval)
+
+        assert errors == []
 
 @pytest.mark.unit
 class TestFindVars:

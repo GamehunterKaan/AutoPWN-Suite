@@ -1,11 +1,40 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 from dataclasses import dataclass
-from time import sleep
+from threading import Lock
+from time import monotonic, sleep
 
 from requests import get
 
+# Dashboard and scheduled scans are long-lived and run concurrently. A successful NVD answer is
+# reused for CACHE_LIFETIME seconds, so CVEs published later are seen; the lock guards both
+# dictionaries. An entry in `cache` without a timestamp counts as expired.
+CACHE_LIFETIME = 3600
 cache = {}
+_cache_stored_at = {}
+_cache_lock = Lock()
+
+
+def _cached(keyword):
+    """Return the unexpired cached result for keyword, or None."""
+    with _cache_lock:
+        stored_at = _cache_stored_at.get(keyword)
+        if keyword in cache and stored_at is not None and monotonic() - stored_at < CACHE_LIFETIME:
+            return cache[keyword]
+        cache.pop(keyword, None)
+        _cache_stored_at.pop(keyword, None)
+    return None
+
+
+def _store(keyword, vulnerabilities):
+    """Cache a complete result and drop every expired entry."""
+    with _cache_lock:
+        now = monotonic()
+        for expired in [key for key, stored_at in _cache_stored_at.items() if now - stored_at >= CACHE_LIFETIME]:
+            del _cache_stored_at[expired]
+            cache.pop(expired, None)
+        cache[keyword] = vulnerabilities
+        _cache_stored_at[keyword] = now
 
 
 @dataclass
@@ -129,8 +158,10 @@ def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=Fal
         headers = {}
     parameters = {"keywordSearch": keyword}
 
-    if keyword in cache and not force_refresh:
-        return cache[keyword]
+    if not force_refresh:
+        cached = _cached(keyword)
+        if cached is not None:
+            return cached
 
     Vulnerabilities = []
     start_index = 0
@@ -183,5 +214,5 @@ def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=Fal
             break
         parameters["startIndex"] = start_index
 
-    cache[keyword] = Vulnerabilities
+    _store(keyword, Vulnerabilities)
     return Vulnerabilities
