@@ -49,6 +49,47 @@ existing release summaries; they do not retroactively claim artifact signing.
 - Link the documents and screenshots in `README.md` with absolute GitHub URLs. PyPI shows the README
   as the project description and cannot resolve relative paths, and a published description cannot be
   edited.
+- Interactive confirmations accept "no" and "yes" (any case, surrounding spaces ignored) and ask
+  again after an unrecognized answer, instead of treating everything except a bare "n" as yes. The
+  Nmap install prompt now shows `[Y/n]`.
+- Service banners, NVD descriptions and Exploit-DB metadata that look like Rich markup (for example
+  `[/bold]`) are printed literally instead of aborting the CLI scan or failing the dashboard job.
+- A host that hits `--host-timeout` is reported as timed out with incomplete port coverage by the
+  CLI log and the Python API (`timedout: True` on that host's result) instead of looking like a host
+  with no open ports.
+- Dashboard scans (and profiles and schedules) run without root no longer make Nmap quit with
+  "requires root privileges": raw-socket scan techniques and `-O` are dropped with a log warning
+  and Nmap's unprivileged connect scan is used.
+- Online NVD lookups are cached for one hour instead of for the life of the process, so long-running
+  dashboards and scheduled scans see newly published CVEs. The cache is thread-safe.
+- With `--vuln-source auto`, the requested email or webhook report is still sent when NVD is
+  unavailable and the scan falls back to the local database. `--offline` and `--vuln-source
+  offline` still send none.
+- On Windows the CLI no longer fails with `UnicodeEncodeError` when its output is redirected or
+  piped; redirected output is written as UTF-8. This matters for the `pipx` and `pip` installs.
+- `--create-config` and `--daemon-install` no longer crash when a password, API key or URL contains
+  `%`.
+- Directory and exposed-file discovery also runs under the path you asked for when the target
+  redirects elsewhere (for example `/` to `/index.php` or `/en/`), so root files such as `/.env`
+  and `/.git/HEAD` are no longer skipped. A landing page that is a file (`/index.php`) scopes
+  discovery to its directory. A deliberate sub-path target such as `http://host/app/` still scopes
+  discovery to `/app/`.
+- The dashboard shows an invalid or rejected scan target, a failed Start Scan request and a failed
+  Stop in a toast as well as in the Terminal tab.
+- The dashboard no longer shows every log line twice on page load and again after each reconnect:
+  `GET /api/events` sends only entries added after the connection opens (history is on
+  `GET /api/log`) and the terminal keeps the newest 2000 lines. Lines logged while the stream is
+  disconnected are not replayed; reload the page to see them.
+- `install.sh` checks that `PYTHON` is 3.10 or newer and can create virtual environments before it
+  changes anything, sets the existing environment aside while the new one is built, and restores it
+  if the build fails or the script is interrupted, so a failed upgrade (no network, no matching
+  wheel, no `python3-venv`) leaves the working installation and its command link in place.
+- `install.sh` no longer aborts, or leaves a nested copy, when `DESTDIR` is inside the checkout (for
+  example `DESTDIR="$PWD/pkgroot"` or `debian/tmp`); that directory is left out of the staged source.
+- The Docker documentation says that a port published from Docker's bridge network reaches the
+  dashboard from the bridge gateway, not from loopback, so signing in over plain HTTP needs
+  `--network host` with `AUTOPWN_WEB_HOST=127.0.0.1` (as `docker-compose.yml` does) or a TLS
+  reverse proxy that keeps `Host` with `AUTOPWN_WEB_SECURE_COOKIE=1`.
 
 ### Security changes
 
@@ -102,6 +143,27 @@ existing release summaries; they do not retroactively claim artifact signing.
   the pinned release build tools (PyInstaller, the wheel build tools and bandit) for known
   vulnerabilities in the security policy, and bundle `LICENSE`, `NOTICE` and the metadata of every
   packaged dependency in the standalone binaries.
+- Bound the regular expressions that read target response bodies. A target controls every body and
+  `re` holds the interpreter lock while it matches, so a hostile body (for example `/.env` with
+  100,000 newlines, or a page repeating `microsoft odbc `) could freeze a scan, its Stop button and
+  the whole dashboard for minutes. The checks now use bounded gaps and read a capped part of the
+  body, and a test feeds 100 KB to 1 MB hostile bodies to each of them.
+- `FLASK_DEBUG` in the environment no longer enables the Werkzeug debugger: with it set, the
+  interactive `/console` and the debugger resources were reachable without sign-in, so every
+  dashboard route requires sign-in again.
+- The daemon configuration (SMTP password, NVD key, webhook URL) is created and installed with mode
+  0600 instead of 0644, so other local users cannot read it (POSIX; Windows has no POSIX modes).
+- A failed webhook delivery logs only the HTTP status and a failed dashboard email only the exception
+  class: webhook response bodies (which can echo the secret URL path or carry terminal escape
+  sequences) and SMTP error text no longer reach the console, the daemon log or the dashboard log.
+- The sudo Nmap install offer and the exploit download can no longer be accepted by an answer such as
+  "no" or "nope".
+- Four silent gaps in coverage or reporting are closed: a host that timed out reported as clean, stale cached NVD
+  results in long-lived scans, root-level files skipped behind a redirecting front page, and notifications
+  dropped after an NVD fallback. A hostile banner can no longer crash a scan through Rich markup.
+- The loopback and Origin checks are unchanged; the Docker documentation now states that
+  publishing to loopback keeps the port off the network but does not make a bridge-published port
+  loopback for sign-in.
 
 ## [2.6.1] - 2026-10-16
 
