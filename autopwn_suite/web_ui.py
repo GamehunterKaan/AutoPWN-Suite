@@ -2156,4 +2156,5 @@ def start_server(host: str = "127.0.0.1", port: int = 8080, version: str = "Unko
         print("  Listening beyond localhost: remote clients must use HTTPS (terminate TLS in a reverse proxy\n"
               "  and set AUTOPWN_WEB_SECURE_COOKIE=1) and the service should be firewalled.\n")
 
-    app.run(host=host, port=port, threaded=True, use_reloader=False, request_handler=_quiet_request_handler())
+    # An explicit debug=False keeps FLASK_DEBUG (or a .env file) from adding Werkzeug's debugger outside sign-in.
+    app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False, request_handler=_quiet_request_handler())

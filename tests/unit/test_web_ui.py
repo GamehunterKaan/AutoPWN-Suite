@@ -1429,6 +1429,32 @@ class TestStartServer:
         with pytest.raises(FileNotFoundError):
             wu.start_server()
 
+    def test_flask_debug_environment_cannot_enable_the_unauthenticated_debugger(self, wu, monkeypatch):
+        """FLASK_DEBUG=1 must not wrap the dashboard in Werkzeug's /console debugger, which sits outside sign-in."""
+        from types import SimpleNamespace
+
+        from werkzeug.debug import DebuggedApplication
+        from werkzeug.test import Client
+
+        served = {}
+
+        def make_server(host, port, application, *args, **kwargs):
+            served["application"] = application
+            return SimpleNamespace(socket=SimpleNamespace(set_inheritable=lambda value: None), fileno=lambda: 0,
+                                   log_startup=lambda: None, serve_forever=lambda: None)
+
+        monkeypatch.setenv("FLASK_DEBUG", "1")
+        monkeypatch.setenv("WERKZEUG_SERVER_FD", "0")  # run_simple exports it; the monkeypatch restores it
+        monkeypatch.setattr("werkzeug.serving.make_server", make_server)
+        monkeypatch.setattr(wu, "_scheduler_loop", lambda: None)
+        wu.start_server(port=0)
+        application = served["application"]
+        assert not isinstance(application, DebuggedApplication)
+        assert application.debug is False
+        console = Client(application).get("/console", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        assert console.status_code == 302 and console.headers["Location"].endswith("/login")
+        assert b"Interactive Console" not in console.data
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # _log helper
