@@ -33,5 +33,5 @@ def test_no_executables_libraries_or_distributions_are_tracked():
 
 def test_ignore_rules_cover_what_the_release_builds_produce():
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8")
-    for pattern in ("dist/", "build/", "*.exe", "*.whl", "SHA256SUMS*", "*.sigstore.json"):
+    for pattern in ("dist/", "build/", "*.exe", "*.whl", "SHA256SUMS*", "*.sigstore.json", "*.intoto.jsonl"):
         assert pattern in ignored.splitlines(), f".gitignore must list {pattern}"

@@ -114,7 +114,7 @@ GitHub OIDC, and uploads verified assets. It never publishes a new software tag.
 
 ## Published artifact format
 
-Releases from v2.7.0 publish **eleven attached files**:
+Releases from v2.7.0 publish **twelve attached files**:
 
 | File | Contents |
 | --- | --- |
@@ -126,6 +126,7 @@ Releases from v2.7.0 publish **eleven attached files**:
 | `autopwn-suite-vVERSION-security.zip` | Release notes, both platform image SBOMs, one SBOM per binary, VEX index/declarations and any backfill reports. |
 | `release-manifest.json` | Release/source identity, hashes of every downloadable file above, hashes of every supporting ZIP member, and exact Docker image digest. |
 | `release-manifest.sigstore.json` | Cosign certificate/signature and transparency-log verification bundle for the manifest. |
+| `autopwn-suite-vVERSION.intoto.jsonl` | Signed SLSA v1 provenance (in-toto attestation bundle) whose subject is `release-manifest.json`. |
 
 The release before this layout (v2.6.1) published five files without binaries.
 
@@ -232,6 +233,20 @@ On macOS use `shasum -a 256 -c` and on Windows compare `Get-FileHash` output wit
 the matching `SHA256SUMS` line. The binaries are not signed for Windows or macOS:
 SmartScreen warns about an unrecognized app, and macOS may need
 `xattr -d com.apple.quarantine <file>` after you have verified it.
+
+The provenance attests the manifest, which in turn binds every file's hash. It records the
+tag, the source commit, the workflow and the run that produced the release:
+
+```sh
+cosign verify-blob-attestation --type slsaprovenance1 --bundle autopwn-suite-vVERSION.intoto.jsonl \
+  --certificate-identity 'https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/tags/vVERSION' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  release-manifest.json
+```
+
+This is self-attested provenance: the workflow that builds also signs, so it shows what
+built the release and from which commit, not that an isolated builder produced it
+(SLSA build level 2 style, not level 3).
 
 To verify the PyPI package, check its PEP 740 attestation against the repository
 before trusting the file, for example with the `pypi-attestations` tool

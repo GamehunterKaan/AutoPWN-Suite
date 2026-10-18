@@ -65,6 +65,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   Sigstore signature. Each SBOM is generated from that platform's build environment (installed
   packages, PyInstaller, CPython) rather than by scanning the executable. The binaries are not
   code-signed for Windows or macOS and are not claimed to be reproducible.
+- Publish a signed SLSA v1 provenance attestation (`autopwn-suite-vVERSION.intoto.jsonl`) with each
+  release; its subject is the release manifest, which binds every release file. It is self-attested by
+  the release workflow, not produced by an isolated builder.
+- Run ClusterFuzzLite (Atheris) fuzzing of the Nmap XML parser, the dashboard option schema and the
+  account validation on pull requests that change the code (`fuzz/`, `.clusterfuzzlite/`).
 - Publish the PyPI package through trusted publishing (no stored token) with PEP 740 attestations,
   after the same security and dynamic-analysis workflows as the container release. The wheel and
   source distribution are built twice from a pinned backend (`poetry-core==2.5.0`) and hash-pinned

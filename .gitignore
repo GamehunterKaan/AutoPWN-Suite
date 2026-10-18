@@ -67,3 +67,4 @@ Thumbs.db
 *.whl
 SHA256SUMS*
 *.sigstore.json
+*.intoto.jsonl

@@ -240,6 +240,10 @@ jobs:
           # The checksum file gets its own signature so the binaries can be verified with two standard commands.
           cosign sign-blob --yes --bundle assets/SHA256SUMS.sigstore.json assets/SHA256SUMS
           cosign verify-blob --bundle assets/SHA256SUMS.sigstore.json --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com assets/SHA256SUMS
+          # SLSA provenance over the release manifest, which binds the hash of every release file.
+          python scripts/release_provenance.py --manifest assets/release-manifest.json --output "$RUNNER_TEMP/provenance.json"
+          cosign attest-blob --yes --type slsaprovenance1 --predicate "$RUNNER_TEMP/provenance.json" --bundle "assets/autopwn-suite-$RELEASE_TAG.intoto.jsonl" assets/release-manifest.json
+          cosign verify-blob-attestation --type slsaprovenance1 --bundle "assets/autopwn-suite-$RELEASE_TAG.intoto.jsonl" --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com assets/release-manifest.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: signed-release
