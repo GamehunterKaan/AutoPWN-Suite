@@ -2,7 +2,11 @@
 # Copyright 2022-2026 Kaan Gültekin
 """The agent guide must keep naming files that exist, and Claude Code must read the same text as other agents."""
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 GUIDE = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
@@ -20,10 +24,17 @@ def referenced_paths():
             yield token
 
 
+def is_gitignored(path):
+    return subprocess.run(["git", "-C", str(ROOT), "check-ignore", "-q", path], check=False).returncode == 0
+
+
 def test_every_path_the_guide_names_exists():
+    if shutil.which("git") is None or not (ROOT / ".git").exists():
+        pytest.skip("needs a git checkout")
     paths = list(referenced_paths())
     assert len(paths) > 20, "the path check found almost nothing; the guide or this pattern changed shape"
-    missing = [path for path in paths if not (ROOT / path).exists()]
+    # Runtime files the guide mentions (such as the gitignored api.txt) need not exist in a clean checkout.
+    missing = [path for path in paths if not (ROOT / path).exists() and not is_gitignored(path)]
     assert not missing, f"AGENTS.md names files that do not exist: {missing}"
 
 
