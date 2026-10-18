@@ -46,6 +46,26 @@ def load_pins(path=PINS):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def contained_members(tar, destination):
+    """The archive members, refusing any whose path or link leaves `destination` (and any device or fifo)."""
+    base = destination.resolve()
+
+    def inside(path):
+        return path == base or base in path.parents
+
+    for member in tar:
+        target = (base / member.name).resolve()
+        if member.issym():
+            linked = (target.parent / member.linkname).resolve()
+        elif member.islnk():
+            linked = (base / member.linkname).resolve()
+        else:
+            linked = target
+        if not (member.isfile() or member.isdir() or member.issym() or member.islnk()) or not inside(target) or not inside(linked):
+            raise SystemExit(f"refusing archive member {member.name!r}")
+        yield member
+
+
 def fetch_python(pins, target, work):
     """Download the pinned interpreter archive (unless it is already there), check its hash and unpack it."""
     entry = pins["archives"][target]
@@ -61,7 +81,8 @@ def fetch_python(pins, target, work):
     destination = work / "python"
     shutil.rmtree(destination, ignore_errors=True)
     with tarfile.open(archive) as tar:
-        tar.extractall(destination, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))  # noqa: S202 - hash-checked archive
+        for member in contained_members(tar, destination):
+            tar.extract(member, destination, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
     return destination / "python" / ("python.exe" if is_windows(target) else "bin/python3")
 
 

@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 import io
 import re
+import sys
 import tarfile
 from pathlib import Path
 
@@ -55,6 +56,33 @@ def test_tampered_interpreter_archive_is_refused_without_unpacking(tmp_path):
     with pytest.raises(SystemExit, match="expected " + "0" * 64):
         builder.fetch_python(pins_for(archive, sha256="0" * 64), "linux-amd64", tmp_path)
     assert not (tmp_path / "python").exists()
+
+
+def test_archive_members_cannot_leave_the_destination(tmp_path):
+    for name, kind, link in [("../escape", tarfile.REGTYPE, ""), ("/absolute", tarfile.REGTYPE, ""), ("python/link", tarfile.SYMTYPE, "../../outside"),
+                             ("python/hard", tarfile.LNKTYPE, "../outside"), ("python/device", tarfile.CHRTYPE, "")]:
+        archive = tmp_path / "bad.tar.gz"
+        with tarfile.open(archive, "w:gz") as tar:
+            info = tarfile.TarInfo(name)
+            info.type, info.linkname = kind, link
+            tar.addfile(info)
+        with pytest.raises(SystemExit, match="refusing archive member"):
+            builder.fetch_python(pins_for(archive), "linux-amd64", tmp_path)
+        assert not (tmp_path / "python" / "python" / "escape").exists() and not (tmp_path / "escape").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="creating symbolic links needs a privilege on Windows")
+def test_interpreter_archive_keeps_its_relative_links(tmp_path):
+    archive = tmp_path / "links.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        real = tarfile.TarInfo("python/bin/python3.13")
+        real.size = 1
+        tar.addfile(real, io.BytesIO(b"x"))
+        link = tarfile.TarInfo("python/bin/python3")
+        link.type, link.linkname = tarfile.SYMTYPE, "python3.13"
+        tar.addfile(link)
+    python = builder.fetch_python(pins_for(archive), "linux-amd64", tmp_path)
+    assert python.is_symlink() and python.read_bytes() == b"x"
 
 
 def test_download_is_limited_to_the_pinned_release_host(tmp_path):
