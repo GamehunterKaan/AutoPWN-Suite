@@ -36,6 +36,15 @@ obligations documented. Four exact-version corrections in
 upstream license URLs and SHA-256 digests; these do not waive vulnerabilities.
 Retain copyright/license notices, including MPL file-level obligations.
 
+The pinned tools that build the release artifacts (`packaging/requirements-build.txt` for
+PyInstaller and `packaging/requirements-publish.txt` for the wheel build) are scanned by the
+same OSV-Scanner run and block on any known vulnerability or malicious package; their
+licenses are not gated because they are not distributed. The standalone binaries carry
+an SBOM each, generated from the build environment (installed runtime packages,
+PyInstaller, CPython), which is not a scan of the executable and omits native libraries
+copied from the runner. Each binary embeds `LICENSE`, `NOTICE` and the metadata of every
+bundled package for attribution; Nmap is not bundled.
+
 The image SBOM also inventories native packages and their license information.
 The release manager must review native/base-image license obligations (including
 Nmap), retain notices and provide corresponding source/offers where required

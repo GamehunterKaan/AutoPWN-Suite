@@ -8,7 +8,7 @@ not isolated accounts or a public multi-tenant service.
 
 ## CLI
 
-Run `python autopwn.py --help` from a source checkout for the generated option
+Run `autopwn-suite --help` (or `python autopwn.py --help` from a source checkout) for the generated option
 reference, types and defaults. `autopwn-suite` is also available after the Linux
 installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 
@@ -47,7 +47,7 @@ unreachable targets and budget limits are not proof of a clean scan.
 From a source checkout:
 
 ```python
-from api import AutoScanner
+from autopwn_suite import AutoScanner
 
 scanner = AutoScanner()
 results = scanner.scan("127.0.0.1", scan_vulns=False)
@@ -208,7 +208,8 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   sends JSON scan/test events. SMTP delivers MIME scan reports/test messages to
   configured recipients. Inspect `autopwn_suite/report.py` and dashboard notification
   functions for payload details; only send to destinations you control/trust.
-- Distribution interfaces are GitHub releases/source and the Docker Hub image.
+- Distribution interfaces are GitHub releases (source archives and standalone binaries),
+  the PyPI package `autopwn-suite` and the Docker Hub image.
   [Releasing](RELEASING.md) defines signed artifact formats and verification.
   Authenticity backfills add an original OCI image-index snapshot plus per-platform
   CycloneDX SBOMs, OSV `results`/`packages` reports, policy results containing
@@ -217,7 +218,7 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   these as `authenticity_backfill` with `rebuilt` and `security_clearance` both
   false; these fields do not declare dependency findings fixed or non-exploitable.
   New publications bundle these supporting files and release notes in one
-  `autopwn-suite-vVERSION-security.zip`. The manifest's `assets` hashes the three
-  downloadable archives; `supporting_archive.name` and `supporting_archive.files`
+  `autopwn-suite-vVERSION-security.zip`. The manifest's `assets` hashes the downloadable
+  source archives, standalone binaries, `SHA256SUMS` and that ZIP; `supporting_archive.name` and `supporting_archive.files`
   identify the ZIP and each member's `name`/`sha256`. Existing separate-file
   releases keep their original manifest and assets.

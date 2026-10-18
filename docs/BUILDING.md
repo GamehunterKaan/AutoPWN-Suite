@@ -7,7 +7,8 @@
   tools if compatible binary wheels are unavailable.
 - Nmap on `PATH` for network/port scans. Website-only dashboard scans do not
   require Nmap. Some Nmap scan techniques need administrator/root privileges.
-- Poetry **2.5.1** for the locked developer environment, tests, or a Python wheel.
+- Poetry **2.5.1** for the locked developer environment and tests. The wheel is
+  built with `poetry-core==2.5.0` (pinned in `pyproject.toml`).
 - Node.js for developer JavaScript syntax checks and workflow-script tests;
   the running Python application does not require Node.
 - Docker Engine with Buildx for container builds; Linux host networking is used
@@ -37,7 +38,11 @@ python autopwn.py --web --web-host 127.0.0.1
 For network scanning, install Nmap (for example, `sudo apt-get install nmap` on
 Debian/Ubuntu or `brew install nmap` on macOS). Windows users can use the official
 Nmap installer. Scan only systems for which you have authorization.
-The source is interpreted Python; no separate compilation step is required.
+The source is interpreted Python; no separate compilation step is required. The code
+lives in the `autopwn_suite` package; `autopwn.py` and `api.py` at the repository root
+are launchers for a source checkout. To install the package itself, run
+`pip install .` (or `pipx install .`) in the checkout; this puts the `autopwn-suite`
+command on `PATH`.
 
 ## Locked development environment and package build
 
@@ -53,9 +58,30 @@ poetry build
 ```
 
 `poetry build` writes a wheel and source distribution into `dist/`. Build outputs
-are ignored by Git and must not be committed. The repository currently
-distributes source archives and a container; local package builds are another
-way to inspect/package the source, not a claim of a PyPI publication.
+are ignored by Git and must not be committed. Releases publish exactly such a
+wheel and source distribution to PyPI (see [Releasing](RELEASING.md)); the release
+workflow builds them with `python -m build --no-isolation` from the hash-pinned
+`packaging/requirements-publish.txt`.
+
+## Standalone binaries
+
+Releases also attach single-file binaries built with PyInstaller. To build one for
+your platform from a checkout (Python 3.13 matches the release builds):
+
+```sh
+python -m pip install --require-hashes --only-binary=:all: --no-deps \
+  -r requirements-locked.txt -r packaging/requirements-build.txt
+pyinstaller --clean --noconfirm packaging/autopwn-suite.spec
+python scripts/smoke_install.py "$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)" dist/autopwn-suite
+```
+
+`packaging/autopwn-suite.spec` bundles the dashboard assets, the data files, the two
+sources the proof-of-concept generator reads as text, `LICENSE`, `NOTICE` and the
+metadata of every bundled package, and runs the interpreter in UTF-8 mode. The
+`.in` files next to each requirements file are the inputs; regenerate the hash-pinned
+`.txt` files with the `uv pip compile` command written at the top of each. No
+compiler or linker is invoked: PyInstaller ships a prebuilt bootloader. The security
+policy scans these pinned build tools for known vulnerabilities.
 
 ## Container build
 
@@ -136,10 +162,12 @@ artifact. What is controlled, and what is not:
 
 | Artifact | Status |
 | --- | --- |
-| Python source / `autopwn.py` | Interpreted source; there is no build output to differ. Release source archives are produced by `scripts/release_assets.py` from the reviewed commit. |
+| Python source (`autopwn_suite/`) | Interpreted source; there is no build output to differ. Release source archives are produced by `scripts/release_assets.py` from the reviewed commit. |
+| PyPI wheel and sdist | Inputs are pinned (`poetry-core==2.5.0`, hash-pinned `build` and its dependencies, `SOURCE_DATE_EPOCH` from the commit time). Building the same commit repeatedly produced identical bytes for both files with `pip wheel` and `python -m build`, and `publish-pypi.yml` builds twice and refuses to publish if the files differ. |
+| Standalone binaries | **Not claimed to be reproducible.** The dependencies are hash-pinned, but PyInstaller output embeds per-platform toolchain details and the GitHub-hosted runner images and the Python 3.13 patch release move over time. Each binary is smoke-tested and has an SBOM. |
 | Container image content (all layer files, modes, owners) | Pinned inputs, see below. |
 | Container layer timestamps and image `created` time | Deterministic only when built with `SOURCE_DATE_EPOCH` and the BuildKit `rewrite-timestamp=true` exporter option, as `publish-docker.yml` does. |
-| `poetry build` wheel/sdist | Not verified; do not rely on it being bit-for-bit reproducible. |
+| `poetry build` with another backend version | Not verified; the pinned backend version is part of the input. |
 
 Container inputs that are pinned:
 

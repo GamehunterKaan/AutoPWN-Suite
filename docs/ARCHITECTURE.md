@@ -68,8 +68,11 @@ flowchart LR
    Resume retains process-memory checkpoints; restarting loses jobs/checkpoints.
 6. `autopwn_suite/api.py` exposes synchronous Python scanning without starting the web server.
    `autopwn_suite/daemon/daemon_installer.py` generates configuration and a systemd
-   service. `install.sh`/`uninstall.sh` manage a system-wide Python installation
-   (unreleased: they honor `PREFIX`, `BINDIR`, `APPDIR` and `DESTDIR`).
+   service that runs the installed program. `install.sh`/`uninstall.sh` manage a
+   system-wide virtual environment (they honor `PREFIX`, `BINDIR`, `APPDIR` and
+   `DESTDIR`). Releases are also distributed as a PyPI package and as standalone
+   PyInstaller binaries defined in `packaging/` and built by
+   `.github/workflows/build-binary.yml`.
 
 ## Resources, deployment and boundaries
 

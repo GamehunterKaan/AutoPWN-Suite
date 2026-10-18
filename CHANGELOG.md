@@ -37,7 +37,8 @@ existing release summaries; they do not retroactively claim artifact signing.
 - `--daemon-install` no longer copies source files or builds its own virtual environment. The
   systemd unit starts the installation that ran it (`python -m autopwn_suite`, or the standalone
   binary) with the configuration kept in `/opt/autopwn-suite/autopwn-daemon.conf`; run it from an
-  installed copy.
+  installed copy. It now refuses to install unless that installation is root-owned (see Security
+  changes), so a pipx or user-owned virtual environment is rejected.
 - Remove the `test` and `tests` Poetry scripts, which a published package would have installed as
   commands on every user's PATH. Run the tests with `poetry run pytest`.
 - Build the wheel and the standalone binaries on every pull request and run an install smoke test
@@ -48,11 +49,26 @@ existing release summaries; they do not retroactively claim artifact signing.
 - Keep dashboard credentials and the CVE database out of the installed package directory, which is
   shared or read-only for a system installation and is discarded by single-file binaries. The
   per-user data directory is created readable only by its owner where the platform supports it.
+- `--daemon-install` refuses to create a root systemd service from an interpreter, package directory
+  or `/opt/autopwn-suite` that an unprivileged user could modify (anything not owned by root, or
+  writable by group or others, including every parent directory and symlink target). Without this a
+  user-owned installation would let that user run code as root at the next service start.
 - Install `install.sh` dependencies without a second copy of the application source under `/opt`,
   and keep `REQUIREMENTS_FILE=requirements-locked.txt` for hash-verified installs.
 - Build the standalone binaries from hash-pinned dependencies (`requirements-locked.txt` and the
   universal, hash-pinned `packaging/requirements-build.txt`), smoke-test every binary on the runner
-  that built it, and publish them only through the signed release workflow.
+  that built it, and publish them only through the signed release workflow. The release manifest
+  binds the binaries, `SHA256SUMS` and one CycloneDX SBOM per binary; `SHA256SUMS` also has its own
+  Sigstore signature. Each SBOM is generated from that platform's build environment (installed
+  packages, PyInstaller, CPython) rather than by scanning the executable. The binaries are not
+  code-signed for Windows or macOS and are not claimed to be reproducible.
+- Publish the PyPI package through trusted publishing (no stored token) with PEP 740 attestations,
+  after the same security and dynamic-analysis workflows as the container release. The wheel and
+  source distribution are built twice from a pinned backend (`poetry-core==2.5.0`) and hash-pinned
+  tools and are published only if both builds are byte-identical.
+- Scan the pinned release build tools (PyInstaller and the wheel build tools) for known
+  vulnerabilities in the security policy, and bundle `LICENSE`, `NOTICE` and the metadata of every
+  packaged dependency in the standalone binaries.
 
 ## [2.6.1] - 2026-10-16
 

@@ -32,26 +32,26 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 
 ## Quick start
 
-1. Install [Nmap](https://nmap.org/download.html) and Python 3.10 or newer, then
-   get the source (see [Installation](#installation) for Linux, Docker and other options):
+1. Install [Nmap](https://nmap.org/download.html) (needed for network scans, not for
+   website-only dashboard scans) and AutoPWN Suite with [pipx](https://pipx.pypa.io/)
+   or [uv](https://docs.astral.sh/uv/). It needs Python 3.10 or newer. See
+   [Installation](#installation) for standalone binaries, Docker and other options:
 
    ```console
-   git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
-   cd AutoPWN-Suite
-   pip install -r requirements.txt
+   pipx install autopwn-suite
    ```
 
 2. Scan a host or network **that you are authorized to test**:
 
    ```console
-   python autopwn.py -t <target ip address>
+   autopwn-suite -t <target ip address>
    ```
 
 3. Or start the [web dashboard](#web-ui), then sign in with the `admin` account whose
    random password is printed once in the terminal on first launch:
 
    ```console
-   python autopwn.py --web
+   autopwn-suite --web
    ```
 
 Use `-h` for all options. Report problems through [support](SUPPORT.md) and
@@ -116,7 +116,7 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 account with a random password and prints both once in the terminal; only a scrypt hash of the
 password is stored in `web_ui_auth.json` (inside `AUTOPWN_DATA_DIR`, or the per-user data directory by
 default). Change the username and password after signing in under **Settings → Account**. If you
-forget the password, run `python autopwn.py --web-reset-account` on the server to restore `admin`
+forget the password, run `autopwn-suite --web-reset-account` on the server to restore `admin`
 with a new random password and sign out all sessions. Remote access requires HTTPS (or set
 `AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy); localhost works over plain HTTP.
 
@@ -327,8 +327,8 @@ downloading only those files is insufficient for vulnerability detection.
 On a connected machine, explicitly download the database:
 
 ```bash
-python autopwn.py --update-vuln-db
-python autopwn.py --vuln-db-status
+autopwn-suite --update-vuln-db
+autopwn-suite --vuln-db-status
 ```
 
 The first download covers all yearly feeds from 2002 through the current year, including
@@ -343,8 +343,8 @@ An update may need to be retried after active scans finish if the operating syst
 Run an airgapped scan with an explicit target:
 
 ```bash
-python autopwn.py --offline -t 192.168.1.0/24 -y
-python autopwn.py --web --offline
+autopwn-suite --offline -t 192.168.1.0/24 -y
+autopwn-suite --web --offline
 ```
 
 Offline mode uses local CVE lookups, skips internet connectivity checks, exploit downloads,
@@ -378,8 +378,8 @@ The default file is `vulnerabilities.sqlite3` in the per-user data directory (`~
 directory, or select its location explicitly:
 
 ```bash
-python autopwn.py --offline --vuln-db /media/transfer/vulnerabilities.sqlite3 -t 192.168.1.10
-python autopwn.py --web --offline --vuln-db /media/transfer/vulnerabilities.sqlite3
+autopwn-suite --offline --vuln-db /media/transfer/vulnerabilities.sqlite3 -t 192.168.1.10
+autopwn-suite --web --offline --vuln-db /media/transfer/vulnerabilities.sqlite3
 ```
 
 The database contains public vulnerability data, without scan targets, credentials or exploit files.
@@ -396,29 +396,66 @@ AutoPWN Suite has a very user friendly easy to read output.
 
 ## Installation
 
-### Windows
+AutoPWN Suite needs [Nmap](https://nmap.org/download.html) on `PATH` for network scans
+(`sudo apt install nmap`, `brew install nmap`, or the installer from nmap.org on Windows).
+Website-only dashboard scans do not need it, and the command line offers to install it
+on first use. Every method below gives you the `autopwn-suite` command. Verify downloads
+as described in [Releasing](docs/RELEASING.md#consumer-verification).
+
+### pipx or uv (recommended)
+
+Needs Python 3.10 or newer. This keeps AutoPWN Suite and its dependencies in their own
+environment on Linux, macOS and Windows:
+
+```bash
+pipx install autopwn-suite        # or: uv tool install autopwn-suite
+pipx upgrade autopwn-suite        # update
+pipx uninstall autopwn-suite      # remove
+```
+
+### Standalone binary
+
+Each [release](https://github.com/GamehunterKaan/AutoPWN-Suite/releases) attaches
+single-file binaries that need no Python installation: `linux-amd64`, `linux-arm64`,
+`windows-amd64.exe` and `macos-arm64`. Verify the signed `SHA256SUMS`
+([how](docs/RELEASING.md#consumer-verification)), then on Linux or macOS make the file
+executable and run it:
+
+```bash
+chmod +x autopwn-suite-v2.7.0-linux-amd64
+./autopwn-suite-v2.7.0-linux-amd64 --help
+```
+
+The binaries are checksum-verified and Sigstore-signed but not code-signed for Windows or
+macOS, so on first run Windows SmartScreen shows an "unrecognized app" warning
+(**More info**, then **Run anyway**) and macOS may block the file until you run
+`xattr -d com.apple.quarantine <file>`. Only do this for a file whose signature and
+checksum you verified. Rename the file to `autopwn-suite` and place it on your `PATH`
+if you want the short command.
+
+### Linux system-wide
+For a system-wide installation from a checkout (requires root privileges), use the provided script:
 ```bash
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
-pip install -r requirements.txt
-```
-
-### Linux
-For a system-wide installation on Linux (which requires root privileges), use the provided installation script. (Recommended)
-```bash
 # Install as root
 sudo bash install.sh
 # Uninstall
 sudo bash uninstall.sh
 ```
 
-You can clone the repo and create a virtual environment. This installation method can be used for non-root installation in Linux.
+It creates a virtual environment in `/opt/autopwn-suite`, installs the package into it and
+links `/usr/local/bin/autopwn-suite` to it. `PREFIX`, `BINDIR`, `APPDIR` and `DESTDIR` are
+honored, and `REQUIREMENTS_FILE=requirements-locked.txt` installs hash-verified dependencies
+(see [Building](docs/BUILDING.md)).
+
+### From source
 ```bash
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install .                    # or: pip install -r requirements.txt && python autopwn.py
 ```
 
 ### Docker
@@ -448,6 +485,16 @@ You can also run the CLI via Docker:
 ```bash
 docker run -it --net=host gamehunterkaan/autopwn-suite -t 192.168.1.0/24 -y
 ```
+
+### Where your data lives
+
+The dashboard account, settings, profiles, schedules and the local CVE database are stored
+in a per-user directory (`~/.local/share/autopwn-suite`, `%LOCALAPPDATA%\autopwn-suite` or
+`~/Library/Application Support/autopwn-suite`), or in `AUTOPWN_DATA_DIR` when set.
+Uninstalling never removes it, because it holds your administrator password hash and
+plaintext integration settings: delete the directory yourself when you no longer want them.
+Scan outputs, downloaded exploits, `api.txt` and configuration files stay in the directory
+you run the command from.
 
 ### Cloud
 You can use Google Cloud Shell.
@@ -546,7 +593,7 @@ The web UI exposes a full REST API:
 ## Module Usage
 
 ```python
-from api import AutoScanner
+from autopwn_suite import AutoScanner
 
 scanner = AutoScanner()
 json_results = scanner.scan("192.168.0.1")

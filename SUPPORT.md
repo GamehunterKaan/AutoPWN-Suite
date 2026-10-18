@@ -4,10 +4,12 @@ AutoPWN Suite supports **the latest stable release only**. Support begins when
 that release is published and ends when the next stable release is published.
 There is no fixed calendar term or long-term-support branch. Prereleases are for
 evaluation and receive no promised security maintenance; upgrade to the stable
-release. The same policy applies to source archives and Docker images.
+release. The same policy applies to source archives, Docker images, the PyPI
+package and the standalone binaries: a fix for any of them is a new stable release,
+never a replaced file.
 
-As of 2026-10-15, **v2.6.0** is the supported stable release. **All versions below
-2.6.0 are end of life** and no longer receive security updates. The maintainer
+As of 2026-10-19, **v2.7.0** is the supported stable release. **All versions below
+2.7.0 are end of life** and no longer receive security updates. The maintainer
 updates this statement with every stable release and identifies superseded
 versions in its release notes. A mutable Docker `latest` alias is not a version:
 record the release version and digest before reporting a problem.

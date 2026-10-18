@@ -11,7 +11,9 @@ quarterly, on role changes, and immediately after a suspected compromise.
   Use a repository-scoped publishing token where the provider supports it.
   Only the isolated push/sign jobs reference these secrets; PR scans/tests and
   image builds receive none. GitHub job tokens are short-lived with explicit
-  minimum permissions. OIDC signs releases without a stored signing key.
+  minimum permissions. OIDC signs releases without a stored signing key, and the
+  PyPI package is published through trusted publishing, so no PyPI token or
+  password exists in the repository or its settings; never create one.
 - Never commit secrets, recovery codes, private keys, `.env` values, scanner
   configuration or credential-bearing scan evidence. Secret scanning and push
   protection are enabled on the authoritative repository. Do not bypass an alert
