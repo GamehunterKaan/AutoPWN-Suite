@@ -24,10 +24,7 @@
 5. Check every publishing/signing/upload step succeeds. Download the uploaded
    artifacts and independently verify signatures/hashes with the procedure below
    before claiming signed distribution. A configured workflow alone is not proof
-   that an existing release is signed. Confirm the new version appears on PyPI;
-   until it does, `pipx install autopwn-suite` resolves to the unrelated 2022
-   releases already on that project, so publish the release promptly after
-   merging documentation that recommends it.
+   that an existing release is signed. Confirm the new version appears on PyPI.
 
 One-time PyPI setup (the project `autopwn-suite` already exists and is owned by the
 maintainer account): add a trusted publisher on pypi.org with owner
@@ -170,18 +167,19 @@ release files without executing them. Choose the expected signer identity
 from the trusted workflow/ref, not from an untrusted bundle:
 
 ```sh
-gh release download v2.6.0 --repo GamehunterKaan/AutoPWN-Suite --dir release-files
+gh release download v2.7.0 --repo GamehunterKaan/AutoPWN-Suite --dir release-files
 cd release-files
 cosign verify-blob --bundle release-manifest.sigstore.json \
-  --certificate-identity 'https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/backfill-release-signatures.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/tags/v2.7.0' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   release-manifest.json
 ```
 
-That exact identity is for an authenticity backfill from main. For an automatic
-published release, use `publish-docker.yml@refs/tags/vVERSION` under the same
-repository's `.github/workflows/` path instead; that is also the identity of the
-`SHA256SUMS` signature. Confirm the
+That identity is the one for an automatic published release
+(`publish-docker.yml@refs/tags/vVERSION` under the repository's `.github/workflows/`
+path); it is also the identity of the `SHA256SUMS` signature. A release whose
+signatures were added afterwards, such as v2.6.0, is signed by
+`backfill-release-signatures.yml@refs/heads/main` instead. Confirm the
 expected repository, workflow, ref and source commit against the release record.
 Do not disable identity or issuer checking. Missing signatures are a verification
 failure, not a reason to bypass verification.
