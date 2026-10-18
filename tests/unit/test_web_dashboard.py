@@ -126,6 +126,20 @@ def test_successful_web_checks_do_not_erase_failed_cve_coverage(dashboard):
 
 
 @pytest.mark.unit
+def test_markup_in_a_service_banner_does_not_fail_the_scan_job(dashboard):
+    wu, _ = dashboard
+    nm = MagicMock()
+    nm.all_hosts.return_value = ["192.0.2.1"]
+    nm.__getitem__.return_value = {"addresses": {}, "tcp": {21: {"state": "open", "name": "ftp", "product": "[/bold]", "version": "[/admin] 1.0"}}}
+    config = wu._profile_config({"skip_discovery": True, "scan_vulns": False}) | {"target": "192.0.2.1"}
+    job = wu.ScanJob("job", config["target"], config)
+    with patch.object(wu.shutil, "which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm), patch.object(wu, "_notify"):
+        wu._run_scan(job)
+    assert job.status == "completed"
+    assert [(port["product"], port["version"]) for port in job.hosts_list()[0]["ports"]] == [("[/bold]", "[/admin] 1.0")]
+
+
+@pytest.mark.unit
 def test_selected_header_only_check_makes_one_request_and_records_redacted_evidence(web_response):
     from autopwn_suite.web.webvuln import webvuln
     controls = normalize_options()

@@ -15,7 +15,9 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+from rich.text import Text
 
+from autopwn_suite.logger import markup_safe
 from autopwn_suite.nmap_backend import parse_nmap_xml
 from autopwn_suite.web.options import normalize_options
 from autopwn_suite.web_auth import ACCOUNT_FILE, password_matches, validate_account
@@ -74,6 +76,24 @@ def random_value(rng, depth=0):
 
 def test_baseline_xml_is_valid():
     assert parse_nmap_xml(VALID_XML)
+
+
+def test_banner_and_cve_text_survives_rich_markup_parsing_unchanged():
+    rng = random.Random(SEED)
+    pieces = list("[]/#@ab-=_ ") + ["[/", "[b]", "[/b]", "[red]", "[/red]", "[/]", "[@click=x]", "[#ff0000]"]
+    for _ in range(2000):
+        value = "".join(rng.choice(pieces) for _ in range(rng.randint(0, 12)))
+        assert Text.from_markup(markup_safe(value), emoji=False).plain == value, value
+        assert Text.from_markup(f"[red]{markup_safe(value)}[/red]", emoji=False).plain == value, value
+        assert Text.from_markup(f"[yellow]{markup_safe(f'[ {value} ]')}[/yellow]", emoji=False).plain == f"[ {value} ]", value
+    # Rich drops one backslash before a bracket that is not a tag, so only require that
+    # backslashes never turn escaped text back into markup that raises.
+    pieces += ["\\", "\\[", "\\\\", "\\[/b]"]
+    for _ in range(2000):
+        value = "".join(rng.choice(pieces) for _ in range(rng.randint(0, 12)))
+        Text.from_markup(markup_safe(value), emoji=False)
+        Text.from_markup(f"[red]{markup_safe(value)}[/red]", emoji=False)
+        Text.from_markup(f"[yellow]{markup_safe(f'[ {value} ]')}[/yellow]", emoji=False)
 
 
 def test_nmap_xml_parser_only_raises_its_documented_error():

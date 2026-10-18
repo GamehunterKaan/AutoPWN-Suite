@@ -3,10 +3,13 @@
 """
 Unit tests for the searchvuln module.
 """
+import io
 from unittest.mock import MagicMock, patch
 
 import pytest
+from rich.console import Console
 
+from autopwn_suite.nist_search import Vulnerability
 from autopwn_suite.searchvuln import (
     GenerateKeyword,
     GenerateKeywords,
@@ -145,3 +148,25 @@ class TestSearchKeyword:
 
         assert result == []
         mock_log.logger.assert_called_once_with("error", test_exception)
+
+
+@pytest.mark.unit
+def test_hostile_banner_and_cve_text_is_printed_literally_instead_of_aborting():
+    """Markup-looking text from a banner or an NVD record must not raise MarkupError."""
+    console = Console(file=io.StringIO(), width=200, color_system=None)
+    status_console = Console(file=io.StringIO(), width=200, color_system=None)
+    vuln = Vulnerability("keyword", "CVE-2024-0001[/id]", "Remote flaw [/admin] in the parser", "[/severity]", 9.8,
+                         "https://nvd.test/[/details]", "[/exploitability]")
+    host_array = [["192.0.2.1", 21, "ftp", "vsftpd", "2.3.4[/bold]"]]
+
+    with patch("autopwn_suite.searchvuln.CheckConnection", return_value=True), \
+         patch("autopwn_suite.searchvuln.SearchKeyword", return_value=[vuln]), \
+         patch("autopwn_suite.searchvuln.get_terminal_width", return_value=100):
+        result = SearchSploits(host_array, MagicMock(), console, status_console)
+
+    output = console.file.getvalue()
+    for text in ("vsftpd 2.3.4[/bold]", "CVE-2024-0001[/id]", "Remote flaw [/admin] in the parser",
+                 "[/severity]", "https://nvd.test/[/details]", "[/exploitability]"):
+        assert text in output
+    assert result[0].title == "vsftpd 2.3.4[/bold]"
+    assert result[0].CVEs == ["CVE-2024-0001[/id]"]

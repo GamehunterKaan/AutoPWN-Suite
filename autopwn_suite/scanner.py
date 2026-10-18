@@ -7,7 +7,7 @@ from time import sleep
 from rich import box
 from rich.table import Table
 
-from autopwn_suite.logger import banner
+from autopwn_suite.logger import banner, markup_safe
 from autopwn_suite.nmap_backend import PortScanner
 from autopwn_suite.nmap_progress import ScanCancelled, scan_with_progress
 from autopwn_suite.utils import GetIpAdress, ScanMode, ScanType, is_root
@@ -24,11 +24,11 @@ class TargetInfo:
     def colored(self) -> str:
 
         return (
-            f"[yellow]MAC Address :[/yellow] {self.mac}\n"
-            + f"[yellow]Vendor :[/yellow] {self.vendor}\n"
-            + f"[yellow]OS :[/yellow] {self.os}\n"
-            + f"[yellow]Accuracy :[/yellow] {self.os_accuracy}\n"
-            + f"[yellow]Type :[/yellow] {self.os_type[:20]}\n"
+            f"[yellow]MAC Address :[/yellow] {markup_safe(self.mac)}\n"
+            + f"[yellow]Vendor :[/yellow] {markup_safe(self.vendor)}\n"
+            + f"[yellow]OS :[/yellow] {markup_safe(self.os)}\n"
+            + f"[yellow]Accuracy :[/yellow] {markup_safe(self.os_accuracy)}\n"
+            + f"[yellow]Type :[/yellow] {markup_safe(self.os_type[:20])}\n"
         )
 
     def __str__(self) -> str:
@@ -323,14 +323,14 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
 
     for port, data in tcp_ports.items():
         state, service, product, version = InitPortInfo(data)
-        table.add_row(str(port), state, service, product, version)
+        table.add_row(str(port), markup_safe(state), markup_safe(service), markup_safe(product), markup_safe(version))
 
         if state == "open":
             HostArray.insert(len(HostArray), [target, port, service, product, version])
 
     for port, data in udp_ports.items():
         state, service, product, version = InitPortInfo(data)
-        table.add_row(f"{port}/udp", state, service, product, version)
+        table.add_row(f"{port}/udp", markup_safe(state), markup_safe(service), markup_safe(product), markup_safe(version))
         if state == "open":
             HostArray.append([target, port, service, product, version, "udp"])
 

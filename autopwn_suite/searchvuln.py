@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from textwrap import wrap
 
-from autopwn_suite.logger import banner
+from autopwn_suite.logger import banner, markup_safe
 from autopwn_suite.nist_search import searchCVE
 from autopwn_suite.utils import CheckConnection, get_terminal_width
 
@@ -101,7 +101,7 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
             status.start()
             status.update(
                 "[white]Searching vulnerability database for[/white] "
-                + f"[red]{keyword}[/red] [white]...[/white]"
+                + f"[red]{markup_safe(keyword)}[/red] [white]...[/white]"
             )
             ApiResponseCVE = (SearchKeyword(keyword, log, apiKey, lookup=lookup) if lookup is not None
                               else SearchKeyword(keyword, log, apiKey))
@@ -113,21 +113,21 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
                 banner(f"Possible vulnerabilities for {target}", "red", console)
                 printed_banner = True
 
-            console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
+            console.print(f"┌─ [yellow]{markup_safe(f'[ {keyword} ]')}[/yellow]")
 
             CVEs = []
             for CVE in ApiResponseCVE:
                 CVEs.append(CVE.CVEID)
-                console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
+                console.print(f"│\n├─────┤ [red]{markup_safe(CVE.CVEID)}[/red]\n│")
 
                 wrapped_description = wrap(CVE.description, max(1, term_width - 50))
                 console.print("│\t\t[cyan]Description: [/cyan]")
                 for line in wrapped_description:
-                    console.print(f"│\t\t\t{line}")
+                    console.print(f"│\t\t\t{markup_safe(line)}")
                 console.print(
-                    f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
-                    + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
-                    + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
+                    f"│\t\t[cyan]Severity: [/cyan]{markup_safe(CVE.severity)} - {markup_safe(CVE.severity_score)}\n"
+                    + f"│\t\t[cyan]Exploitability: [/cyan] {markup_safe(CVE.exploitability)}\n"
+                    + f"│\t\t[cyan]Details: [/cyan] {markup_safe(CVE.details_url)}"
                 )
 
             VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)

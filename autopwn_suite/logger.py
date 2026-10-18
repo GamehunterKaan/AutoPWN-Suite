@@ -3,6 +3,7 @@
 import logging
 
 from rich.logging import RichHandler
+from rich.markup import escape
 from rich.text import Text
 
 from autopwn_suite.utils import get_terminal_width
@@ -14,6 +15,11 @@ def banner(msg, color, console) -> None:
     console.print("─" * term_width, style=color)
     console.print(Text(msg), justify="center", style=color)
     console.print("─" * term_width, style=color)
+
+
+def markup_safe(value) -> str:
+    """Escape target, NVD or Exploit-DB text so Rich prints it literally instead of parsing markup."""
+    return escape(str(value))
 
 
 class Logger:

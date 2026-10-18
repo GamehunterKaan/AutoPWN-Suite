@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 """Offline regressions for configuration, actual Nmap results and NVD failures."""
+import io
 from argparse import Namespace
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from requests.exceptions import ConnectionError, HTTPError
+from rich.console import Console
 
 from autopwn_suite.api import AutoScanner
 from autopwn_suite.cli import StartScanning, main
@@ -292,3 +294,17 @@ def test_searchsploits_handles_empty_input_and_narrow_terminal():
         result = SearchSploits([["192.0.2.1", 53, "domain", "DNS", "1"]],
                               MagicMock(), MagicMock(), MagicMock())
     assert result[0].CVEs == ["CVE-A"]
+
+
+def test_hostile_banner_text_is_printed_literally_instead_of_aborting_the_scan():
+    # Banner text such as "[/bold]" is Rich markup; it must reach the screen verbatim.
+    host = {"addresses": {"mac": "AA:BB"}, "vendor": {"AA:BB": "[/vendor]"},
+            "osmatch": [{"name": "[/os]", "accuracy": "[/accuracy]", "osclass": [{"type": "[/type]"}]}],
+            "tcp": {21: {"state": "open", "name": "[/service]", "product": "[/bold]", "version": "[/admin] 1.0"}}}
+    console = Console(file=io.StringIO(), width=200, color_system=None)
+    rows = AnalyseScanResults(nmap_result({"192.0.2.1": host}), MagicMock(), console, "192.0.2.1")
+    output = console.file.getvalue()
+    for text in ("[/vendor]", "[/os]", "[/accuracy]", "[/type]", "[/service]", "[/bold]", "[/admin] 1.0"):
+        assert text in output
+    assert rows == [["192.0.2.1", 21, "[/service]", "[/bold]", "[/admin] 1.0"]]
+
