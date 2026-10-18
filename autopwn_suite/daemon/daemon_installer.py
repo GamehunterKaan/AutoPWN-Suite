@@ -2,10 +2,10 @@
 # Copyright 2022-2026 Kaan Gültekin
 import os
 import re
+import shlex
 import shutil
-import stat
 import subprocess
-import venv
+import sys
 from configparser import ConfigParser
 from pathlib import Path
 from platform import system
@@ -198,12 +198,17 @@ def CreateConfig(console, config_filename=""):
     console.print(f"[green]Config file '{config_file}' created successfully![/green]")
     return True
 
+def _exec_start(install_path):
+    """Command line systemd runs: the interpreter that installed the service, or the frozen binary itself."""
+    command = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, "-m", "autopwn_suite"]
+    command += ["-c", str(install_path / "autopwn-daemon.conf")]
+    return " ".join(shlex.quote(part) for part in command)
+
+
 def CopyFiles(console):
     DAEMON_INSTALL_PATH = Path("/opt/autopwn-suite")
     SERVICE_PATH = Path("/etc/systemd/system/autopwn-daemon.service")
     LOG_PATH = Path("/var/log/autopwn-daemon.log")
-
-    files_to_copy = ["autopwn_suite", "autopwn-daemon.conf", "autopwn.py", "api.py", "__init__.py", "requirements.txt"]
 
     try:
         console.print(f"Creating install directory: {DAEMON_INSTALL_PATH}")
@@ -212,73 +217,19 @@ def CopyFiles(console):
         console.print(f"[red]Failed to create install directory {DAEMON_INSTALL_PATH}: {e}[/red]")
         return
 
-    # Copy repo files
-    console.print("Copying files...")
-    cwd = Path.cwd()
-    for item in files_to_copy:
-        src = cwd / item
-        dst = DAEMON_INSTALL_PATH / item
-        try:
-            if not src.exists():
-                console.print(f"[yellow]Warning: {src} does not exist — skipping[/yellow]")
-                continue
-
-            if src.is_dir():
-                if dst.exists():
-                    shutil.rmtree(dst)
-                shutil.copytree(src, dst)
-            else:
-                shutil.copy2(src, dst)
-            console.print(f"[green]Copied {src} -> {dst}[/green]")
-        except Exception as e:
-            console.print(f"[red]Error copying {src} -> {dst}: {e}[/red]")
+    # The service runs the installed program; only the configuration written by CreateConfig is placed here.
+    src = Path.cwd() / "autopwn-daemon.conf"
+    dst = DAEMON_INSTALL_PATH / "autopwn-daemon.conf"
+    try:
+        if not src.exists():
+            console.print(f"[red]Configuration file {src} does not exist.[/red]")
             return
-
-    # Optionally copy helper script if exists
-    try:
-        daemon_sh_src = cwd / "autopwn_suite" / "daemon" / "autopwn-daemon.sh"
-        if daemon_sh_src.exists():
-            daemon_sh_dst = DAEMON_INSTALL_PATH / "autopwn-daemon.sh"
-            shutil.copy2(daemon_sh_src, daemon_sh_dst)
-            daemon_sh_dst.chmod(daemon_sh_dst.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-            console.print(f"[green]Copied and marked executable: {daemon_sh_dst}[/green]")
+        if src.resolve() != dst.resolve():
+            shutil.copy2(src, dst)
+        console.print(f"[green]Configuration available at {dst}[/green]")
     except Exception as e:
-        console.print(f"[yellow]Warning copying optional daemon script: {e}[/yellow]")
-
-    # Create virtualenv
-    venv_dir = DAEMON_INSTALL_PATH / ".venv"
-    try:
-        if not venv_dir.exists():
-            console.print(f"Creating virtualenv at {venv_dir} ...")
-            builder = venv.EnvBuilder(with_pip=True)
-            builder.create(str(venv_dir))
-            console.print(f"[green]Virtualenv created at {venv_dir}[/green]")
-        else:
-            console.print(f"[yellow]Virtualenv already exists at {venv_dir}, skipping creation.[/yellow]")
-    except Exception as e:
-        console.print(f"[red]Failed to create virtualenv: {e}[/red]")
+        console.print(f"[red]Error copying {src} -> {dst}: {e}[/red]")
         return
-
-    # Install dependencies into venv
-    req_file = DAEMON_INSTALL_PATH / "requirements.txt"
-    if req_file.exists():
-        console.print(f"Installing requirements from {req_file} ...")
-        pip_exe = venv_dir / "bin" / "pip"
-        try:
-            subprocess.check_call([str(pip_exe), "install", "--upgrade", "pip", "setuptools", "wheel"])
-            subprocess.check_call([str(pip_exe), "install", "-r", str(req_file)])
-            console.print("[green]Dependencies installed.[/green]")
-        except subprocess.CalledProcessError as e:
-            console.print(f"[red]pip install failed: {e}[/red]")
-            return
-    else:
-        console.print("[yellow]No requirements.txt found; skipping dependency install.[/yellow]")
-
-    # Ensure entrypoint executable
-    entrypoint = DAEMON_INSTALL_PATH / "autopwn.py"
-    if entrypoint.exists():
-        entrypoint.chmod(entrypoint.stat().st_mode | stat.S_IXUSR)
-        console.print(f"[green]Marked entrypoint executable: {entrypoint}[/green]")
 
     # Create log file
     try:
@@ -290,7 +241,7 @@ def CopyFiles(console):
     except Exception as e:
         console.print(f"[yellow]Warning: could not create log file {LOG_PATH}: {e}[/yellow]")
 
-    # Write systemd service file — runs Python from venv, restarts automatically
+    # Write systemd service file — runs the installed program, restarts automatically
     service_content = f"""
 [Unit]
 Description=AutoPWN Suite Daemon
@@ -301,7 +252,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory={DAEMON_INSTALL_PATH}
-ExecStart={venv_dir}/bin/python {DAEMON_INSTALL_PATH}/autopwn.py -c {DAEMON_INSTALL_PATH}/autopwn-daemon.conf
+ExecStart={_exec_start(DAEMON_INSTALL_PATH)}
 Restart=always
 RestartSec=5
 KillMode=control-group

@@ -3,7 +3,10 @@
 """
 Unit tests for the daemon installer in autopwn_suite/daemon/daemon_installer.py.
 """
-import os
+import re
+import shlex
+import sys
+from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -13,6 +16,7 @@ from autopwn_suite.daemon.daemon_installer import (
     CreateConfig,
     InstallDaemon,
     UninstallDaemon,
+    _exec_start,
     _get_menu_choice,
     _get_non_empty_input,
     _get_validated_email,
@@ -277,112 +281,99 @@ class TestInstallDaemon:
 class TestCopyFiles:
     """Tests for the CopyFiles function."""
 
+    @staticmethod
+    def _paths(mock_path, config_exists=True, same_file=False):
+        """Mock Path so the install directory, service file and log file are distinguishable."""
+        install, service, log, cwd = MagicMock(name="install"), MagicMock(name="service"), MagicMock(name="log"), MagicMock(name="cwd")
+        source, target = MagicMock(name="source_conf"), MagicMock(name="target_conf")
+        source.exists.return_value = config_exists
+        source.resolve.return_value = "same" if same_file else "source"
+        target.resolve.return_value = "same" if same_file else "target"
+        cwd.__truediv__.side_effect = lambda name: source
+        install.__truediv__.side_effect = lambda name: target
+        mock_path.side_effect = lambda p: {
+            "/opt/autopwn-suite": install,
+            "/etc/systemd/system/autopwn-daemon.service": service,
+            "/var/log/autopwn-daemon.log": log,
+        }[str(p)]
+        mock_path.cwd.return_value = cwd
+        return install, source, target
+
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.venv")
     @patch("autopwn_suite.daemon.daemon_installer.shutil")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
-    def test_copy_files_success_path(
-        self, mock_open, mock_path, mock_shutil, mock_venv, mock_subprocess, mock_console
+    def test_copy_files_installs_only_the_config_and_runs_the_installed_program(
+        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
     ):
-        """Verify the complete file copy and systemd setup process."""
-        # Mock Path objects and their methods
-        mock_cwd = MagicMock()
-        mock_cwd.glob.return_value = []
-        mock_install_path = MagicMock()
-        mock_service_path = MagicMock()
-        mock_log_path = MagicMock()
-
-        # When Path() is called with a specific string, return the corresponding mock object.
-        # This handles paths created like `Path("/opt/autopwn-suite")`.
-        mock_path.side_effect = lambda p: {
-            "/opt/autopwn-suite": mock_install_path,
-            "/etc/systemd/system/autopwn-daemon.service": mock_service_path,
-            "/var/log/autopwn-daemon.log": mock_log_path,
-        }.get(str(p), MagicMock())
-
-        # When Path.cwd() is called, return our mock current working directory.
-        mock_path.cwd.return_value = mock_cwd
-
-        # Configure the behavior of the `/` operator on our mock_cwd object.
-        # This handles paths created like `cwd / "autopwn_suite"`.
-        # We return a new MagicMock for each path component to avoid recursion.
-        path_mocks = {
-            item: MagicMock(name=f"path_{item}")
-            for item in ["autopwn_suite", "autopwn.py", "autopwn-daemon.conf", "api.py", "__init__.py", "requirements.txt", "autopwn_suite/daemon/autopwn-daemon.sh"]
-        }
-        mock_cwd.__truediv__.side_effect = lambda p: path_mocks.get(p, MagicMock(name=f"path_unknown_{p}"))
-
-        mock_install_path.exists.return_value = False
-
-        # Ensure the venv directory is reported as not existing, so it gets created.
-        (mock_install_path / ".venv").exists.return_value = False
-
-        # Configure the behavior of `src.exists()` and `src.is_dir()` for each file.
-        path_mocks["autopwn_suite"].exists.return_value = True
-        path_mocks["autopwn_suite"].is_dir.return_value = True
-        path_mocks["autopwn.py"].exists.return_value = True
-        path_mocks["autopwn.py"].is_dir.return_value = False
-        path_mocks["autopwn-daemon.conf"].exists.return_value = True
-        path_mocks["autopwn-daemon.conf"].is_dir.return_value = False
-        path_mocks["api.py"].exists.return_value = True
-        path_mocks["api.py"].is_dir.return_value = False
-        path_mocks["__init__.py"].exists.return_value = True
-        path_mocks["__init__.py"].is_dir.return_value = False
-        path_mocks["requirements.txt"].exists.return_value = True
-        path_mocks["requirements.txt"].is_dir.return_value = False
-        path_mocks["autopwn_suite/daemon/autopwn-daemon.sh"].exists.return_value = True
+        install, source, target = self._paths(mock_path)
 
         CopyFiles(mock_console)
 
-        # Verify key steps
-        mock_install_path.mkdir.assert_called_once()
-        mock_shutil.copytree.assert_called()
-        mock_shutil.copy2.assert_called()
-        mock_venv.EnvBuilder.assert_called_once_with(with_pip=True)
+        install.mkdir.assert_called_once()
+        mock_shutil.copy2.assert_called_once_with(source, target)
+        mock_shutil.copytree.assert_not_called()
         mock_subprocess.check_call.assert_has_calls(
             [
                 call(["systemctl", "daemon-reload"]),
                 call(["systemctl", "enable", "--now", "autopwn-daemon.service"]),
             ]
         )
-        assert mock_open.call_count > 0  # For service file
+        # No virtualenv or pip is involved: the unit starts the interpreter that performed the install.
+        assert all("pip" not in str(c) for c in mock_subprocess.check_call.call_args_list)
         unit = mock_open.return_value.__enter__.return_value.write.call_args.args[0]
         assert "KillMode=control-group" in unit
+        assert re.search(r"^ExecStart=.* -m autopwn_suite -c ", unit, re.MULTILINE)
+        assert "autopwn.py" not in unit and ".venv" not in unit
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.venv")
     @patch("autopwn_suite.daemon.daemon_installer.shutil")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
-    def test_copy_files_skips_missing_source(
-        self, mock_open, mock_path, mock_shutil, mock_venv, mock_subprocess, mock_console
+    def test_copy_files_does_not_copy_a_config_onto_itself(
+        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
     ):
-        """Verify it prints a warning and skips a file if it's missing."""
-        # Mock Path objects and their methods
-        mock_cwd = MagicMock()
-        mock_install_path = MagicMock()
-        mock_path.cwd.return_value = mock_cwd
-
-        # --- MOCK SETUP ---
-        def path_side_effect(*args):
-            path_str = os.path.join(*[str(arg) for arg in args])
-            if path_str == "/opt/autopwn-suite":
-                return mock_install_path
-            return mock_cwd / path_str
-
-        mock_path.side_effect = path_side_effect
-        mock_install_path.exists.return_value = False
-
-        # Configure most files to exist, but one to be missing
-        (mock_cwd / "autopwn_suite").exists.return_value = True
-        (mock_cwd / "autopwn.py").exists.return_value = True
-        (mock_cwd / "api.py").exists.return_value = False  # The missing file
+        self._paths(mock_path, same_file=True)
 
         CopyFiles(mock_console)
 
-        # Verify the warning was printed for the missing file
-        mock_console.print.assert_any_call(f"[yellow]Warning: {mock_cwd / 'autopwn_suite.api.py'} does not exist — skipping[/yellow]")
+        mock_shutil.copy2.assert_not_called()
+        mock_subprocess.check_call.assert_any_call(["systemctl", "daemon-reload"])
+
+    @patch("autopwn_suite.daemon.daemon_installer.subprocess")
+    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer.Path")
+    @patch("autopwn_suite.daemon.daemon_installer.open")
+    def test_copy_files_stops_when_the_config_is_missing(
+        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
+    ):
+        self._paths(mock_path, config_exists=False)
+
+        CopyFiles(mock_console)
+
+        mock_shutil.copy2.assert_not_called()
+        mock_subprocess.check_call.assert_not_called()
+        mock_open.assert_not_called()
+        assert any("does not exist" in str(c) for c in mock_console.print.call_args_list)
+
+
+CONFIG = str(Path("/opt/autopwn-suite") / "autopwn-daemon.conf")
+
+
+@pytest.mark.unit
+class TestExecStart:
+    def test_source_or_wheel_install_runs_the_module_with_the_installing_interpreter(self):
+        line = _exec_start(Path("/opt/autopwn-suite"))
+        assert line == f"{shlex.quote(sys.executable)} -m autopwn_suite -c {shlex.quote(CONFIG)}"
+
+    def test_frozen_binary_runs_itself(self, monkeypatch):
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        line = _exec_start(Path("/opt/autopwn-suite"))
+        assert line == f"{shlex.quote(sys.executable)} -c {shlex.quote(CONFIG)}"
+
+    def test_paths_with_spaces_are_quoted(self, monkeypatch):
+        monkeypatch.setattr(sys, "executable", "/opt/my tools/python")
+        assert _exec_start(Path("/opt/autopwn-suite")).startswith("'/opt/my tools/python' -m autopwn_suite")
 
 
 @pytest.mark.unit

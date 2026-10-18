@@ -114,7 +114,7 @@ AutoPWN Suite includes a built-in web dashboard for managing scans from your bro
 
 **Signing in.** The dashboard requires a login. On first launch the server creates an `admin`
 account with a random password and prints both once in the terminal; only a scrypt hash of the
-password is stored in `web_ui_auth.json` (inside `AUTOPWN_DATA_DIR`, or the `modules` directory by
+password is stored in `web_ui_auth.json` (inside `AUTOPWN_DATA_DIR`, or the per-user data directory by
 default). Change the username and password after signing in under **Settings → Account**. If you
 forget the password, run `python autopwn.py --web-reset-account` on the server to restore `admin`
 with a new random password and sign out all sessions. Remote access requires HTTPS (or set
@@ -372,8 +372,9 @@ and overrides the source for all new and scheduled scans. It also blocks downloa
 Turn it off when you want to download updates. Finish or stop active online scans and let any database
 update or pending notification finish before turning it on. A server started with `--offline` keeps offline mode enforced.
 
-The default file is `autopwn_suite/vulnerabilities.sqlite3`, or `AUTOPWN_DATA_DIR/vulnerabilities.sqlite3`
-when that environment variable is set. Copy this single file to the airgapped machine's data
+The default file is `vulnerabilities.sqlite3` in the per-user data directory (`~/.local/share/autopwn-suite`,
+`%LOCALAPPDATA%\autopwn-suite` or `~/Library/Application Support/autopwn-suite`), or
+`AUTOPWN_DATA_DIR/vulnerabilities.sqlite3` when that environment variable is set. Copy this single file to the airgapped machine's data
 directory, or select its location explicitly:
 
 ```bash
@@ -490,6 +491,10 @@ For more details about usage and flags use `-h` flag.
 ```console
 autopwn-suite --daemon-install
 ```
+
+Run it as root on Linux from an installed copy of AutoPWN Suite (pipx, `install.sh` or a standalone binary).
+The systemd service starts that same installation, and the generated configuration is kept in
+`/opt/autopwn-suite/autopwn-daemon.conf`.
 
 ### Web UI
 

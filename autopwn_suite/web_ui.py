@@ -76,6 +76,7 @@ from autopwn_suite.credential_files import (
 )
 from autopwn_suite.nist_search import VulnerabilityLookup
 from autopwn_suite.nmap_progress import ScanCancelled
+from autopwn_suite.paths import data_dir
 from autopwn_suite.vulnerability_db import database_path, database_status, update_database
 from autopwn_suite.web.options import CHECKS as WEB_CHECKS
 from autopwn_suite.web.options import normalize_options
@@ -154,8 +155,8 @@ def _validate_job_target(target, config):
 
 _MODULE_DIR  = Path(__file__).parent
 _STATIC_DIR  = _MODULE_DIR / "web_ui_static"
-_DATA_DIR    = Path(os.environ.get("AUTOPWN_DATA_DIR", str(_MODULE_DIR)))
-_DATA_DIR.mkdir(parents=True, exist_ok=True)
+_DATA_DIR    = data_dir()
+_DATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
 _SETTINGS_FILE = _DATA_DIR / "web_ui_settings.json"
 _OFFLINE_ONLY = False
 _mode_lock = threading.RLock()
@@ -2101,7 +2102,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
 
 def reset_web_account():
     """Local recovery only; rotate credentials and invalidate active sessions."""
-    store = AccountStore(Path(os.environ.get("AUTOPWN_DATA_DIR", str(_MODULE_DIR))) / ACCOUNT_FILE)
+    store = AccountStore(data_dir() / ACCOUNT_FILE)
     credentials = store.reset()
     show_credentials(credentials, store.path)
 
