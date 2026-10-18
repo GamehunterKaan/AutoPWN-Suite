@@ -66,18 +66,30 @@ workflow builds them with `python -m build --no-isolation` from the hash-pinned
 ## Standalone binaries
 
 Releases also attach single-file binaries built with PyInstaller. To build one for
-your platform from a checkout (Python 3.13 matches the release builds):
+your platform from a checkout (any Python 3.10 or newer runs the script; the interpreter
+that builds the binary is downloaded):
 
 ```sh
-python -m pip install --require-hashes --only-binary=:all: --no-deps \
-  -r requirements-locked.txt -r packaging/requirements-build.txt
-pyinstaller --clean --noconfirm packaging/autopwn-suite.spec
+python scripts/build_binary.py --target linux-amd64 --work-dir "$HOME/autopwn-build" \
+  --source-date-epoch "$(git log -1 --format=%ct)" --repeat --output dist/autopwn-suite
 python scripts/smoke_install.py "$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)" dist/autopwn-suite
 ```
 
+The targets are `linux-amd64`, `linux-arm64`, `windows-amd64` and `macos-arm64`, and each
+must be built on that platform (PyInstaller does not cross-compile). `--repeat` builds twice from
+scratch and fails unless both binaries are identical. The script:
+
+1. downloads the CPython that `packaging/build-python.json` pins for the target (a self-contained
+   python-build-standalone archive) and unpacks it only if its SHA-256 matches;
+2. installs the hash-pinned `requirements-locked.txt` and `packaging/requirements-build.txt` into a
+   virtual environment of that interpreter;
+3. runs PyInstaller with `PYTHONHASHSEED=1` and `SOURCE_DATE_EPOCH` set to the commit time.
+
 `packaging/autopwn-suite.spec` bundles the dashboard assets, the data files, the two
 sources the proof-of-concept generator reads as text, `LICENSE`, `NOTICE` and the
-metadata of every bundled package, and runs the interpreter in UTF-8 mode. The
+metadata of every bundled package, and runs the interpreter in UTF-8 mode. It leaves out what
+the installer recorded about the build machine (`RECORD`, `INSTALLER`: they hold the path of the
+virtual environment) and the build machine's `libgcc_s`, which every glibc system provides. The
 `.in` files next to each requirements file are the inputs; regenerate the hash-pinned
 `.txt` files with the `uv pip compile` command written at the top of each. No
 compiler or linker is invoked: PyInstaller ships a prebuilt bootloader. The security
@@ -169,10 +181,36 @@ artifact. What is controlled, and what is not:
 | --- | --- |
 | Python source (`autopwn_suite/`) | Interpreted source; there is no build output to differ. Release source archives are produced by `scripts/release_assets.py` from the reviewed commit. |
 | PyPI wheel and sdist | Inputs are pinned (`poetry-core==2.5.0`, hash-pinned `build` and its dependencies, `SOURCE_DATE_EPOCH` from the commit time). Building the same commit repeatedly produced identical bytes for both files with `pip wheel` and `python -m build`, and `publish-pypi.yml` builds twice and refuses to publish if the files differ. |
-| Standalone binaries | **Not claimed to be reproducible.** The dependencies are hash-pinned, but PyInstaller output embeds per-platform toolchain details and the GitHub-hosted runner images and the Python 3.13 patch release move over time. Each binary is smoke-tested and has an SBOM. |
+| Standalone binaries | Repeatable, and reproducible from the pinned toolchain described in [Rebuilding a standalone binary](#rebuilding-a-standalone-binary). `build-binary.yml` builds every binary twice on its runner and the job fails unless both builds are identical; pull requests and releases both run it. Each binary is smoke-tested and has an SBOM. |
 | Container image content (all layer files, modes, owners) | Pinned inputs, see below. |
 | Container layer timestamps and image `created` time | Deterministic only when built with `SOURCE_DATE_EPOCH` and the BuildKit `rewrite-timestamp=true` exporter option, as `publish-docker.yml` does. |
 | `poetry build` with another backend version | Not verified; the pinned backend version is part of the input. |
+| Standalone binary built with another interpreter or other tool versions | Different bytes by design: the interpreter and every tool version is an input, pinned in `packaging/build-python.json` and the hash-pinned requirements. |
+
+### Rebuilding a standalone binary
+
+The inputs of a binary are the source archive, `SOURCE_DATE_EPOCH` (the commit time of the release
+commit), the interpreter archive pinned by SHA-256 in `packaging/build-python.json`, the hash-pinned
+Python requirements and PyInstaller with its prebuilt bootloader (inside the hash-pinned wheel),
+`PYTHONHASHSEED=1`, and the platform it is built on. The interpreter is a self-contained
+python-build-standalone distribution, so no Python or shared library of the build machine is copied
+into the binary: the GitHub runner image does not influence the result, and a binary built in a
+different directory, virtual environment or interpreter location is identical. Build from a checkout
+without line-ending conversion (`core.autocrlf=false`; the release archive has LF endings) or from the release's
+source archive. To check a release:
+
+```sh
+git -c core.autocrlf=false clone --branch vVERSION https://github.com/GamehunterKaan/AutoPWN-Suite && cd AutoPWN-Suite
+python scripts/build_binary.py --target linux-amd64 --work-dir "$HOME/autopwn-build" \
+  --source-date-epoch "$(git log -1 --format=%ct)" --output autopwn-suite
+sha256sum autopwn-suite    # compare with the autopwn-suite-vVERSION-linux-amd64 line of the signed SHA256SUMS
+```
+
+Limits: the build must run on the target platform (Windows binaries on Windows, macOS binaries on
+macOS, and so on); the Linux binaries link the C library and zlib of the machine that runs them,
+which is not an input of the build; a changed interpreter archive, requirement or PyInstaller
+version gives different bytes on purpose; and the identical-bytes claim covers the build, not the
+runtime behavior of the dependencies.
 
 Container inputs that are pinned:
 

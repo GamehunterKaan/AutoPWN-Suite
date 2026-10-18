@@ -86,6 +86,7 @@ jobs:
     uses: ./.github/workflows/build-binary.yml
     with:
       source-artifact: release-source
+      source-date-epoch: ${{ needs.validate.outputs.source_date_epoch }}
 
   build:
     needs: [validate, source-security]

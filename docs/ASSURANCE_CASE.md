@@ -135,9 +135,11 @@ case that hides them would not be an assurance case.
   its service as root, so it refuses to install from an interpreter, package or
   configuration directory that another user could modify (`_root_controlled` in
   `autopwn_suite/daemon/daemon_installer.py`).
-- **Standalone binaries** are not code-signed for Windows or macOS and are not claimed to be
-  reproducible; their authenticity rests on the Sigstore-signed `SHA256SUMS` and release
-  manifest, and each has an SBOM generated from its build environment.
+- **Standalone binaries** are not code-signed for Windows or macOS; their authenticity rests on
+  the Sigstore-signed `SHA256SUMS` and release manifest, each has an SBOM generated from its
+  build environment, and they are built twice from pinned inputs and must be identical, so a
+  rebuilt binary can be compared with the signed hashes
+  ([how](BUILDING.md#rebuilding-a-standalone-binary)).
 - **Process limits.** The project has a single maintainer today
   ([continuity plan](CONTINUITY.md)); independent human review is configured but its
   strength depends on a second reviewer being available.

@@ -48,8 +48,9 @@ PyInstaller and `packaging/requirements-publish.txt` for the wheel build) are sc
 same OSV-Scanner run and block on any known vulnerability or malicious package; their
 licenses are not gated because they are not distributed. The standalone binaries carry
 an SBOM each, generated from the build environment (installed runtime packages,
-PyInstaller, CPython), which is not a scan of the executable and omits native libraries
-copied from the runner. Each binary embeds `LICENSE`, `NOTICE` and the metadata of every
+PyInstaller, CPython and the python-build-standalone release), which is not a scan of the executable and
+omits the native libraries inside the interpreter distribution and the wheels. Every binary is built twice on
+its runner (`scripts/build_binary.py --repeat`) and the job fails unless both builds are identical. Each binary embeds `LICENSE`, `NOTICE` and the metadata of every
 bundled package for attribution; Nmap is not bundled.
 
 The image SBOM also inventories native packages and their license information.

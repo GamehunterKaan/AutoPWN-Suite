@@ -44,16 +44,18 @@ remain read-only. Third-party actions/tools are pinned. These checks apply to
 historical rebuilds too; an old tag does not waive current security policy.
 
 The standalone binaries (linux-amd64, linux-arm64, windows-amd64, macos-arm64)
-are built from Python 3.13 by the reusable `build-binary.yml` from the exact source
-archive that release validation produced (the same handoff the image build uses; pull requests run it
+are built by the reusable `build-binary.yml` from the exact source archive that release
+validation produced (the same handoff the image build uses; pull requests run it
 too, because `install-smoke.yml` archives the commit with `git archive` and passes that archive on, so the
-extraction runs on all four platforms before a release), with the hash-pinned `requirements-locked.txt` and
-`packaging/requirements-build.txt`. Each binary is smoke-tested on the runner that
+extraction runs on all four platforms before a release). `scripts/build_binary.py` builds each one with the
+CPython that `packaging/build-python.json` pins by SHA-256, the hash-pinned `requirements-locked.txt` and
+`packaging/requirements-build.txt`, `PYTHONHASHSEED=1` and the release commit time as `SOURCE_DATE_EPOCH`,
+**twice**, and the job fails unless both builds are byte-identical. Each binary is smoke-tested on the runner that
 built it (`scripts/smoke_install.py`: version check, then the dashboard serves its
 sign-in page), and `scripts/binary_sbom.py` writes a CycloneDX SBOM of that
-platform's bundled Python packages, PyInstaller and the interpreter. The binaries
-are produced on GitHub-hosted runners with moving tool images, so unlike the wheel
-and the container they are **not** claimed to be bit-for-bit reproducible. They
+platform's bundled Python packages, PyInstaller and the interpreter. Because the inputs are pinned and no
+library of the runner is bundled, anyone can rebuild a binary and compare its SHA-256 with `SHA256SUMS`
+([how](BUILDING.md#rebuilding-a-standalone-binary)). The binaries
 are not code-signed for Windows (Authenticode) or macOS (notarization); release
 signatures are Sigstore signatures only. The signing job is the only job in
 `publish-docker.yml` that holds `id-token:write`; keep signing there so the

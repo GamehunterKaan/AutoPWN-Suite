@@ -71,8 +71,9 @@ flowchart LR
    service that runs the installed program. `install.sh`/`uninstall.sh` manage a
    system-wide virtual environment (they honor `PREFIX`, `BINDIR`, `APPDIR` and
    `DESTDIR`). Releases are also distributed as a PyPI package and as standalone
-   PyInstaller binaries defined in `packaging/` and built by
-   `.github/workflows/build-binary.yml`.
+   PyInstaller binaries defined in `packaging/` and built, twice and byte-identical, by
+   `scripts/build_binary.py` in `.github/workflows/build-binary.yml` with the interpreter pinned in
+   `packaging/build-python.json`.
 
 ## Resources, deployment and boundaries
 

@@ -71,13 +71,18 @@ existing release summaries; they do not retroactively claim artifact signing.
   user-owned installation would let that user run code as root at the next service start.
 - Install `install.sh` dependencies without a second copy of the application source under `/opt`,
   and keep `REQUIREMENTS_FILE=requirements-locked.txt` for hash-verified installs.
-- Build the standalone binaries from hash-pinned dependencies (`requirements-locked.txt` and the
-  universal, hash-pinned `packaging/requirements-build.txt`), smoke-test every binary on the runner
-  that built it, and publish them only through the signed release workflow. The release manifest
+- Build the standalone binaries reproducibly. `scripts/build_binary.py` uses the CPython that
+  `packaging/build-python.json` pins by SHA-256 (a self-contained python-build-standalone archive, so no
+  library of the build machine is bundled), installs the hash-pinned dependencies (`requirements-locked.txt` and
+  the universal, hash-pinned `packaging/requirements-build.txt`) into a virtual environment of it and runs
+  PyInstaller with `PYTHONHASHSEED=1` and the commit time as `SOURCE_DATE_EPOCH`. Pull requests and releases
+  build every binary twice on its runner and fail unless both builds are byte-identical, so anyone can rebuild
+  a binary from the release source and compare its SHA-256 with `SHA256SUMS`. Every binary is smoke-tested on
+  the runner that built it and published only through the signed release workflow. The release manifest
   binds the binaries, `SHA256SUMS` and one CycloneDX SBOM per binary; `SHA256SUMS` also has its own
   Sigstore signature. Each SBOM is generated from that platform's build environment (installed
-  packages, PyInstaller, CPython) rather than by scanning the executable. The binaries are not
-  code-signed for Windows or macOS and are not claimed to be reproducible.
+  packages, PyInstaller, CPython and its python-build-standalone release) rather than by scanning the
+  executable. The binaries are not code-signed for Windows or macOS.
 - Publish a signed SLSA v1 provenance attestation (`autopwn-suite-vVERSION.intoto.jsonl`) with each
   release; its subject is the release manifest, which binds every release file. It is self-attested by
   the release workflow, not produced by an isolated builder.

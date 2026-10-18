@@ -46,16 +46,20 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    outputs:
+      source_date_epoch: ${{ steps.archive.outputs.source_date_epoch }}
     steps:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         persist-credentials: false
     - name: Archive the commit the way the release does
+      id: archive
       run: |
         set -euo pipefail
         version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
         mkdir out
         git archive --format=tar.gz --prefix="autopwn-suite-v${version}/" --output="out/autopwn-suite-v${version}.tar.gz" HEAD
+        printf 'source_date_epoch=%s\n' "$(git log -1 --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
         name: release-source
@@ -71,3 +75,4 @@ jobs:
     uses: ./.github/workflows/build-binary.yml
     with:
       source-artifact: release-source
+      source-date-epoch: ${{ needs.source.outputs.source_date_epoch }}

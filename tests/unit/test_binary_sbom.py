@@ -63,6 +63,13 @@ def test_components_carry_purls_and_the_interpreter_version(installed):
     assert components["cpython"]["version"] == platform.python_version()
 
 
+def test_the_standalone_interpreter_release_is_listed_when_pinned(installed):
+    pins = {"python": "3.13.16", "release": "20261013"}
+    components = {c["name"]: c for c in sbom.build_sbom(REQUIREMENTS, "2.7.0", "linux-amd64", pins)["components"]}
+    assert components["python-build-standalone"]["purl"] == "pkg:github/astral-sh/python-build-standalone@20261013"
+    assert "python-build-standalone" not in {c["name"] for c in sbom.build_sbom(REQUIREMENTS, "2.7.0", "linux-amd64")["components"]}
+
+
 def test_a_version_that_differs_from_the_lock_is_an_error(installed):
     installed["requests"] = "2.0.0"
     with pytest.raises(ValueError, match="installed as 2.0.0 but locked as 2.33.1"):

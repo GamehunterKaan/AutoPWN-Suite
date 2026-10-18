@@ -1,8 +1,10 @@
 name: Build binaries
 
-# Reusable: builds the standalone single-file binaries and smoke-tests each of them on the runner that built
-# it. Pull requests build the triggering commit through install-smoke.yml; the release workflow passes the
-# artifact holding the exact source archive its validation job produced and publishes the output.
+# Reusable: builds the standalone single-file binaries twice, requires both builds to be identical, and smoke-tests
+# each binary on the runner that built it. Pull requests build the triggering commit through install-smoke.yml; the
+# release workflow passes the artifact holding the exact source archive its validation job produced and publishes
+# the output. The interpreter is the one packaging/build-python.json pins by SHA-256, so the result does not depend
+# on the runner image (docs/BUILDING.md explains how to rebuild a published binary).
 on:
   workflow_call:
     inputs:
@@ -10,6 +12,10 @@ on:
         description: Artifact with the validated release source archive; empty builds the triggering commit
         type: string
         default: ''
+      source-date-epoch:
+        description: Commit time of the source in seconds, used as SOURCE_DATE_EPOCH
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -19,7 +25,7 @@ jobs:
     name: ${{ matrix.target }}
     permissions:
       contents: read
-    # Oldest runner images that are still supported, so the Linux binaries run on older glibc versions.
+    # One runner per platform and architecture. The binary does not use the runner's Python or libraries.
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -60,18 +66,22 @@ jobs:
           cd "$RUNNER_TEMP/release-source"
           dest="$(cd "$GITHUB_WORKSPACE" && pwd)"
           tar --extract --gzip --file autopwn-suite-v*.tar.gz --strip-components=1 --directory "$dest"
-      - name: Set up Python 3.13
+      - name: Set up Python to run the build script
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.13"
-      - name: Install hash-pinned dependencies and PyInstaller
+      - name: Build twice with the pinned toolchain and require identical bytes
         shell: bash
+        env:
+          SOURCE_DATE_EPOCH: ${{ inputs.source-date-epoch }}
         run: |
-          python -m pip install --require-hashes --only-binary=:all: --no-deps \
-            -r requirements-locked.txt -r packaging/requirements-build.txt
-      - name: Build
-        shell: bash
-        run: pyinstaller --clean --noconfirm packaging/autopwn-suite.spec
+          set -euo pipefail
+          echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+          # The script downloads the interpreter pinned in packaging/build-python.json, verifies its SHA-256, installs
+          # the hash-pinned requirements and PyInstaller into a virtual environment of it and builds the binary twice.
+          python scripts/build_binary.py --target "$TARGET" --work-dir "$RUNNER_TEMP/binary-build" --repeat \
+            --output "dist/autopwn-suite$SUFFIX"
+          sha256sum "dist/autopwn-suite$SUFFIX" 2>/dev/null || shasum -a 256 "dist/autopwn-suite$SUFFIX"
       - name: Smoke test the binary
         shell: bash
         run: |
@@ -86,7 +96,9 @@ jobs:
           mkdir binaries
           cp "dist/autopwn-suite$SUFFIX" "binaries/autopwn-suite-v${version}-${TARGET}${SUFFIX}"
           # The packages frozen into this binary depend on the platform, so the SBOM comes from this build environment.
-          python scripts/binary_sbom.py --version "$version" --target "$TARGET" --output "binaries/autopwn-suite-v${version}-binary-${TARGET}.cdx.json"
+          python="$RUNNER_TEMP/binary-build/venv/bin/python"
+          [ -x "$python" ] || python="$RUNNER_TEMP/binary-build/venv/Scripts/python.exe"
+          "$python" scripts/binary_sbom.py --version "$version" --target "$TARGET" --output "binaries/autopwn-suite-v${version}-binary-${TARGET}.cdx.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binary-${{ matrix.target }}
