@@ -798,6 +798,22 @@ class TestAPILog:
         assert len(resp.get_json()) == 1
 
 
+class TestAPIEvents:
+    def test_stream_sends_only_new_entries_because_the_page_loads_history_from_api_log(self, client, wu):
+        for number in range(3):
+            wu._broadcast({"msg": f"history {number}"})
+        assert [row["msg"] for row in client.get("/api/log").get_json()] == ["history 0", "history 1", "history 2"]
+        stream = client.get("/api/events", buffered=False)
+        try:
+            wu._broadcast({"msg": "live"})
+            chunks = iter(stream.response)
+            received = next(chunks) + next(chunks)  # the test client has already consumed one heartbeat
+            assert b"live" in received and b"history" not in received
+        finally:
+            stream.close()
+        assert not wu._sse_subscribers
+
+
 class TestAPISettings:
     def test_get_settings(self, client):
         resp = client.get("/api/settings")

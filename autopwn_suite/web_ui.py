@@ -1845,16 +1845,12 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     def api_events():
         session_token = request.cookies.get(COOKIE)
         client_q = queue.Queue(maxsize=_MAX_LOG_HISTORY)
-        with _log_history_lock:
-            snapshot = list(_log_history)
-            with _sse_subscribers_lock:
-                _sse_subscribers.append(client_q)
+        # History is served by /api/log; replaying it here would show every line twice on page load
+        # and again on every reconnect.
+        with _sse_subscribers_lock:
+            _sse_subscribers.append(client_q)
         def generate():
             try:
-                for entry in snapshot:
-                    if not auth.stream_valid(session_token):
-                        return
-                    yield f"data: {json.dumps(entry)}\n\n"
                 while True:
                     if not auth.stream_valid(session_token):
                         return

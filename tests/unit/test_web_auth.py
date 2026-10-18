@@ -178,10 +178,13 @@ def test_logout_revokes_cookie_copies_and_stops_open_event_stream(dashboard_logi
     client, csrf = logged_in(d)
     copied = d.app.test_client()
     copied.set_cookie(COOKIE, client.get_cookie(COOKIE).value)
-    d.wu._log_history.extend([{"msg": "first"}, {"msg": "must-not-leak-after-logout"}])
     stream = client.get("/api/events", buffered=False)
     iterator = iter(stream.response)
-    assert b"first" in next(iterator)
+    d.wu._broadcast({"msg": "first"})
+    d.wu._broadcast({"msg": "must-not-leak-after-logout"})
+    received = b""
+    while b"first" not in received:  # a heartbeat may come before the first entry
+        received += next(iterator)
     assert client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf}).status_code == 200
     with pytest.raises(StopIteration):
         next(iterator)

@@ -121,7 +121,7 @@ updates return 202.
 | `GET /api/vulnerability-database/download` | None | SQLite attachment when ready; otherwise 409. |
 | `GET /api/hosts` | None | Latest observed host records, with latest-attempt information where applicable. |
 | `GET /api/log` | None | Retained log/event entries. |
-| `GET /api/events` | SSE connection | `text/event-stream` with JSON event data and heartbeat comments. Disconnect to unsubscribe. |
+| `GET /api/events` | SSE connection | `text/event-stream` with JSON event data for entries added after the connection opens, and heartbeat comments. It does not replay retained history; read `GET /api/log` for that. Disconnect to unsubscribe. |
 | `GET /api/settings` | None | Stored settings object; SMTP password is masked, but this is still sensitive configuration (a stored NVD key and webhook URL are returned as saved). Values supplied by `*_FILE` credential files are not included. |
 | `PUT /api/settings` | Partial settings object | `{ok}`; merges/persists configuration. Masked SMTP password sentinel preserves the stored password. Account or credential keys are refused (400); use `PUT /api/auth/account`. |
 | `POST /api/settings/test_email` | Empty object | `{ok}` after configured test mail, or error. Disabled offline. |

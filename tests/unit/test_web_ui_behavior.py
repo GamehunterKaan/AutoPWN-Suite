@@ -267,6 +267,19 @@ assert.equal(document.getElementById('toast-el').textContent,'');
 """)
 
 
+def test_terminal_keeps_only_the_newest_lines():
+    run_js("""
+const term=document.getElementById('term');
+Object.defineProperty(term,'firstElementChild',{get(){return this.children[0]}});
+const createElement=document.createElement;
+document.createElement=()=>{const line=createElement();line.remove=()=>{term.children.splice(term.children.indexOf(line),1)};return line};
+for(let i=0;i<MAX_TERM_LINES+25;i++) addLog(null,'line '+i);
+assert.equal(term.children.length,MAX_TERM_LINES);
+assert.match(term.children[0].innerHTML,/line 25</);
+assert.match(term.children[MAX_TERM_LINES-1].innerHTML,new RegExp('line '+(MAX_TERM_LINES+24)+'<'));
+""")
+
+
 def test_profile_source_is_loaded_and_new_profile_resets_it():
     run_js("""
 profiles={airgap:{id:'airgap',name:'Airgap',config:{vulnerability_source:'offline'}}};

@@ -807,6 +807,7 @@ function updateBadges(){
 }
 
 // ── Terminal ──────────────────────────────────────────────────────────────────
+const MAX_TERM_LINES = 2000;
 function addLog(scanId,msg,level='info',ts=null){
   const f=document.getElementById('term-filter').value;
   const term=document.getElementById('term');
@@ -816,7 +817,9 @@ function addLog(scanId,msg,level='info',ts=null){
   line.className='ll '+level; line.dataset.scanId=scanId||'';
   line.style.display=(f&&scanId&&f!==scanId)?'none':'';
   line.innerHTML=`<span class="ll-sid">${esc(sid)}</span><span class="ll-ts">${time}</span><span class="ll-msg">${esc(msg)}</span>`;
-  term.appendChild(line); term.scrollTop=term.scrollHeight;
+  term.appendChild(line);
+  if(term.children.length>MAX_TERM_LINES) term.firstElementChild.remove();
+  term.scrollTop=term.scrollHeight;
 }
 function addTermFilterOption(scanId,target){
   const sel=document.getElementById('term-filter');
