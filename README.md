@@ -9,7 +9,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml/badge.svg" alt="security policy"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml/badge.svg" alt="dynamic analysis"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/releases"><img src="https://img.shields.io/github/v/release/GamehunterKaan/AutoPWN-Suite?color=3ba9ee&label=release" alt="release"></a>
-      <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="license: Apache 2.0"></a>
+      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="license: Apache 2.0"></a>
       <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.10%2B-3776AB.svg" alt="Python 3.10+"></a>
     </td>
   </tr>
@@ -54,8 +54,8 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
    autopwn-suite --web
    ```
 
-Use `-h` for all options. Report problems through [support](SUPPORT.md) and
-vulnerabilities privately through the [security policy](SECURITY.md).
+Use `-h` for all options. Report problems through [support](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SUPPORT.md) and
+vulnerabilities privately through the [security policy](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SECURITY.md).
 
 ### Security expectations
 
@@ -63,7 +63,7 @@ AutoPWN Suite is an operator-controlled scanner that runs with your privileges a
 stores integration credentials in plaintext JSON. Scan only systems you are authorized
 to test, do not expose the dashboard to the public internet, keep it behind HTTPS and
 trusted network controls, and verify releases before use. See the
-[security policy](SECURITY.md) for reporting, response times and deployment guidance.
+[security policy](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SECURITY.md) for reporting, response times and deployment guidance.
 
 ## Achievements and project health
 
@@ -71,21 +71,21 @@ The badges at the top show the status that
 [OpenSSF Best Practices project 15518](https://www.bestpractices.dev/projects/15518)
 reports for the Best Practices levels and the
 [OpenSSF Baseline](https://www.bestpractices.dev/en/projects/15518/baseline-3) levels.
-They are updated by OpenSSF, not by this repository. The [roadmap](docs/ROADMAP.md) lists
-planned work and non-goals, and the [continuity plan](docs/CONTINUITY.md) describes
+They are updated by OpenSSF, not by this repository. The [roadmap](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/ROADMAP.md) lists
+planned work and non-goals, and the [continuity plan](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/CONTINUITY.md) describes
 maintainer succession.
 
 ## Features
 
-Project documentation: [build from source](docs/BUILDING.md),
-[dependency management](docs/DEPENDENCIES.md), [architecture](docs/ARCHITECTURE.md),
-[interfaces](docs/INTERFACES.md), [governance](GOVERNANCE.md),
-[changelog](CHANGELOG.md), [release verification](docs/RELEASING.md), and
-[security policy](SECURITY.md), [support lifecycle](SUPPORT.md),
-[threat model](docs/THREAT_MODEL.md), [secret management](docs/SECRETS.md), and
-[security checks](docs/SECURITY_TESTING.md), [roadmap](docs/ROADMAP.md),
-[access continuity](docs/CONTINUITY.md), [accessibility](docs/ACCESSIBILITY.md) and
-[internationalization](docs/INTERNATIONALIZATION.md).
+Project documentation: [build from source](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/BUILDING.md),
+[dependency management](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/DEPENDENCIES.md), [architecture](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/ARCHITECTURE.md),
+[interfaces](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/INTERFACES.md), [governance](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/GOVERNANCE.md),
+[changelog](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/CHANGELOG.md), [release verification](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/RELEASING.md), and
+[security policy](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SECURITY.md), [support lifecycle](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SUPPORT.md),
+[threat model](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/THREAT_MODEL.md), [secret management](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/SECRETS.md), and
+[security checks](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/SECURITY_TESTING.md), [roadmap](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/ROADMAP.md),
+[access continuity](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/CONTINUITY.md), [accessibility](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/ACCESSIBILITY.md) and
+[internationalization](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/INTERNATIONALIZATION.md).
 
 ### CLI
 - Fully [automatic](#usage) scanning and exploitation
@@ -110,7 +110,7 @@ Project documentation: [build from source](docs/BUILDING.md),
 
 AutoPWN Suite includes a built-in web dashboard for managing scans from your browser.
 
-![Web UI Dashboard](images/screenshots/dashboard.png)
+![Web UI Dashboard](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/dashboard.png)
 
 **Signing in.** The dashboard requires a login. On first launch the server creates an `admin`
 account with a random password and prints both once in the terminal; only a scrypt hash of the
@@ -133,9 +133,9 @@ with a new random password and sign out all sessions. Remote access requires HTT
 - **Persistent settings** - All settings, profiles and schedules are saved to disk
 - **Configurable via environment variables** - Set host, port and data directory without touching code
 
-![Scan Profiles](images/screenshots/profiles.png)
+![Scan Profiles](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/profiles.png)
 
-![Scheduled Scans](images/screenshots/schedules.png)
+![Scheduled Scans](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/schedules.png)
 
 
 ## How Does It Work?
@@ -400,7 +400,7 @@ AutoPWN Suite needs [Nmap](https://nmap.org/download.html) on `PATH` for network
 (`sudo apt install nmap`, `brew install nmap`, or the installer from nmap.org on Windows).
 Website-only dashboard scans do not need it, and the command line offers to install it
 on first use. Every method below gives you the `autopwn-suite` command. Verify downloads
-as described in [Releasing](docs/RELEASING.md#consumer-verification).
+as described in [Releasing](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/RELEASING.md#consumer-verification).
 
 ### pipx or uv (recommended)
 
@@ -418,7 +418,7 @@ pipx uninstall autopwn-suite      # remove
 Each [release](https://github.com/GamehunterKaan/AutoPWN-Suite/releases) attaches
 single-file binaries that need no Python installation: `linux-amd64`, `linux-arm64`,
 `windows-amd64.exe` and `macos-arm64`. Verify the signed `SHA256SUMS`
-([how](docs/RELEASING.md#consumer-verification)), then on Linux or macOS make the file
+([how](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/RELEASING.md#consumer-verification)), then on Linux or macOS make the file
 executable and run it:
 
 ```bash
@@ -447,7 +447,7 @@ sudo bash uninstall.sh
 It creates a virtual environment in `/opt/autopwn-suite`, installs the package into it and
 links `/usr/local/bin/autopwn-suite` to it. `PREFIX`, `BINDIR`, `APPDIR` and `DESTDIR` are
 honored, and `REQUIREMENTS_FILE=requirements-locked.txt` installs hash-verified dependencies
-(see [Building](docs/BUILDING.md)).
+(see [Building](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/BUILDING.md)).
 
 ### From source
 ```bash
@@ -561,7 +561,7 @@ autopwn-suite --web --web-host 0.0.0.0 --web-port 3000
 
 Listening beyond localhost exposes the sign-in page to the network. Remote clients must then use HTTPS (terminate TLS in a reverse proxy, set `AUTOPWN_WEB_SECURE_COOKIE=1`, and firewall the service). Inside containers, publish the port to loopback only (`-p 127.0.0.1:8080:8080`).
 
-![Scan Running](images/screenshots/scan-running.png)
+![Scan Running](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/scan-running.png)
 
 ### REST API
 
@@ -642,7 +642,7 @@ poetry run pytest -m "not slow"
 docker build --tag autopwn-suite:local .
 ```
 
-See [Build from source](docs/BUILDING.md) for prerequisites, package builds and
+See [Build from source](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/BUILDING.md) for prerequisites, package builds and
 running the locally built image. The Compose file runs a published image.
 
 
@@ -653,7 +653,7 @@ I would be glad if you are willing to contribute this project. I am looking forw
 
 ## License
 
-AutoPWN Suite is licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
+AutoPWN Suite is licensed under the [Apache License 2.0](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/LICENSE). See [NOTICE](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/NOTICE) for attribution.
 
 Third-party dependencies are covered by their own licenses.
 

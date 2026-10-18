@@ -46,6 +46,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   commands on every user's PATH. Run the tests with `poetry run pytest`.
 - Build the wheel and the standalone binaries on every pull request and run an install smoke test
   (`scripts/smoke_install.py`) on Linux, macOS and Windows.
+- Link the documents and screenshots in `README.md` with absolute GitHub URLs. PyPI shows the README
+  as the project description and cannot resolve relative paths, and a published description cannot be
+  edited.
 
 ### Security changes
 
