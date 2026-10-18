@@ -18,19 +18,22 @@ class SQLIScanner:
         self.tested_urls = set()
         self.findings = []
         self.sqli_test = "'1"
+        # The target controls the body, and re holds the GIL while it matches, so every gap between two words is
+        # bounded (an error message keeps its words close together) and the body is cut before matching.
         self.sql_dbms_errors = [
             r"you have an error in your sql syntax",
-            r"warning.*?mysql(?:i)?[_\W]",
-            r"postgresql.*?error|pg_query\(\).*?failed|psycopg\w*\.errors\.syntaxerror",
+            r"warning.{0,200}?mysql(?:i)?[_\W]",
+            r"postgresql.{0,200}?error|pg_query\(\).{0,200}?failed|psycopg\w*\.errors\.syntaxerror",
             r"unclosed quotation mark after the character string",
-            r"microsoft.*?(?:odbc|oledb).*?sql server|sqlserverexception",
+            r"microsoft.{0,200}?(?:odbc|oledb).{0,200}?sql server|sqlserverexception",
             r"\bORA-\d{5}\b",
-            r"microsoft.*?(?:jet|access).*?database",
-            r"sqlite(?:3)?\.(?:operationalerror|exception)|sqlite_error|sqlite.*?syntax error",
-            r"syntax error.*?at or near",
+            r"microsoft.{0,200}?(?:jet|access).{0,200}?database",
+            r"sqlite(?:3)?\.(?:operationalerror|exception)|sqlite_error|sqlite.{0,200}?syntax error",
+            r"syntax error.{0,200}?at or near",
         ]
 
     def _errors(self, text):
+        text = text[:50_000]
         return {pattern for pattern in self.sql_dbms_errors if re.search(pattern, text, re.I)}
 
     def exploit_sqli(self, base_url, url_params):

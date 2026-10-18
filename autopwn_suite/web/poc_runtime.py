@@ -104,11 +104,13 @@ class _Document(HTMLParser):
 
 
 def _sql_errors(text):
-    patterns = [r"you have an error in your sql syntax", r"warning.*?mysql(?:i)?[_\W]",
-                r"postgresql.*?error|pg_query\(\).*?failed|psycopg\w*\.errors\.syntaxerror",
-                r"unclosed quotation mark after the character string", r"microsoft.*?(?:odbc|oledb).*?sql server|sqlserverexception",
-                r"\bORA-\d{5}\b", r"microsoft.*?(?:jet|access).*?database",
-                r"sqlite(?:3)?\.(?:operationalerror|exception)|sqlite_error|sqlite.*?syntax error", r"syntax error.*?at or near"]
+    # Bounded gaps and a cut body: the target controls the text and re holds the GIL while it matches.
+    patterns = [r"you have an error in your sql syntax", r"warning.{0,200}?mysql(?:i)?[_\W]",
+                r"postgresql.{0,200}?error|pg_query\(\).{0,200}?failed|psycopg\w*\.errors\.syntaxerror",
+                r"unclosed quotation mark after the character string", r"microsoft.{0,200}?(?:odbc|oledb).{0,200}?sql server|sqlserverexception",
+                r"\bORA-\d{5}\b", r"microsoft.{0,200}?(?:jet|access).{0,200}?database",
+                r"sqlite(?:3)?\.(?:operationalerror|exception)|sqlite_error|sqlite.{0,200}?syntax error", r"syntax error.{0,200}?at or near"]
+    text = text[:50_000]
     return {pattern for pattern in patterns if re.search(pattern, text, re.I)}
 
 
@@ -154,7 +156,7 @@ def _response_condition(plan, response):
     if kind == "ERROR_DISCLOSURE":
         patterns = [r"Traceback \(most recent call last\):[\s\S]{0,4000}File [\"']",
                     r"(?:Fatal error|Uncaught \w+(?:Exception|Error))[\s\S]{0,2000}Stack trace:",
-                    r"(?:\w*Exception|\w*Error):[^\n<]*[\s\S]{0,2000}\bat [\w.$]+\([^)]*\.java:\d+\)",
+                    r"\b(?:\w*Exception|\w*Error):[\s\S]{0,2000}\bat [\w.$]+\([^)]*\.java:\d+\)",
                     r"Server Error in [\s\S]{0,4000}(?:Stack Trace:|Source Error:)"]
         return response.status_code >= 500 and any(re.search(pattern, text, re.I) for pattern in patterns)
     if kind == "DEBUG_DISCLOSURE":
@@ -166,14 +168,14 @@ def _response_condition(plan, response):
         if not 200 <= response.status_code < 300 or (is_html and re.search(r"<(?:!doctype html|html|body)\b", text, re.I)):
             return False
         if ".env" in path:
-            keys = re.findall(r"^\s*(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=.+$", text, re.M)
+            keys = [match[1] for line in text.splitlines()[:5000] if (match := re.match(r"[ \t]*(?:export[ \t]+)?([A-Z_][A-Z0-9_]*)[ \t]*=.", line[:500]))]
             return len(set(keys)) >= 2 and any(re.search(r"SECRET|PASSWORD|TOKEN|DATABASE|DB_", key) for key in keys)
         if path.endswith("/.git/head"):
             return bool(re.fullmatch(r"(?:ref: refs/(?:heads|tags)/[^\s]+|[0-9a-f]{40})\s*", text, re.I))
         if path.endswith("/.git/config"):
             return bool(re.search(r"^\[core\]", text, re.M)) and "repositoryformatversion" in text
         if path.endswith((".sql", ".sql.bak")):
-            return bool(re.search(r"-- (?:MySQL|PostgreSQL).*dump|CREATE TABLE\s", text, re.I))
+            return bool(re.search(r"-- (?:MySQL|PostgreSQL).{0,200}dump|CREATE TABLE\s", text, re.I))
         if path.endswith((".bak", ".old", "~", ".save")):
             return "<?php" in text and bool(re.search(r"\$\w+\s*=|function\s+\w+", text))
         if path.endswith("/web.config"):

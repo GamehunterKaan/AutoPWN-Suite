@@ -10,6 +10,10 @@ from bs4 import BeautifulSoup
 from autopwn_suite.web.findings import emit, finding
 from autopwn_suite.web.http import is_html, resolve_url, same_origin
 
+# One assignment per line. The patterns below read target-controlled text and re holds the GIL while it matches,
+# so no pattern may backtrack over the whole body: lines are matched one at a time and gaps are bounded.
+ENV_ASSIGNMENT = re.compile(r"[ \t]*(?:export[ \t]+)?([A-Z_][A-Z0-9_]*)[ \t]*=.")
+
 
 def inspect_content(url, response, console):
     from autopwn_suite.web.runtime import ACTIVE
@@ -29,14 +33,14 @@ def inspect_content(url, response, console):
     if 200 <= response.status_code < 300:
         if not is_html(response) or not re.search(r"<(?:!doctype html|html|body)\b", text, re.I):
             if path.endswith(("/.env", "/.env.local", "/.env.production")):
-                keys = re.findall(r"^\s*(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=.+$", text, re.M)
+                keys = [match[1] for line in text.splitlines()[:5_000] if (match := ENV_ASSIGNMENT.match(line[:500]))]
                 if len(set(keys)) >= 2 and any(re.search(r"SECRET|PASSWORD|TOKEN|DATABASE|DB_", key) for key in keys):
                     add("EXPOSED_FILE", "Environment configuration with sensitive-key assignments; values omitted", "high")
             if path.endswith("/.git/head") and re.fullmatch(r"(?:ref: refs/(?:heads|tags)/[^\s]+|[0-9a-f]{40})\s*", text, re.I):
                 add("EXPOSED_FILE", "Publicly readable Git HEAD structure", "low", "observation")
             if path.endswith("/.git/config") and re.search(r"^\[core\]", text, re.M) and "repositoryformatversion" in text:
                 add("EXPOSED_FILE", "Publicly readable Git repository configuration; contents omitted")
-            if path.endswith((".sql", ".sql.bak")) and re.search(r"(?:-- (?:MySQL|PostgreSQL).*dump|CREATE TABLE\s)", text, re.I):
+            if path.endswith((".sql", ".sql.bak")) and re.search(r"(?:-- (?:MySQL|PostgreSQL).{0,200}dump|CREATE TABLE\s)", text, re.I):
                 add("EXPOSED_FILE", "Database dump structure; records omitted", "high")
             if path.endswith((".bak", ".old", "~", ".save")) and "<?php" in text and re.search(r"\$\w+\s*=|function\s+\w+", text):
                 add("EXPOSED_FILE", "Unprocessed PHP source in a backup file; source omitted", "high")
@@ -66,7 +70,7 @@ def inspect_content(url, response, console):
         signatures = [
             ("Python traceback", r"Traceback \(most recent call last\):[\s\S]{0,4000}File [\"']"),
             ("PHP stack trace", r"(?:Fatal error|Uncaught \w+(?:Exception|Error))[\s\S]{0,2000}Stack trace:"),
-            ("Java stack trace", r"(?:\w*Exception|\w*Error):[^\n<]*[\s\S]{0,2000}\bat [\w.$]+\([^)]*\.java:\d+\)"),
+            ("Java stack trace", r"\b(?:\w*Exception|\w*Error):[\s\S]{0,2000}\bat [\w.$]+\([^)]*\.java:\d+\)"),
             ("ASP.NET detailed error", r"Server Error in [\s\S]{0,4000}(?:Stack Trace:|Source Error:)"),
         ]
         for label, pattern in signatures:
