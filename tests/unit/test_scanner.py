@@ -97,6 +97,42 @@ class TestPortScan:
         assert "-sS" not in kwargs["arguments"]
         assert "-O" not in kwargs["arguments"]
 
+    @pytest.mark.parametrize("technique", ["-sS", "-sA", "-sW", "-sM", "-sN", "-sF", "-sX"])
+    @patch("autopwn_suite.scanner.is_root", return_value=False)
+    def test_port_scan_as_non_root_drops_raw_socket_flags_from_customflags(self, mock_is_root, mock_port_scanner, technique):
+        """The dashboard always sends a scan technique and may send -O; Nmap refuses both without root."""
+        mock_log = MagicMock()
+
+        PortScan("127.0.0.1", mock_log, customflags=f"{technique} -p 22,80 --version-intensity 5 -O")
+
+        arguments = mock_port_scanner.scan.call_args.kwargs["arguments"].split()
+        assert technique not in arguments and "-O" not in arguments
+        assert "-sV" in arguments and "-p" in arguments and "22,80" in arguments
+        assert "--version-intensity" in arguments and "5" in arguments
+        mock_log.logger.assert_called_with(
+            "warning", f"Not running as root; dropping {technique}, -O, which need raw-socket privileges."
+        )
+
+    @pytest.mark.parametrize("flags", ["-sT -p 80", "-sU", "-sV --osscan-guess", ""])
+    @patch("autopwn_suite.scanner.is_root", return_value=False)
+    def test_port_scan_as_non_root_leaves_other_flags_alone(self, mock_is_root, mock_port_scanner, flags):
+        mock_log = MagicMock()
+
+        PortScan("127.0.0.1", mock_log, customflags=flags)
+
+        assert mock_port_scanner.scan.call_args.kwargs["arguments"].endswith(f" {flags}")
+        mock_log.logger.assert_called_once_with("info", "Scanning 127.0.0.1 for open ports ...")
+
+    @patch("autopwn_suite.scanner.is_root", return_value=True)
+    def test_port_scan_as_root_keeps_customflags_verbatim(self, mock_is_root, mock_port_scanner):
+        mock_log = MagicMock()
+
+        PortScan("127.0.0.1", mock_log, customflags="-sA -O")
+
+        arguments = mock_port_scanner.scan.call_args.kwargs["arguments"].split()
+        assert arguments.count("-sA") == 1 and arguments.count("-O") == 2
+        mock_log.logger.assert_called_once_with("info", "Scanning 127.0.0.1 for open ports ...")
+
 
 @pytest.mark.unit
 class TestResultParsing:

@@ -112,6 +112,13 @@ def PortScan(
                 base_flags += ["-f", "-g", "53", "--data-length", "10"]
             arguments = " ".join(base_flags + [customflags])
         else:
+            # The dashboard always sends a scan technique and may send -O; Nmap refuses
+            # both without raw-socket privileges. -sT is Nmap's unprivileged default.
+            raw_socket_flag = _re.compile(r'(?<!\S)(?:-O|-s[SAWMNFX])(?!\S)')
+            dropped = raw_socket_flag.findall(customflags)
+            if dropped:
+                log.logger("warning", f"Not running as root; dropping {', '.join(dropped)}, which need raw-socket privileges.")
+                customflags = raw_socket_flag.sub("", customflags)
             arguments = " ".join(
                 [
                     "-sV",
