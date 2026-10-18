@@ -64,6 +64,39 @@ def test_cli_offline_scan_has_no_online_side_effects(local_database, monkeypatch
     assert "-n" in autopwn.PortScan.call_args.args[-1]
 
 
+@pytest.mark.parametrize("source, report_sent", [("auto", True), ("offline", False)])
+def test_cli_report_follows_the_offline_choice_not_the_nvd_fallback(local_database, monkeypatch, source, report_sent):
+    """An automatic fallback concerns NVD only; the webhook report is skipped solely when offline was chosen."""
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    from autopwn_suite.report import ReportType
+    monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)  # -y sets it; restored afterwards.
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    webhook = "https://hooks.example.test/h"
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--vuln-source", source, "--vuln-db", str(local_database),
+                                    "-t", "192.168.1.10", "-y", "--skip-discovery", "--skip-exploit-download",
+                                    "--api", "unused", "--report", "webhook", "--report-webhook", webhook])
+    monkeypatch.setattr(autopwn, "check_nmap", MagicMock())
+    monkeypatch.setattr(autopwn, "PortScan", MagicMock(return_value=nmap_observation()))
+    monkeypatch.setattr(autopwn, "AnalyseScanResults", lambda *a: [["192.168.1.10", 22, "ssh", "OpenSSH", "8.2p1"]])
+    monkeypatch.setattr(autopwn, "WebScan", lambda: False)
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock())
+    monkeypatch.setattr(autopwn, "InitializeReport", MagicMock())
+    unreachable = MagicMock(side_effect=RuntimeError("NVD unreachable"))
+    monkeypatch.setattr("autopwn_suite.nist_search.searchCVE", unreachable)
+
+    autopwn.main()
+
+    if report_sent:
+        unreachable.assert_called_once()  # NVD was tried, failed, and the scan went on with the local database.
+        assert autopwn.InitializeReport.call_count == 1
+        assert autopwn.InitializeReport.call_args.args[:2] == (ReportType.WEBHOOK, webhook)
+    else:
+        unreachable.assert_not_called()
+        autopwn.InitializeReport.assert_not_called()
+
+
 def test_database_management_commands_do_not_start_a_scan(local_database, monkeypatch):
     from rich.console import Console
 

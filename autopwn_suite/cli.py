@@ -202,7 +202,9 @@ def main() -> None:
     finally:
         lookup.close()
 
-    if lookup.source != "offline":
+    # Only an offline mode the operator chose suppresses the report; an automatic fallback to the local
+    # database (lookup.source) concerns NVD, not SMTP or the webhook.
+    if not offline:
         InitializeReport(ReportMethod, ReportObject, log, console)
     SaveOutput(console, args.output_type, args.output, args.output_folder, targetarg)
 
