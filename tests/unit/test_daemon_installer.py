@@ -25,6 +25,7 @@ from autopwn_suite.daemon.daemon_installer import (
     _get_validated_email,
     _get_validated_int,
 )
+from autopwn_suite.utils import InitArgsConf
 
 
 @pytest.fixture
@@ -231,6 +232,34 @@ class TestCreateConfig:
             f"Expected call '{expected_write_call}' not found in call list: {mock_open.call_args_list}"
 
         mock_config_instance.write.assert_called_once()
+
+    def test_create_config_keeps_percent_signs_in_a_webhook_url_and_api_key(self, mock_console, tmp_path):
+        """A lone '%' is legal in a secret; the writer must accept what InitArgsConf reads."""
+        webhook, api_key = "https://hooks.example.test/h?t=a%2Fb", "k%ey%"
+        mock_console.input.side_effect = [
+            "0", "2", webhook, "", "", api_key, "", "", "1", "", "1", "", "",
+        ]
+        config_path = tmp_path / "autopwn.conf"
+
+        assert CreateConfig(mock_console, str(config_path)) is True
+
+        args = SimpleNamespace(config=str(config_path))
+        InitArgsConf(args, MagicMock())
+        assert args.report_webhook == webhook
+        assert args.api == api_key
+
+    def test_create_config_keeps_percent_signs_in_an_smtp_password(self, mock_console, tmp_path):
+        mock_console.input.side_effect = [
+            "0", "1", "user@example.test", "p%ssw0rd", "to@example.test", "", "smtp.example.test", "587",
+            "", "", "", "", "", "1", "", "1", "", "",
+        ]
+        config_path = tmp_path / "autopwn.conf"
+
+        assert CreateConfig(mock_console, str(config_path)) is True
+
+        args = SimpleNamespace(config=str(config_path))
+        InitArgsConf(args, MagicMock())
+        assert args.report_email_password == "p%ssw0rd"
 
 
 @pytest.mark.unit

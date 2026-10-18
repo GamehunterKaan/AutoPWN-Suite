@@ -139,7 +139,8 @@ def CreateConfig(console, config_filename=""):
         output_type = "html"
 
     console.print("Creating config file...")
-    config = ConfigParser()
+    # InitArgsConf reads with interpolation disabled, so a '%' in a secret or URL must be written the same way.
+    config = ConfigParser(interpolation=None)
     config['AUTOPWN'] = {
         'scan_interval': str(scan_interval),
         'target': target,
