@@ -67,3 +67,20 @@ def test_missing_wordlist_and_baseline_failure():
         assert dirbust("http://example.com", console, log) == []
         get.assert_called_once()
     console.print.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("target,expected", [
+    ("http://example.com/index.php?view=one", "http://example.com/admin"),
+    ("http://example.com/app/index.php", "http://example.com/app/admin"),
+    ("http://example.com/en/", "http://example.com/en/admin"),
+])
+def test_discovery_is_relative_to_the_directory_of_a_file_path(web_response, target, expected):
+    def respond(url, **kwargs):
+        if "__autopwn_missing_" in url:
+            return web_response("not found", status=404, url=url)
+        return web_response("admin panel", url=url)
+
+    with patch("autopwn_suite.web.dirbust.open", mock_open(read_data="admin")), patch("autopwn_suite.web.dirbust.get", side_effect=respond):
+        found = dirbust(target, MagicMock(), MagicMock())
+    assert [item["url"] for item in found] == [expected]

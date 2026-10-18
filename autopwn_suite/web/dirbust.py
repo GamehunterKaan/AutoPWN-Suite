@@ -38,10 +38,17 @@ def _catch_all(response, url, controls):
     return False
 
 
-def dirbust(target_url, console, log):
-    parts = urlsplit(target_url)
+def discovery_base(url):
+    parts = urlsplit(url)
     # Directory discovery is relative to the application path, never its query.
-    target_url = urlunsplit(parts._replace(path=parts.path.rstrip("/") + "/", query="", fragment=""))
+    # A last segment with a dot names a file (/index.php), so use its directory.
+    head, _, last = parts.path.rpartition("/")
+    path = head if "." in last else parts.path
+    return urlunsplit(parts._replace(path=path.rstrip("/") + "/", query="", fragment=""))
+
+
+def dirbust(target_url, console, log):
+    target_url = discovery_base(target_url)
     try:
         with open(f"{dirname(__file__)}/../data/web_discovery.txt", "r", encoding="utf-8") as file:
             dirs = list(dict.fromkeys(line.strip() for line in file if line.strip() and not line.startswith("#")))

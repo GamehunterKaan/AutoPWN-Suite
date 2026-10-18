@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlsplit
 
 import pytest
 from requests.exceptions import ConnectionError
@@ -102,3 +103,39 @@ def test_injection_endpoint_control_limits_every_classic_scanner(web_response):
         getattr(scanner.return_value, method).assert_called_once_with(url + "a?id=1")
     assert summary["status"] == "partial"
     assert "Injection endpoint budget reached; coverage is limited." in summary["issues"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("landing", ["/index.php", "/en/"])
+def test_directory_discovery_still_covers_the_requested_root_after_a_redirect(web_response, landing):
+    requested = []
+
+    def respond(url, **kwargs):
+        requested.append(url)
+        path = urlsplit(url).path
+        if path == "/":
+            return web_response(status=302, url=url, headers={"Location": landing})
+        if path == landing:
+            return web_response("<html>Home</html>", url=url)
+        if path == "/.env":
+            return web_response("APP_ENV=lab", url=url)
+        return web_response("not found", status=404, url=url)
+
+    with patch("autopwn_suite.web.webvuln.get", side_effect=respond), patch("autopwn_suite.web.dirbust.get", side_effect=respond), patch("autopwn_suite.web.webvuln.crawl", return_value={"http://example.test" + landing}):
+        findings = webvuln("http://example.test/", MagicMock(), MagicMock(), controls={"speed": 5})
+    assert {"/.env", "/.git/HEAD", "/backup.sql"} <= {urlsplit(url).path for url in requested}
+    assert "http://example.test/.env" in {item["url"] for item in findings}
+
+
+@pytest.mark.unit
+def test_directory_discovery_stays_under_a_deliberate_sub_path(web_response):
+    requested = []
+
+    def respond(url, **kwargs):
+        requested.append(url)
+        return web_response("<html>App</html>" if url.endswith("/app/") else "not found", status=200 if url.endswith("/app/") else 404, url=url)
+
+    with patch("autopwn_suite.web.webvuln.get", side_effect=respond), patch("autopwn_suite.web.dirbust.get", side_effect=respond), patch("autopwn_suite.web.webvuln.crawl", return_value={"http://example.test/app/"}):
+        webvuln("http://example.test/app/", MagicMock(), MagicMock(), controls={"speed": 5})
+    assert "http://example.test/app/admin" in requested
+    assert all(urlsplit(url).path.startswith("/app/") for url in requested)

@@ -13,7 +13,7 @@ from autopwn_suite.nmap_progress import ScanCancelled
 from autopwn_suite.random_user_agent import random_user_agent
 from autopwn_suite.web.additional import additional_checks, critical_checks
 from autopwn_suite.web.crawler import crawl
-from autopwn_suite.web.dirbust import dirbust
+from autopwn_suite.web.dirbust import dirbust, discovery_base
 from autopwn_suite.web.http import origin, same_origin, scoped_get
 from autopwn_suite.web.lfi import LFIScanner
 from autopwn_suite.web.passive import inspect_response
@@ -165,7 +165,12 @@ def _execute_webvuln(target, log, console):
     # injection checks, so it cannot consume their entire request budget.
     if any(enabled(name) for name in ("directories", "exposed_files", "errors")):
         stage("Directory and content discovery")
-        results.extend(dirbust(target_url, console, log))
+        # A redirect from the requested path (/ to /en/ or /index.php) must not
+        # hide it, so discover under the requested path and the landing page.
+        landing = urlsplit(target_url)
+        requested = urlunsplit(landing._replace(path=urlsplit(candidate).path))
+        for base in dict.fromkeys(discovery_base(url) for url in (requested, target_url)):
+            results.extend(dirbust(base, console, log))
     results.extend(additional_checks(target_url, urls, response, log, console, headers, include_boolean=False))
     if enabled("headers"):
         results.extend(run_task("headers", target_url, lambda: inspect_response(target_url, response, console)))
