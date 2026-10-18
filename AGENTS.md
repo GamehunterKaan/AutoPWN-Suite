@@ -58,7 +58,7 @@ Update these in the same change:
 - Report vulnerabilities privately (`SECURITY.md`), never in public issues or PRs.
 
 **Git and review**
-- Work on a branch and open a pull request to `main`. It needs the required checks, an up-to-date branch and one approval from a human who is neither the author nor the last pusher, so agents cannot approve or merge; any push dismisses earlier approvals, so batch pushes.
+- Work on a branch and open a pull request to `main` directly: a suggested change or fix needs no issue and no prior approval from the maintainer. It needs the required checks, an up-to-date branch and one approval from a human who is neither the author nor the last pusher, so agents cannot approve or merge; any push dismisses earlier approvals, so batch pushes.
 - Sign off every commit (`git commit -s`; the DCO in `.github/CONTRIBUTING.md`, which the maintainer checks and CI does not) and, as `main` does, add a `Co-Authored-By` trailer for AI assistance.
 - The PR description says why a new dependency is needed and explains any new lint exception or skipped test; dashboard changes include the accessibility checklist.
 - Ask first before force-pushing, tagging, releasing, or changing repository, PyPI or Docker Hub settings or code-scanning alerts.
@@ -72,7 +72,9 @@ Update these in the same change:
 - A Windows working tree can hold CRLF files while the index is LF; keep each file's line endings when editing.
 - `tests/unit/test_install_scripts.py` runs its install-script cases only with bash and tar (9 of 13 skip on Windows); `tests/integration/test_nmap_live.py` needs Nmap; four test modules skip without Node.
 
-## Working style
+## How to work
+
+Every agent or session that changes this repository works this way:
 
 - State assumptions and ask when a requirement is ambiguous.
 - Make surgical changes: every changed line traces to the request, and unrelated dead code is mentioned, not deleted.
@@ -87,4 +89,4 @@ Update these in the same change:
 - Dependencies, builds, releases: `docs/DEPENDENCIES.md`, `docs/BUILDING.md`, `docs/RELEASING.md`
 - CLI, environment and library surface: `docs/INTERFACES.md`
 - Secrets: `docs/SECRETS.md`; vulnerability reports: `SECURITY.md`
-- New or large features: `docs/ROADMAP.md` (non-goals) and an issue first, unless the maintainer asked for the work; governance: `GOVERNANCE.md`
+- New or large features: check the non-goals in `docs/ROADMAP.md` first; governance: `GOVERNANCE.md`

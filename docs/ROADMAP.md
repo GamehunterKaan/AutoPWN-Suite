@@ -14,8 +14,8 @@ Sources for this plan: the open and locally fixed items in
 [Security advisories](SECURITY_ADVISORIES.md), the known gaps in the
 [threat model](THREAT_MODEL.md) and [secret management](SECRETS.md), the
 OpenSSF Best Practices criteria, and the `Unreleased` section of the changelog. Contributions are welcome
-for any item; see [CONTRIBUTING.md](../.github/CONTRIBUTING.md) and open an issue
-before starting large work.
+for any item; see [CONTRIBUTING.md](../.github/CONTRIBUTING.md) and check the non-goals
+below before starting large work.
 
 ## Where the project is today
 

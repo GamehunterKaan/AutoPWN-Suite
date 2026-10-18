@@ -1,7 +1,7 @@
 # Contributing
 
-When contributing to this repository, please first discuss the change you wish to make via issue,
-email, or any other method with the owners of this repository before making a change. 
+Pull requests with suggested changes and fixes are welcome directly: you do not need to open an
+issue or ask the owners first. Describe the change and why it is needed in the pull request.
 
 Please note we have a code of conduct, please follow it in all your interactions with the project.
 
@@ -125,9 +125,9 @@ user-visible text.
 ## Good first contributions
 
 New or occasional contributors can pick any of these small, self-contained tasks. Each one
-is a single focused pull request that does not need deep knowledge of the scanner. Comment
-on (or open) an issue first so work is not duplicated; maintainers label starter issues
-`good first issue` and `help wanted`.
+is a single focused pull request that does not need deep knowledge of the scanner. Open the
+pull request directly, or comment on an issue first if you want to avoid duplicated work;
+maintainers label starter issues `good first issue` and `help wanted`.
 
 | Task | Where to start | Skills |
 | --- | --- | --- |
