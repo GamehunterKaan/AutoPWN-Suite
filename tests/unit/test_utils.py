@@ -533,6 +533,32 @@ class TestNmapInstallation:
         mock_log.logger.assert_any_call("warning", "Nmap is not installed.")
         mock_install_linux.assert_called_once_with(mock_log)
 
+    @pytest.mark.parametrize("answer", ["n", "N", "no", "NO", " n ", "No\t"])
+    @patch("autopwn_suite.utils.install_nmap_linux")
+    @patch("autopwn_suite.utils.system", return_value="Linux")
+    @patch("autopwn_suite.utils.check_call", side_effect=FileNotFoundError)
+    def test_check_nmap_declining_the_install_offer_runs_no_installer(
+        self, mock_check_call, mock_system, mock_install_linux, answer, monkeypatch
+    ):
+        """Any spelling of "no" must refuse the sudo install instead of running it."""
+        monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
+        with patch("builtins.input", return_value=answer), pytest.raises(SystemExit):
+            check_nmap(MagicMock())
+        mock_install_linux.assert_not_called()
+
+    @patch("autopwn_suite.utils.install_nmap_linux")
+    @patch("autopwn_suite.utils.system", return_value="Linux")
+    @patch("autopwn_suite.utils.check_call", side_effect=FileNotFoundError)
+    def test_check_nmap_asks_again_after_an_unrecognized_answer(
+        self, mock_check_call, mock_system, mock_install_linux, monkeypatch
+    ):
+        """An answer that is neither yes nor no must not be taken as permission for sudo."""
+        monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
+        with patch("builtins.input", side_effect=["nope", "no"]) as prompt, pytest.raises(SystemExit):
+            check_nmap(MagicMock())
+        assert prompt.call_count == 2
+        mock_install_linux.assert_not_called()
+
     @patch("autopwn_suite.utils.check_call")
     @pytest.mark.parametrize(
         "distro_name, expected_command",
@@ -829,3 +855,29 @@ class TestConfirmation:
         result = Confirmation("Test message")
         assert result is expected_result
         mock_input.assert_called_once_with("Test message")
+
+    @pytest.mark.parametrize("user_input, expected_result", [
+        ("no", False), ("NO", False), ("No", False), (" n ", False), ("\tno\t", False),
+        (" y ", True), ("YES", True), (" yes ", True), ("  ", True),
+    ])
+    @patch("builtins.input")
+    def test_confirmation_accepts_words_case_and_surrounding_space(
+        self, mock_input, monkeypatch, user_input, expected_result
+    ):
+        """"no" must decline and padding must not change the answer."""
+        monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
+        mock_input.return_value = user_input
+        assert Confirmation("Test message") is expected_result
+        mock_input.assert_called_once_with("Test message")
+
+    @pytest.mark.parametrize("unrecognized", ["nope", "0", "never", "yep", "maybe"])
+    @pytest.mark.parametrize("final, expected_result", [("n", False), ("y", True), ("", True)])
+    @patch("builtins.input")
+    def test_confirmation_asks_again_after_an_unrecognized_answer(
+        self, mock_input, monkeypatch, unrecognized, final, expected_result
+    ):
+        """An answer that is neither yes nor no is never taken as consent; the question is repeated."""
+        monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
+        mock_input.side_effect = [unrecognized, final]
+        assert Confirmation("Test message") is expected_result
+        assert mock_input.call_count == 2

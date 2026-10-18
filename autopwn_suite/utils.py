@@ -635,8 +635,13 @@ def Confirmation(message) -> bool:
     if DontAskForConfirmation:
         return True
 
-    confirmation = input(message)
-    return confirmation.lower() != "n"
+    while True:
+        answer = input(message).strip().lower()
+        if answer in ("", "y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print("Please answer y or n.")
 
 
 def UserConfirmation(args) -> tuple[bool, bool, bool]:
@@ -916,13 +921,7 @@ def check_nmap(log, *, offline=False) -> None:
         log.logger("warning", "Nmap is not installed.")
         if offline:
             raise SystemExit("Nmap must be installed before using offline mode.") from None
-        if DontAskForConfirmation:
-            auto_install = True
-        else:
-            auto_install = (
-                input(f"Install Nmap on your system ({system()})? ").lower() != "n"
-            )
-        if auto_install:
+        if Confirmation(f"Install Nmap on your system ({system()})? [Y/n] : "):
             platform_ = system().lower()
             if platform_ == "linux":
                 install_nmap_linux(log)
