@@ -1,7 +1,7 @@
 # Roadmap
 
 This roadmap covers **Q4 2026 through Q4 2027** (five calendar quarters, 2026-10-01
-to 2027-12-31) and was last reviewed on 2026-10-18. It states what the maintainer
+to 2027-12-31) and was last reviewed on 2026-10-19. It states what the maintainer
 intends to work on and what the project deliberately will not do. AutoPWN Suite is
 a volunteer-maintained project: items are **intentions, not commitments or delivery
 dates**, and they may move, shrink or be dropped as security reports, contributor
@@ -19,7 +19,7 @@ below before starting large work.
 
 ## Where the project is today
 
-- **v2.7.0** (2026-10-18) is the supported stable release ([support policy](../SUPPORT.md)).
+- **v2.7.0** (2026-10-19) is the supported stable release ([support policy](../SUPPORT.md)).
 - v2.6.1 (2026-10-16) shipped fixes for AUTOPWN-SA-2026-002 through 005, a
   required dashboard login, signed-release tooling and expanded documentation.
   v2.6.0 and earlier do not have these changes.
@@ -33,7 +33,7 @@ below before starting large work.
 ### Q4 2026 (October-December): harden the release path
 
 - Done: v2.6.1 (2026-10-16) shipped the dashboard login and the
-  AUTOPWN-SA-2026-002..005 fixes, followed by v2.7.0 (2026-10-18); the release notes
+  AUTOPWN-SA-2026-002..005 fixes, followed by v2.7.0 (2026-10-19); the release notes
   are in [CHANGELOG.md](../CHANGELOG.md) ([release procedure](RELEASING.md)).
 - At each stable release, update [SECURITY_ADVISORIES.md](SECURITY_ADVISORIES.md), the threat model,
   interface and support documents so they match the released behavior (the dashboard

@@ -128,7 +128,7 @@ release that contains it.
 ## AUTOPWN-SA-2026-006 — Webhook URL written to logs and reports on delivery failure
 
 - Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
-- Status: **fixed in v2.7.0** (2026-10-18). Fixed released version: **2.7.0**.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
 - CWE-532; low, requiring a failed webhook delivery and access to the resulting
   log, report or server log.
 - Impact: a webhook URL is a credential (for Slack, Discord and similar services
