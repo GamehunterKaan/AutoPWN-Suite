@@ -58,7 +58,7 @@ def source_tree(tmp_path):
 
 
 def run_script(repo, script, env_overrides, expect=0, cwd=None):
-    env = {k: v for k, v in os.environ.items() if k not in {"PREFIX", "BINDIR", "APPDIR", "DESTDIR", "PYTHON"}}
+    env = {k: v for k, v in os.environ.items() if k not in {"PREFIX", "BINDIR", "APPDIR", "DESTDIR", "PYTHON", "SYSTEMDDIR"}}
     env.update(env_overrides)
     result = subprocess.run(
         [BASH, str(repo / script)], env=env, capture_output=True, text=True, timeout=120, cwd=cwd)
@@ -134,7 +134,7 @@ def test_non_staged_install_creates_venv_without_sudo(source_tree, tmp_path):
     app.mkdir(parents=True)
     (app / "autopwn-daemon.conf").write_text("[DAEMON]\n")
     env = {
-        "APPDIR": str(app), "BINDIR": str(bindir),
+        "APPDIR": str(app), "BINDIR": str(bindir), "SYSTEMDDIR": str(tmp_path / "no-systemd"),
         "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(pip_log),
         "REQUIREMENTS_FILE": "requirements-locked.txt",
         "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
@@ -155,6 +155,60 @@ def test_non_staged_install_creates_venv_without_sudo(source_tree, tmp_path):
     run_script(source_tree, "uninstall.sh", {"APPDIR": str(app), "BINDIR": str(bindir),
                                             "PATH": env["PATH"]})
     assert not app.exists() and not os.path.lexists(bindir / "autopwn-suite")
+
+
+LEGACY_UNIT = """[Service]
+WorkingDirectory=/opt/autopwn-suite
+ExecStart=/opt/autopwn-suite/.venv/bin/python /opt/autopwn-suite/autopwn.py -c /opt/autopwn-suite/autopwn-daemon.conf
+"""
+CURRENT_UNIT = """[Service]
+WorkingDirectory=/opt/autopwn-suite
+ExecStart=/opt/autopwn-suite/.venv/bin/python -m autopwn_suite -c /opt/autopwn-suite/autopwn-daemon.conf
+"""
+
+
+def install_with_unit(source_tree, tmp_path, unit, **extra):
+    """A non-staged install with a fake systemd directory, optionally holding a daemon unit."""
+    systemd = tmp_path / "systemd"
+    systemd.mkdir()
+    if unit is not None:
+        (systemd / "autopwn-daemon.service").write_text(unit)
+    env = {
+        "APPDIR": str(tmp_path / "live/app"), "BINDIR": str(tmp_path / "live/bin"),
+        "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(tmp_path / "pip.log"),
+        "SYSTEMDDIR": str(systemd),
+    }
+    env.update(extra)
+    return run_script(source_tree, "install.sh", env), systemd / "autopwn-daemon.service"
+
+
+@posix_only
+def test_install_warns_when_a_daemon_from_an_earlier_release_still_runs_its_own_copy(source_tree, tmp_path):
+    result, unit = install_with_unit(source_tree, tmp_path, LEGACY_UNIT)
+    assert "WARNING:" in result.stdout and "autopwn.py" in result.stdout
+    assert "sudo autopwn-suite --daemon-install" in result.stdout
+    assert "sudo systemctl restart autopwn-daemon" in result.stdout
+    if os.geteuid() != 0:
+        assert "sudo bash install.sh" in result.stdout
+    # The installer only reports: the service file is never rewritten or restarted.
+    assert unit.read_text() == LEGACY_UNIT
+
+
+@posix_only
+@pytest.mark.parametrize("unit", [CURRENT_UNIT, None], ids=["current-unit", "no-unit"])
+def test_install_stays_quiet_when_the_daemon_is_current_or_absent(source_tree, tmp_path, unit):
+    result, _ = install_with_unit(source_tree, tmp_path, unit)
+    assert "WARNING" not in result.stdout + result.stderr
+    assert "Installation complete!" in result.stdout
+
+
+@posix_only
+def test_staged_install_never_inspects_the_systemd_directory(source_tree, tmp_path):
+    systemd = tmp_path / "systemd"
+    systemd.mkdir()
+    (systemd / "autopwn-daemon.service").write_text(LEGACY_UNIT)
+    result = run_script(source_tree, "install.sh", {"DESTDIR": str(tmp_path / "stage"), "SYSTEMDDIR": str(systemd)})
+    assert "WARNING" not in result.stdout + result.stderr
 
 
 @posix_only
@@ -182,6 +236,7 @@ def test_unsafe_or_relative_paths_are_rejected(source_tree, tmp_path, script):
     run_script(source_tree, script, {"APPDIR": "/", "DESTDIR": str(tmp_path / "s")}, expect=2)
     run_script(source_tree, script, {"APPDIR": "relative/dir", "DESTDIR": str(tmp_path / "s")}, expect=2)
     run_script(source_tree, script, {"PREFIX": "usr", "DESTDIR": str(tmp_path / "s")}, expect=2)
+    run_script(source_tree, script, {"SYSTEMDDIR": "relative/dir", "DESTDIR": str(tmp_path / "s")}, expect=2)
 
 
 # ---------------------------------------------------------------- repeatable builds

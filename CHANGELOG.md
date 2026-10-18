@@ -38,7 +38,10 @@ existing release summaries; they do not retroactively claim artifact signing.
   systemd unit starts the installation that ran it (`python -m autopwn_suite`, or the standalone
   binary) with the configuration kept in `/opt/autopwn-suite/autopwn-daemon.conf`; run it from an
   installed copy. It now refuses to install unless that installation is root-owned (see Security
-  changes), so a pipx or user-owned virtual environment is rejected.
+  changes), so a pipx or user-owned virtual environment is rejected. A daemon installed by 2.6.x or
+  earlier keeps running its own copy of the old source until you run `sudo autopwn-suite --daemon-install`
+  once more (it asks for the configuration again) and restart the service; `install.sh` now warns when
+  it finds such a service (`SYSTEMDDIR` names the directory it checks).
 - Remove the `test` and `tests` Poetry scripts, which a published package would have installed as
   commands on every user's PATH. Run the tests with `poetry run pytest`.
 - Build the wheel and the standalone binaries on every pull request and run an install smoke test
@@ -57,6 +60,8 @@ existing release summaries; they do not retroactively claim artifact signing.
 - Keep dashboard credentials and the CVE database out of the installed package directory, which is
   shared or read-only for a system installation and is discarded by single-file binaries. The
   per-user data directory is created readable only by its owner where the platform supports it.
+- `install.sh` warns when a root daemon installed by an earlier release still runs its old copied
+  source, which would otherwise keep running without the fixes in this release.
 - `--daemon-install` refuses to create a root systemd service from an interpreter, package directory
   or `/opt/autopwn-suite` that an unprivileged user could modify (anything not owned by root, or
   writable by group or others, including every parent directory and symlink target). Without this a

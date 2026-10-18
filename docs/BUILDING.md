@@ -127,6 +127,7 @@ are unchanged: the application goes to `/opt/autopwn-suite` and the command to
 | `DESTDIR` | empty | Staging root; every file written goes under it. |
 | `PYTHON` | `python3` | Interpreter used to create the virtualenv. |
 | `REQUIREMENTS_FILE` | `requirements.txt` | Dependency file; `requirements-locked.txt` gives hash-verified, lockfile-exact installs. |
+| `SYSTEMDDIR` | `/etc/systemd/system` | Directory holding the daemon unit; `install.sh` checks it for a service that an earlier release installed, and `uninstall.sh` removes the unit from it. |
 
 ```sh
 # Live install to a custom prefix (no sudo when the directories are writable)
@@ -142,7 +143,11 @@ and then the package from the checkout itself (`pip install --no-deps`), so no s
 copy of the source tree is kept, and links `$BINDIR/autopwn-suite` to the command in
 that venv. `sudo` is used only when the target is not writable by the current user.
 Re-running it replaces the venv and leaves other files in `$APPDIR` (such as the
-daemon configuration) alone.
+daemon configuration) alone. A daemon installed by release 2.6 or earlier runs its own
+copy of the source in `$APPDIR`, which `install.sh` does not replace, so that service keeps
+running the older version. `install.sh` therefore warns when the unit still starts
+`autopwn.py`; run `sudo autopwn-suite --daemon-install` once, which asks for the
+configuration again, and restart the service.
 
 With `DESTDIR` set, the script stages the source in `$APPDIR/src` and writes the
 command link only: no `sudo`, no ownership changes, no systemd calls, and no

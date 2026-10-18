@@ -30,6 +30,9 @@ Variables (standard GNU/packaging conventions):
   REQUIREMENTS_FILE  Dependency file inside the repository. Default:
                      requirements.txt. Use requirements-locked.txt for
                      hash-verified, lockfile-exact installs.
+  SYSTEMDDIR         Directory holding the daemon unit, checked for a service
+                     that an earlier release installed. Default:
+                     /etc/systemd/system
 USAGE
 }
 
@@ -63,6 +66,7 @@ elif [ -n "$PREFIX_GIVEN" ]; then
 else
     APPDIR="/opt/autopwn-suite"
 fi
+SYSTEMDDIR="$(strip_slashes "${SYSTEMDDIR:-/etc/systemd/system}")"
 if [ -n "$DESTDIR" ]; then
     DESTDIR="$(strip_slashes "$DESTDIR")"
     case "$DESTDIR" in
@@ -71,7 +75,7 @@ if [ -n "$DESTDIR" ]; then
     esac
 fi
 
-for var in PREFIX BINDIR APPDIR; do
+for var in PREFIX BINDIR APPDIR SYSTEMDDIR; do
     value="${!var}"
     case "$value" in
         /*) ;;
@@ -173,3 +177,18 @@ echo "You can now run AutoPWN Suite simply with:"
 echo "  autopwn-suite"
 echo "or as root:"
 echo "  sudo autopwn-suite"
+
+# A daemon that release 2.6 or earlier installed runs its own copy of the source (autopwn.py) that this
+# script never touches, so it keeps running that older version until its unit is regenerated.
+SERVICE_UNIT="$SYSTEMDDIR/autopwn-daemon.service"
+if [ -f "$SERVICE_UNIT" ] && grep -q 'autopwn\.py' "$SERVICE_UNIT"; then
+    echo
+    echo "WARNING: $SERVICE_UNIT still starts the copy of AutoPWN Suite that an"
+    echo "earlier release installed (autopwn.py), so the daemon keeps running that older version."
+    echo "Regenerate the service so it runs this installation, then restart it:"
+    echo "  sudo autopwn-suite --daemon-install     # asks for the configuration again"
+    echo "  sudo systemctl restart autopwn-daemon"
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "The daemon runs as root and only accepts a root-owned installation: run 'sudo bash install.sh' first."
+    fi
+fi
