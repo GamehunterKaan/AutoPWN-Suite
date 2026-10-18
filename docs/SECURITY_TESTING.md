@@ -86,9 +86,9 @@ JavaScript/TypeScript and Actions; retain its required checks.
 Medium/low results remain visible in retained reports and require triage within
 14 days; target medium remediation within 30 days and low within 90 days. Review
 CodeQL security alerts with the same high/critical blocking threshold and
-medium/low targets. Existing open medium findings remain disclosed in the
+medium/low targets. Medium findings, including those already fixed, remain disclosed in the
 [assessment](SECURITY_ASSESSMENT.md) and [advisories](SECURITY_ADVISORIES.md).
-Passing automated checks does not remediate those findings or prove safety.
+Passing automated checks does not remediate findings or prove safety.
 
 The only SAST suppression mechanism is `.security/sast-exceptions.json`: a
 reviewed exact finding fingerprint, source-backed non-exploitability reason and

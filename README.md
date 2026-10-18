@@ -648,7 +648,7 @@ running the locally built image. The Compose file runs a published image.
 
 ## Contributing to AutoPWN Suite
 
-I would be glad if you are willing to contribute this project. I am looking forward to merge your pull request unless its something that is not needed or just a personal preference. Also minor changes and bug fixes will not be merged. Please create an issue for those and I will do it myself. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
+Pull requests with suggested changes and fixes are welcome directly: you do not need to open an issue or ask first. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
 
 
 ## License
