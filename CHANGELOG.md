@@ -87,6 +87,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   after the same security and dynamic-analysis workflows as the container release. The wheel and
   source distribution are built twice from a pinned backend (`poetry-core==2.5.0`) and hash-pinned
   tools and are published only if both builds are byte-identical.
+- Give the container build the release commit time as `SOURCE_DATE_EPOCH` (the validation job computed it but
+  never exported it, so the build received an empty value), push the image only after the standalone binaries
+  have been built so that a failed binary build leaves no unsigned image or moved `latest` tag, and extract the
+  release source archive on Windows with a destination path that GNU tar can read. Pull requests now build the
+  binaries from a `git archive` of the commit through the same source-archive handoff as the release.
 - Install the policy's static-analysis tool (`bandit`) from a hash-pinned requirements file, and scan
   the pinned release build tools (PyInstaller, the wheel build tools and bandit) for known
   vulnerabilities in the security policy, and bundle `LICENSE`, `NOTICE` and the metadata of every

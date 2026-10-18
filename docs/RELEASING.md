@@ -35,7 +35,8 @@ Keep at least two project owners (see [continuity](CONTINUITY.md)).
 Read-only jobs validate/archive the release and run source security checks, then
 build each architecture without publication secrets. Syft generates a CycloneDX
 SBOM from each actual image archive; OSV checks installed OS/Python dependencies
-and Python licenses before registry publication. A separate push job has no
+and Python licenses before registry publication. A separate push job, which waits for
+the image builds, the dynamic analysis and the standalone binaries, has no
 GitHub token permissions and only the Docker Hub credentials it needs. Signing
 gets `contents:read`, `id-token:write` and registry signature-push access. Upload
 alone gets `contents:write` and no OIDC or Docker credentials. Workflow defaults
@@ -44,7 +45,9 @@ historical rebuilds too; an old tag does not waive current security policy.
 
 The standalone binaries (linux-amd64, linux-arm64, windows-amd64, macos-arm64)
 are built from Python 3.13 by the reusable `build-binary.yml` from the exact source
-archive that release validation produced (the same handoff the image build uses), with the hash-pinned `requirements-locked.txt` and
+archive that release validation produced (the same handoff the image build uses; pull requests run it
+too, because `install-smoke.yml` archives the commit with `git archive` and passes that archive on, so the
+extraction runs on all four platforms before a release), with the hash-pinned `requirements-locked.txt` and
 `packaging/requirements-build.txt`. Each binary is smoke-tested on the runner that
 built it (`scripts/smoke_install.py`: version check, then the dashboard serves its
 sign-in page), and `scripts/binary_sbom.py` writes a CycloneDX SBOM of that

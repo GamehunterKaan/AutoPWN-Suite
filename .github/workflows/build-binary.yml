@@ -55,9 +55,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Relative archive name: GNU tar reads "D:\..." on Windows as a remote host.
+          # Relative archive name: GNU tar reads "D:\..." on Windows as a remote host. The destination goes through
+          # pwd for the same reason: GITHUB_WORKSPACE is D:\a\repo\repo there, and tar reads "\a" in --directory as an escape.
           cd "$RUNNER_TEMP/release-source"
-          tar --extract --gzip --file autopwn-suite-v*.tar.gz --strip-components=1 --directory "$GITHUB_WORKSPACE"
+          dest="$(cd "$GITHUB_WORKSPACE" && pwd)"
+          tar --extract --gzip --file autopwn-suite-v*.tar.gz --strip-components=1 --directory "$dest"
       - name: Set up Python 3.13
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
