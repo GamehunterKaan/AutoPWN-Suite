@@ -7,7 +7,9 @@ usage() {
     cat <<'USAGE'
 Usage: [VARIABLE=value ...] bash install.sh
 
-Installs AutoPWN Suite system-wide. Defaults are unchanged from earlier
+Installs AutoPWN Suite system-wide from this checkout: a virtual environment
+in the application directory holds the package and its dependencies, and the
+autopwn-suite command in BINDIR links to it. Defaults are unchanged from earlier
 releases: application in /opt/autopwn-suite, command in /usr/local/bin.
 
 Variables (standard GNU/packaging conventions):
@@ -18,10 +20,11 @@ Variables (standard GNU/packaging conventions):
   APPDIR             Application directory. Default: /opt/autopwn-suite, or
                      $PREFIX/lib/autopwn-suite when PREFIX is set.
   DESTDIR            Staging root for packagers. Every file is written under
-                     "$DESTDIR"; the generated wrapper still refers to the final
+                     "$DESTDIR"; the command link still refers to the final
                      (non-DESTDIR) path. No sudo, ownership change, or virtualenv
-                     is created when DESTDIR is set; the command to create the
-                     virtualenv on the target system is printed instead.
+                     is created when DESTDIR is set: the source is staged in
+                     "$DESTDIR$APPDIR/src" and the commands that create the
+                     virtualenv on the target system are printed instead.
   PYTHON             Python interpreter used to create the virtualenv.
                      Default: python3
   REQUIREMENTS_FILE  Dependency file inside the repository. Default:
@@ -117,59 +120,51 @@ if [ -n "$DESTDIR" ]; then
     echo "Staged install into DESTDIR=$DESTDIR (no virtualenv, no ownership changes)."
 fi
 
-echo "[1/4] Copying repo to $STAGE_TARGET_DIR ..."
-run_for "$STAGE_TARGET_DIR" rm -rf "$STAGE_TARGET_DIR"
-run_for "$STAGE_TARGET_DIR" mkdir -p "$STAGE_TARGET_DIR"
-if needs_sudo "$STAGE_TARGET_DIR"; then
-    # The directory was just created by root; hand it to the invoking user first.
-    sudo chown "$(id -un)":"$(id -gn)" "$STAGE_TARGET_DIR"
-fi
-(cd "$REPO_DIR" && tar -cf - --exclude='.venv' --exclude='./.git' .) \
-    | (cd "$STAGE_TARGET_DIR" && tar -xpf - --no-same-owner)
-if [ -z "$DESTDIR" ]; then
-    run_for "$TARGET_DIR" chown -R "$(id -un)":"$(id -gn)" "$TARGET_DIR"
+# Final (runtime) location of the staged source, and what pip installs from.
+if [ -n "$DESTDIR" ]; then
+    SOURCE_DIR="$TARGET_DIR/src"
+else
+    SOURCE_DIR="$REPO_DIR"
 fi
 
 if [ -n "$DESTDIR" ]; then
-    echo "[2/4] Skipping virtualenv creation (DESTDIR is set)."
-    echo "[3/4] Skipping dependency installation (DESTDIR is set)."
+    echo "[1/3] Staging source in $STAGE_TARGET_DIR/src ..."
+    run_for "$STAGE_TARGET_DIR/src" rm -rf "$STAGE_TARGET_DIR/src"
+    run_for "$STAGE_TARGET_DIR/src" mkdir -p "$STAGE_TARGET_DIR/src"
+    (cd "$REPO_DIR" && tar -cf - --exclude='.venv' --exclude='./.git' .)         | (cd "$STAGE_TARGET_DIR/src" && tar -xpf - --no-same-owner)
+    echo "[2/3] Skipping virtualenv and package installation (DESTDIR is set)."
 else
-    echo "[2/4] Creating virtual environment at $VENV_DIR ..."
+    echo "[1/3] Creating virtual environment at $VENV_DIR ..."
+    run_for "$TARGET_DIR" rm -rf "$VENV_DIR"
+    run_for "$TARGET_DIR" mkdir -p "$TARGET_DIR"
+    if needs_sudo "$TARGET_DIR"; then
+        # The directory was just created by root; hand it to the invoking user first.
+        sudo chown "$(id -un)":"$(id -gn)" "$TARGET_DIR"
+    fi
     "$PYTHON" -m venv "$VENV_DIR"
 
-    echo "[3/4] Installing Python dependencies ..."
+    echo "[2/3] Installing Python dependencies and AutoPWN Suite ..."
     # shellcheck disable=SC1091
     source "$VENV_DIR/bin/activate"
     pip install --upgrade pip setuptools wheel
-    if [ -f "$TARGET_DIR/$REQUIREMENTS_FILE" ]; then
-        pip install -r "$TARGET_DIR/$REQUIREMENTS_FILE"
+    if [ -f "$REPO_DIR/$REQUIREMENTS_FILE" ]; then
+        pip install -r "$REPO_DIR/$REQUIREMENTS_FILE"
     fi
+    pip install --no-deps "$SOURCE_DIR"
     deactivate
 fi
 
-echo "[4/4] Creating wrapper command at $STAGE_WRAPPER ..."
+echo "[3/3] Linking command $STAGE_WRAPPER -> $VENV_DIR/bin/autopwn-suite ..."
 run_for "$STAGE_BINDIR" mkdir -p "$STAGE_BINDIR"
-# The wrapper embeds the final path ($TARGET_DIR), never the DESTDIR path.
-run_for "$STAGE_WRAPPER" tee "$STAGE_WRAPPER" > /dev/null <<EOF
-#!/usr/bin/env bash
-REPO_DIR="$TARGET_DIR"
-VENV_PY="\$REPO_DIR/.venv/bin/python"
-ENTRY="\$REPO_DIR/autopwn.py"
-
-if [ ! -x "\$VENV_PY" ]; then
-    echo "Error: virtualenv python not found at \$VENV_PY" >&2
-    exit 1
-fi
-
-exec "\$VENV_PY" "\$ENTRY" "\$@"
-EOF
-run_for "$STAGE_WRAPPER" chmod 0755 "$STAGE_WRAPPER"
+# The link targets the final path ($VENV_DIR), never the DESTDIR path.
+run_for "$STAGE_WRAPPER" ln -sfn "$VENV_DIR/bin/autopwn-suite" "$STAGE_WRAPPER"
 
 if [ -n "$DESTDIR" ]; then
     echo "Staged installation complete under $DESTDIR."
-    echo "On the target system, create the virtualenv the wrapper expects:"
+    echo "On the target system, create the virtualenv the command links to:"
     echo "  $PYTHON -m venv $VENV_DIR"
-    echo "  $VENV_DIR/bin/pip install -r $TARGET_DIR/$REQUIREMENTS_FILE"
+    echo "  $VENV_DIR/bin/pip install -r $SOURCE_DIR/$REQUIREMENTS_FILE"
+    echo "  $VENV_DIR/bin/pip install --no-deps $SOURCE_DIR"
     exit 0
 fi
 

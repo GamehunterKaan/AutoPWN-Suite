@@ -10,7 +10,7 @@ not isolated accounts or a public multi-tenant service.
 
 Run `python autopwn.py --help` from a source checkout for the generated option
 reference, types and defaults. `autopwn-suite` is also available after the Linux
-installer creates its wrapper. Arguments are parsed in `autopwn_suite/utils.py`.
+installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 
 | Options | Input and effect |
 | --- | --- |

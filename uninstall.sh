@@ -107,12 +107,13 @@ else
     echo "Directory $TARGET_DIR does not exist; skipping."
 fi
 
-echo "[3/3] Removing wrapper $WRAPPER ..."
-if [ -f "$WRAPPER" ]; then
+echo "[3/3] Removing command $WRAPPER ..."
+# -L: the link dangles once the application directory is gone (older installs have a wrapper script).
+if [ -e "$WRAPPER" ] || [ -L "$WRAPPER" ]; then
     run_for "$WRAPPER" rm -f "$WRAPPER"
-    echo "Removed wrapper $WRAPPER"
+    echo "Removed command $WRAPPER"
 else
-    echo "Wrapper $WRAPPER does not exist; skipping."
+    echo "Command $WRAPPER does not exist; skipping."
 fi
 
 echo "Uninstallation complete!"

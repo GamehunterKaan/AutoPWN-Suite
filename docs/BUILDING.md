@@ -111,15 +111,21 @@ DESTDIR="$PWD/pkgroot" PREFIX=/usr bash install.sh
 DESTDIR="$PWD/pkgroot" PREFIX=/usr bash uninstall.sh   # mirrors the same variables
 ```
 
-With `DESTDIR` set, the scripts copy the source and write the wrapper only: no
-`sudo`, no ownership changes, no systemd calls, and no virtualenv (a venv embeds
-absolute paths and cannot be relocated, and creating it needs network access
-that packaging build roots often lack). The generated wrapper refers to the
-final path (for example `/usr/lib/autopwn-suite`), never the `DESTDIR` path. The
-script prints the two commands to run on the target system (typically from a
-package post-install step) to create `$APPDIR/.venv` and install the
-dependencies. Without `DESTDIR`, the venv is created in place as before, and
-`sudo` is used only when the target is not writable by the current user.
+Without `DESTDIR`, `install.sh` creates `$APPDIR/.venv`, installs the dependencies
+and then the package from the checkout itself (`pip install --no-deps`), so no second
+copy of the source tree is kept, and links `$BINDIR/autopwn-suite` to the command in
+that venv. `sudo` is used only when the target is not writable by the current user.
+Re-running it replaces the venv and leaves other files in `$APPDIR` (such as the
+daemon configuration) alone.
+
+With `DESTDIR` set, the script stages the source in `$APPDIR/src` and writes the
+command link only: no `sudo`, no ownership changes, no systemd calls, and no
+virtualenv (a venv embeds absolute paths and cannot be relocated, and creating it
+needs network access that packaging build roots often lack). The link refers to the
+final path (for example `/usr/lib/autopwn-suite/.venv/bin/autopwn-suite`), never the
+`DESTDIR` path. The script prints the three commands to run on the target system
+(typically from a package post-install step) to create `$APPDIR/.venv`, install the
+dependencies and install the staged source.
 `uninstall.sh` must be given the same `PREFIX`/`BINDIR`/`APPDIR` (and optional
 `SYSTEMDDIR`, default `/etc/systemd/system`) that were used to install.
 

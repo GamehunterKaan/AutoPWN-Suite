@@ -38,12 +38,12 @@ chmod +x "$venv/bin/pip" "$venv/bin/python"
 @pytest.fixture
 def source_tree(tmp_path):
     repo = tmp_path / "repo"
-    (repo / "modules").mkdir(parents=True)
+    (repo / "autopwn_suite").mkdir(parents=True)
     (repo / ".git").mkdir()
     (repo / ".venv").mkdir()
     (repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
     (repo / ".venv" / "marker").write_text("do not copy\n")
-    (repo / "modules" / "tool.py").write_text("print('tool')\n")
+    (repo / "autopwn_suite" / "tool.py").write_text("print('tool')\n")
     (repo / "autopwn.py").write_text("print('autopwn')\n")
     (repo / "requirements.txt").write_text("requests\n")
     (repo / "requirements-locked.txt").write_text("requests==1.0 --hash=sha256:00\n")
@@ -75,22 +75,20 @@ def test_scripts_are_valid_bash():
 
 
 @posix_only
-def test_destdir_stages_every_file_and_wrapper_uses_final_path(source_tree, tmp_path):
+def test_destdir_stages_the_source_and_links_to_the_final_path(source_tree, tmp_path):
     stage = tmp_path / "stage"
     result = run_script(source_tree, "install.sh", {"DESTDIR": str(stage), "PREFIX": "/usr"})
 
     app = stage / "usr/lib/autopwn-suite"
-    wrapper = stage / "usr/bin/autopwn-suite"
-    assert (app / "autopwn.py").is_file()
-    assert (app / "modules/tool.py").is_file()
-    assert not (app / ".git").exists() and not (app / ".venv").exists()
-    assert wrapper.stat().st_mode & 0o755 == 0o755
-
-    text = wrapper.read_text()
-    assert 'REPO_DIR="/usr/lib/autopwn-suite"' in text
-    assert str(stage) not in text
+    command_link = stage / "usr/bin/autopwn-suite"
+    assert (app / "src/autopwn.py").is_file()
+    assert (app / "src/autopwn_suite/tool.py").is_file()
+    assert not (app / "src/.git").exists() and not (app / "src/.venv").exists()
+    assert command_link.is_symlink()
+    assert os.readlink(command_link) == "/usr/lib/autopwn-suite/.venv/bin/autopwn-suite"
     # No venv is created inside DESTDIR; the operator is told how to make it.
     assert "python3 -m venv /usr/lib/autopwn-suite/.venv" in result.stdout
+    assert "pip install --no-deps /usr/lib/autopwn-suite/src" in result.stdout
     # Nothing escaped the staging directory.
     written = {p.relative_to(stage).parts[0] for p in stage.iterdir()}
     assert written == {"usr"}
@@ -100,9 +98,9 @@ def test_destdir_stages_every_file_and_wrapper_uses_final_path(source_tree, tmp_
 def test_default_layout_is_unchanged_under_destdir(source_tree, tmp_path):
     stage = tmp_path / "stage"
     run_script(source_tree, "install.sh", {"DESTDIR": str(stage)})
-    assert (stage / "opt/autopwn-suite/autopwn.py").is_file()
-    wrapper = stage / "usr/local/bin/autopwn-suite"
-    assert 'REPO_DIR="/opt/autopwn-suite"' in wrapper.read_text()
+    assert (stage / "opt/autopwn-suite/src/autopwn.py").is_file()
+    command_link = stage / "usr/local/bin/autopwn-suite"
+    assert os.readlink(command_link) == "/opt/autopwn-suite/.venv/bin/autopwn-suite"
 
 
 @posix_only
@@ -111,14 +109,14 @@ def test_bindir_and_appdir_override_prefix(source_tree, tmp_path):
     run_script(
         source_tree, "install.sh",
         {"DESTDIR": str(stage), "PREFIX": "/usr", "BINDIR": "/usr/sbin", "APPDIR": "/srv/ap//"})
-    assert (stage / "srv/ap/autopwn.py").is_file()
-    assert 'REPO_DIR="/srv/ap"' in (stage / "usr/sbin/autopwn-suite").read_text()
+    assert (stage / "srv/ap/src/autopwn.py").is_file()
+    assert os.readlink(stage / "usr/sbin/autopwn-suite") == "/srv/ap/.venv/bin/autopwn-suite"
 
 
 @posix_only
 def test_relative_destdir_is_made_absolute(source_tree, tmp_path):
     run_script(source_tree, "install.sh", {"DESTDIR": "relative-stage"}, cwd=tmp_path)
-    assert (tmp_path / "relative-stage/opt/autopwn-suite/autopwn.py").is_file()
+    assert (tmp_path / "relative-stage/opt/autopwn-suite/src/autopwn.py").is_file()
 
 
 @posix_only
@@ -130,6 +128,11 @@ def test_non_staged_install_creates_venv_without_sudo(source_tree, tmp_path):
     sudo.chmod(0o755)
     pip_log = tmp_path / "pip.log"
     app, bindir = tmp_path / "live/app", tmp_path / "live/bin"
+    # An earlier release left a wrapper script here and the daemon keeps its configuration in the app directory.
+    bindir.mkdir(parents=True)
+    (bindir / "autopwn-suite").write_text("#!/usr/bin/env bash\n")
+    app.mkdir(parents=True)
+    (app / "autopwn-daemon.conf").write_text("[DAEMON]\n")
     env = {
         "APPDIR": str(app), "BINDIR": str(bindir),
         "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(pip_log),
@@ -139,15 +142,19 @@ def test_non_staged_install_creates_venv_without_sudo(source_tree, tmp_path):
     result = run_script(source_tree, "install.sh", env)
     assert "sudo-was-called" not in result.stderr
     assert (app / ".venv/bin/python").is_file()
-    assert (bindir / "autopwn-suite").stat().st_mode & stat.S_IXUSR
-    assert f'REPO_DIR="{app}"' in (bindir / "autopwn-suite").read_text()
+    assert (bindir / "autopwn-suite").is_symlink()
+    assert os.readlink(bindir / "autopwn-suite") == f"{app}/.venv/bin/autopwn-suite"
+    # Installed from the checkout itself: no second copy of the source tree.
+    assert not (app / "autopwn.py").exists() and not (app / "src").exists()
+    assert (app / "autopwn-daemon.conf").read_text() == "[DAEMON]\n"
     log = pip_log.read_text()
     assert "install --upgrade pip setuptools wheel" in log
-    assert f"install -r {app}/requirements-locked.txt" in log
+    assert f"install -r {source_tree}/requirements-locked.txt" in log
+    assert f"install --no-deps {source_tree}" in log
 
     run_script(source_tree, "uninstall.sh", {"APPDIR": str(app), "BINDIR": str(bindir),
                                             "PATH": env["PATH"]})
-    assert not app.exists() and not (bindir / "autopwn-suite").exists()
+    assert not app.exists() and not os.path.lexists(bindir / "autopwn-suite")
 
 
 @posix_only
@@ -164,7 +171,7 @@ def test_uninstall_destdir_removes_only_staged_files(source_tree, tmp_path):
     result = run_script(source_tree, "uninstall.sh", env)
     assert "systemctl" not in result.stdout
     assert not (stage / "usr/lib/autopwn-suite").exists()
-    assert not (stage / "usr/bin/autopwn-suite").exists()
+    assert not os.path.lexists(stage / "usr/bin/autopwn-suite")
     assert not unit.exists()
     assert keep.read_text() == "keep\n"
 
