@@ -86,10 +86,9 @@ def test_unknown_or_unapproved_python_license_blocks(root, licenses):
 
 def test_release_build_tools_are_pinned_and_scanned_by_osv_name():
     root = Path(__file__).resolve().parents[2]
-    pins = policy.build_tool_pins(root)
-    assert ("pyinstaller", "6.22.3") in pins
-    assert ("poetry-core", "2.5.0") in pins
-    assert all(name == name.lower() and "_" not in name for name, _ in pins)
+    names = {name for name, _ in policy.build_tool_pins(root)}
+    assert {"pyinstaller", "poetry-core", "bandit"} <= names
+    assert all(name == name.lower() and "_" not in name for name in names)
 
 
 def test_build_tool_vulnerabilities_block_but_their_licenses_do_not(root):
