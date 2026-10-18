@@ -4,6 +4,7 @@
 
 import importlib.util
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -81,6 +82,45 @@ def test_clean_inventory_passes_and_missing_package_fails(root):
 @pytest.mark.parametrize("licenses", [[], ["non-standard"], ["GPL-3.0-only"], ["MIT", "UNKNOWN"]])
 def test_unknown_or_unapproved_python_license_blocks(root, licenses):
     assert policy.evaluate_sca(report(licenses=licenses), "2.6.0", root)[0]
+
+
+def test_release_build_tools_are_pinned_and_scanned_by_osv_name():
+    root = Path(__file__).resolve().parents[2]
+    pins = policy.build_tool_pins(root)
+    assert ("pyinstaller", "6.22.3") in pins
+    assert ("poetry-core", "2.5.0") in pins
+    assert all(name == name.lower() and "_" not in name for name, _ in pins)
+
+
+def test_build_tool_vulnerabilities_block_but_their_licenses_do_not(root):
+    # PyInstaller is GPL with a bootloader exception and is never shipped, so only vulnerabilities gate it.
+    gpl = report(licenses=("GPL-2.0-or-later",))
+    assert policy.evaluate_sca(gpl, "2.6.0", root, licenses=False)[0] == []
+    assert policy.evaluate_sca(report(["CVE-TEST-1"], licenses=("GPL-2.0-or-later",)), "2.6.0", root, licenses=False)[0]
+
+
+def test_a_scan_that_misses_a_pinned_build_tool_is_rejected(root):
+    with pytest.raises(ValueError, match="omitted locked packages"):
+        policy.evaluate_sca(report(), "2.6.0", root, expected={("example", "1.0"), ("pyinstaller", "6.22.3")}, licenses=False)
+
+
+def test_packaging_requirement_files_are_hash_pinned_and_match_their_inputs():
+    root = Path(__file__).resolve().parents[2]
+    for stem in ("build", "publish"):
+        inputs = (root / f"packaging/requirements-{stem}.in").read_text(encoding="utf-8")
+        compiled = (root / f"packaging/requirements-{stem}.txt").read_text(encoding="utf-8")
+        wanted = dict(re.findall(r"^([A-Za-z0-9._-]+)==(\S+)$", inputs, re.MULTILINE))
+        pinned = {name.lower(): version for name, version in policy.re.findall(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;\\]+)", compiled, re.MULTILINE)}
+        assert wanted and all(pinned.get(name.lower()) == version for name, version in wanted.items())
+        blocks = re.split(r"\n(?=[A-Za-z0-9])", compiled)
+        assert all("--hash=sha256:" in block for block in blocks if re.match(r"[A-Za-z0-9]+==", block))
+
+
+def test_poetry_core_pin_matches_the_release_toolchain():
+    root = Path(__file__).resolve().parents[2]
+    backend = re.search(r'^requires\s*=\s*\["poetry-core==([^"]+)"\]', (root / "pyproject.toml").read_text(encoding="utf-8"), re.MULTILINE)
+    assert backend, "[build-system] must pin poetry-core exactly so wheels do not depend on the latest release"
+    assert ("poetry-core", backend[1]) in policy.build_tool_pins(root)
 
 
 def test_vex_exemption_binds_product_component_and_version(root):

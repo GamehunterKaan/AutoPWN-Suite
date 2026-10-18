@@ -79,6 +79,14 @@ jobs:
     with:
       source-ref: ${{ needs.validate.outputs.commit }}
 
+  binaries:
+    needs: [validate, source-security]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-binary.yml
+    with:
+      ref: ${{ needs.validate.outputs.commit }}
+
   build:
     needs: [validate, source-security]
     runs-on: ubuntu-latest
@@ -186,7 +194,7 @@ jobs:
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 
   sign:
-    needs: [validate, push]
+    needs: [validate, push, binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -205,6 +213,11 @@ jobs:
           pattern: sbom-*
           path: assets
           merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: binary-*
+          path: assets
+          merge-multiple: true
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -218,12 +231,15 @@ jobs:
           DIGEST: ${{ needs.push.outputs.digest }}
         run: |
           set -euo pipefail
-          python scripts/release_assets.py manifest --tag "$RELEASE_TAG" --output assets --image "$IMAGE" --digest "$DIGEST"
+          python scripts/release_assets.py manifest --tag "$RELEASE_TAG" --output assets --image "$IMAGE" --digest "$DIGEST" --binaries
           identity="https://github.com/$GITHUB_WORKFLOW_REF"
           cosign sign --yes "$IMAGE@$DIGEST"
           cosign verify --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$IMAGE@$DIGEST"
           cosign sign-blob --yes --bundle assets/release-manifest.sigstore.json assets/release-manifest.json
           cosign verify-blob --bundle assets/release-manifest.sigstore.json --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com assets/release-manifest.json
+          # The checksum file gets its own signature so the binaries can be verified with two standard commands.
+          cosign sign-blob --yes --bundle assets/SHA256SUMS.sigstore.json assets/SHA256SUMS
+          cosign verify-blob --bundle assets/SHA256SUMS.sigstore.json --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com assets/SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: signed-release

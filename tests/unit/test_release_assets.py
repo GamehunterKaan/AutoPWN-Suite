@@ -249,6 +249,88 @@ def test_backfill_rejects_ambiguous_or_invalid_platform():
         release.platform_digest({"manifests": [entry]}, "amd64")
 
 
+@pytest.fixture
+def binary_assets(source_repo, tmp_path):
+    """Release staging directory as the sign job sees it: sources, image SBOMs, binaries and their SBOM."""
+    notes = tmp_path / "notes.md"
+    notes.write_text("## [2.6.0]\n### Functional changes\nChanges.\n### Security changes\nSecurity.\n")
+    output = tmp_path / "assets"
+    release.prepare(source_repo, "v2.6.0", output, notes)
+    for arch in ("amd64", "arm64"):
+        (output / f"autopwn-suite-v2.6.0-linux-{arch}.cdx.json").write_text(json.dumps({
+            "bomFormat": "CycloneDX", "components": [{"name": "nmap"}, {"name": "requests"}],
+        }))
+    for name in release.binary_names("v2.6.0"):
+        (output / name).write_bytes(b"binary " + name.encode())
+    for name in release.binary_sbom_names("v2.6.0"):
+        (output / name).write_text(json.dumps({
+            "bomFormat": "CycloneDX", "components": [{"name": "requests"}, {"name": "Flask"}, {"name": "cpython"}],
+        }))
+    return output
+
+
+IMAGE = "docker.io/gamehunterkaan/autopwn-suite"
+DIGEST = "sha256:" + "a" * 64
+
+
+def test_manifest_binds_binaries_checksums_and_their_sbom(source_repo, binary_assets):
+    output = binary_assets
+    binaries = release.binary_names("v2.6.0")
+    manifest = release.write_manifest(source_repo, "v2.6.0", output, IMAGE, DIGEST, binaries=True)
+
+    published = [asset["name"] for asset in manifest["assets"]]
+    assert published == ["autopwn-suite-v2.6.0.tar.gz", "autopwn-suite-v2.6.0.zip", *binaries, "SHA256SUMS",
+                         "autopwn-suite-v2.6.0-security.zip"]
+    assert {p.name for p in output.iterdir()} == {*published, "release-manifest.json"}
+    for asset in manifest["assets"]:
+        assert asset["sha256"] == hashlib.sha256((output / asset["name"]).read_bytes()).hexdigest()
+    # The binaries stay separate downloads; only their SBOM joins the supporting archive.
+    supporting = {asset["name"] for asset in manifest["supporting_archive"]["files"]}
+    assert set(release.binary_sbom_names("v2.6.0")) <= supporting
+    assert not supporting.intersection({*binaries, "SHA256SUMS"})
+    # SHA256SUMS is what `sha256sum -c` reads, sorted, one line per binary.
+    lines = (output / "SHA256SUMS").read_text().splitlines()
+    assert [line.split("  ", 1)[1] for line in lines] == sorted(binaries)
+    for line in lines:
+        digest, name = line.split("  ", 1)
+        assert digest == hashlib.sha256((output / name).read_bytes()).hexdigest()
+
+
+def test_manifest_without_the_flag_rejects_binaries_in_staging(source_repo, binary_assets):
+    with pytest.raises(ValueError, match="Unexpected"):
+        release.write_manifest(source_repo, "v2.6.0", binary_assets, IMAGE, DIGEST)
+
+
+@pytest.mark.parametrize("missing", ["autopwn-suite-v2.6.0-windows-amd64.exe", "autopwn-suite-v2.6.0-binary-macos-arm64.cdx.json"])
+def test_a_missing_binary_or_binaries_sbom_stops_the_release(source_repo, binary_assets, missing):
+    (binary_assets / missing).unlink()
+    with pytest.raises(ValueError, match="missing"):
+        release.write_manifest(source_repo, "v2.6.0", binary_assets, IMAGE, DIGEST, binaries=True)
+
+
+def test_an_empty_binary_stops_the_release(source_repo, binary_assets):
+    (binary_assets / "autopwn-suite-v2.6.0-linux-amd64").write_bytes(b"")
+    with pytest.raises(ValueError, match="missing"):
+        release.write_manifest(source_repo, "v2.6.0", binary_assets, IMAGE, DIGEST, binaries=True)
+
+
+@pytest.mark.parametrize("document", [
+    {"bomFormat": "SPDX", "components": [{"name": "requests"}, {"name": "flask"}, {"name": "cpython"}]},
+    {"bomFormat": "CycloneDX", "components": []},
+    {"bomFormat": "CycloneDX", "components": [{"name": "requests"}, {"name": "cpython"}]},
+    {"bomFormat": "CycloneDX", "components": [{"name": "requests"}, {"name": "flask"}]},
+])
+def test_binary_sboms_must_list_the_bundled_dependencies_and_interpreter(source_repo, binary_assets, document):
+    (binary_assets / "autopwn-suite-v2.6.0-binary-windows-amd64.cdx.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="SBOM"):
+        release.write_manifest(source_repo, "v2.6.0", binary_assets, IMAGE, DIGEST, binaries=True)
+
+
+def test_backfill_never_claims_binaries(source_repo, binary_assets):
+    with pytest.raises(ValueError, match="never rebuilds"):
+        release.write_manifest(source_repo, "v2.6.0", binary_assets, release.OFFICIAL_IMAGE, DIGEST, backfill=True, binaries=True)
+
+
 def test_current_version_has_matching_release_notes_and_runtime_version():
     """Catch a version bump without its changelog section at PR time, not in the release run."""
     root = Path(__file__).resolve().parents[2]

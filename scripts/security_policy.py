@@ -23,6 +23,9 @@ ALLOWED_LICENSES = {
     "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "MIT-0", "MPL-2.0", "PSF-2.0",
     "0BSD", "Unlicense",
 }
+# Hash-pinned tools that build the release artifacts. They are not shipped, so only known vulnerabilities
+# (not licenses) gate them; PyInstaller, for example, is GPL-2.0-or-later with a bootloader exception.
+BUILD_REQUIREMENTS = ("packaging/requirements-build.txt", "packaging/requirements-publish.txt")
 JUSTIFICATIONS = {
     "component_not_present", "vulnerable_code_not_present",
     "vulnerable_code_not_in_execute_path", "vulnerable_code_cannot_be_controlled_by_adversary",
@@ -109,6 +112,18 @@ def evaluate_sca(report, version, root=POLICY_ROOT, expected=None, licenses=True
     return violations, len(packages)
 
 
+def build_tool_pins(repo):
+    """(name, version) pairs pinned in the release build requirements, named the way OSV normalizes them."""
+    pins = set()
+    for name in BUILD_REQUIREMENTS:
+        text = (repo / name).read_text(encoding="utf-8")
+        pins.update((re.sub(r"[-_.]+", "-", package).lower(), version)
+                    for package, version in re.findall(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;\\]+)", text, re.MULTILINE))
+    if not pins:
+        raise ValueError("No pinned build tools found")
+    return pins
+
+
 def sast_fingerprint(item):
     return hashlib.sha256(json.dumps({
         "path": Path(item["filename"]).as_posix().removeprefix("./"),
@@ -164,7 +179,15 @@ def main():
         expected = {(p["name"], p["version"]) for p in locked}
     report = run_scanner(command, report_path)
     violations, count = evaluate_sca(report, version, expected=expected)
+    build_count = 0
     if not args.image_archive:
+        build_report_path = args.output / "sca-build.json"
+        build_command = [args.osv, "scan", "source", "--all-packages", "--all-vulns", "--format=json",
+                         f"--output-file={build_report_path.resolve()}", "--no-call-analysis=go", "--no-call-analysis=rust",
+                         *(f"--lockfile=requirements.txt:{repo / name}" for name in BUILD_REQUIREMENTS)]
+        build_report = run_scanner(build_command, build_report_path)
+        build_violations, build_count = evaluate_sca(build_report, version, expected=build_tool_pins(repo), licenses=False)
+        violations += [f"build tool {violation}" for violation in build_violations]
         tracked = subprocess.check_output(["git", "-C", str(repo), "ls-files", "--", "*.py"], text=True).splitlines()
         sources = [str(repo / p) for p in tracked if not p.startswith("tests/")]
         if not sources:
@@ -176,11 +199,11 @@ def main():
             item["filename"] = Path(item["filename"]).relative_to(repo).as_posix()
         violations += evaluate_sast(report)
     (args.output / "policy-result.json").write_text(json.dumps({
-        "version": version, "packages": count, "violations": violations,
+        "version": version, "packages": count, "build_tool_packages": build_count, "violations": violations,
     }, indent=2) + "\n", encoding="utf-8")
     if violations:
         raise ValueError("Security policy violations:\n" + "\n".join(violations))
-    print(f"Security policy passed: {count} packages; no blocking findings")
+    print(f"Security policy passed: {count} packages and {build_count} build tool packages; no blocking findings")
 
 
 if __name__ == "__main__":

@@ -40,6 +40,12 @@ jobs:
       TARGET: ${{ matrix.target }}
       SUFFIX: ${{ matrix.suffix }}
     steps:
+      - name: Require a full commit hash
+        shell: bash
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          [[ "$REF" =~ ^[0-9a-f]{40}$ ]] || { echo "ref must be a 40-character commit hash" >&2; exit 1; }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.ref }}
@@ -62,13 +68,15 @@ jobs:
           set -euo pipefail
           version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
           python scripts/smoke_install.py "$version" "dist/autopwn-suite$SUFFIX"
-      - name: Give the binary its release name
+      - name: Give the binary its release name and describe what it bundles
         shell: bash
         run: |
           set -euo pipefail
           version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
           mkdir binaries
           cp "dist/autopwn-suite$SUFFIX" "binaries/autopwn-suite-v${version}-${TARGET}${SUFFIX}"
+          # The packages frozen into this binary depend on the platform, so the SBOM comes from this build environment.
+          python scripts/binary_sbom.py --version "$version" --target "$TARGET" --output "binaries/autopwn-suite-v${version}-binary-${TARGET}.cdx.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binary-${{ matrix.target }}

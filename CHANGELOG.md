@@ -7,6 +7,53 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-10-19
+
+### Functional changes
+
+- Add installation methods besides a source checkout and Docker. The package is published to
+  PyPI, so `pipx install autopwn-suite` (or `uv tool install autopwn-suite`) installs the
+  `autopwn-suite` command. Each release also carries standalone single-file binaries for Linux
+  (amd64 and arm64), Windows (amd64) and macOS (arm64) that need no Python installation. Nmap is
+  still required for network scans and is not bundled; the CLI still offers to install it.
+- **Breaking:** the code now lives in the `autopwn_suite` package instead of the top-level
+  `modules`, `api` and `autopwn` modules. Use `from autopwn_suite import AutoScanner` (the
+  repository-root `api.py` and `autopwn.py` remain as launchers for source checkouts, so
+  `python autopwn.py` and `from api import AutoScanner` keep working there). Imports of
+  `modules.*` must be changed to `autopwn_suite.*`. `python -m autopwn_suite` also works.
+- **Breaking:** the dashboard account, settings, profiles, schedules and the local CVE database
+  now default to a per-user directory (`~/.local/share/autopwn-suite`,
+  `%LOCALAPPDATA%\autopwn-suite` or `~/Library/Application Support/autopwn-suite`) instead of
+  the package directory. `AUTOPWN_DATA_DIR` still overrides it, so the supplied Compose
+  deployment is unchanged. Existing files are not migrated: move `web_ui_*.json` and
+  `vulnerabilities.sqlite3` from the old `modules/` directory (for installs made with
+  `install.sh`, `/opt/autopwn-suite/modules/`), or set `AUTOPWN_DATA_DIR` to that directory.
+  The root-owned daemon uses the root account's directory unless `AUTOPWN_DATA_DIR` is set.
+- `install.sh` now creates the virtual environment, installs the dependencies and installs the
+  package from the checkout instead of copying the source tree to `/opt/autopwn-suite`, and
+  `$BINDIR/autopwn-suite` is a link to the command in that environment rather than a wrapper
+  script. `PREFIX`, `BINDIR`, `APPDIR`, `DESTDIR`, `PYTHON` and `REQUIREMENTS_FILE` keep working;
+  with `DESTDIR` the source is staged in `$APPDIR/src`.
+- `--daemon-install` no longer copies source files or builds its own virtual environment. The
+  systemd unit starts the installation that ran it (`python -m autopwn_suite`, or the standalone
+  binary) with the configuration kept in `/opt/autopwn-suite/autopwn-daemon.conf`; run it from an
+  installed copy.
+- Remove the `test` and `tests` Poetry scripts, which a published package would have installed as
+  commands on every user's PATH. Run the tests with `poetry run pytest`.
+- Build the wheel and the standalone binaries on every pull request and run an install smoke test
+  (`scripts/smoke_install.py`) on Linux, macOS and Windows.
+
+### Security changes
+
+- Keep dashboard credentials and the CVE database out of the installed package directory, which is
+  shared or read-only for a system installation and is discarded by single-file binaries. The
+  per-user data directory is created readable only by its owner where the platform supports it.
+- Install `install.sh` dependencies without a second copy of the application source under `/opt`,
+  and keep `REQUIREMENTS_FILE=requirements-locked.txt` for hash-verified installs.
+- Build the standalone binaries from hash-pinned dependencies (`requirements-locked.txt` and the
+  universal, hash-pinned `packaging/requirements-build.txt`), smoke-test every binary on the runner
+  that built it, and publish them only through the signed release workflow.
+
 ## [2.6.1] - 2026-10-16
 
 ### Functional changes

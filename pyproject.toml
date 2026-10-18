@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autopwn-suite"
-version = "2.6.1"
+version = "2.7.0"
 requires-poetry = "==2.5.1"
 description = "AutoPWN Suite - Automated Vulnerability Scanning and Exploitation Tool"
 authors = ["AutoPWN Suite Contributors"]
@@ -117,7 +117,7 @@ directory = "htmlcov"
 output = "coverage.xml"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core==2.5.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
