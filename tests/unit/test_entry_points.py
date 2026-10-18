@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 """Every way of starting the CLI or importing the library reaches the same code."""
+import io
 import re
 import subprocess
 import sys
@@ -8,9 +9,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from rich.console import Console
 
 import autopwn_suite
 from autopwn_suite import cli
+from autopwn_suite.banners import print_banner
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = re.search(r'^version\s*=\s*"([^"]+)"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"), re.MULTILINE)[1]
@@ -52,3 +55,45 @@ def test_unknown_package_attribute_is_an_attribute_error():
 def test_run_turns_ctrl_c_into_a_clean_exit():
     with patch("autopwn_suite.cli.main", side_effect=KeyboardInterrupt), pytest.raises(SystemExit, match=r"Ctrl\+C pressed"):
         cli.run()
+
+
+def _redirected_ansi_stream():
+    """What Windows gives a program whose output is piped or redirected: a non-console stream in the ANSI code page."""
+    return io.TextIOWrapper(io.BytesIO(), encoding="cp1252", errors="strict")
+
+
+@pytest.mark.parametrize("stream_name", ["stdout", "stderr"])
+def test_run_makes_redirected_windows_output_utf8_so_the_banner_prints(monkeypatch, stream_name):
+    stream = _redirected_ansi_stream()
+    monkeypatch.setattr(sys, stream_name, stream)
+    monkeypatch.setattr(cli, "system", lambda: "Windows")
+    monkeypatch.setattr("autopwn_suite.banners.get_terminal_width", lambda: 80)  # The narrow banner uses box-drawing characters.
+    monkeypatch.setattr(cli, "main", lambda: print_banner(Console(file=getattr(sys, stream_name), color_system=None)))
+
+    cli.run()
+
+    stream.flush()
+    assert "╔═╗" in stream.buffer.getvalue().decode("utf-8")
+
+
+def test_run_leaves_the_output_encoding_alone_outside_windows(monkeypatch):
+    stream = _redirected_ansi_stream()
+    monkeypatch.setattr(sys, "stdout", stream)
+    monkeypatch.setattr(cli, "system", lambda: "Linux")
+
+    with patch("autopwn_suite.cli.main"):
+        cli.run()
+
+    assert stream.encoding == "cp1252"
+
+
+def test_run_leaves_a_windows_console_alone(monkeypatch):
+    stream = _redirected_ansi_stream()
+    stream.isatty = lambda: True
+    monkeypatch.setattr(sys, "stdout", stream)
+    monkeypatch.setattr(cli, "system", lambda: "Windows")
+
+    with patch("autopwn_suite.cli.main"):
+        cli.run()
+
+    assert stream.encoding == "cp1252"

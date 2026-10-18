@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
+import sys
 from datetime import datetime
+from platform import system
 from time import sleep
 
 from rich.console import Console
@@ -215,7 +217,18 @@ def main() -> None:
         sleep(args.scan_interval)
 
 
+def _write_utf8_when_redirected() -> None:
+    """Windows gives redirected or piped output the ANSI code page, which cannot encode the banner and
+    the box-drawing text, so the first print would raise UnicodeEncodeError. A console is unaffected."""
+    if system().lower() != "windows":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure") and not stream.isatty():
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def run() -> None:
+    _write_utf8_when_redirected()
     try:
         main()
     except KeyboardInterrupt:
