@@ -48,6 +48,12 @@ analysis.datas[:] = [
 # Every glibc system provides libgcc_s (the C library loads it itself); PyInstaller would bundle the copy it finds
 # on the build machine, which makes the binary depend on that machine's package versions.
 analysis.binaries[:] = [entry for entry in analysis.binaries if os.path.basename(entry[0]) != "libgcc_s.so.1"]
+# Windows 10 and later provide the Universal C Runtime. PyInstaller copies it into the bundle only when the build
+# machine has the Windows SDK's redistributable files (the hosted runners do, most machines do not).
+analysis.binaries[:] = [
+    entry for entry in analysis.binaries
+    if not (os.path.basename(entry[0]).lower().startswith("api-ms-win-") or os.path.basename(entry[0]).lower() == "ucrtbase.dll")
+]
 
 executable = EXE(  # noqa: F821
     PYZ(analysis.pure),  # noqa: F821

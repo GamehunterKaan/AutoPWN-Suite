@@ -45,6 +45,19 @@ def test_pins_cover_every_binary_target_with_a_verifiable_archive():
     assert len({entry["sha256"] for entry in pins["archives"].values()}) == 4
 
 
+def test_wheels_are_chosen_with_fixed_platform_tags_for_every_target(monkeypatch, tmp_path):
+    assert set(builder.PLATFORM_TAGS) == set(builder.load_pins()["archives"])
+    calls = []
+    monkeypatch.setattr(builder.subprocess, "run", lambda command, **kwargs: calls.append(command))
+    builder.make_environment(tmp_path / "python3", tmp_path, "linux-amd64", "3.13")
+    download, install = calls[1], calls[2]
+    assert download[2:4] == ["pip", "download"] and "--require-hashes" in download and "--no-deps" in download
+    tags = [download[index + 1] for index, value in enumerate(download) if value == "--platform"]
+    assert tags == list(builder.PLATFORM_TAGS["linux-amd64"]) and "3.13" in download
+    assert install[2:4] == ["pip", "install"] and "--no-index" in install and "--require-hashes" in install
+    assert download[download.index("--dest") + 1] == install[install.index("--find-links") + 1]
+
+
 def test_interpreter_is_unpacked_only_after_its_hash_matches(tmp_path):
     archive = make_archive(tmp_path)
     python = builder.fetch_python(pins_for(archive), "linux-amd64", tmp_path)

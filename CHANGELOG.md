@@ -74,7 +74,8 @@ existing release summaries; they do not retroactively claim artifact signing.
 - Build the standalone binaries reproducibly. `scripts/build_binary.py` uses the CPython that
   `packaging/build-python.json` pins by SHA-256 (a self-contained python-build-standalone archive, so no
   library of the build machine is bundled), installs the hash-pinned dependencies (`requirements-locked.txt` and
-  the universal, hash-pinned `packaging/requirements-build.txt`) into a virtual environment of it and runs
+  the universal, hash-pinned `packaging/requirements-build.txt`, with fixed wheel platform tags so the machine's
+  glibc cannot change which build of a package is used) into a virtual environment of it and runs
   PyInstaller with `PYTHONHASHSEED=1` and the commit time as `SOURCE_DATE_EPOCH`. Pull requests and releases
   build every binary twice on its runner and fail unless both builds are byte-identical, so anyone can rebuild
   a binary from the release source and compare its SHA-256 with `SHA256SUMS`. Every binary is smoke-tested on

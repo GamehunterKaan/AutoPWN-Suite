@@ -28,6 +28,15 @@ PINS = ROOT / "packaging" / "build-python.json"
 SPEC = ROOT / "packaging" / "autopwn-suite.spec"
 REQUIREMENTS = (ROOT / "requirements-locked.txt", ROOT / "packaging" / "requirements-build.txt")
 DOWNLOAD_PREFIX = "https://github.com/astral-sh/python-build-standalone/releases/download/"
+# Wheel tags per target, most preferred first. Several wheels of one release can match a machine (cryptography has a
+# manylinux2014 and a manylinux_2_34 build), and pip picks the one its own glibc or macOS version prefers, so the
+# wheels are chosen here: the oldest-compatible build first, which also runs on older systems.
+PLATFORM_TAGS = {
+    "linux-amd64": ("manylinux2014_x86_64", "manylinux_2_28_x86_64", "manylinux_2_34_x86_64"),
+    "linux-arm64": ("manylinux2014_aarch64", "manylinux_2_28_aarch64", "manylinux_2_34_aarch64"),
+    "windows-amd64": ("win_amd64",),
+    "macos-arm64": ("macosx_11_0_arm64", "macosx_10_13_universal2", "macosx_10_9_universal2"),
+}
 
 
 def is_windows(target):
@@ -86,14 +95,21 @@ def fetch_python(pins, target, work):
     return destination / "python" / ("python.exe" if is_windows(target) else "bin/python3")
 
 
-def make_environment(interpreter, work, target):
+def make_environment(interpreter, work, target, python_version):
     """A virtual environment of that interpreter holding the hash-pinned runtime and build requirements."""
-    venv = work / "venv"
-    shutil.rmtree(venv, ignore_errors=True)
+    venv, wheels = work / "venv", work / "wheels"
+    for path in (venv, wheels):
+        shutil.rmtree(path, ignore_errors=True)
     subprocess.run([str(interpreter), "-m", "venv", str(venv)], check=True)
     python = venv / ("Scripts/python.exe" if is_windows(target) else "bin/python")
-    subprocess.run([str(python), "-m", "pip", "install", "--disable-pip-version-check", "--require-hashes", "--only-binary=:all:", "--no-deps",
-                    *[arg for path in REQUIREMENTS for arg in ("-r", str(path))]], check=True)
+    requirements = [arg for path in REQUIREMENTS for arg in ("-r", str(path))]
+    pip = [str(python), "-m", "pip"]
+    # Download with fixed platform tags (hash-checked), then install exactly those files.
+    subprocess.run([*pip, "download", "--disable-pip-version-check", "--require-hashes", "--only-binary=:all:", "--no-deps",
+                    "--implementation", "cp", "--python-version", python_version, *[arg for tag in PLATFORM_TAGS[target] for arg in ("--platform", tag)],
+                    "--dest", str(wheels), *requirements], check=True)
+    subprocess.run([*pip, "install", "--disable-pip-version-check", "--require-hashes", "--only-binary=:all:", "--no-deps",
+                    "--no-index", "--find-links", str(wheels), *requirements], check=True)
     return python
 
 
@@ -136,7 +152,7 @@ def main(argv=None):
         parser.error("--source-date-epoch (or SOURCE_DATE_EPOCH) must be a non-negative number of seconds")
     work = args.work_dir.resolve()
     work.mkdir(parents=True, exist_ok=True)
-    python = make_environment(fetch_python(pins, args.target, work), work, args.target)
+    python = make_environment(fetch_python(pins, args.target, work), work, args.target, ".".join(pins["python"].split(".")[:2]))
     built = build(python, work, args.target, args.source_date_epoch, args.repeat)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(built, args.output)

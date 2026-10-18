@@ -81,15 +81,18 @@ scratch and fails unless both binaries are identical. The script:
 
 1. downloads the CPython that `packaging/build-python.json` pins for the target (a self-contained
    python-build-standalone archive) and unpacks it only if its SHA-256 matches;
-2. installs the hash-pinned `requirements-locked.txt` and `packaging/requirements-build.txt` into a
-   virtual environment of that interpreter;
+2. downloads the hash-pinned `requirements-locked.txt` and `packaging/requirements-build.txt` wheels with
+   platform tags fixed per target (`PLATFORM_TAGS`, oldest-compatible build first, because pip would otherwise
+   pick between several builds of one release by the glibc or macOS version of the machine) and installs them
+   into a virtual environment of that interpreter;
 3. runs PyInstaller with `PYTHONHASHSEED=1` and `SOURCE_DATE_EPOCH` set to the commit time.
 
 `packaging/autopwn-suite.spec` bundles the dashboard assets, the data files, the two
 sources the proof-of-concept generator reads as text, `LICENSE`, `NOTICE` and the
 metadata of every bundled package, and runs the interpreter in UTF-8 mode. It leaves out what
 the installer recorded about the build machine (`RECORD`, `INSTALLER`: they hold the path of the
-virtual environment) and the build machine's `libgcc_s`, which every glibc system provides. The
+virtual environment), the build machine's `libgcc_s` (every glibc system provides it) and the Windows Universal
+C Runtime (Windows 10 provides it; PyInstaller copies it only when the Windows SDK is installed). The
 `.in` files next to each requirements file are the inputs; regenerate the hash-pinned
 `.txt` files with the `uv pip compile` command written at the top of each. No
 compiler or linker is invoked: PyInstaller ships a prebuilt bootloader. The security
@@ -192,12 +195,14 @@ artifact. What is controlled, and what is not:
 The inputs of a binary are the source archive, `SOURCE_DATE_EPOCH` (the commit time of the release
 commit), the interpreter archive pinned by SHA-256 in `packaging/build-python.json`, the hash-pinned
 Python requirements and PyInstaller with its prebuilt bootloader (inside the hash-pinned wheel),
-`PYTHONHASHSEED=1`, and the platform it is built on. The interpreter is a self-contained
+`PYTHONHASHSEED=1`, the fixed wheel platform tags in `scripts/build_binary.py`, and the platform it is built on. The interpreter is a self-contained
 python-build-standalone distribution, so no Python or shared library of the build machine is copied
 into the binary: the GitHub runner image does not influence the result, and a binary built in a
 different directory, virtual environment or interpreter location is identical. Build from a checkout
 without line-ending conversion (`core.autocrlf=false`; the release archive has LF endings) or from the release's
-source archive. To check a release:
+source archive unpacked with `tar`: PyInstaller records an executable data file differently, so copying the
+files from a file system that marks everything executable (for example a Windows drive seen from WSL) changes
+the bytes. To check a release:
 
 ```sh
 git -c core.autocrlf=false clone --branch vVERSION https://github.com/GamehunterKaan/AutoPWN-Suite && cd AutoPWN-Suite
