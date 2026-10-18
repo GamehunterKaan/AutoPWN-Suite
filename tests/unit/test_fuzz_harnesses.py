@@ -86,3 +86,12 @@ def test_the_workflow_and_build_script_cover_the_harnesses():
     assert "fuzz/fuzz_*.py" in build and "compile_python_fuzzer" in build and "--require-hashes" in build
     workflow = (ROOT / ".github/workflows/cflite_pr.yml").read_text(encoding="utf-8")
     assert "build_fuzzers@" in workflow and "run_fuzzers@" in workflow and "mode: code-change" in workflow
+
+
+def test_fuzz_files_are_kept_out_of_the_product_image_but_not_out_of_the_fuzzing_image():
+    product = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+    assert "fuzz" in product and ".clusterfuzzlite" in product
+    # ClusterFuzzLite builds with the repository's .dockerignore unless a Dockerfile-specific one exists,
+    # and would then lose .clusterfuzzlite/build.sh from its build context.
+    own = (ROOT / ".clusterfuzzlite/Dockerfile.dockerignore").read_text(encoding="utf-8").splitlines()
+    assert "fuzz" not in own and ".clusterfuzzlite" not in own
