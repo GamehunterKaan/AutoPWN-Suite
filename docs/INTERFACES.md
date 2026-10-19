@@ -68,8 +68,8 @@ score come from the newest CVSS version NVD lists; exploitability is the sub-sco
 the newest version that has one. CVSS v4 has none, so a record scored only with v4 reports 0.0,
 which means that no sub-score is available, not that the CVE is not exploitable. An older
 version's sub-score keeps its own scale (0 to 3.9 for CVSS v3, up to 10.0 for v2), which can
-differ from the scale of the version that supplies the severity. They are
-version-based candidates. Failures may raise scanner/database exceptions;
+differ from the scale of the version that supplies the severity. Vulnerability
+records are version-based candidates. Failures may raise scanner/database exceptions;
 callers must handle them and protect output paths and sensitive results.
 `save_to_file(filename="autopwn.json")` overwrites the selected file with JSON.
 
