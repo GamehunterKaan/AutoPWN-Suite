@@ -117,7 +117,7 @@ class _DeadlineAdapter(HTTPAdapter):
                 # resolved address. Poll nonblocking connects against one budget.
                 try:
                     addresses = socket.getaddrinfo(self._dns_host, self.port, allowed_gai_family(), socket.SOCK_STREAM)
-                except socket.gaierror as error:
+                except (socket.gaierror, UnicodeError) as error:  # an empty or over-long label fails IDNA here, not in urllib3
                     raise NameResolutionError(self.host, self, error) from error
                 error = OSError("No target addresses resolved")
                 pending = {errno.EINPROGRESS, errno.EWOULDBLOCK, errno.EALREADY, errno.EINTR, 10035, 10036, 10037}

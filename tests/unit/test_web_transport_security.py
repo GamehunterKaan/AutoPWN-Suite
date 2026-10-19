@@ -25,6 +25,7 @@ from autopwn_suite.web.poc import python_poc
 from autopwn_suite.web.poc_runtime import verify_plan
 from autopwn_suite.web.runtime import ScanContext
 from autopwn_suite.web.transport import RequestCancelled, read_response
+from autopwn_suite.web.webvuln import webvuln
 
 # Several tests deliberately disable certificate verification against a loopback server.
 pytestmark = pytest.mark.filterwarnings("ignore:Unverified HTTPS request:urllib3.exceptions.InsecureRequestWarning")
@@ -205,6 +206,15 @@ def test_downloaded_poc_is_standalone_and_obeys_its_network_deadline(diagnostic_
                                           "target": url, "requests": [{"url": url}]})
         assert result["status"] == "inconclusive"
         assert time.monotonic() - started < 1.5
+
+
+@pytest.mark.parametrize("host", ["example..test", "a" * 70 + ".test"])
+def test_host_that_cannot_be_encoded_is_a_connection_failure_not_a_unicode_error(host):
+    with pytest.raises(requests.exceptions.ConnectionError):
+        scoped_get(requests.get, f"http://{host}/")
+    log = MagicMock()
+    assert webvuln(f"http://{host}/", log, MagicMock()) == []
+    log.logger.assert_any_call("warning", f"No reachable in-scope web endpoint on http://{host}/.")
 
 
 def test_precancelled_request_never_opens_a_socket():
