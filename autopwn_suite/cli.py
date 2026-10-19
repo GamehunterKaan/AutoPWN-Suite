@@ -11,7 +11,7 @@ from autopwn_suite import __version__
 from autopwn_suite.banners import print_banner
 from autopwn_suite.daemon.daemon_installer import CreateConfig, InstallDaemon, UninstallDaemon
 from autopwn_suite.getexploits import GetExploitsFromArray
-from autopwn_suite.logger import Logger
+from autopwn_suite.logger import Logger, console_safe
 from autopwn_suite.nist_search import VulnerabilityLookup
 from autopwn_suite.report import InitializeReport
 from autopwn_suite.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, ResolveScanHosts
@@ -201,7 +201,7 @@ def main() -> None:
     try:
         if lookup.local:
             console.print(f"Local NVD database: {lookup.local.metadata['count']} CVEs; "
-                          f"updated {lookup.local.metadata['updated_at']}. Findings are possible vulnerabilities.")
+                          f"updated {console_safe(lookup.local.metadata['updated_at'])}. Findings are possible vulnerabilities.")
         StartScanning(args, targetarg, scantype, scanmode, apiKey, console, console2, log, lookup=lookup)
     except NoHostsFound as exc:
         # With a scan interval (the daemon) an empty discovery is a finished round: exiting would make systemd

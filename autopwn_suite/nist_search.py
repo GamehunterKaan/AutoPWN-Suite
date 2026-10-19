@@ -6,6 +6,8 @@ from time import monotonic, sleep
 
 from requests import get
 
+from autopwn_suite.web.findings import printable
+
 # Dashboard and scheduled scans are long-lived and run concurrently. A successful NVD answer is
 # reused for CACHE_LIFETIME seconds, so CVEs published later are seen; the lock guards both
 # dictionaries. An entry in `cache` without a timestamp counts as expired.
@@ -48,6 +50,12 @@ class Vulnerability:
     exploitability: float
     data_source: str = "online"
     database_updated_at: str = None
+
+    def __post_init__(self):
+        # The NVD, or a database copied from another machine, controls these texts, and they reach the console, the
+        # dashboard and the API: one line each, without control or layout characters.
+        for name in ("CVEID", "description", "severity", "details_url"):
+            setattr(self, name, printable(getattr(self, name)))
 
     def __str__(self) -> str:
         return (
