@@ -535,6 +535,24 @@ class TestExistingDataFilesAreRestricted:
         if os.name != "nt":
             assert _mode(kept) == 0o600
 
+    @POSIX_ONLY
+    @pytest.mark.parametrize("restrict_first", [True, False])
+    def test_a_file_moved_aside_keeps_the_mode_it_had(self, wu, restrict_first):
+        """A rename keeps the original's mode: owner-only once the start-up restriction ran, otherwise what it was
+        (docs/THREAT_MODEL.md, "Set-aside copies of unreadable files")."""
+        for path in (wu._PROFILES_FILE, wu._SCHEDULES_FILE):
+            path.write_text("{not json", encoding="utf-8")  # cannot be loaded, so it is moved, not copied
+            path.chmod(0o644)
+        if restrict_first:
+            wu._tighten_data_files()
+
+        wu._load_profiles()
+        wu._load_schedules()
+
+        for name in (wu._PROFILES_FILE.name, wu._SCHEDULES_FILE.name):
+            kept, = wu._DATA_DIR.glob(name + ".corrupt-*")
+            assert _mode(kept) == (0o600 if restrict_first else 0o644)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Profiles persistence

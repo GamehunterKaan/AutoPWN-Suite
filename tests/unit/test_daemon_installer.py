@@ -827,10 +827,14 @@ class TestOwnerOnlyConfigInstall:
         assert stat.S_IMODE(installation.installed.stat().st_mode) == 0o600
 
     @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX file modes")
-    def test_a_new_install_directory_is_not_writable_by_others_whatever_the_umask(self, installation):
-        self._install_under_umask(installation, 0o000)
+    @pytest.mark.parametrize("umask, expected", [(0o000, 0o755), (0o022, 0o755), (0o027, 0o750), (0o077, 0o700)],
+                             ids=["umask-000", "umask-022", "umask-027", "umask-077"])
+    def test_a_new_install_directory_is_0755_less_what_the_umask_removes(self, installation, umask, expected):
+        """Never wider than 0755 (the umask can only remove bits), so not 0777 under umask 000, which the
+        root-ownership check would refuse."""
+        self._install_under_umask(installation, umask)
 
-        assert stat.S_IMODE(installation.opt.stat().st_mode) == 0o755
+        assert stat.S_IMODE(installation.opt.stat().st_mode) == expected
 
 
 CONFIG = str(Path("/opt/autopwn-suite") / "autopwn-daemon.conf")

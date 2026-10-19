@@ -290,7 +290,7 @@ def _check_installable(console, install_path):
     try:
         if not install_path.exists():
             console.print(f"Creating install directory: {install_path}")
-        # Not 0777 under an unusual umask: the root-ownership check below refuses a directory others can write.
+        # 0755 less what the umask removes, never 0777: the root-ownership check below refuses a directory others can write.
         install_path.mkdir(mode=0o755, parents=True, exist_ok=True)
     except Exception as e:
         console.print(f"[red]Failed to create install directory {install_path}: {e}[/red]")
