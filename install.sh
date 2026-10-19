@@ -106,6 +106,10 @@ needs_sudo() {
     local path="$1"
     [ -z "$DESTDIR" ] || return 1
     [ "$(id -u)" -ne 0 ] || return 1
+    # Replacing a symlink needs write access to its directory; -w would follow the link to its target.
+    if [ -L "$path" ]; then
+        path="$(dirname "$path")"
+    fi
     while [ ! -e "$path" ] && [ "$path" != "/" ]; do
         path="$(dirname "$path")"
     done
@@ -181,6 +185,11 @@ else
     if needs_sudo "$TARGET_DIR"; then
         # The directory was just created by root; hand it to the invoking user first.
         sudo chown "$(id -un)":"$(id -gn)" "$TARGET_DIR"
+    elif [ "$(id -u)" -eq 0 ]; then
+        # The root daemon only accepts an installation that no other user can modify. A directory that an
+        # earlier run as a normal user left (owned by that user) would stay theirs without this.
+        chown "$(id -un)":"$(id -gn)" "$TARGET_DIR"
+        chmod go-w "$TARGET_DIR"
     fi
     "$PYTHON" -m venv "$VENV_DIR"
 
@@ -216,6 +225,11 @@ echo "You can now run AutoPWN Suite simply with:"
 echo "  autopwn-suite"
 echo "or as root:"
 echo "  sudo autopwn-suite"
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Note: this installation belongs to $(id -un), so 'sudo autopwn-suite' runs files that account can"
+    echo "change, and 'autopwn-suite --daemon-install' refuses it. Run 'sudo bash install.sh' for an installation"
+    echo "that belongs to root."
+fi
 
 # A daemon that release 2.6 or earlier installed runs its own copy of the source (autopwn.py) that this
 # script never touches, so it keeps running that older version until its unit is regenerated.

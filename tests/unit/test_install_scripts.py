@@ -43,7 +43,8 @@ printf '%s\\n' 'export PATH="'"$venv"'/bin:$PATH"' 'deactivate() { :; }' > "$ven
 printf '%s\\n' '#!/usr/bin/env bash' 'echo "$*" >> "$PIP_LOG"' \\
     '[ -z "${FAKE_PIP_HANGS:-}" ] || { touch "$FAKE_PIP_HANGS"; sleep 60; }' '[ -z "${FAKE_PIP_FAILS:-}" ]' > "$venv/bin/pip"
 printf '%s\\n' '#!/usr/bin/env bash' 'exit 0' > "$venv/bin/python"
-chmod +x "$venv/bin/pip" "$venv/bin/python"
+printf '%s\\n' '#!/usr/bin/env bash' 'exit 0' > "$venv/bin/autopwn-suite"
+chmod +x "$venv/bin/pip" "$venv/bin/python" "$venv/bin/autopwn-suite"
 """
 
 
@@ -76,6 +77,29 @@ def run_script(repo, script, env_overrides, expect=0, cwd=None):
         [BASH, str(repo / script)], env=env, capture_output=True, text=True, timeout=120, cwd=cwd)
     assert result.returncode == expect, result.stdout + result.stderr
     return result
+
+
+running_as_root = hasattr(os, "geteuid") and os.geteuid() == 0
+as_normal_user = pytest.mark.skipif(running_as_root, reason="root can write everywhere and never needs sudo")
+
+
+def fake_tools(tmp_path, root=False):
+    """A directory to put first on PATH and the log its tools append to ($TOOL_LOG). `sudo` records its
+    command line and runs nothing. With `root`, `id` reports uid 0, `chown` only records and `chmod` records
+    before it runs, so the root branches of install.sh can be exercised without being root."""
+    tools = tmp_path / "fake-tools"
+    tools.mkdir()
+    scripts = {"sudo": 'echo "sudo $*" >> "$TOOL_LOG"\n'}
+    if root:
+        scripts["id"] = (
+            f'case "$1" in -u) echo 0;; -un|-gn) echo root;; *) exec {shutil.which("id")} "$@";; esac\n')
+        scripts["chown"] = 'echo "chown $*" >> "$TOOL_LOG"\n'
+        # chmod also runs for the fake virtualenv (+x on its scripts), so it records and then does the real thing.
+        scripts["chmod"] = f'echo "chmod $*" >> "$TOOL_LOG"\nexec {shutil.which("chmod")} "$@"\n'
+    for name, body in scripts.items():
+        (tools / name).write_text("#!/usr/bin/env bash\n" + body)
+        (tools / name).chmod(0o755)
+    return tools, tmp_path / "tool.log"
 
 
 @posix_only
@@ -262,6 +286,47 @@ def test_environment_left_by_a_killed_upgrade_is_never_overwritten(source_tree, 
     assert ".venv.old" in result.stderr
     assert (app / ".venv.old/marker").read_text() == "working\n"
     assert (app / ".venv/marker").read_text() == "half-built\n"
+
+
+@posix_only
+@as_normal_user
+def test_rerun_as_a_normal_user_uses_sudo_for_a_command_link_in_a_protected_directory(source_tree, tmp_path):
+    # The link resolves to the user's own virtualenv, which is writable, but replacing the link needs its directory.
+    app, bindir, env = working_install(tmp_path)
+    tools, log = fake_tools(tmp_path)
+    bindir.chmod(0o555)  # the directory belongs to someone else
+    try:
+        run_script(source_tree, "install.sh", {**env, "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}", "TOOL_LOG": str(log)})
+    finally:
+        bindir.chmod(0o755)
+    assert any(line.startswith("sudo ln -sfn") for line in log.read_text().splitlines())
+
+
+@posix_only
+def test_as_root_the_application_directory_is_handed_to_root(source_tree, tmp_path):
+    # A directory that an earlier run as a normal user left stays theirs unless root takes it over,
+    # and the daemon refuses an installation that another user owns.
+    tools, log = fake_tools(tmp_path, root=True)
+    app, bindir = tmp_path / "live/app", tmp_path / "live/bin"
+    app.mkdir(parents=True)
+    env = {
+        "APPDIR": str(app), "BINDIR": str(bindir), "SYSTEMDDIR": str(tmp_path / "no-systemd"),
+        "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(tmp_path / "pip.log"),
+        "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}", "TOOL_LOG": str(log),
+    }
+    result = run_script(source_tree, "install.sh", env)
+    calls = log.read_text().splitlines()
+    assert f"chown root:root {app}" in calls and f"chmod go-w {app}" in calls
+    assert not any(line.startswith("sudo") for line in calls)
+    assert "Note: this installation belongs to" not in result.stdout
+
+
+@posix_only
+@as_normal_user
+def test_install_as_a_normal_user_says_that_the_installation_is_not_owned_by_root(source_tree, tmp_path):
+    result, _ = install_with_unit(source_tree, tmp_path, None)
+    assert "Note: this installation belongs to" in result.stdout
+    assert "'sudo autopwn-suite' runs files that account can" in result.stdout and "sudo bash install.sh" in result.stdout
 
 
 LEGACY_UNIT = """[Service]

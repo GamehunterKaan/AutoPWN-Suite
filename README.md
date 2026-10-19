@@ -445,7 +445,9 @@ sudo bash uninstall.sh
 ```
 
 It creates a virtual environment in `/opt/autopwn-suite`, installs the package into it and
-links `/usr/local/bin/autopwn-suite` to it. `PREFIX`, `BINDIR`, `APPDIR` and `DESTDIR` are
+links `/usr/local/bin/autopwn-suite` to it. Run without `sudo`, the script asks for it only where needed and
+the installation then belongs to your account, so `--daemon-install` refuses it and `sudo autopwn-suite`
+would run files you can change; `sudo bash install.sh` makes the installation belong to root. `PREFIX`, `BINDIR`, `APPDIR` and `DESTDIR` are
 honored, and `REQUIREMENTS_FILE=requirements-locked.txt` installs hash-verified dependencies
 (see [Building](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/BUILDING.md)).
 

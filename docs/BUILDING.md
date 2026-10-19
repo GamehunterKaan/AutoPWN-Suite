@@ -160,7 +160,13 @@ DESTDIR="$PWD/pkgroot" PREFIX=/usr bash uninstall.sh   # mirrors the same variab
 Without `DESTDIR`, `install.sh` creates `$APPDIR/.venv`, installs the dependencies
 and then the package from the checkout itself (`pip install --no-deps`), so no second
 copy of the source tree is kept, and links `$BINDIR/autopwn-suite` to the command in
-that venv. `sudo` is used only when the target is not writable by the current user.
+that venv. `sudo` is used only when the target is not writable by the current user (for the command
+link, the directory that holds it is what counts, not the venv an existing link points to).
+Run as root, the script also makes `$APPDIR` belong to root and not group- or world-writable, also when
+an earlier run as a normal user created it: the daemon installer only accepts an installation that no
+other user can modify. Run as a normal user, the installation belongs to that user and the script says
+so: `sudo autopwn-suite` would run files that user can change, and `--daemon-install` refuses it until
+`sudo bash install.sh` has been run.
 Re-running it replaces the venv and leaves other files in `$APPDIR` (such as the
 daemon configuration) alone. Before it changes anything it checks that `$PYTHON` is
 Python 3.10 or newer and can create virtual environments with pip. It then sets the old
