@@ -4,6 +4,8 @@
 Unit tests for the report module.
 """
 import smtplib
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
@@ -169,6 +171,53 @@ class TestSendWebhook:
         assert "SECRETTOKEN" not in logged
         assert "Webhook report failed to send." in logged
 
+    @pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+    def test_a_redirect_is_a_failed_delivery_and_is_not_followed(self, status, tmp_path, monkeypatch):
+        """A 307/308 would make requests POST the whole report again to the Location, possibly over plain HTTP."""
+        monkeypatch.setenv("NO_PROXY", "127.0.0.1")
+        monkeypatch.setenv("no_proxy", "127.0.0.1")
+        received = []
+
+        class Sink(BaseHTTPRequestHandler):
+            def do_POST(self):
+                received.append(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                self.send_response(200)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        sink = ThreadingHTTPServer(("127.0.0.1", 0), Sink)
+
+        class Redirector(Sink):
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                self.send_response(status)
+                self.send_header("Location", f"http://127.0.0.1:{sink.server_port}/collect")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+        redirector = ThreadingHTTPServer(("127.0.0.1", 0), Redirector)
+        servers = [sink, redirector]
+        for server in servers:
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+        report = tmp_path / "report.log"
+        report.write_text("SCAN REPORT BODY", encoding="utf-8")
+        log = MagicMock()
+        try:
+            SendWebhook(f"http://127.0.0.1:{redirector.server_port}/hook", log, str(report))
+        finally:
+            for server in servers:
+                server.shutdown()
+                server.server_close()
+
+        assert received == [], "the redirect target must never receive the report"
+        logged = [call.args for call in log.logger.call_args_list]
+        assert ("error", f"Webhook delivery failed: HTTP {status}") in logged
+        assert ("error", "Webhook report failed to send.") in logged
+        assert not any(level == "success" for level, _ in logged)
+
     @pytest.mark.parametrize("status", [201, 202, 204])
     @patch("autopwn_suite.report.post")
     @patch("autopwn_suite.report.open", new_callable=mock_open, read_data="report content")
@@ -177,6 +226,7 @@ class TestSendWebhook:
         log = MagicMock()
         SendWebhook("url", log)
         assert mock_post.call_args.kwargs["timeout"] == 30
+        assert mock_post.call_args.kwargs["allow_redirects"] is False
         log.logger.assert_called_with("success", "Webhook report sent succesfully.")
 
 

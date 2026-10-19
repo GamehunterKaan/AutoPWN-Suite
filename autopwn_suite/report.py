@@ -122,7 +122,9 @@ def SendWebhook(url, log, report_path="report.log") -> None:
         payload = {"payload": file}
 
         try:
-            req = post(url, files=payload, timeout=30)
+            # A 307/308 redirect would re-send the whole report to whatever host the Location names, possibly
+            # over plain HTTP, so a redirect is a failed delivery.
+            req = post(url, files=payload, timeout=30, allow_redirects=False)
             if 200 <= req.status_code < 300:
                 log.logger("success", "Webhook report sent succesfully.")
             else:

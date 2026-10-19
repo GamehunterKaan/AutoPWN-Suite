@@ -220,7 +220,8 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   untrusted certificates and legacy protocols without trusting them. Server replay
   is explicit. Generated Python/curl/HTML/JSON PoCs are
   downloads; running one is a separate operator action.
-- CLI webhook delivery sends its report payload; dashboard webhook delivery
+- CLI webhook delivery sends its report payload to the configured URL only (a redirect
+  response is a failed delivery and is not followed); dashboard webhook delivery
   sends JSON scan/test events. SMTP delivers MIME scan reports/test messages to
   configured recipients. Inspect `autopwn_suite/report.py` and dashboard notification
   functions for payload details; only send to destinations you control/trust.
