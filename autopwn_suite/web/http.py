@@ -108,9 +108,11 @@ def same_origin(left, right):
 
 
 def resolve_url(base, reference):
-    """Treat malformed server-provided links as unusable, not scanner errors."""
+    """Treat malformed server-provided links as unusable, not scanner errors. A raw space in a link is written as
+    %20, which is what the HTTP client sends; a space would end the URL in a log line and leave the rest of its query
+    unredacted."""
     try:
-        return urldefrag(urljoin(base, reference))[0]
+        return urldefrag(urljoin(base, reference))[0].replace(" ", "%20")
     except ValueError:
         return None
 

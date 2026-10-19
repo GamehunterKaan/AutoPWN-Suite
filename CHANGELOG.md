@@ -391,7 +391,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   (<class>)"). Findings still redact only credential-named parameters so that proof-of-concept replays keep
   working, now with a longer list of credential names (code, key, sig, sid, otp, pw, pwd, ticket, nonce,
   bearer, cookie and others), so a secret in a parameter with another name, in a URL path or nested inside
-  another parameter's value is still shown in a finding.
+  another parameter's value is still shown in a finding. A raw space in a link of a page is written as %20
+  when the scan reads it (the request on the wire is the same), so it no longer ends the URL in a log line
+  and leaves the rest of its query visible.
 - AUTOPWN-SA-2026-018: Inflate the stored records of a copied vulnerability database within size limits and
   check their types, so a hostile or damaged mirror ends the lookup as incomplete instead of using unbounded
   memory or crashing the scan (affects v2.6.0 and v2.6.1; NaN and Infinity scores and lone-surrogate text

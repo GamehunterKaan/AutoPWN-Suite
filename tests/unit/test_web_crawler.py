@@ -287,8 +287,10 @@ def test_the_links_of_one_page_are_cut_to_a_total_size_and_stay_fast(web_respons
         started = time.perf_counter()
         urls = link_finder("http://example.com/", log)
         elapsed = time.perf_counter() - started
+    # The size is the guarantee (without the cut these links add up to 336 MB); the time only guards against a hang,
+    # because a loaded CI runner takes several times as long as a workstation (0.6 s here, 2.8 s once on CI).
     assert 0 < sum(map(len, urls)) <= MAX_LINK_CHARACTERS
-    assert elapsed < 2.0 and _reported(log, "were not followed")
+    assert elapsed < 30 and _reported(log, "were not followed")
 
 
 @pytest.mark.unit
@@ -304,3 +306,15 @@ def test_a_crawl_stores_links_for_resuming_only_up_to_a_total_size(monkeypatch):
             found = crawl(root, MagicMock(), max_pages=2, max_urls=100)
     assert found >= first | second  # the crawl uses the links of every page it reads
     assert set(state["crawl"]) == {root}  # the second page's links would take the store past its size
+
+
+@pytest.mark.unit
+def test_a_raw_space_in_a_link_is_written_as_percent_20_so_a_log_line_keeps_the_whole_url(web_response):
+    from autopwn_suite.web.runtime import redact_text
+    log = MagicMock()
+    page = '<a href="/s?q=hello world&sid=SEKRET123&id=1">a</a><a href="/t?q=a%20b">b</a><form action="/f x" method="get"><input name="q"></form>'
+    with patch("autopwn_suite.web.crawler.get", return_value=web_response(page)):
+        links = link_finder("http://example.com/", log)
+    assert {"http://example.com/s?q=hello%20world&sid=SEKRET123&id=1", "http://example.com/t?q=a%20b"} <= links
+    assert not any(" " in link for link in links)
+    assert "SEKRET123" not in redact_text("Unable to crawl http://example.com/s?q=hello%20world&sid=SEKRET123&id=1; coverage is incomplete.")
