@@ -55,8 +55,9 @@ below before starting large work.
   routes, and the same-origin `Origin` checks noted in
   [ARCHITECTURE.md](ARCHITECTURE.md)) and fix what the review finds, with
   regression tests.
-- Reduce the plaintext-secret exposure documented in [SECRETS.md](SECRETS.md): evaluate
-  owner-only file permissions enforced by the application and an option to supply
+- Reduce the plaintext-secret exposure documented in [SECRETS.md](SECRETS.md): the dashboard
+  now creates its files with mode `0600` on POSIX, so evaluate tightening what that leaves
+  (an existing data directory and files from earlier releases keep their modes) and an option to supply
   integration secrets through environment variables or a file outside the data
   directory instead of the JSON settings.
 - Address the high-impact items in the [accessibility plan](ACCESSIBILITY.md): keyboard-operable
