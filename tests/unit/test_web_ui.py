@@ -1234,6 +1234,21 @@ class TestAPITestEmail:
                 resp = client.post("/api/settings/test_email")
                 assert resp.status_code == 500
 
+    def test_email_failure_is_logged_as_the_class_only(self, client, wu, caplog):
+        """The SMTP reply names hosts and accounts; the server log gets the class name like every delivery path."""
+        import smtplib
+        wu._settings["email"] = {
+            "enabled": True, "smtp_host": "smtp.test.com", "smtp_port": 587,
+            "username": "u", "password": "p", "from_addr": "f@t.com",
+            "to_addr": "t@t.com",
+        }
+        reply = b"5.7.8 Authentication failed for u at mx7.internal.example SECRETDETAIL"
+        with patch("smtplib.SMTP", side_effect=smtplib.SMTPAuthenticationError(535, reply)):
+            resp = client.post("/api/settings/test_email")
+        assert resp.status_code == 500 and resp.get_json() == {"error": "Failed to send test email"}
+        assert "Failed to send test email: SMTPAuthenticationError" in caplog.text
+        assert "SECRETDETAIL" not in caplog.text and "internal.example" not in caplog.text
+
 
 class TestAPITestWebhook:
     def test_webhook_disabled(self, client, wu):

@@ -1998,8 +1998,8 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             with _smtp_connection(cfg) as srv:
                 srv.sendmail(msg["From"], [cfg["to_addr"]], msg.as_string())
             return jsonify({"ok": True})
-        except Exception:
-            logging.exception("Failed to send test email")
+        except Exception as error:
+            logging.error("Failed to send test email: %s", delivery_error_summary(error))
             return jsonify({"error": "Failed to send test email"}), 500
 
     @app.route("/api/settings/test_webhook", methods=["POST"])
