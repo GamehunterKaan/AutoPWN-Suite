@@ -62,7 +62,8 @@ flowchart LR
    Detection is not proof of full exploitation. `poc.py` generates text/downloads;
    `poc_runtime.py` validates and replays stored plans after an explicit request.
 5. `autopwn_suite/web_ui.py` owns process-wide jobs, locks, progress, notifications,
-   persistence, REST routes and SSE. `autopwn_suite/web_ui_static/` renders the browser
+   persistence, REST routes and SSE (log entries carry an increasing id, and the stream resumes after the id in
+   `Last-Event-ID` or `after`). `autopwn_suite/web_ui_static/` renders the browser
    UI. Since v2.6.1: `autopwn_suite/web_auth.py` installs the sign-in, session, CSRF,
    `Origin` and HTTPS checks ahead of every route (`install_auth`, called from
    `_build_app`), and `autopwn_suite/credential_files.py` reads `*_FILE` secrets.
