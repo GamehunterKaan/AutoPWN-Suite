@@ -335,6 +335,24 @@ assert.equal(requests,0);
 """)
 
 
+@pytest.mark.parametrize("narrow", [True, False])
+def test_selecting_a_host_brings_its_detail_into_view_only_on_a_narrow_viewport(narrow):
+    run_js(f"const narrow={json.dumps(narrow)};" + """
+const queries=[], revealed=[];
+window.matchMedia=query=>{queries.push(query);return {matches:narrow}};
+document.getElementById('right').scrollIntoView=options=>revealed.push(options);
+hosts={'192.0.2.1':{ip:'192.0.2.1',ports:[],vulns:[],scan_status:'completed'}};
+selectHost('192.0.2.1');
+assert.equal(selIp,'192.0.2.1');
+assert.match(nodes.get('det-content').innerHTML,/192\\.0\\.2\\.1/);
+assert.equal(revealed.length,narrow?1:0);
+if(narrow) assert.equal(revealed[0].block,'nearest');
+assert.deepEqual(queries.map(String),['(max-width: 760px)']);
+selectHost('192.0.2.99');          // a host that is gone changes nothing
+assert.equal(revealed.length,narrow?1:0);
+""")
+
+
 @pytest.mark.parametrize("scrolled,follows", [(790, True), (800, True), (100, False), (759, False)])
 def test_terminal_follows_new_lines_only_while_the_reader_is_at_the_end(scrolled, follows):
     run_js(f"const scrolled={scrolled}, follows={json.dumps(follows)};" + """

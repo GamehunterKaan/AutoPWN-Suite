@@ -53,6 +53,29 @@ def css_rule(selector: str) -> str:
     return match.group(1)
 
 
+def media_block(query: str) -> str:
+    """The body of the `@media(query){...}` block in styles.css, nested braces included."""
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+    start = css.index("@media(" + query + "){") + len("@media(" + query + "){")
+    depth = 1
+    for position in range(start, len(css)):
+        depth += {"{": 1, "}": -1}.get(css[position], 0)
+        if not depth:
+            return css[start:position]
+    raise AssertionError(f"unterminated @media({query}) block")
+
+
+@pytest.mark.unit
+def test_host_detail_stays_reachable_on_a_narrow_viewport() -> None:
+    """The three-column layout collapses to one column below 760 px; the detail panel moves under the
+    main area instead of disappearing, which made selecting a host look like it did nothing."""
+    narrow = media_block("max-width:760px")
+    assert not re.search(r"#right\{[^}]*display:none", narrow)
+    assert "grid-template-rows:52px auto minmax(500px,1fr) auto" in narrow
+    # The Web Security tab has no host detail and keeps hiding the panel at every width.
+    assert re.search(r"#app\.web-focus #right\{display:none\}", (STATIC / "styles.css").read_text(encoding="utf-8"))
+
+
 @pytest.mark.unit
 def test_the_faded_toast_never_intercepts_clicks() -> None:
     """The toast stays in the page (it is a live region) and only fades to opacity 0, so it must not

@@ -757,7 +757,10 @@ function renderHosts(){
 function selectHost(ip){
   selIp=ip;
   document.querySelectorAll('.host-card').forEach(el=>el.classList.toggle('selected',el.dataset.ip===ip));
-  if(hosts[ip]) renderDetail(hosts[ip]);
+  if(!hosts[ip]) return;
+  renderDetail(hosts[ip]);
+  // On a narrow viewport the detail panel sits below the main area, out of sight of the host list.
+  if(window.matchMedia?.('(max-width: 760px)').matches) document.getElementById('right').scrollIntoView({block:'nearest'});
 }
 
 function renderDetail(h){

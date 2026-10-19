@@ -41,7 +41,9 @@ Only features that exist in the source are listed.
 - Primary body text on the dashboard background is high contrast (about 14:1 for
   the main text color).
 - Layout adapts at 1100 px and 760 px widths and the page scrolls on narrow
-  screens; the viewport zoom is not disabled.
+  screens; below 760 px the host detail panel moves under the main area (selecting
+  a host scrolls it into view) instead of being hidden. The viewport zoom is not
+  disabled.
 - A `.sr-only` utility class exists for visually hidden text.
 - Many form fields in Settings and Web controls use `<label for>`; boolean options use
   checkboxes, and one switch has `role="switch"`.
