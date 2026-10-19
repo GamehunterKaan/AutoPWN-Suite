@@ -21,7 +21,7 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `--daemon-install`, `--daemon-uninstall` | Install/remove the Linux root systemd scanner service; privileged filesystem/service side effects. Installing asks for the configuration, writes `/opt/autopwn-suite/autopwn-daemon.conf` and the unit, then enables and restarts the service. Removing, as root on Linux, stops and disables the service and deletes the unit and that configuration; the program, `/var/log/autopwn-daemon.log` and other files in `/opt/autopwn-suite` stay. Removing exits with status 1 when it is not run as root on Linux or cannot delete one of those files. |
 | `-t/--target`, `-hf/--host-file` | Target IP/hostname/range/CIDR or newline-separated target file; explicit target takes precedence over the host file. |
 | `-sd/--skip-discovery`, `-st/--scan-type` | Skip discovery, or choose `arp`/`ping` discovery. Privileges limit available techniques. |
-| `-nf/--nmap-flags` | Trusted operator Nmap arguments; pass a single argument such as `-nf="-p 80,443"`. These expose native Nmap capabilities, not a restricted remote job language. |
+| `-nf/--nmap-flags` | Trusted operator Nmap arguments; pass a single argument such as `-nf="-p 80,443"`. These expose native Nmap capabilities, not a restricted remote job language. The scanner owns the XML output, so `-oX`, `-oA`, `--resume` and `--append-output` are refused whatever their spelling (`--oX`, an abbreviation such as `--appe`). |
 | `-s/--speed`, `-ht/--host-timeout` | Nmap speed 0–5 (default 3) and per-host timeout in seconds (default 240). |
 | `-a/--api` | Optional NVD API key. Keep it out of committed files and shell history where possible. When omitted, `AUTOPWN_NIST_API_KEY_FILE` (since v2.6.1) names a one-line key file that is read at use time, before `api.txt`. |
 | `-m/--mode`, `-nt/--noise-timeout` | `normal`, `evade`, or `noise`; optional noise duration. Raw-packet features depend on host privileges. Noise mode runs one Nmap per live host for at most 32 hosts, and ends those Nmap processes when the duration passes or the scan is interrupted. |
@@ -153,7 +153,10 @@ Configuration fields are `mode` (normal/evade/noise), `speed` (0–5), `scan_typ
 (arp/ping/null), `scan_technique`, `ports`, `version_intensity` (0–9/null),
 `os_detection`, `nmap_flags`, `host_timeout` (positive seconds), `scan_ports`,
 `scan_vulns`, `skip_discovery`, `scan_web`, `vulnerability_source` and
-`web_options`. Boolean fields require JSON booleans. Web-only mode sets
+`web_options`. The three Nmap fields (`scan_technique`, `ports`, `nmap_flags`) are rejected with HTTP 400
+when they name a file: output options (`-oN`, `-oG`, `-oS`, `-oM`, `-oX`, `-oA`, `-o`, however
+spelled or clustered, as in `-6o`), `-iL`, `--excludefile`, `--datadir`, `--servicedb`, `--versiondb`,
+`--stylesheet`, `--resume` and `--append-output`. Boolean fields require JSON booleans. Web-only mode sets
 `scan_ports:false,scan_web:true` and disables discovery/CVE lookup. Noise mode
 falls back to normal in the dashboard. Job statuses are `running`, `stopping`,
 `completed`, `partial`, `stopped` or `error`; progress can have a null percentage.

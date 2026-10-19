@@ -46,12 +46,50 @@ def _tokens(value):
     raise TypeError("Nmap targets and arguments must be strings or lists of strings")
 
 
+# Nmap reads options with getopt_long_only: "-" and "--" are interchangeable, a unique prefix of a long
+# option is enough, and "-6o file" is the short options -6 and -o. Options are therefore matched by name.
+_OWNED_OUTPUT = ("resume", "append-output", "append_output")
+_FILE_OPTIONS = _OWNED_OUTPUT + ("excludefile", "datadir", "servicedb", "versiondb", "stylesheet")
+# Real options that share a prefix with, or start like, the file options above.
+_OTHER_OPTIONS = frozenset(("data", "exclude", "version", "open", "osscan-limit", "osscan-guess", "iR", "iflist"))
+_SHORT_WITHOUT_ARGUMENT = "46AFfhInqRrV"
+
+
+def _option_name(flag):
+    """The option an Nmap argument spells, or None when it is not an option."""
+    if len(flag) < 2 or not flag.startswith("-"):
+        return None
+    return flag.lstrip("-").split("=", 1)[0] or None
+
+
+def _abbreviates(name, options):
+    return len(name) >= 2 and any(option.startswith(name) for option in options)
+
+
+def replaces_xml_output(flag):
+    """Whether an Nmap argument would replace or continue the XML output this module owns."""
+    name = _option_name(flag)
+    return name is not None and (name[:2] in ("oX", "oA") or _abbreviates(name, _OWNED_OUTPUT))
+
+
+def uses_files(flag):
+    """Whether an Nmap argument names a file to write, read or replace (output, input, data and script files)."""
+    name = _option_name(flag)
+    if name is None or name in _OTHER_OPTIONS:
+        return False
+    if replaces_xml_output(flag) or _abbreviates(name, _FILE_OPTIONS):
+        return True
+    if flag.startswith("--"):
+        return name.startswith(("o", "iL"))
+    return name.lstrip(_SHORT_WITHOUT_ARGUMENT)[:1] in ("o", "i")
+
+
 def scan_with_progress(scanner, hosts, arguments, progress=None, should_stop=None, *, timeout=None):
     """Run only this job's Nmap process; drain both pipes and stop it on request."""
     scanner.clear()
     flags = _tokens(arguments)
     targets = _tokens(hosts)
-    if any(flag.startswith(("-oX", "-oA", "--resume", "--append-output")) for flag in flags):
+    if any(replaces_xml_output(flag) for flag in flags):
         raise ValueError("XML scan output cannot be redirected")
     if any(target.startswith("-") for target in targets):
         raise ValueError("Targets cannot contain Nmap options")

@@ -132,6 +132,49 @@ def test_xml_redirection_cannot_replace_the_managed_output(fake_spawn):
     spawn.assert_not_called()
 
 
+@pytest.mark.parametrize("flags", [
+    "-oX out.xml", "--oX out.xml", "-oA base", "--oA base", "-oXout.xml", "-oAbase", "--resume scan.log",
+    "--resu=scan.log", "--resum scan.log", "-resume scan.log", "--append-output", "--append_output", "--app", "-appe",
+    "-sV --oX -",
+])
+def test_every_spelling_of_the_managed_output_options_is_refused(fake_spawn, flags):
+    """getopt_long_only accepts "--oX" and unique abbreviations, so the guard cannot match one spelling."""
+    spawn, _ = fake_spawn
+    with pytest.raises(ValueError, match="redirected"):
+        monitored.scan_with_progress(scanner(), "192.0.2.1", flags, MagicMock())
+    spawn.assert_not_called()
+
+
+@pytest.mark.parametrize("flags", ["-oN notes.txt", "-oG notes.gnmap", "-iL targets.txt", "--exclude 192.0.2.9",
+                                   "--open --osscan-limit", "--version-intensity 5 -r", "--data 41 --datadir /opt/nmap"])
+def test_trusted_operator_flags_that_leave_the_managed_output_alone_still_run(fake_spawn, flags):
+    spawn, _ = fake_spawn
+    monitored.scan_with_progress(scanner(), "192.0.2.1", flags, None)
+    assert spawn.call_args.args[0][:3] == ["C:/Program Files/Nmap/nmap.exe", "-oX", "-"]
+
+
+@pytest.mark.parametrize("flag", [
+    "-oN", "-oNout.txt", "--oN", "-oG", "--oG", "-oS", "-oM", "-oX", "--oX", "-oA", "--oA", "-o", "-ox", "--o",
+    "-6o", "-Rno", "-Fo", "-6iL", "-i", "-iL", "--iL", "-iLhosts", "-6i", "--excludefile", "--excludef=hosts",
+    "--datadir", "--datad=/tmp", "--servicedb=x", "--serv=x", "--versiondb", "--versiond=x", "--stylesheet=x.xsl",
+    "--styl=x.xsl", "--resume", "--resu", "--append-output", "--appe",
+])
+def test_file_options_are_recognised_by_name(flag):
+    assert monitored.uses_files(flag)
+
+
+@pytest.mark.parametrize("flag", [
+    "-sS", "-sV", "-sn", "-O", "-A", "-n", "-r", "-R", "-F", "-6", "-ff", "-v", "-vv", "-d", "-dd", "-T4", "-Pn",
+    "-PS22,80", "-p", "-p-", "-e", "-g", "-S", "-D", "RND:10", "22,80", "192.0.2.1", "out.txt", "-", "--",
+    "--open", "--osscan-limit", "--osscan-guess", "-open", "--exclude", "--exclude=192.0.2.9", "--data", "--data-length",
+    "--data-string", "--version", "--version-intensity", "--script=default", "--script-args=a=b", "--top-ports",
+    "--host-timeout", "--stats-every", "--no-stylesheet", "--min-rate=100", "--reason", "--traceroute", "--iflist",
+    "-iR", "--iR", "--system-dns", "--dns-servers", "--max-retries",
+])
+def test_ordinary_scan_options_are_not_file_options(flag):
+    assert not monitored.uses_files(flag)
+
+
 def test_reader_error_still_drains_and_reaps_child(fake_spawn):
     _, process = fake_spawn
     callback = MagicMock(side_effect=RuntimeError("callback failed"))

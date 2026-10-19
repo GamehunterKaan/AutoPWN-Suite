@@ -147,6 +147,27 @@ class TestValidateNmapFlags:
     def test_pipe_injection(self, wu):
         assert wu._validate_nmap_flags("-sV | cat /etc/passwd") is not None
 
+    @pytest.mark.parametrize("flags", [
+        "-oN /etc/cron.d/x", "-oG out", "-oS out", "-oX out", "--oX out", "-oA out", "--oA out", "-o out", "-ox out",
+        "-sV -6o out", "-Rno out", "-iL /etc/shadow", "-iL=hosts", "-iLhosts", "-6i hosts", "--excludefile hosts",
+        "--datadir /tmp/x", "--servicedb=x", "--versiondb=x", "--stylesheet=x.xsl", "--resume scan.log",
+        "--appe", "-appe", "-p 80 -oN out",
+    ])
+    def test_flags_that_read_or_write_files_are_rejected(self, wu, flags):
+        assert wu._validate_nmap_flags(flags) == "nmap_flags cannot read or write files"
+
+    @pytest.mark.parametrize("flags", [
+        "-sS -sV -O -T 4", "-p 1-1000 --version-intensity 3", "--open --osscan-limit", "--exclude 192.0.2.9 --data-length 10",
+        "--script=http-title --script-args=a=b", "-Pn -n -r -vv", "-6 -sn", "-iR 0", "--version",
+    ])
+    def test_ordinary_scan_flags_are_still_accepted(self, wu, flags):
+        assert wu._validate_nmap_flags(flags) is None
+
+    def test_a_profile_cannot_smuggle_file_options_through_the_structured_fields(self, wu):
+        for field in ("scan_technique", "ports", "nmap_flags"):
+            with pytest.raises(ValueError, match="read or write files"):
+                wu._profile_config({field: "-oN /etc/cron.d/x"})
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Deep merge

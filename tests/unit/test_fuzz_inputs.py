@@ -222,6 +222,20 @@ def test_event_stream_resume_point_is_the_first_short_ascii_number_and_never_rai
     assert accepted and rejected  # the corpus exercises both outcomes
 
 
+def test_flag_allowlist_rejects_every_file_option_spelling_among_random_flags(web_ui):
+    rng = random.Random(SEED + 40)
+    file_options = ["-oN", "-oXout", "--oX", "--oA", "-6o", "-Rno", "-ox", "-iL", "--iL", "-6i", "--resu", "--appe",
+                    "--datad", "--stylesheet", "--excludef", "--servicedb", "--versiondb"]
+    ordinary = ["-sV", "-sS", "-Pn", "-n", "-T4", "-p", "80,443", "--open", "--exclude", "192.0.2.9", "--version-intensity",
+                "5", "--script=default", "--data-length", "10", "-vv", "-6", "out.txt", "-O"]
+    check = web_ui.module._validate_nmap_flags
+    for _ in range(2000):
+        tokens = [rng.choice(ordinary) for _ in range(rng.randint(0, 5))]
+        assert check(" ".join(tokens)) is None
+        tokens.insert(rng.randint(0, len(tokens)), rng.choice(file_options) + rng.choice(["", "=out.txt", " out.txt", "	."]))
+        assert check(" ".join(tokens)) == "nmap_flags cannot read or write files"
+
+
 def test_account_validation_and_hash_check_only_raise_value_error():
     rng = random.Random(SEED + 3)
     for _ in range(1000):
