@@ -603,6 +603,8 @@ function connectSSE(){
     if(d.level==='__web_finding__'){ window.webSecurity?.refresh(); return; }
     addLog(d.scan_id, d.msg, d.level, d.ts);
     if(d.msg && d.msg.includes('Scheduled scan fired')){ loadSchedulesFromServer(); poll(); }
+    // The scheduler switches off a schedule that no longer validates: show it as disabled without a reload.
+    else if(d.msg && d.msg.includes('Scheduled scan disabled')) loadSchedulesFromServer();
   };
 }
 

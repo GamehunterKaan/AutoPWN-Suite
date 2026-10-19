@@ -548,6 +548,21 @@ assert.ok(requested.includes('/api/schedules'));
 """)
 
 
+def test_a_schedule_the_scheduler_disabled_is_reloaded_without_waiting_for_a_page_reload():
+    run_js(EVENT_SOURCE_SCRIPT + """
+renderScans=renderHosts=renderVulnTable=updateBadges=()=>{};
+const requested=[];
+fetch=async url=>{requested.push(url);return {ok:true,json:async()=>[]}};
+connectSSE();
+eventSource.onmessage(message(1,'[!] Scheduled scan disabled (Nightly): Invalid target. Edit the schedule or its profile and enable it again.','error'));
+assert.ok(requested.includes('/api/schedules'),requested.join());
+assert.ok(!requested.includes('/api/scans'),requested.join());  // only the list of schedules changed
+requested.length=0;
+eventSource.onmessage(message(2,'[!] Scheduled scan skipped (Nightly): the previous run is still active.','error'));
+assert.equal(requested.length,0);
+""")
+
+
 def test_disappearing_host_clears_selected_details():
     run_js("""
 renderScans=renderHosts=renderVulnTable=updateBadges=()=>{};
