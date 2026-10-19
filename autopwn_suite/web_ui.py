@@ -251,7 +251,10 @@ def _write_json(path: Path, data: dict) -> None:
     """Replace a complete JSON document; an interrupted save keeps the old one."""
     temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
-        with temporary.open("x", encoding="utf-8") as output:
+        # Owner-only like the account file: these files hold the SMTP password, NVD key and webhook URL,
+        # and an existing data directory keeps whatever mode it already had.
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
             json.dump(data, output, indent=2)
             output.flush()
             os.fsync(output.fileno())

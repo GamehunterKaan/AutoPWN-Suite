@@ -225,6 +225,28 @@ class TestSettings:
         result = wu._get_setting("nonexistent", "key")
         assert not result  # empty dict or None for missing keys
 
+    def test_persisted_files_are_created_owner_only(self, wu, monkeypatch):
+        """Settings hold the SMTP password, NVD key and webhook URL; an existing data directory may be 0755."""
+        modes = []
+        real_open = wu.os.open
+
+        def recording_open(path, flags, mode=0o777, **kwargs):
+            modes.append(mode)
+            return real_open(path, flags, mode, **kwargs)
+
+        monkeypatch.setattr(wu.os, "open", recording_open)
+        previous = wu.os.umask(0o022)
+        try:
+            wu._load_settings()  # writes the defaults
+            wu._save_profiles()
+            wu._save_schedules()
+        finally:
+            wu.os.umask(previous)
+        assert len(modes) == 3 and set(modes) == {0o600}
+        if wu.os.name != "nt":
+            for path in (wu._SETTINGS_FILE, wu._PROFILES_FILE, wu._SCHEDULES_FILE):
+                assert path.stat().st_mode & 0o777 == 0o600
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Profiles persistence

@@ -41,7 +41,11 @@ quarterly, on role changes, and immediately after a suspected compromise.
   contents. Use a
   dedicated scanner account, an absolute `AUTOPWN_DATA_DIR` outside the checkout,
   directory mode `0700` and file mode `0600` (or equivalent owner-only Windows
-  ACLs). The application does not enforce these modes or encrypt these files.
+  ACLs). The dashboard writes its settings, profiles, schedules and account files
+  with mode `0600` on POSIX (a file written by an earlier release keeps its mode
+  until it is next saved) and creates a missing data directory with mode `0700`,
+  but it does not change the mode of an existing directory or of any other file,
+  and it does not encrypt these files.
   Use host/disk encryption and encrypted, access-controlled backups. Protect
   caller-CWD configuration, exports, logs and downloaded evidence separately:
   `AUTOPWN_DATA_DIR` does not relocate every file.
