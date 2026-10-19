@@ -192,15 +192,18 @@ through Python's `SSL_CERT_FILE`/`SSL_CERT_DIR` trust configuration.
 Schedule keys are `name,target,profile_id,enabled,type,interval_value,
 interval_unit,time_utc,weekday`. Types are `interval`, `daily`, `weekly`;
 interval units are minutes/hours/days, with a positive value; time is `HH:MM`
-UTC and weekday is 0–6 (Monday–Sunday). Saved records add `id,created_at,last_run`.
+UTC and weekday is 0–6 (Monday–Sunday). Saved records add `id,created_at,last_run`
+and, once a schedule has been enabled again or had its type, time or weekday
+changed, `armed_at` (set by the dashboard; a value in a request is ignored).
 Schedules use the selected profile when firing and must satisfy offline policy: in
 offline mode a due schedule whose profile has web checks is skipped with one log
 line (a manual start answers 409) and is tried again at its next interval or time.
 The scheduler checks once a minute. A daily or weekly schedule whose time was
 missed (a restart, a suspend or a slow check) still runs once when the check
 comes within an hour of that time, and never for a time that passed before the
-schedule was created. A schedule does not start a scan while the scan it started
-last is still running or stopping; it logs one skip and starts when that scan ends.
+schedule was created, enabled again or retimed. A schedule does not start a scan
+while the scan it started last is still running or stopping; it logs one skip and
+starts when that scan ends.
 A due schedule that fails validation (for example a hand-edited file) is disabled
 and logged once instead of failing every minute; enable it again after fixing it.
 

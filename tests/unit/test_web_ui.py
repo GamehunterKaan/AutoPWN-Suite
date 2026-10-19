@@ -716,6 +716,19 @@ class TestShouldFire:
         # A hand-written record without created_at still fires inside the window.
         assert fire_at({"id": "s1", "enabled": True, "type": "daily", "time_utc": "02:00"}, self.utc(19, 2, 10)) is True
 
+    def test_a_schedule_enabled_again_or_retimed_waits_for_its_next_slot(self, fire_at):
+        daily = {"id": "s1", "enabled": True, "type": "daily", "time_utc": "02:00",
+                 "created_at": "2026-10-01T00:00:00Z", "armed_at": "2026-10-19T02:30:00Z"}
+        yesterday = self.utc(18, 2, 0, 5)
+        assert fire_at(daily, self.utc(19, 2, 45), yesterday) is False  # the 02:00 slot passed before it was armed
+        assert fire_at(daily, self.utc(20, 2, 0, 20), yesterday) is True
+        assert fire_at({**daily, "armed_at": "2026-10-19T01:59:00Z"}, self.utc(19, 2, 0, 20), yesterday) is True
+        weekly = {**daily, "type": "weekly", "weekday": 0}
+        assert fire_at(weekly, self.utc(19, 2, 45), self.utc(12, 2, 0, 5)) is False
+        assert fire_at(weekly, self.utc(26, 2, 0, 20), self.utc(12, 2, 0, 5)) is True
+        # A hand-edited value that is not a timestamp is ignored rather than raising.
+        assert fire_at({**daily, "armed_at": "later"}, self.utc(19, 2, 10), yesterday) is True
+
     def test_weekly_slot_survives_a_restart_and_runs_once_a_week(self, fire_at):
         weekly = {"id": "s1", "enabled": True, "type": "weekly", "weekday": 0, "time_utc": "02:00"}
         last_week = self.utc(12, 2, 0, 5)
@@ -1271,6 +1284,39 @@ class TestAPISchedules:
                           content_type="application/json")
         assert resp.status_code == 200
         assert resp.get_json()["name"] == "Updated"
+
+    def _daily_schedule(self, client, wu, minutes_ago, **fields):
+        """A daily schedule created long ago whose slot passed minutes_ago, so it is owed a catch-up run."""
+        slot = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+        resp = client.post("/api/schedules", json={"target": "192.0.2.10", "profile_id": self._create_profile(client),
+                                                   "type": "daily", "time_utc": slot.strftime("%H:%M"), **fields})
+        assert resp.status_code == 201
+        sid = resp.get_json()["id"]
+        wu._schedules[sid]["created_at"] = "2026-01-01T00:00:00Z"
+        return sid
+
+    def test_enabling_a_schedule_again_does_not_run_the_slot_it_missed(self, client, wu):
+        sid = self._daily_schedule(client, wu, 30, enabled=False)
+        assert client.put(f"/api/schedules/{sid}", json={"enabled": True}).status_code == 200
+        assert "armed_at" in wu._schedules[sid]
+        assert not wu._should_fire(wu._schedules[sid])
+        # Edits that leave the schedule on and its timing alone keep the catch-up they were owed.
+        other = self._daily_schedule(client, wu, 30)
+        assert client.put(f"/api/schedules/{other}", json={"name": "Renamed", "enabled": True,
+                                                           "armed_at": "2000-01-01T00:00:00Z"}).status_code == 200
+        assert "armed_at" not in wu._schedules[other]  # and a request cannot set it
+        assert wu._should_fire(wu._schedules[other])
+
+    @pytest.mark.parametrize("kind", ["daily", "weekly"])
+    def test_retiming_a_schedule_does_not_run_a_slot_that_passed_before_the_edit(self, client, wu, kind):
+        sid = self._daily_schedule(client, wu, 30)
+        assert wu._should_fire(wu._schedules[sid])
+        passed = datetime.now(timezone.utc) - timedelta(minutes=20)
+        change = {"time_utc": passed.strftime("%H:%M")}
+        if kind == "weekly":
+            change.update(type="weekly", weekday=passed.weekday())
+        assert client.put(f"/api/schedules/{sid}", json=change).status_code == 200
+        assert not wu._should_fire(wu._schedules[sid])
 
     def test_update_schedule_not_found(self, client):
         resp = client.put("/api/schedules/nonexistent",

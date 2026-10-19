@@ -1539,10 +1539,11 @@ def _parse_utc(value):
 
 def _slot_due(schedule: dict, last, slot, now) -> bool:
     """Whether the daily or weekly slot at or before now still has to run: once, within the catch-up
-    window, and never for a slot that passed before the schedule was created."""
+    window, and never for a slot that passed before the schedule was created, enabled again or retimed."""
     if now - slot > _SCHEDULE_CATCH_UP:
         return False
-    since = last or _parse_utc(schedule.get("created_at"))
+    marks = (last, _parse_utc(schedule.get("created_at")), _parse_utc(schedule.get("armed_at")))
+    since = max((mark for mark in marks if mark is not None), default=None)
     return since is None or since < slot
 
 
@@ -2267,6 +2268,11 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                         return jsonify({"error": "Invalid schedule configuration"}), 400
                     if s["profile_id"] not in _profiles:
                         return jsonify({"error": "Profile not found"}), 400
+                old = _schedules[sid]
+                if s["enabled"] is True and (old.get("enabled", True) is not True or any(
+                        old.get(key) != s.get(key) for key in ("type", "time_utc", "weekday"))):
+                    # A slot that passed before this change is not owed a catch-up run (see _slot_due).
+                    s["armed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                 _schedules[sid] = s
         _save_schedules()
         return jsonify(s)
