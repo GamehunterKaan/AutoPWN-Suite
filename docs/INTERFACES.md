@@ -203,8 +203,10 @@ missed (a restart, a suspend or a slow check) still runs once when the check
 comes within an hour of that time (a later check skips that day or week, without
 a log line), and never for a time that passed before the
 schedule was created, enabled again or retimed. A schedule does not start a scan
-while the scan it started last is still running or stopping; it logs one skip and
-starts when that scan ends.
+while the scan it started last is still running or stopping; it logs one skip. An
+interval schedule starts when that scan ends; a daily or weekly schedule only if
+that happens within the one-hour catch-up window of its time, otherwise it waits
+for its next time.
 A due schedule that fails validation (for example a hand-edited file) is disabled
 and logged once instead of failing every minute; enable it again after fixing it.
 Each such disabling, and one caused by a profile edit, is also written to the server

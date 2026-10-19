@@ -1628,7 +1628,8 @@ def _previous_run_active(schedule: dict) -> bool:
     if sid not in _schedule_overlap_logged:
         _schedule_overlap_logged.add(sid)
         _scheduler_note("warning", f"[*] Scheduled scan skipped ({schedule.get('name') or sid[:8]}): "
-                        "its previous scan is still running; it starts when that one ends.")
+                        "its previous scan is still running; it starts when that one ends (a daily or weekly "
+                        "schedule only within an hour of its time, otherwise at its next time).")
     return True
 
 
@@ -1675,16 +1676,20 @@ def _scheduler_loop() -> None:
                     continue
                 if _previous_run_active(schedule):
                     continue
-                checked = _schedule_data(schedule)
                 # Keep the profile and schedule stable until launch. Deleting,
                 # disabling, or editing either cannot start the stale snapshot.
                 with _profiles_lock:
-                    profile = _profiles.get(checked["profile_id"])
-                    if not isinstance(profile, dict):
-                        raise ValueError("Linked profile no longer exists")
-                    config = _profile_config({}, profile.get("config", {}))
-                    config["target"] = checked["target"]
-                    config["nmap_flags"] = _build_nmap_flags(config)
+                    try:  # only a validation failure disables the schedule, not a ValueError from launching
+                        checked = _schedule_data(schedule)
+                        profile = _profiles.get(checked["profile_id"])
+                        if not isinstance(profile, dict):
+                            raise ValueError("Linked profile no longer exists")
+                        config = _profile_config({}, profile.get("config", {}))
+                        config["target"] = checked["target"]
+                        config["nmap_flags"] = _build_nmap_flags(config)
+                    except ValueError as exc:
+                        _disable_invalid_schedule(schedule, exc)
+                        continue
                     if config["scan_web"] and (_offline_enabled() or config["vulnerability_source"] == "offline"):
                         # A manual start is refused with 409 here; a scheduled one must not become a
                         # "completed" scan that skipped all of its work.
@@ -1706,8 +1711,6 @@ def _scheduler_loop() -> None:
                     "msg": f"[*] Scheduled scan fired: {schedule.get('name', schedule['id'][:8])} → {config['target']}",
                 })
                 _save_schedules()
-            except ValueError as exc:
-                _disable_invalid_schedule(schedule, exc)
             except Exception as exc:
                 logging.exception("Scheduled scan failed")
                 label = schedule.get("name") or schedule.get("id", "unknown") if isinstance(schedule, dict) else "unknown"
@@ -2212,7 +2215,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                             _schedule_data(schedule)
                         except ValueError:
                             schedule["enabled"] = False
-                            disabled.append(schedule.get("name") or str(schedule.get("id", ""))[:8])
+                            disabled.append(str(schedule.get("name") or str(schedule.get("id", ""))[:8]))
                             _log_schedule_disabled(schedule, "a profile edit")
         _save_profiles()
         if disabled:

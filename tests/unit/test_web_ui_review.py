@@ -248,6 +248,8 @@ def test_schedule_waits_for_its_own_unfinished_scan_and_logs_the_skip_once(clien
     assert wu_review._launch_scan.call_count == 1
     skips = [entry["msg"] for entry in wu_review._log_history if "previous scan is still running" in entry["msg"]]
     assert len(skips) == 1
+    # Not every schedule starts when the scan ends: a daily or weekly slot is dropped after the catch-up window.
+    assert "within an hour of its time, otherwise at its next time" in skips[0]
     job.mark_done("stopped")
     due_again()
     _one_scheduler_tick(wu_review)  # the finished scan no longer blocks the schedule
@@ -258,15 +260,21 @@ def test_profile_edit_disables_the_schedules_it_no_longer_fits(client_review, wu
     profile_id = _profile(client_review)
     cidr = client_review.post("/api/schedules", json={"target": "192.0.2.0/24", "profile_id": profile_id}).get_json()["id"]
     host = client_review.post("/api/schedules", json={"target": "example.test", "profile_id": profile_id}).get_json()["id"]
+    # The schedules file loads any object, so a hand-edited name need not be a string.
+    wu_review._schedules["edited"] = {"id": "edited", "enabled": True, "profile_id": profile_id, "name": 5,
+                                      "target": "example.test", "type": "interval"}
     response = client_review.put(f"/api/profiles/{profile_id}", json={"scan_web": True, "scan_ports": False})
     assert response.status_code == 200
     # A CIDR range is not a web target, so that schedule would fail on every check; the other one still fits.
     assert wu_review._schedules[cidr]["enabled"] is False and wu_review._schedules[host]["enabled"] is True
+    assert wu_review._schedules["edited"]["enabled"] is False
     assert json.loads(wu_review._SCHEDULES_FILE.read_text())[cidr]["enabled"] is False
-    assert any("Disabled after a profile edit" in entry["msg"] for entry in wu_review._log_history)
+    notices = [entry["msg"] for entry in wu_review._log_history if "Disabled after a profile edit" in entry["msg"]]
+    assert len(notices) == 1 and f"{cidr[:8]}, 5." in notices[0]
     warnings = [record for record in caplog.records if record.levelname == "WARNING"]
     assert [record.getMessage() for record in warnings] == [
-        f"Scheduled scan disabled after a profile edit (schedule '{cidr}')"]
+        f"Scheduled scan disabled after a profile edit (schedule '{cidr}')",
+        "Scheduled scan disabled after a profile edit (schedule 'edited')"]
     _one_scheduler_tick(wu_review)
     assert [call.args[0]["target"] for call in wu_review._launch_scan.call_args_list] == ["example.test"]
 
@@ -285,6 +293,21 @@ def test_schedule_that_fails_validation_is_disabled_instead_of_erroring_every_mi
     # The server log (the only record for a headless daemon) names the schedule but carries no exception text.
     assert [record.getMessage() for record in caplog.records if record.levelname == "WARNING"] == [
         f"Scheduled scan disabled after a validation failure (schedule '{schedule_id}')"]
+
+
+def test_a_value_error_from_launching_does_not_disable_the_schedule(client_review, wu_review, caplog):
+    """Only a failed validation repeats until someone edits the schedule; a launch that failed is tried again."""
+    profile_id = _profile(client_review)
+    schedule_id = _schedule(client_review, profile_id)
+    wu_review._launch_scan.side_effect = ValueError("not a validation failure")
+    _one_scheduler_tick(wu_review)
+    assert wu_review._schedules[schedule_id]["enabled"] is True
+    assert schedule_id not in wu_review._schedule_last_run
+    assert not [record for record in caplog.records if record.levelname == "WARNING"]
+    wu_review._launch_scan.side_effect = None
+    _one_scheduler_tick(wu_review)  # not started, so it is still due
+    assert wu_review._launch_scan.call_count == 2
+    assert schedule_id in wu_review._schedule_last_run
 
 
 def test_put_can_turn_off_an_invalid_schedule_but_not_turn_it_on(client_review, wu_review):
