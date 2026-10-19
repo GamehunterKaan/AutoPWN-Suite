@@ -17,9 +17,13 @@ included automatically. Only standard PyPI sources are approved. Human review
 also checks provenance, unexpected package names, maintainer changes and install
 scripts: no scanner proves that an unknown package is benign. The release scan
 checks the Python packages actually installed in each Docker image, covering
-pip resolution differences from the Poetry environment. Operating-system packages
-inherited from the base image are inventoried in the signed SBOM and scan reports but
-do not block a release; a known malicious package blocks in any ecosystem.
+pip resolution differences from the Poetry environment. That inventory must
+name every package `requirements-locked.txt` pins without an environment marker
+(the file the image installs from), so a scan that found no Python packages, or
+lost one, fails instead of passing on operating-system packages alone.
+Operating-system packages inherited from the base image are inventoried in the
+signed SBOM and scan reports but do not block a release; a known malicious
+package blocks in any ecosystem.
 
 **Threshold:** every known applicable dependency vulnerability, regardless of
 severity or available fix, blocks merge/release until upgraded, removed or

@@ -79,6 +79,48 @@ def test_clean_inventory_passes_and_missing_package_fails(root):
         policy.evaluate_sca({"results": []}, "2.6.0", root)
 
 
+def test_image_scan_must_inventory_the_python_runtime_packages(root):
+    """An image inventory of operating-system packages alone (or missing a pinned Python package) cannot pass."""
+    assert policy.evaluate_sca(report(), "2.6.0", root, expected_names={"example"}) == ([], 1)
+    with pytest.raises(ValueError, match="omitted installed Python packages"):
+        policy.evaluate_sca(os_report(), "2.6.0", root, expected_names={"example"})
+    with pytest.raises(ValueError, match="omitted installed Python packages"):
+        policy.evaluate_sca(report(), "2.6.0", root, expected_names={"example", "flask"})
+    spelled = report()
+    spelled["results"][0]["packages"][0]["package"]["name"] = "Example_Pkg"
+    assert policy.evaluate_sca(spelled, "2.6.0", root, expected_names={"example-pkg"}) == ([], 1)
+
+
+def test_image_runtime_packages_are_the_unconditional_locked_pins(tmp_path):
+    (tmp_path / "requirements-locked.txt").write_text(
+        "# Generated\nFlask-Cors==6.0.1 \\\n    --hash=sha256:aa\n"
+        'cffi==2.1.1 ; platform_python_implementation != "PyPy" \\\n    --hash=sha256:bb\n'
+        'colorama==0.4.6 ; platform_system == "Windows" \\\n    --hash=sha256:cc\nMarkupSafe==3.0.2\n')
+    assert policy.image_runtime_packages(tmp_path) == {"flask-cors", "markupsafe"}
+    with pytest.raises(ValueError, match="requirements-locked"):
+        policy.image_runtime_packages(tmp_path / "missing")
+    real = policy.image_runtime_packages(Path(__file__).resolve().parents[2])
+    assert {"flask", "requests", "rich", "beautifulsoup4"} <= real and not {"cffi", "colorama"} & real
+
+
+def run_image_policy(tmp_path, monkeypatch, scanned):
+    """Run main() in image mode against this repository with a fake scanner that returns `scanned`."""
+    monkeypatch.setattr(policy, "run_scanner", lambda command, output: scanned)
+    monkeypatch.setattr(policy.sys, "argv", ["security_policy.py", "--repo", str(Path(__file__).resolve().parents[2]),
+                                             "--output", str(tmp_path / "reports"), "--image-archive", str(tmp_path / "image.tar")])
+    policy.main()
+    return json.loads((tmp_path / "reports/policy-result.json").read_text())
+
+
+def test_image_policy_fails_when_the_scan_found_no_python_packages(tmp_path, monkeypatch):
+    real = policy.image_runtime_packages(Path(__file__).resolve().parents[2])
+    complete = {"results": [{"packages": [{"package": {"name": name, "version": "1", "ecosystem": "PyPI", "purl": f"pkg:pypi/{name}@1"},
+                                           "licenses": ["MIT"]} for name in sorted(real)]}]}
+    assert run_image_policy(tmp_path, monkeypatch, complete)["violations"] == []
+    with pytest.raises(ValueError, match="omitted installed Python packages"):
+        run_image_policy(tmp_path, monkeypatch, os_report())
+
+
 @pytest.mark.parametrize("licenses", [[], ["non-standard"], ["GPL-3.0-only"], ["MIT", "UNKNOWN"]])
 def test_unknown_or_unapproved_python_license_blocks(root, licenses):
     assert policy.evaluate_sca(report(licenses=licenses), "2.6.0", root)[0]

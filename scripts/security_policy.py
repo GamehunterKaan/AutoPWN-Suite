@@ -77,7 +77,7 @@ def vex_exceptions(version, root=POLICY_ROOT, now=None):
     return result
 
 
-def evaluate_sca(report, version, root=POLICY_ROOT, expected=None, licenses=True):
+def evaluate_sca(report, version, root=POLICY_ROOT, expected=None, licenses=True, expected_names=None):
     exemptions = vex_exceptions(version, root)
     overrides = read_json(root / "license-overrides.json")
     packages = [p for source in report["results"] for p in source["packages"]]
@@ -111,6 +111,11 @@ def evaluate_sca(report, version, root=POLICY_ROOT, expected=None, licenses=True
                 violations.append(f"{purl}: unapproved/unknown license {detected}")
     if expected is not None and not expected.issubset(found):
         raise ValueError(f"SCA omitted locked packages: {sorted(expected - found)}")
+    if expected_names is not None:
+        installed = {re.sub(r"[-_.]+", "-", item["package"]["name"]).lower() for item in packages
+                     if item["package"].get("ecosystem") == "PyPI"}
+        if not expected_names.issubset(installed):
+            raise ValueError(f"SCA omitted installed Python packages: {sorted(expected_names - installed)}")
     return violations, len(packages)
 
 
@@ -126,6 +131,19 @@ def build_tool_pins(repo):
     if not pins:
         raise ValueError("No pinned build tools found")
     return pins
+
+
+def image_runtime_packages(repo):
+    """Names (OSV-normalized) of the packages the image installs unconditionally from requirements-locked.txt."""
+    path = repo / "requirements-locked.txt"
+    if not path.is_file():
+        raise ValueError("Release source has no requirements-locked.txt to check the image inventory against")
+    names = {re.sub(r"[-_.]+", "-", package).lower()
+             for package, marker in re.findall(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==[^\s;\\]+([ \t]*;)?", path.read_text(encoding="utf-8"), re.MULTILINE)
+             if not marker}
+    if not names:
+        raise ValueError("No pinned runtime packages found")
+    return names
 
 
 def sast_fingerprint(item):
@@ -173,8 +191,11 @@ def main():
                "--all-packages", "--all-vulns", "--format=json", f"--output-file={report_path.resolve()}",
                "--no-call-analysis=go", "--no-call-analysis=rust"]
     expected = None
+    expected_names = None
     if args.image_archive:
         command += ["--licenses", "--archive", str(args.image_archive.resolve())]
+        # The image installs requirements-locked.txt: a scan that inventoried no Python packages must not pass.
+        expected_names = image_runtime_packages(repo)
     else:
         command += ["--licenses", f"--lockfile={repo / 'poetry.lock'}"]
         locked = tomllib.loads((repo / "poetry.lock").read_text(encoding="utf-8"))["package"]
@@ -182,7 +203,7 @@ def main():
             raise ValueError("Only standard PyPI lockfile dependencies are approved")
         expected = {(p["name"], p["version"]) for p in locked}
     report = run_scanner(command, report_path)
-    violations, count = evaluate_sca(report, version, expected=expected)
+    violations, count = evaluate_sca(report, version, expected=expected, expected_names=expected_names)
     build_count = 0
     if not args.image_archive:
         # Read the pins first: a tag without the build requirement files stops here with a clear message,
