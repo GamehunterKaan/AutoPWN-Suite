@@ -9,12 +9,14 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Functional changes
 
-- Add `--check-update` to check GitHub for a newer AutoPWN Suite and exit. Supports
-  release-based (`--update-channel release`, default: compares against the latest GitHub
-  release tag) and commit-based (`--update-channel commit`: compares the local git `HEAD`
-  against the latest commit on `--update-branch`) checks. The target repo defaults to this
-  fork and can be overridden with `--update-repo OWNER/REPO` or `AUTOPWN_UPDATE_REPO`. The
-  check only runs when explicitly requested; it never runs automatically during a scan.
+- Add `--check-update` to check GitHub for a newer AutoPWN Suite and exit, and `--apply-update`
+  to actually fast-forward this git checkout to it. Both support release-based
+  (`--update-channel release`, default: the latest GitHub release tag) and commit-based
+  (`--update-channel commit`: the latest commit on `--update-branch`) comparison. The target
+  repo defaults to this fork and can be overridden with `--update-repo OWNER/REPO` or
+  `AUTOPWN_UPDATE_REPO`. `--apply-update` requires a git checkout with a clean working tree
+  and only fast-forwards, refusing (without changing anything) on uncommitted changes or a
+  diverged branch. Neither flag runs automatically during a scan.
 
 ## [2.6.1] - 2026-10-16
 

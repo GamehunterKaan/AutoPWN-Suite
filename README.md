@@ -358,20 +358,30 @@ The default `--vuln-source auto` tries online NVD lookups and falls back to a re
 if NVD is unavailable, staying local for the rest of that scan. `--vuln-source online` requires
 online lookups. Use `--offline` (or `--vuln-source offline`) to avoid trying NVD at all.
 
-## Checking for updates
+## Checking for updates and self-updating
 
 ```bash
 python autopwn.py --check-update
 python autopwn.py --check-update --update-channel commit --update-branch main
+
+python autopwn.py --apply-update
+python autopwn.py --apply-update --update-channel commit --update-branch main
 ```
 
-`--check-update` asks GitHub for a newer AutoPWN Suite, prints the result, then exits; it never
-runs automatically during a scan. By default it compares the running version against the repo's
-latest GitHub release tag (`--update-channel release`, the default). Pass
-`--update-channel commit` to instead compare the local git `HEAD` against the latest commit on
-`--update-branch` (default `main`) — this requires running from a git checkout. Use
-`--update-repo OWNER/REPO` (or the `AUTOPWN_UPDATE_REPO` environment variable) to point the check
-at a different fork. Requires internet access.
+`--check-update` asks GitHub for a newer AutoPWN Suite, prints the result, then exits.
+`--apply-update` goes further and fast-forwards this git checkout to that newer release/commit,
+then exits. Neither runs automatically during a scan — both are explicit, one-shot commands.
+
+By default both compare against the repo's latest GitHub release tag (`--update-channel
+release`, the default). Pass `--update-channel commit` to instead target the latest commit on
+`--update-branch` (default `main`). Use `--update-repo OWNER/REPO` (or the `AUTOPWN_UPDATE_REPO`
+environment variable) to point at a different fork. Requires internet access.
+
+`--apply-update` requires a git checkout of AutoPWN Suite (not a plain pip install) with a clean
+working tree, and only fast-forwards — it refuses and leaves your checkout untouched if the
+working tree has uncommitted changes or the local branch has diverged from the target (resolve
+that manually, e.g. with `git rebase` or by committing/stashing first). Restart AutoPWN Suite
+after it reports success so the updated code takes effect.
 Missing or invalid local data fails explicitly rather than reporting a clean vulnerability scan.
 Stored data remains usable without an expiry; its update time is shown in scan logs and dashboard
 results. Offline matching uses description keyword prefixes, with all query terms required,
