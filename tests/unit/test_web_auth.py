@@ -295,6 +295,51 @@ def test_failed_account_write_preserves_login_and_original_file(dashboard_login)
     assert not list(d.path.parent.glob(".web_ui_auth.json.*.tmp"))
 
 
+def test_account_replacement_retries_while_another_process_holds_the_file_open(tmp_path):
+    # On Windows os.replace raises PermissionError while the running dashboard has the file open to check a session.
+    store = AccountStore(tmp_path / ACCOUNT_FILE)
+    real_replace, attempts = os.replace, []
+
+    def contended(source, destination):
+        attempts.append(source)
+        if len(attempts) < 3:
+            raise PermissionError(13, "Access is denied")
+        return real_replace(source, destination)
+
+    with patch("autopwn_suite.web_auth.os.replace", side_effect=contended), patch("autopwn_suite.web_auth.time.sleep") as sleep:
+        username, password = store.reset()
+    assert len(attempts) == 3 and sleep.call_count == 2
+    assert username == "admin" and password_matches(password, store.load()["password_hash"])
+    assert not list(tmp_path.glob(".*.tmp"))
+
+
+@pytest.mark.skipif(os.name != "nt", reason="only Windows refuses to replace a file that is open")
+def test_reset_succeeds_when_a_reader_releases_the_account_file_shortly_after(tmp_path):
+    import threading
+    store = AccountStore(tmp_path / ACCOUNT_FILE)
+    store.reset()
+    reader = store.path.open(encoding="utf-8")
+    timer = threading.Timer(.3, reader.close)
+    timer.start()
+    try:
+        username, password = store.reset()
+    finally:
+        timer.join()
+        reader.close()
+    assert username == "admin" and password_matches(password, store.load()["password_hash"])
+
+
+def test_account_replacement_gives_up_after_the_retries_and_keeps_the_original(tmp_path):
+    store = AccountStore(tmp_path / ACCOUNT_FILE)
+    store.reset()
+    original = store.path.read_bytes()
+    with patch("autopwn_suite.web_auth.os.replace", side_effect=PermissionError(13, "Access is denied")) as replace,             patch("autopwn_suite.web_auth.time.sleep"):
+        with pytest.raises(PermissionError):
+            store.reset()
+    assert replace.call_count == 20
+    assert store.path.read_bytes() == original and not list(tmp_path.glob(".*.tmp"))
+
+
 def test_login_throttling_cannot_be_bypassed_by_new_challenges(dashboard_login):
     d = dashboard_login
     client = d.app.test_client()

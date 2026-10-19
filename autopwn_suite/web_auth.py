@@ -142,7 +142,16 @@ class AccountStore:
                 json.dump(data, output, indent=2)
                 output.flush()
                 os.fsync(output.fileno())
-            os.replace(temporary, self.path)
+            # On Windows, replacing a file that another process has open fails with PermissionError until
+            # it is closed, and the running dashboard opens this one on every request, so retry briefly.
+            for attempt in range(20):
+                try:
+                    os.replace(temporary, self.path)
+                    break
+                except PermissionError:
+                    if attempt == 19:
+                        raise
+                    time.sleep(.05)
         finally:
             temporary.unlink(missing_ok=True)
         return data
