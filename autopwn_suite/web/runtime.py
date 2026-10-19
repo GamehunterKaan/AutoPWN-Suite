@@ -76,6 +76,7 @@ class ScanContext:
         self.state.setdefault("tasks", {})
         self.state.setdefault("findings", [])
         self.findings = deepcopy(self.state["findings"])
+        self.finding_ids = {old["id"] for old in self.findings}
         self.records = deque(maxlen=self.options["request_budget"])
         self.issues = []
         self.phase = "Preparing web checks"
@@ -210,9 +211,11 @@ class ScanContext:
     def record_finding(self, result):
         if not allowed(result["type"]):
             return
-        if not any(old["id"] == result["id"] for old in self.findings):
+        if result["id"] not in self.finding_ids:
+            self.finding_ids.add(result["id"])
             self.findings.append(deepcopy(result))
-            self.state["findings"] = deepcopy(self.findings)
+            # Copy only the new finding: copying the whole list for each one is quadratic in the findings.
+            self.state["findings"].append(deepcopy(result))
             if self.on_finding:
                 self.on_finding(deepcopy(result))
 

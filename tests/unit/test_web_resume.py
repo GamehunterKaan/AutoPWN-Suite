@@ -2,6 +2,7 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Continuation must finish remaining work without erasing earlier evidence."""
 
+import time
 from collections import Counter
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -10,6 +11,7 @@ import pytest
 
 from autopwn_suite.nmap_progress import ScanCancelled
 from autopwn_suite.web.crawler import crawl
+from autopwn_suite.web.findings import finding
 from autopwn_suite.web.options import CHECKS, normalize_options
 from autopwn_suite.web.runtime import ScanContext
 from autopwn_suite.web.webvuln import webvuln
@@ -35,6 +37,24 @@ def test_crawl_resumes_uncrawled_pages_and_retains_links_hidden_by_limits():
                 found = crawl(root, MagicMock(), max_pages=1, max_urls=10, max_depth=5)
     assert found == set(graph)
     assert Counter(calls) == Counter({url: 1 for url in graph})
+
+
+def test_recording_many_findings_stays_fast_and_keeps_the_checkpoint_in_step():
+    state, seen = {}, []
+    context = ScanContext("http://example.com/", MagicMock(), checkpoint=state, on_finding=seen.append)
+    with context.activate():
+        results = [finding("XSS", f"http://example.com/p?id={number}", "Unescaped reflection", parameter="id") for number in range(1_500)]
+        started = time.perf_counter()
+        for result in results + results[:10]:
+            context.record_finding(result)
+        elapsed = time.perf_counter() - started
+    assert elapsed < 2
+    assert len(context.findings) == len(state["findings"]) == len(seen) == 1_500
+    assert state["findings"] == context.findings
+    assert state["findings"][0] is not context.findings[0]
+    resumed = ScanContext("http://example.com/", MagicMock(), checkpoint=state)
+    resumed.record_finding(results[0])
+    assert len(resumed.findings) == len(state["findings"]) == 1_500
 
 
 @pytest.mark.parametrize("status", [401, 403, 408, 429, 500, 503])
