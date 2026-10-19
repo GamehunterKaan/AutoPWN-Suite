@@ -301,6 +301,7 @@ def test_legacy_tls_poc_only_checks_the_exact_negotiated_version(label, version)
     ("DEBUG_DISCLOSURE", "/phpinfo", "diagnostic", '<title>phpinfo()</title>PHP Version 8', {"Content-Type": "text/html"}, 200, "reproduced"),
     ("ERROR_DISCLOSURE", "/error", "trace", "Reference: Source Error:", {}, 500, "not_reproduced"),
     ("ERROR_DISCLOSURE", "/error", "trace", 'Traceback (most recent call last):\nFile "app.py", line 2', {}, 500, "reproduced"),
+    ("ERROR_DISCLOSURE", "/error", "trace", "java.lang.IllegalStateException: boom\n\tat com.example.App.run(App.java:42)", {}, 500, "reproduced"),
     ("EXPOSED_FILE", "/.env", "configuration", "<html><body>DB_PASSWORD=example\nDB_HOST=example</body></html>", {}, 200, "not_reproduced"),
     ("EXPOSED_FILE", "/.env", "configuration", "DB_PASSWORD=example\nDB_PASSWORD=example", {}, 200, "not_reproduced"),
     ("EXPOSED_FILE", "/.env", "configuration", "export DB_PASSWORD=example\n  DB_HOST=example", {}, 200, "reproduced"),

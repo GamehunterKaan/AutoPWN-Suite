@@ -26,6 +26,11 @@ MAX_FORM_ELEMENTS = 5_000
 MAX_CONTROLS = 2_000
 MAX_OPTION_ELEMENTS = 200
 MAX_PAGE_NODES = 200_000
+# A web server answers a request line of more than about 8,000 characters with an error, so a longer link is no use
+# to a scan, and a hostile page can multiply the length of all its links by pointing <base href> at a long URL
+# (6 such pages left 240 million characters in the crawl checkpoint).
+MAX_URL_LENGTH = 8_192
+MAX_LINK_CHARACTERS = 4_000_000  # the links of one page, and the links a crawl keeps for resuming, in total
 
 
 class _Walk:
@@ -60,6 +65,14 @@ class _Walk:
         return "".join(islice((node for node in self.below(tag, 200) if type(node) in (NavigableString, CData)), 50))
 
 
+def _coverage_note(log, message):
+    current = ACTIVE.get()
+    if current:
+        current.issue(message)
+    else:
+        log.logger("warning", message)
+
+
 def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS["max_urls"][0], max_depth=LIMITS["max_depth"][0], on_discovered=None) -> set[str]:
     parts = urlsplit(urldefrag(target_url)[0])
     target_url = urlunsplit(parts._replace(path=parts.path or "/"))
@@ -68,6 +81,7 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
     log.logger("info", f"Crawling web application at {target_url} ...")
     current = ACTIVE.get()
     graph = current.state.setdefault("crawl", {}) if current else {}
+    stored = sum(len(url) for links in graph.values() for url in links)
     urls, visited = {target_url}, set()
     fetched = 0
     limited = False
@@ -97,7 +111,11 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
                 # budget ran out). The crawl and a resume with raised limits read this list as it is. A hostile
                 # page with 55,000 links would otherwise leave about 11 MB in the job's checkpoint for every page.
                 followable = (url for url in prioritize_urls(links) if same_origin(target_url, url) and not skip_discovered_url(url))
-                links = graph[page] = list(islice(followable, LIMITS["max_urls"][2] + 1))
+                links = list(islice(followable, LIMITS["max_urls"][2] + 1))
+                # A page that would take the store past its size is crawled from this list and read again on a resume.
+                if stored + sum(map(len, links)) <= MAX_LINK_CHARACTERS:
+                    graph[page] = links
+                    stored += sum(map(len, links))
             else:
                 links = prioritize_urls(links)
         discovered = set()
@@ -145,13 +163,31 @@ def link_finder(target_url, log) -> set[str]:
     base_url = resolve_url(page_url, base["href"]) if base else page_url
     if not base_url or not same_origin(target_url, base_url):
         base_url = page_url
+    if len(base_url) > MAX_URL_LENGTH:  # every link and form action of the page would be longer than a server accepts
+        _coverage_note(log, f"Links on {page_url} were not followed because its base URL is longer than {MAX_URL_LENGTH} characters; coverage is incomplete.")
+        return set()
+    characters, dropped = 0, False
+
+    def keep(url):
+        """False once the links of the page have used up their share, which ends the search for more."""
+        nonlocal characters, dropped
+        if len(url) > MAX_URL_LENGTH:
+            dropped = True
+        elif url not in urls:
+            if characters + len(url) > MAX_LINK_CHARACTERS:
+                dropped = True
+                return False
+            urls.add(url)
+            characters += len(url)
+        return True
+
     for link in soup.find_all("a", href=True):
         href = link["href"].strip()
         if not href or href.startswith("#"):
             continue
         url = resolve_url(base_url, href)
-        if url and same_origin(target_url, url):
-            urls.add(url)
+        if url and same_origin(target_url, url) and not keep(url):
+            break
     # Build URLs only for GET forms. Do not submit POST, passwords or uploads.
     forms = soup.find_all("form", limit=MAX_FORMS + 1)
     limited = len(forms) > MAX_FORMS
@@ -190,12 +226,9 @@ def link_finder(target_url, log) -> set[str]:
                 params.append((name, value))
         if params:
             # Browsers replace an action's query when submitting a GET form.
-            urls.add(urlunsplit(urlsplit(action)._replace(query=urlencode(params))))
+            keep(urlunsplit(urlsplit(action)._replace(query=urlencode(params))))
     if limited or walk.cut:
-        message = f"Only part of the forms of {page_url} were analysed; coverage is incomplete."
-        current = ACTIVE.get()
-        if current:
-            current.issue(message)
-        else:
-            log.logger("warning", message)
+        _coverage_note(log, f"Only part of the forms of {page_url} were analysed; coverage is incomplete.")
+    if dropped:
+        _coverage_note(log, f"Links on {page_url} that are longer than {MAX_URL_LENGTH} characters, or beyond {MAX_LINK_CHARACTERS:,} characters in all, were not followed; coverage is incomplete.")
     return urls

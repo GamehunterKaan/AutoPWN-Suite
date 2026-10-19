@@ -3,12 +3,14 @@
 """
 Unit tests for the crawler module.
 """
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
 from requests.exceptions import ConnectionError
 
-from autopwn_suite.web.crawler import crawl, link_finder
+from autopwn_suite.web import crawler
+from autopwn_suite.web.crawler import MAX_LINK_CHARACTERS, MAX_URL_LENGTH, crawl, link_finder
 from autopwn_suite.web.options import LIMITS
 from autopwn_suite.web.planning import prioritize_urls
 from autopwn_suite.web.runtime import ScanContext
@@ -252,3 +254,53 @@ def test_links_to_other_origins_do_not_use_up_the_stored_list():
         with ScanContext(root, MagicMock(), checkpoint=state).activate():
             assert crawl(root, MagicMock(), max_pages=1, max_urls=5) == {root, root + "one"}
     assert state["crawl"][root] == [root + "one"]
+
+
+def _reported(log, text):
+    return any(text in call.args[1] for call in log.logger.call_args_list)
+
+
+@pytest.mark.unit
+def test_a_link_longer_than_a_server_accepts_is_not_followed_and_is_reported(web_response):
+    log = MagicMock()
+    page = f'<a href="/{"a" * MAX_URL_LENGTH}">long</a><a href="/ok">ok</a><form><input name="q" value="{"b" * MAX_URL_LENGTH}"></form>'
+    with patch("autopwn_suite.web.crawler.get", return_value=web_response(page)):
+        assert link_finder("http://example.com/", log) == {"http://example.com/ok"}
+    assert _reported(log, "were not followed")
+
+
+@pytest.mark.unit
+def test_a_page_whose_base_url_is_too_long_offers_no_links(web_response):
+    # Every relative link would be 20,000 characters long: 2,000 of them left 40 MB in the checkpoint of one page.
+    page = f'<base href="/{"a" * 20_000}/">' + "".join(f'<a href="p{number}">x</a>' for number in range(2_000))
+    log = MagicMock()
+    with patch("autopwn_suite.web.crawler.get", return_value=web_response(page)):
+        assert link_finder("http://example.com/", log) == set()
+    assert _reported(log, "base URL is longer")
+
+
+@pytest.mark.unit
+def test_the_links_of_one_page_are_cut_to_a_total_size_and_stay_fast(web_response):
+    page = f'<base href="/{"a" * 7_000}/">' + "".join(f'<a href="p{number}">x</a>' for number in range(60_000))
+    log = MagicMock()
+    with patch("autopwn_suite.web.crawler.get", return_value=web_response(page)):
+        started = time.perf_counter()
+        urls = link_finder("http://example.com/", log)
+        elapsed = time.perf_counter() - started
+    assert 0 < sum(map(len, urls)) <= MAX_LINK_CHARACTERS
+    assert elapsed < 2.0 and _reported(log, "were not followed")
+
+
+@pytest.mark.unit
+def test_a_crawl_stores_links_for_resuming_only_up_to_a_total_size(monkeypatch):
+    monkeypatch.setattr(crawler, "MAX_LINK_CHARACTERS", 1_500)
+    root = "http://example.com/"
+    first = {f"{root}a{number:03}" for number in range(40)}  # 40 links of 23 characters
+    second = {f"{root}b{number:03}" for number in range(40)}
+    pages = {root: first, min(first): second}
+    state = {}
+    with patch("autopwn_suite.web.crawler.link_finder", side_effect=lambda url, log: set(pages.get(url, ()))):
+        with ScanContext(root, MagicMock(), checkpoint=state).activate():
+            found = crawl(root, MagicMock(), max_pages=2, max_urls=100)
+    assert found >= first | second  # the crawl uses the links of every page it reads
+    assert set(state["crawl"]) == {root}  # the second page's links would take the store past its size

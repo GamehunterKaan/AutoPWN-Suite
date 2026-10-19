@@ -205,7 +205,7 @@ def _response_condition(plan, response):
     if kind == "ERROR_DISCLOSURE":
         patterns = [r"Traceback \(most recent call last\):[\s\S]{0,4000}File [\"']",
                     r"(?:Fatal error|Uncaught \w+(?:Exception|Error))[\s\S]{0,2000}Stack trace:",
-                    r"\b(?:\w*Exception|\w*Error):[\s\S]{0,2000}\bat [\w.$]+\([^)]*\.java:\d+\)",
+                    r"\b(?:\w*Exception|\w*Error):[\s\S]{0,1000}\bat [\w.$]+\([^)]{0,100}\.java:\d+\)",
                     r"Server Error in [\s\S]{0,4000}(?:Stack Trace:|Source Error:)"]
         return response.status_code >= 500 and any(re.search(pattern, text, re.I) for pattern in patterns)
     if kind == "DEBUG_DISCLOSURE":

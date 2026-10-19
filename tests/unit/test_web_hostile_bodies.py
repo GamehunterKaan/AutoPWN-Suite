@@ -34,7 +34,8 @@ FILE_BODIES = {
     "/.env": ["\n" * 100_000, " \n" * 50_000, "A" * 100_000, "export " * 14_000],
     "/dump.sql": ["-- MySQL" * 12_000, "-- PostgreSQL" * 8_000],
 }
-ERROR_BODIES = ["a" * 100_000, "Exception:" * 10_000, "AException:" + "a" * 100_000, "Uncaught " + "a" * 100_000, "Traceback (most recent call last):\n" * 3_000]
+ERROR_BODIES = ["a" * 100_000, "Exception:" * 10_000, "AException:" + "a" * 100_000, "Uncaught " + "a" * 100_000, "Traceback (most recent call last):\n" * 3_000,
+                "Error:at a(" * 9_000, "Exception:at a(" * 7_000, "Error: at a(  " * 7_000]  # a Java frame that never closes: its gap scanned the rest of the body
 
 
 def seconds(call, *args):
@@ -62,6 +63,8 @@ def test_exposed_file_checks_stay_fast_on_hostile_bodies(web_response, path, bod
 def test_error_page_signatures_stay_fast_on_hostile_bodies(web_response, body):
     response = web_response(body, status=500, headers={"Content-Type": "text/plain"})
     assert seconds(inspect_content, "http://example.com/", response, MagicMock()) < LIMIT_SECONDS
+    plan = {"kind": "ERROR_DISCLOSURE", "requests": [{"url": "http://example.com/"}]}
+    assert seconds(poc_runtime._response_condition, plan, response) < LIMIT_SECONDS
 
 
 @pytest.mark.unit

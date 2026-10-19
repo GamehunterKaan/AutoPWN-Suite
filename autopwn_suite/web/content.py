@@ -72,7 +72,7 @@ def inspect_content(url, response, console):
         signatures = [
             ("Python traceback", r"Traceback \(most recent call last\):[\s\S]{0,4000}File [\"']"),
             ("PHP stack trace", r"(?:Fatal error|Uncaught \w+(?:Exception|Error))[\s\S]{0,2000}Stack trace:"),
-            ("Java stack trace", r"\b(?:\w*Exception|\w*Error):[\s\S]{0,2000}\bat [\w.$]+\([^)]*\.java:\d+\)"),
+            ("Java stack trace", r"\b(?:\w*Exception|\w*Error):[\s\S]{0,1000}\bat [\w.$]+\([^)]{0,100}\.java:\d+\)"),
             ("ASP.NET detailed error", r"Server Error in [\s\S]{0,4000}(?:Stack Trace:|Source Error:)"),
         ]
         for label, pattern in signatures:
