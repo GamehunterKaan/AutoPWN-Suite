@@ -37,10 +37,16 @@ def allowed(kind):
     return enabled(TYPE_CHECK.get(kind, "headers"))
 
 
+# Query parameters that hold a credential. A redacted value cannot be replayed, so words that only contain a keyword
+# are left alone: "author" (but not "authorization"), "bypass" or "passenger" (but "pass", "user_pass", "userPass").
+SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?-i:(?<![a-zA-Z])pass|Pass|PASS)(?![a-z])|pass(?:word|wd|phrase|code)"
+                                 r"|secret|token|api.?key|session|jwt|signature|csrf", re.I)
+
+
 def redact_url(url):
     try:
         parts = urlsplit(url)
-        pairs = [(key, "REDACTED" if value and re.search(r"pass|secret|token|api.?key|auth|session|jwt|signature|csrf", key, re.I) else value)
+        pairs = [(key, "REDACTED" if value and SENSITIVE_PARAMETER.search(key) else value)
                  for key, value in parse_qsl(parts.query, keep_blank_values=True)]
         return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1], query=urlencode(pairs), fragment=""))
     except ValueError:

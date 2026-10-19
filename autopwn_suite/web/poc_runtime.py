@@ -51,10 +51,15 @@ def validate_plan(plan):
     return scope
 
 
+# Same as SENSITIVE_PARAMETER in runtime.py, which a downloaded PoC does not have.
+_SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?-i:(?<![a-zA-Z])pass|Pass|PASS)(?![a-z])|pass(?:word|wd|phrase|code)"
+                                  r"|secret|token|api.?key|session|jwt|signature|csrf", re.I)
+
+
 def _public_url(value):
     try:
         parts = urlsplit(value)
-        pairs = [(key, "REDACTED" if item and re.search(r"pass|secret|token|api.?key|auth|session|jwt|signature|csrf", key, re.I) else item)
+        pairs = [(key, "REDACTED" if item and _SENSITIVE_PARAMETER.search(key) else item)
                  for key, item in parse_qsl(parts.query, keep_blank_values=True)]
         return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1], query=urlencode(pairs), fragment=""))
     except ValueError:

@@ -7,8 +7,10 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from autopwn_suite.web.findings import finding
 from autopwn_suite.web.poc import browser_poc, build_plan, curl_poc, python_poc
-from autopwn_suite.web.poc_runtime import verify_plan
+from autopwn_suite.web.poc_runtime import _public_url, validate_plan, verify_plan
+from autopwn_suite.web.runtime import ScanContext, redact_url
 from tests.unit.test_web_dashboard import dashboard as dashboard
 from tests.unit.test_web_tls import certificate_der as certificate_der
 
@@ -63,6 +65,36 @@ def test_invalid_or_redacted_plans_are_rejected_before_any_request(mutate):
     with patch("autopwn_suite.web.poc_runtime.requests.Session") as session, pytest.raises(ValueError):
         verify_plan(plan)
     session.assert_not_called()
+
+
+CREDENTIAL_NAMES = ["password", "passwd", "pass", "user_pass", "userPass", "passphrase", "secret", "client_secret", "token", "access_token",
+                    "api_key", "apikey", "api-key", "auth", "auth_token", "authorization", "oauth", "authorize", "session", "sessionid",
+                    "jwt", "signature", "csrf", "csrf_token", "PASSWORD"]
+PLAIN_NAMES = ["author", "authors", "author_id", "authorId", "authored", "bypass", "compass", "passenger", "passage", "passport", "page", "id", "q"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("name,credential", [(name, True) for name in CREDENTIAL_NAMES] + [(name, False) for name in PLAIN_NAMES])
+def test_only_credential_parameters_are_redacted_from_urls(name, credential):
+    value = "REDACTED" if credential else "value"
+    for redact in (redact_url, _public_url):
+        assert redact(f"http://example.com/?{name}=value&page=2") == f"http://example.com/?{name}={value}&page=2"
+
+
+@pytest.mark.unit
+def test_finding_on_an_author_parameter_keeps_a_replayable_plan():
+    url = "http://example.com/?author=1&token=private"
+    with ScanContext(url, MagicMock(), controls={"speed": 5}).activate():
+        result = finding("XSS", url, "Unescaped reflection", parameter="author",
+                         reproduction={"strategy": "xss_reflection", "marker": "m", "payload": "m", "requests": [{"url": url}]})
+    result["endpoint"] = redact_url(url)
+    plan = build_plan(result)
+    assert plan["requests"][0]["url"] == "http://example.com/?author=1&token=REDACTED"
+    with pytest.raises(ValueError, match="redacted query values"):
+        validate_plan(plan)
+    # Only the credential has to be restored locally, not the author.
+    plan["requests"][0]["url"] = plan["requests"][0]["url"].replace("REDACTED", "private")
+    validate_plan(plan)
 
 
 @pytest.mark.unit
