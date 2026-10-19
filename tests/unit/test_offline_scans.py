@@ -307,7 +307,7 @@ def test_update_blocked_by_a_running_scan_asks_to_stop_scans_not_to_check_the_co
     status = client.get("/api/vulnerability-database").json
     assert not status["update"]["running"]
     error = status["update"]["error"]
-    assert "running scan" in error and "preserved" in error
+    assert "running scan" in error and "read-only" in error and "preserved" in error
     assert "connection" not in error and "private path" not in error
 
 

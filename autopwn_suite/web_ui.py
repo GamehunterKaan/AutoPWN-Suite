@@ -177,7 +177,7 @@ def _update_vulnerability_database():
         update_database(_VULNERABILITY_DB, _database_progress)
     except Exception as error:
         logging.exception("Vulnerability database update failed; retaining the previous database")
-        text = ("A running scan is using the database. Stop running scans and update again; "
+        text = ("A running scan is using the database, or the file is read-only. Stop running scans, make it writable and update again; "
                 "the previous database is preserved." if isinstance(error, DatabaseInUse) else
                 "Download failed. Check your connection and available disk space; "
                 "the previous database is preserved.")
