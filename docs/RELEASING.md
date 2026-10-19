@@ -229,7 +229,7 @@ is under `https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/`:
 | How the signatures were made | Signer identity |
 | --- | --- |
 | The automatic run for the published release | `publish-docker.yml@refs/tags/vVERSION` |
-| **Publish Docker Image** dispatched by hand from `main` to recover that release (v2.6.1 was recovered this way) | `publish-docker.yml@refs/heads/main` |
+| **Publish Docker Image** dispatched by hand from `main` to recover that release (v2.6.1 was recovered this way, with the workflow as it was then) | `publish-docker.yml@refs/heads/main` |
 | Signatures added afterwards by the authenticity backfill (v2.6.0 was signed this way) | `backfill-release-signatures.yml@refs/heads/main` |
 
 A validly signed recovered release therefore fails a command written for the tag
@@ -307,8 +307,9 @@ built the release and from which commit, not that an isolated builder produced i
 
 To verify the PyPI package, check its PEP 740 attestation against the repository
 before trusting the file, for example with the `pypi-attestations` tool
-(`pypi-attestations verify pypi --repository https://github.com/GamehunterKaan/AutoPWN-Suite pypi:autopwn_suite-VERSION-py3-none-any.whl`),
-or install with a pinned hash (`pip install --require-hashes`) taken from the
+(`pypi-attestations verify pypi --repository https://github.com/GamehunterKaan/AutoPWN-Suite pypi:autopwn_suite-VERSION-py3-none-any.whl`;
+VERSION is the PEP 440 form of the version, for example `2.8.0rc1` for the tag
+`v2.8.0-rc.1`), or install with a pinned hash (`pip install --require-hashes`) taken from the
 hashes shown on the project page of the matching release.
 
 Verify the printed image **by digest**, using the same expected signing identity:

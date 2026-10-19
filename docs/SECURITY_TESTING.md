@@ -158,8 +158,8 @@ execute downloaded install scripts. Run unit tests under
 Every file in `.github/workflows/` is listed here; a test fails when one is missing
 or when this table names a file that does not exist. Third-party actions are pinned
 to full commit SHAs, every checkout sets `persist-credentials: false`, and each
-workflow declares its permissions at workflow level (jobs repeat or narrow them),
-read-only unless the third column says otherwise. The required status checks are `test`, `Tests (ubuntu-latest)`,
+workflow declares its permissions at workflow level and a job states its own where it
+needs more or less. The third column lists everything beyond read-only contents. The required status checks are `test`, `Tests (ubuntu-latest)`,
 `Tests (macos-latest)`, `Security policy` and `Independent human approval`, plus
 CodeQL's default setup; the workflows behind them have no `paths:` filter.
 

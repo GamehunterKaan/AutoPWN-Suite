@@ -189,6 +189,12 @@ def test_security_testing_doc_lists_every_workflow_and_only_existing_ones():
     assert workflows
     assert not sorted(name for name in workflows if f"`{name}`" not in document)
     assert set(re.findall(r"`([A-Za-z0-9_-]+\.yml)`", document)) <= workflows
+    # Jobs widen the workflow-level permissions, so the table must say where a write permission exists.
+    assert "jobs repeat or narrow them" not in document
+    rows = {name: line for line in document.splitlines() for name in workflows if line.startswith(f"| `{name}` |")}
+    for name in sorted(workflows):
+        if re.search(r"^\s+[a-z-]+: write$", (project / ".github/workflows" / name).read_text(encoding="utf-8"), re.MULTILINE):
+            assert ": write" in rows[name], name
 
 
 def test_zap_image_is_pinned_by_digest_and_its_refresh_is_documented():

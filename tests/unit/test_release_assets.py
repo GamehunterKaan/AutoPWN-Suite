@@ -426,6 +426,8 @@ def test_verification_docs_name_every_signer_identity_the_workflows_can_produce(
     for identity in ("publish-docker.yml@refs/tags/vVERSION", "publish-docker.yml@refs/heads/main",
                      "backfill-release-signatures.yml@refs/heads/main"):
         assert identity in docs
+    # Only v2.7.0 and later can be dispatched now, so the v2.6.1 recovery is history, not a repeatable procedure.
+    assert "v2.6.1 was recovered this way, with the workflow as it was then" in docs
 
 
 @pytest.mark.parametrize("workflow", ["publish-docker.yml", "publish-pypi.yml"])
@@ -434,6 +436,12 @@ def test_dispatch_example_tag_has_the_layout_the_policy_scans(workflow):
     text = (Path(__file__).resolve().parents[2] / ".github/workflows" / workflow).read_text(encoding="utf-8")
     example = release.re.search(r"for example v(\d+)\.(\d+)\.(\d+)", text)
     assert example and tuple(map(int, example.groups())) >= (2, 7, 0)
+
+
+def test_pypi_attestation_example_names_the_pep_440_file_for_a_prerelease():
+    docs = (Path(__file__).resolve().parents[2] / "docs/RELEASING.md").read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert "pypi:autopwn_suite-VERSION-py3-none-any.whl`;\nVERSION is the PEP 440 form of the version, for example `2.8.0rc1`" in docs
+    assert release.pypi_files("v2.8.0-rc.1")[0] == "autopwn_suite-2.8.0rc1-py3-none-any.whl"
 
 
 def test_old_tag_dispatch_doc_says_where_each_workflow_stops():
