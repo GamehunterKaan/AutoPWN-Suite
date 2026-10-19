@@ -61,6 +61,13 @@ class TestDaemonHelpers:
             "[red]Invalid choice. Please enter one of ['1', '2'].[/red]"
         )
 
+    def test_get_menu_choice_accepts_any_letter_case_like_the_config_loader(self, mock_console):
+        """The loader lowercases the output type, so 'HTML' or ' Txt ' must not be rejected by the wizard."""
+        options = {"html": "HTML report", "txt": "Plain text"}
+        for typed, expected in (("HTML", "html"), (" Txt ", "txt")):
+            mock_console.input.return_value = typed
+            assert _get_menu_choice(mock_console, "Prompt", options) == expected
+
     def test_get_menu_choice_default(self, mock_console):
         """Verify the default value is returned on empty input."""
         mock_console.input.return_value = ""
@@ -358,7 +365,7 @@ class TestInstallDaemon:
 
     @pytest.fixture(autouse=True)
     def installable(self, monkeypatch):
-        """The preflight touches /opt and the interpreter; its own tests live in TestCopyFiles and TestPreflight."""
+        """The preflight touches /opt and the interpreter; its own tests live in TestCopyFiles and TestCheckInstallable."""
         check = MagicMock(return_value=True)
         monkeypatch.setattr(daemon_installer, "_check_installable", check)
         return check

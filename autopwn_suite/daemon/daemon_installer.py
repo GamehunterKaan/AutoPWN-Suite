@@ -40,8 +40,8 @@ def _get_menu_choice(console, prompt: str, options: dict, default: str = None) -
         choice = console.input(f"Enter your choice ({'-'.join(options.keys())}): ").strip()
         if default and choice == "":
             return default
-        if choice in options:
-            return choice
+        if choice.lower() in options:  # the keys are digits or lowercase words, and InitArgsConf lowercases the type too
+            return choice.lower()
         console.print(f"[red]Invalid choice. Please enter one of {list(options.keys())}.[/red]")
 
 def _get_validated_int(console, prompt: str, default: int = None, minimum: int = None, maximum: int = None) -> int:

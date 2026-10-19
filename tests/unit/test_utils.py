@@ -577,7 +577,20 @@ class TestNmapInstallation:
             mock_log = MagicMock()
             from autopwn_suite.utils import install_nmap_linux
             install_nmap_linux(mock_log)
-            mock_check_call.assert_called_once_with(expected_command, stderr=DEVNULL)
+            mock_check_call.assert_called_once_with(expected_command, stderr=DEVNULL, env=None)
+
+    @pytest.mark.parametrize("distro_name", ["ubuntu", "arch", "fedora", "centos", "opensuse"])
+    @patch("autopwn_suite.utils.check_call")
+    def test_install_nmap_linux_gives_the_package_manager_the_standalone_binary_environment(
+            self, mock_check_call, distro_name):
+        """The package manager must not load the libraries the standalone binary unpacked."""
+        restored = {"LD_LIBRARY_PATH": "/usr/lib/original"}
+        with patch("autopwn_suite.utils.distro", create=True) as mock_distro, \
+                patch("autopwn_suite.utils.child_environment", return_value=restored):
+            mock_distro.id.return_value = distro_name
+            from autopwn_suite.utils import install_nmap_linux
+            install_nmap_linux(MagicMock())
+        assert mock_check_call.call_args.kwargs["env"] is restored
 
     @patch("autopwn_suite.utils.check_call")
     @patch("builtins.input", return_value="1") # User selects 'apt-get'
@@ -595,7 +608,7 @@ class TestNmapInstallation:
 
             # Verify it called the apt-get command after user input
             mock_check_call.assert_called_once_with(
-                ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL
+                ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL, env=None
             )
 
     @patch("autopwn_suite.utils.check_call")

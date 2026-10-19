@@ -846,24 +846,31 @@ def install_nmap_linux(log) -> None:
             check_call(
                 ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"],
                 stderr=DEVNULL,
+                env=child_environment(),
             )
         elif distro_ in ["arch", "manjaro"]:
             check_call(
                 ["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"],
                 stderr=DEVNULL,
+                env=child_environment(),
             )
         elif distro_ in ["fedora", "oracle"]:
             check_call(
-                ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"], stderr=DEVNULL
+                ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"],
+                stderr=DEVNULL,
+                env=child_environment(),
             )
         elif distro_ in ["rhel", "centos"]:
             check_call(
-                ["/usr/bin/sudo", "yum", "install", "nmap", "-y"], stderr=DEVNULL
+                ["/usr/bin/sudo", "yum", "install", "nmap", "-y"],
+                stderr=DEVNULL,
+                env=child_environment(),
             )
         elif distro_ in ["sles", "opensuse"]:
             check_call(
                 ["/usr/bin/sudo", "zypper", "install", "nmap", "--non-interactive"],
                 stderr=DEVNULL,
+                env=child_environment(),
             )
         else:
             raise CalledProcessError(1, "cmd")
@@ -887,7 +894,7 @@ def install_nmap_linux(log) -> None:
         }
         if _distro_choice_ in pkg_cmds:
             try:
-                check_call(pkg_cmds[_distro_choice_], stderr=DEVNULL)
+                check_call(pkg_cmds[_distro_choice_], stderr=DEVNULL, env=child_environment())
             except CalledProcessError:
                 log.logger("error", "Couldn't install nmap (Linux)")
         else:
