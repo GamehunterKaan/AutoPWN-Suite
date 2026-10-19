@@ -14,7 +14,7 @@ Every not-affected statement must include:
 
 - The real vulnerability ID and relevant aliases; never invent identifiers.
 - An exact product `@id`, for example
-  `pkg:github/GamehunterKaan/AutoPWN-Suite@2.6.0`, and an exact versioned component
+  `pkg:github/GamehunterKaan/AutoPWN-Suite@2.7.0`, and an exact versioned component
   purl under that product's `subcomponents`.
 - `status: not_affected`, an OpenVEX justification, a substantive
   `impact_statement`, and `status_notes` citing the reviewed call path,

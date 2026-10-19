@@ -1,0 +1,141 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to run the PyPI gates and build for (for example v2.7.0); only the release event itself can publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  validate:
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+      version: ${{ steps.release.outputs.version }}
+      source_date_epoch: ${{ steps.release.outputs.source_date_epoch }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate the release tag against reviewed source
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Same checks as the container release: tag format, reviewed commit on main, version and changelog.
+          commit="$(python scripts/release_assets.py prepare --tag "$RELEASE_TAG" --output "$RUNNER_TEMP/assets")"
+          release="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          test "$(jq -r .draft <<< "$release")" = false
+          # Commit time of the reviewed release commit; fixes the timestamps inside the distributions.
+          epoch="$(git show --no-patch --format=%ct "$commit")"
+          [[ "$epoch" =~ ^[0-9]+$ ]]
+          printf 'commit=%s\nversion=%s\nsource_date_epoch=%s\n' "$commit" "${RELEASE_TAG#v}" "$epoch" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-source
+          path: ${{ runner.temp }}/assets/autopwn-suite-${{ env.RELEASE_TAG }}.tar.gz
+          if-no-files-found: error
+
+  source-security:
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/security.yml
+    with:
+      source-ref: ${{ needs.validate.outputs.commit }}
+
+  dynamic-analysis:
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dynamic-analysis.yml
+    with:
+      source-ref: ${{ needs.validate.outputs.commit }}
+
+  build:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-source
+          path: ${{ runner.temp }}/release-source
+      - name: Extract the exact source archive produced by release validation
+        run: |
+          set -euo pipefail
+          tar --extract --gzip --file "$RUNNER_TEMP/release-source/autopwn-suite-$RELEASE_TAG.tar.gz" --strip-components=1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - name: Build the wheel and source distribution without publication credentials
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.validate.outputs.source_date_epoch }}
+        run: |
+          set -euo pipefail
+          python -m pip install --require-hashes --only-binary=:all: --no-deps -r packaging/requirements-publish.txt
+          # Fixed inputs (pinned backend, commit time) make the distributions repeatable; build twice and compare.
+          python -m build --no-isolation --outdir dist
+          python -m build --no-isolation --outdir "$RUNNER_TEMP/rebuild"
+          (cd dist && sha256sum -- * | sort -k2) > "$RUNNER_TEMP/first.sha256"
+          (cd "$RUNNER_TEMP/rebuild" && sha256sum -- * | sort -k2) > "$RUNNER_TEMP/second.sha256"
+          diff "$RUNNER_TEMP/first.sha256" "$RUNNER_TEMP/second.sha256"
+          # Exactly the wheel and the sdist; their names carry the PEP 440 form of the version (v2.8.0-rc.1 builds 2.8.0rc1).
+          python scripts/release_assets.py pypi-dist --tag "$RELEASE_TAG" --output dist
+      - name: Install the wheel into a clean environment and start it
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install dist/*.whl
+          python scripts/smoke_install.py "${RELEASE_TAG#v}" "$RUNNER_TEMP/venv/bin/autopwn-suite"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pypi-dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: [validate, source-security, dynamic-analysis, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      # PyPI version pages have no "v" prefix.
+      url: https://pypi.org/project/autopwn-suite/${{ needs.validate.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: pypi-dist
+          path: dist
+      # Trusted publishing: PyPI trusts this workflow and the `pypi` environment, so no token is stored.
+      # The action also uploads PEP 740 attestations that bind each file to this repository and workflow.
+      # PyPI files are immutable, so a run that uploaded only one of the two files cannot be repeated as it was
+      # ("File already exists"). Re-running the failed jobs of the release run keeps the tag ref, which is the only
+      # kind of ref the `pypi` environment admits (v* tags), and may skip files that are already there; the first
+      # attempt of a run never does.
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist/
+          attestations: true
+          skip-existing: ${{ github.run_attempt > 1 }}

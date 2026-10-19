@@ -18,7 +18,7 @@ required `poetry-tests` job, so a change that violates them cannot be merged.
 - **Target version:** Python 3.10 (`target-version = "py310"`); do not use newer syntax.
 - **Configuration and exceptions:** all settings live in `pyproject.toml` under
   `[tool.ruff]`. Per-file exceptions are intentional and explained there:
-  long literal templates (`modules/web/details.py`, `modules/web/poc.py`) and test fixtures
+  long literal templates (`autopwn_suite/web/details.py`, `autopwn_suite/web/poc.py`) and test fixtures
   (`E501`), and callbacks run immediately inside their loop (`B023`). Prefer fixing the code
   to adding an exception, and explain any new exception in the pull request.
 
@@ -29,7 +29,7 @@ poetry run ruff check .          # report violations
 poetry run ruff check . --fix    # apply safe fixes (import order, whitespace)
 ```
 
-## JavaScript (dashboard, `modules/web_ui_static/`)
+## JavaScript (dashboard, `autopwn_suite/web_ui_static/`)
 
 - Plain browser scripts (no bundler, no framework), ECMAScript 2022, strict mode.
 - Enforced by ESLint with the explicit rule set in `eslint.config.mjs`: no undefined or
@@ -42,7 +42,7 @@ poetry run ruff check . --fix    # apply safe fixes (import order, whitespace)
 Run locally (Node.js 20 or newer):
 
 ```bash
-npx --yes eslint@10.12.0 --config eslint.config.mjs modules/web_ui_static
+npx --yes eslint@10.12.0 --config eslint.config.mjs autopwn_suite/web_ui_static
 ```
 
 ## Warnings policy
@@ -51,7 +51,7 @@ The aim is the strictest setting that is practical for each tool:
 
 - **Ruff/ESLint:** any violation fails CI; there is no warning tier.
 - **Python runtime warnings in tests:** `SyntaxWarning`, and `DeprecationWarning` or
-  `FutureWarning` raised by this project's own code (`modules`, `autopwn`, `api`), are
+  `FutureWarning` raised by this project's own code (`autopwn_suite`), are
   errors under `pytest`. Using a deprecated API therefore fails the build instead of
   accumulating. Third-party deprecation warnings are not fatal because they differ between
   supported Python versions and are outside a contributor's change; they are reviewed when
@@ -69,8 +69,13 @@ because Python removes assertions under `python -O`. Untrusted input is checked 
 explicit conditions that raise a documented exception (for example `ValueError`), and
 invariants are verified by the test suite, including the seeded fuzz tests in
 `tests/unit/test_fuzz_inputs.py`, which feed mutated input to the Nmap XML parser, the
-options schema, the target and flag allowlists, account validation and the login
-endpoints and require that only documented errors occur.
+options schema, the target allowlist, the dashboard's structured scan fields and its refusal
+of any free-text Nmap options (every spelling of an Nmap file option and NSE option included),
+the web port and generated report names, the event-stream resume point, account
+validation, the login endpoints, the schedule time fields, the profiles and schedules
+loaders, the stored records of a copied vulnerability database and the text a scanned
+target controls (terminal sanitizing, URL redaction and body comparison), and require
+that only documented errors occur.
 
 ## Tests
 

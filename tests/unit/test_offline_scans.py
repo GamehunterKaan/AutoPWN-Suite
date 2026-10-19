@@ -14,14 +14,14 @@ from tests.unit.test_vulnerability_db import feed_server as feed_server  # Share
 
 @pytest.fixture
 def local_database(feed_server, monkeypatch):
-    from modules.vulnerability_db import update_database
+    from autopwn_suite.vulnerability_db import update_database
     path = feed_server[3]
     update_database(path)
     # Reads and offline scans must not even instantiate a downloader.
     monkeypatch.setattr("requests.Session", lambda: pytest.fail("Offline scan tried HTTP"))
-    monkeypatch.setattr("modules.nist_search.get", lambda *a, **k: pytest.fail("Offline scan contacted NVD"))
+    monkeypatch.setattr("autopwn_suite.nist_search.get", lambda *a, **k: pytest.fail("Offline scan contacted NVD"))
     monkeypatch.setattr("requests.sessions.Session.request", lambda *a, **k: pytest.fail("Test tried a real HTTP request"))
-    monkeypatch.setattr("modules.nmap_backend.PortScanner.__init__", lambda *a, **k: pytest.fail("Test tried real Nmap"))
+    monkeypatch.setattr("autopwn_suite.nmap_backend.PortScanner.__init__", lambda *a, **k: pytest.fail("Test tried real Nmap"))
     return path
 
 
@@ -35,7 +35,7 @@ def nmap_observation():
 
 
 def test_python_api_scans_with_local_cves_and_no_http(local_database, monkeypatch):
-    import api
+    import autopwn_suite.api as api
     nm = nmap_observation()
     monkeypatch.setattr(api, "PortScanner", lambda: nm)
     scanner = api.AutoScanner()
@@ -49,7 +49,7 @@ def test_python_api_scans_with_local_cves_and_no_http(local_database, monkeypatc
 def test_cli_offline_scan_has_no_online_side_effects(local_database, monkeypatch):
     from rich.console import Console
 
-    import autopwn
+    import autopwn_suite.cli as autopwn
     monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
     monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(local_database),
                                     "-t", "192.168.1.10", "-y", "--skip-discovery"])
@@ -64,10 +64,104 @@ def test_cli_offline_scan_has_no_online_side_effects(local_database, monkeypatch
     assert "-n" in autopwn.PortScan.call_args.args[-1]
 
 
+@pytest.mark.parametrize("source, report_sent", [("auto", True), ("offline", False)])
+def test_cli_report_follows_the_offline_choice_not_the_nvd_fallback(local_database, monkeypatch, source, report_sent):
+    """An automatic fallback concerns NVD only; the webhook report is skipped solely when offline was chosen."""
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    from autopwn_suite.report import ReportType
+    monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)  # -y sets it; restored afterwards.
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    webhook = "https://hooks.example.test/h"
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--vuln-source", source, "--vuln-db", str(local_database),
+                                    "-t", "192.168.1.10", "-y", "--skip-discovery", "--skip-exploit-download",
+                                    "--api", "unused", "--report", "webhook", "--report-webhook", webhook])
+    monkeypatch.setattr(autopwn, "check_nmap", MagicMock())
+    monkeypatch.setattr(autopwn, "PortScan", MagicMock(return_value=nmap_observation()))
+    monkeypatch.setattr(autopwn, "AnalyseScanResults", lambda *a: [["192.168.1.10", 22, "ssh", "OpenSSH", "8.2p1"]])
+    monkeypatch.setattr(autopwn, "WebScan", lambda: False)
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock())
+    monkeypatch.setattr(autopwn, "InitializeReport", MagicMock())
+    unreachable = MagicMock(side_effect=RuntimeError("NVD unreachable"))
+    monkeypatch.setattr("autopwn_suite.nist_search.searchCVE", unreachable)
+
+    autopwn.main()
+
+    if report_sent:
+        unreachable.assert_called_once()  # NVD was tried, failed, and the scan went on with the local database.
+        assert autopwn.InitializeReport.call_count == 1
+        assert autopwn.InitializeReport.call_args.args[:2] == (ReportType.WEBHOOK, webhook)
+    else:
+        unreachable.assert_not_called()
+        autopwn.InitializeReport.assert_not_called()
+
+
+@pytest.mark.parametrize("save_failure", [None, OSError("disk full")], ids=["saved", "disk-full"])
+def test_cli_keeps_the_recorded_output_when_the_lookup_aborts_the_scan(tmp_path, monkeypatch, save_failure):
+    """NVD fails and no local database exists: the scan stops with exit status 1 but its output is saved,
+    and a failure to save it does not hide why the scan stopped."""
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)  # -y sets it; restored afterwards.
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--vuln-source", "auto", "--vuln-db", str(tmp_path / "missing.sqlite3"),
+                                    "-t", "192.0.2.10", "-y", "--skip-discovery", "--skip-exploit-download",
+                                    "--api", "unused"])
+    logger = MagicMock()
+    monkeypatch.setattr(autopwn, "Logger", lambda console: logger)
+    monkeypatch.setattr(autopwn, "check_nmap", MagicMock())
+    monkeypatch.setattr(autopwn, "PortScan", MagicMock(return_value=nmap_observation()))
+    monkeypatch.setattr(autopwn, "AnalyseScanResults", lambda *a: [["192.0.2.10", 22, "ssh", "OpenSSH", "8.2p1"]])
+    monkeypatch.setattr(autopwn, "WebScan", lambda: False)
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock(side_effect=save_failure))
+    monkeypatch.setattr(autopwn, "InitializeReport", MagicMock())
+    monkeypatch.setattr("autopwn_suite.nist_search.searchCVE", MagicMock(side_effect=RuntimeError("HTTP 429")))
+
+    with pytest.raises(SystemExit) as stopped:
+        autopwn.main()
+
+    # A text exit code is printed to stderr and the process exits with status 1, as before the output was saved.
+    assert isinstance(stopped.value.code, str)
+    assert "NVD lookup failed" in stopped.value.code and "local vulnerability database" in stopped.value.code
+    autopwn.SaveOutput.assert_called_once()
+    autopwn.InitializeReport.assert_not_called()
+    logged = [(call.args[0], str(call.args[1])) for call in logger.logger.call_args_list]
+    assert sum(text == stopped.value.code for _, text in logged) == 1  # Logged once, by the lookup, not again here.
+    assert any(level == "warning" and "did not finish" in text for level, text in logged)
+    assert any(level == "error" and text == "The recorded output could not be saved." for level, text in logged) == bool(save_failure)
+
+
+def test_cli_keeps_the_recorded_output_when_host_discovery_fails(tmp_path, monkeypatch):
+    """README: a scan that stops on a RuntimeError such as a failed host discovery saves its output and ends with its text."""
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    scanner = importlib.import_module("autopwn_suite.scanner")
+    monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)  # -y sets it; restored afterwards.
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(tmp_path / "missing.sqlite3"),
+                                    "-t", "192.0.2.10", "-y", "--skip-exploit-download"])
+    nm = MagicMock()
+    nm.scan.side_effect = RuntimeError("nmap exploded")
+    monkeypatch.setattr(scanner, "PortScanner", lambda: nm)
+    monkeypatch.setattr(autopwn, "Logger", lambda console: MagicMock())
+    monkeypatch.setattr(autopwn, "check_nmap", MagicMock())
+    monkeypatch.setattr(autopwn, "VulnerabilityLookup", MagicMock())
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock())
+
+    with pytest.raises(SystemExit) as stopped:
+        autopwn.main()
+
+    assert stopped.value.code == "nmap exploded"
+    autopwn.SaveOutput.assert_called_once()
+
+
 def test_database_management_commands_do_not_start_a_scan(local_database, monkeypatch):
     from rich.console import Console
 
-    import autopwn
+    import autopwn_suite.cli as autopwn
     monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
     scan = MagicMock()
     monkeypatch.setattr(autopwn, "StartScanning", scan)
@@ -86,9 +180,9 @@ def test_database_management_commands_do_not_start_a_scan(local_database, monkey
 
 
 def test_offline_discovery_disables_reverse_dns(monkeypatch):
-    from modules.scanner import DiscoverHosts, TestArp, TestPing
-    from modules.utils import ScanType
-    scanner = importlib.import_module("modules.scanner")
+    from autopwn_suite.scanner import DiscoverHosts, TestArp, TestPing
+    from autopwn_suite.utils import ScanType
+    scanner = importlib.import_module("autopwn_suite.scanner")
     nm = nmap_observation()
     monkeypatch.setattr(scanner, "PortScanner", lambda: nm)
     TestPing("192.168.1.10", offline=True)
@@ -100,7 +194,7 @@ def test_offline_discovery_disables_reverse_dns(monkeypatch):
 
 
 def test_offline_missing_nmap_never_attempts_install(monkeypatch):
-    utils = importlib.import_module("modules.utils")
+    utils = importlib.import_module("autopwn_suite.utils")
     monkeypatch.setattr(utils, "check_call", MagicMock(side_effect=FileNotFoundError))
     installer = MagicMock()
     for name in ("install_nmap_windows", "install_nmap_linux", "install_nmap_mac"):
@@ -113,7 +207,7 @@ def test_offline_missing_nmap_never_attempts_install(monkeypatch):
 @pytest.fixture
 def web(monkeypatch, tmp_path):
     pytest.importorskip("flask")
-    wu = importlib.import_module("modules.web_ui")
+    wu = importlib.import_module("autopwn_suite.web_ui")
     monkeypatch.setattr(wu, "_VULNERABILITY_DB", tmp_path / "vulnerabilities.sqlite3")
     monkeypatch.setattr(wu, "_OFFLINE_ONLY", False)
     monkeypatch.setattr(wu, "_settings", {})
@@ -131,7 +225,7 @@ def test_web_offline_job_uses_database_and_skips_notifications(web, local_databa
     wu, client = web
     monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
     monkeypatch.setattr(wu.shutil, "which", lambda name: "nmap")
-    scanner = importlib.import_module("modules.scanner")
+    scanner = importlib.import_module("autopwn_suite.scanner")
     monkeypatch.setattr(scanner, "PortScan", MagicMock(return_value=nmap_observation()))
     monkeypatch.setattr(scanner, "AnalyseScanResults", lambda *a: [["192.168.1.10", 22, "ssh", "OpenSSH", "8.2p1", "tcp"]])
     notifications = MagicMock()
@@ -150,6 +244,101 @@ def test_web_offline_job_uses_database_and_skips_notifications(web, local_databa
     export = client.get("/api/vulnerability-database/download")
     assert export.status_code == 200 and export.data == local_database.read_bytes()
     export.close()
+
+
+def test_dashboard_nvd_fallback_does_not_make_the_scan_offline(web, local_database, monkeypatch):
+    """Offline mode is the operator's choice. A scan that fell back to the local database after NVD failed
+    still runs its web checks and sends its notifications, like the CLI (see the report test above)."""
+    wu, _ = web
+    monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
+    monkeypatch.setattr(wu.shutil, "which", lambda name: "nmap")
+    scanner = importlib.import_module("autopwn_suite.scanner")
+    monkeypatch.setattr(scanner, "PortScan", MagicMock(return_value=nmap_observation()))
+    monkeypatch.setattr(scanner, "AnalyseScanResults", lambda *a: [["192.168.1.10", 22, "ssh", "OpenSSH", "8.2p1", "tcp"]])
+    unreachable = MagicMock(side_effect=RuntimeError("NVD unreachable"))
+    monkeypatch.setattr("autopwn_suite.nist_search.searchCVE", unreachable)
+    web_checks = MagicMock()
+    monkeypatch.setattr(importlib.import_module("autopwn_suite.web.webvuln"), "webvuln", web_checks)
+    notifications = MagicMock()
+    monkeypatch.setattr(wu, "_send_email", notifications)
+    monkeypatch.setattr(wu, "_send_webhook", notifications)
+    monkeypatch.setattr(wu.threading, "Thread", lambda target, args=(), **kwargs: MagicMock(start=lambda: target(*args)))
+    job = wu.ScanJob("fallback", "192.168.1.10", {"target": "192.168.1.10", "skip_discovery": True,
+                                                  "scan_web": True, "vulnerability_source": "auto"})
+    wu._run_scan(job)
+    unreachable.assert_called_once()  # NVD was tried, failed, and the scan went on with the local database.
+    assert job.config["vulnerability_source_used"] == "offline" and job.config["vulnerability_source"] == "auto"
+    assert job.hosts_list()[0]["vulns"][0]["data_source"] == "offline"
+    web_checks.assert_called_once()
+    assert job.hosts_list()[0].get("web_status") != "skipped_offline"
+    assert notifications.call_count == 2  # webhook and email
+
+
+@pytest.mark.parametrize("config, cli_only, toggle, offline", [
+    ({"vulnerability_source": "auto", "vulnerability_source_used": "offline"}, False, False, False),  # fallback only
+    ({"vulnerability_source": "online", "vulnerability_source_used": "offline"}, False, False, False),
+    ({"vulnerability_source": "offline", "vulnerability_source_used": "offline"}, False, False, True),  # chosen per job
+    ({"vulnerability_source": "auto"}, True, False, True),  # --offline
+    ({"vulnerability_source": "auto"}, False, True, True),  # the dashboard toggle
+])
+def test_notifications_follow_the_chosen_offline_mode(web, monkeypatch, config, cli_only, toggle, offline):
+    wu, _ = web
+    monkeypatch.setattr(wu, "_OFFLINE_ONLY", cli_only)
+    wu._settings["offline_mode"] = toggle
+    assert wu._notifications_offline(wu.ScanJob("job", "192.168.1.10", config)) is offline
+
+
+@pytest.mark.parametrize("source, status", [("auto", 202), ("offline", 409)])
+def test_poc_verification_follows_the_chosen_offline_mode_not_the_nvd_fallback(web, monkeypatch, source, status):
+    """Verification replays requests to the scanned target, never to an online service; only a chosen offline mode blocks it."""
+    from tests.unit.test_web_poc import sample
+    wu, client = web
+    monkeypatch.setattr(wu, "_web_verifications_running", 0)  # the mocked Thread never runs its decrement; monkeypatch restores the counter
+    job = wu.ScanJob("job", "example.com", {"vulnerability_source": source, "vulnerability_source_used": "offline"})
+    job.mark_done()
+    job.add_web_finding("example.com", "http://example.com/", sample())
+    wu._register_scan(job)
+    monkeypatch.setattr(wu.threading, "Thread", MagicMock())  # accepted requests must not replay anything here
+    assert client.post("/api/web/findings/job/finding/verify", json={}).status_code == status
+
+
+def test_scan_thread_changes_the_job_config_only_under_the_job_lock(web, local_database, monkeypatch):
+    """/api/scans copies the config under that lock; an unlocked insert could break its iteration."""
+    import threading
+    wu, _ = web
+    monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
+    monkeypatch.setattr(wu.shutil, "which", lambda name: "nmap")
+    scanner = importlib.import_module("autopwn_suite.scanner")
+    monkeypatch.setattr(scanner, "PortScan", MagicMock(return_value=nmap_observation()))
+    monkeypatch.setattr(scanner, "AnalyseScanResults", lambda *a: [["192.168.1.10", 22, "ssh", "OpenSSH", "8.2p1", "tcp"]])
+    monkeypatch.setattr(wu, "_notify", MagicMock())
+    unlocked = []
+
+    def held_by_this_thread():
+        answer = []
+
+        def probe():
+            free = job._lock.acquire(blocking=False)
+            if free:
+                job._lock.release()
+            answer.append(not free)
+
+        thread = threading.Thread(target=probe)
+        thread.start()
+        thread.join()
+        return answer[0]
+
+    class Config(dict):
+        def __setitem__(self, key, value):
+            if not held_by_this_thread():
+                unlocked.append(key)
+            super().__setitem__(key, value)
+
+    job = wu.ScanJob("offline", "192.168.1.10", Config(target="192.168.1.10", skip_discovery=True,
+                                                       vulnerability_source="offline"))
+    wu._run_scan(job)
+    assert job.status == "completed" and job.config["vulnerability_database_updated_at"]
+    assert unlocked == []
 
 
 def test_missing_local_database_rejected_before_launch(web, monkeypatch):
@@ -202,6 +391,19 @@ def test_update_error_is_reported_and_not_left_running(web, monkeypatch):
     assert not status["update"]["running"]
     assert "preserved" in status["update"]["error"]
     assert "private path" not in status["update"]["error"]
+
+
+def test_update_blocked_by_a_running_scan_asks_to_stop_scans_not_to_check_the_connection(web, monkeypatch):
+    from autopwn_suite.vulnerability_db import DatabaseInUse
+    wu, client = web
+    monkeypatch.setattr(wu, "update_database", MagicMock(side_effect=DatabaseInUse("private path details")))
+    wu._database_update["running"] = True
+    wu._update_vulnerability_database()
+    status = client.get("/api/vulnerability-database").json
+    assert not status["update"]["running"]
+    error = status["update"]["error"]
+    assert "running scan" in error and "read-only" in error and "preserved" in error
+    assert "connection" not in error and "private path" not in error
 
 
 @pytest.mark.parametrize("source", ["bogus", {}, [], None, True])

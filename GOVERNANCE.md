@@ -2,16 +2,17 @@
 
 AutoPWN Suite is maintained in the single authoritative repository
 [GamehunterKaan/AutoPWN-Suite](https://github.com/GamehunterKaan/AutoPWN-Suite).
-External packages and the Docker Hub image are dependencies and distribution
-channels, not additional project source repositories.
+External packages, the Docker Hub image and the PyPI project `autopwn-suite` are
+dependencies and distribution channels, not additional project source repositories.
 
 ## Members with sensitive access
 
 | Member | Role | Sensitive resources and responsibilities |
 | --- | --- | --- |
 | [Kaan Gültekin (@GamehunterKaan)](https://github.com/GamehunterKaan) | Owner, maintainer, release manager, security contact | Repository administration and collaborator permissions; branch protection and Actions settings; CI secret administration; Docker Hub publishing credentials; release approval and publication; private vulnerability reports and coordinated disclosure. |
+| [@autosec-overflow](https://github.com/autosec-overflow) | Second maintainer account (per the owner's attestation) | Repository write access; administration is not granted. Successor arrangements are held privately ([continuity plan](docs/CONTINUITY.md)). |
 
-This is the human access inventory as of 2026-10-15. The owner updates it whenever
+This is the human access inventory as of 2026-10-19. The owner updates it whenever
 access changes. Contributors do not gain sensitive access by submitting a pull
 request. Invitations and permission changes are manual. Require MFA or a passkey
 for accounts with sensitive access, and revoke access that is no longer needed.
@@ -21,10 +22,14 @@ Do not list secret values, recovery codes, or private reporting details here.
 
 GitHub Actions uses short-lived `GITHUB_TOKEN` credentials. The repository default
 is read-only, and each workflow declares its permissions. Builds and scans have
-read-only access; only signing receives OIDC and only publication receives
-release-write permissions. Docker Hub push/sign access uses
-the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. An OIDC identity
-signs release artifacts through Sigstore; no long-lived signing key is stored.
+read-only access; only signing, PyPI trusted publishing and the OpenSSF Scorecard
+workflow receive OIDC and only publication receives release-write permissions. Docker
+Hub push/sign access uses the repository secrets `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN`. An OIDC identity signs release artifacts through Sigstore; no
+long-lived signing key is stored. The Scorecard workflow (`scorecard.yml`) uses its
+OIDC token only to publish its results to the OpenSSF API and has
+`security-events: write` only to upload them to code scanning; it holds no secret and
+can neither publish nor sign.
 Dependabot proposes dependency updates; it does not approve or merge them.
 The separate authenticity-backfill workflow inventories existing image digests
 and adds signatures/reports to an existing release without rebuilding images or

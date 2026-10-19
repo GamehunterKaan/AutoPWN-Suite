@@ -6,12 +6,12 @@ AutoPWN Suite is **English-only**. There is no translation framework, no message
 catalog and no language selection. User-facing text is written directly in the
 source:
 
-- CLI and daemon messages in the Python modules (`autopwn.py`, `modules/*.py`),
+- CLI and daemon messages in the Python modules (`autopwn_suite/cli.py`, `autopwn_suite/*.py`),
   rendered through `rich`.
-- Dashboard text in `modules/web_ui_static/index.html`, `login.html`, `app.js`,
+- Dashboard text in `autopwn_suite/web_ui_static/index.html`, `login.html`, `app.js`,
   `auth.js`, `login.js` and `web_security.js`; both HTML pages declare `lang="en"`.
 - Reports, notification e-mails, web-check findings and remediation text generated in
-  Python (for example `modules/report.py` and `modules/web/`).
+  Python (for example `autopwn_suite/report.py` and `autopwn_suite/web/`).
 - Documentation, issues and pull-request discussion are in English
   (OpenSSF criterion `english`).
 
@@ -71,7 +71,13 @@ earlier, open an issue to discuss starting with step 3.
   (the existing code does so for settings, profiles, schedules and reports). Serve
   and declare HTML/JSON as UTF-8, and do not assume ASCII hostnames, banners or
   evidence. Treat target-supplied text as arbitrary bytes that may not be valid
-  UTF-8 and decode with a replacement strategy rather than crashing.
+  UTF-8 and decode with a replacement strategy rather than crashing. Scanned
+  text keeps every printable character of every script, but `printable` removes
+  its control, bidirectional and zero-width characters, including the zero-width
+  joiner and non-joiner and the Mongolian vowel separator that some scripts use for
+  shaping, so that a target cannot
+  forge a line or reorder what the operator reads; the text shown can differ from
+  the bytes the host sent in that respect.
 - **Locale-independent behavior.** Do not depend on the system locale for
   parsing, sorting or comparison. Sort by stable keys (IP address, severity rank,
   timestamp), not by localized text. Do not use locale-dependent `strftime("%b")`

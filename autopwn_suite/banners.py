@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
+from rich.align import Align
+from rich.panel import Panel
+from rich.text import Text
+
+from autopwn_suite.utils import get_terminal_width
+
+
+# https://patorjk.com/software/taag/
+def print_banner(console) -> None:
+    width = get_terminal_width()
+    height = 8
+    banner = r"""___           __          ____  _       __ _   __   _____         _  __
+    /   |  __  __ / /_ ____   / __ \| |     / // | / /  / ___/ __  __ (_)/ /_ ___
+    / /| | / / / // __// __ \ / /_/ /| | /| / //  |/ /   \__ \ / / / // // __// _ \
+   / ___ |/ /_/ // /_ / /_/ // ____/ | |/ |/ // /|  /   ___/ // /_/ // // /_ /  __/
+ /_/  |_|\____/ \__/ \____//_/      |__/|__//_/ |_/   /____/ \____//_/ \__/ \___/
+"""
+
+    banner_small = r"""╔═╗┬ ┬┌┬┐┌─┐╔═╗╦ ╦╔╗╔  ╔═╗┬ ┬┬┌┬┐┌─┐
+╠═╣│ │ │ │ │╠═╝║║║║║║  ╚═╗│ ││ │ ├┤
+╩ ╩└─┘ ┴ └─┘╩  ╚╩╝╝╚╝  ╚═╝└─┘┴ ┴ └─┘
+"""
+
+    if width < 90:
+        banner = banner_small
+        height = 5
+
+    panel = Panel(
+        Align(
+            Text(banner, justify="center", style="blue"),
+            vertical="middle",
+            align="center",
+        ),
+        width=width,
+        height=height,
+        subtitle="by Kaan Gültekin @ kaangultekin.net",
+    )
+    console.print(panel)

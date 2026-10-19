@@ -4,11 +4,13 @@
 Unit tests for the api.py module.
 """
 import json
+import shlex
 from unittest.mock import ANY, MagicMock, mock_open, patch
 
 import pytest
 
-from api import AutoScanner, GenerateKeyword
+from autopwn_suite.api import AutoScanner, GenerateKeyword
+from autopwn_suite.nmap_progress import _tokens
 
 
 @pytest.mark.unit
@@ -28,6 +30,20 @@ class TestAutoScanner:
         assert "-T 4" in args
         assert "-O" not in args  # os_scan is False
         assert "-sC" in args
+
+    @pytest.mark.parametrize("nmap_args", [
+        ["--script-args", "user=a b"],
+        ["--datadir", r"C:\Program Files\Nmap"],
+        ["--script=http-*", "-p", "80,443"],
+        ["--script-args", "a='b'"],
+        "-sC -p 1-1000",
+    ])
+    def test_nmap_arguments_reach_nmap_as_the_caller_wrote_them(self, scanner, nmap_args):
+        """The arguments are joined into a string that the scanner splits again; a list item with a space or a
+        backslash must come out as the same single argument, not as extra arguments or targets."""
+        expected = shlex.split(nmap_args) if isinstance(nmap_args, str) else nmap_args
+        arguments = scanner.CreateScanArgs(None, None, False, nmap_args)
+        assert _tokens(arguments) == ["-sV", *expected]
 
     def test_create_scan_args_invalid_speed(self, scanner):
         """Verify that an invalid scan speed raises an exception."""
@@ -86,8 +102,8 @@ class TestAutoScanner:
         # to ensure the API's usage context is covered.
         assert GenerateKeyword(product, version) == expected
 
-    @patch("api.GenerateKeyword", return_value="apache 2.4")
-    @patch("api.searchCVE")
+    @patch("autopwn_suite.api.GenerateKeyword", return_value="apache 2.4")
+    @patch("autopwn_suite.api.searchCVE")
     def test_search_vuln(self, mock_search_cve, mock_gen_keyword, scanner):
         """Verify that SearchVuln correctly calls search functions and parses results."""
         mock_vuln = MagicMock()
@@ -108,9 +124,9 @@ class TestAutoScanner:
         assert "CVE-2023-1234" in results
         assert results["CVE-2023-1234"]["description"] == "Test vulnerability"
 
-    @patch("api.is_root", return_value=True)
-    @patch("api.PortScanner")
-    @patch("api.AutoScanner.SearchVuln")
+    @patch("autopwn_suite.api.is_root", return_value=True)
+    @patch("autopwn_suite.api.PortScanner")
+    @patch("autopwn_suite.api.AutoScanner.SearchVuln")
     def test_scan_success_path(self, mock_search_vuln, mock_port_scanner, mock_is_root, scanner, mock_nmap_result):
         """Verify the main scan method orchestrates scans and returns JSON."""
         mock_scanner_instance = MagicMock()
@@ -137,7 +153,7 @@ class TestAutoScanner:
         assert "Apache httpd" in results[target]["vulns"]
         assert "CVE-2023-TEST" in results[target]["vulns"]["Apache httpd"]
 
-    @patch("api.PortScanner")
+    @patch("autopwn_suite.api.PortScanner")
     def test_scan_host_offline(self, mock_port_scanner, scanner):
         """Verify that an offline host is handled gracefully."""
         mock_scanner_instance = MagicMock()
@@ -153,7 +169,7 @@ class TestAutoScanner:
         # Verify the result contains the host but with empty ports and vulns.
         assert results == {"192.168.1.99": {"ports": {}, "vulns": {}}}
 
-    @patch("api.PortScanner")
+    @patch("autopwn_suite.api.PortScanner")
     def test_scan_with_custom_nmap_args(self, mock_port_scanner, scanner):
         """Verify that custom nmap arguments are passed to the scanner."""
         mock_scanner_instance = MagicMock()
@@ -169,7 +185,7 @@ class TestAutoScanner:
         _, call_kwargs = mock_scanner_instance.scan.call_args
         assert custom_args in call_kwargs["arguments"]
 
-    @patch("api.PortScanner")
+    @patch("autopwn_suite.api.PortScanner")
     def test_scan_debug_mode(self, mock_port_scanner, scanner, capsys):
         """Verify that debug mode prints status messages."""
         mock_scanner_instance = MagicMock()

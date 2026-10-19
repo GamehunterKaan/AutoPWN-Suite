@@ -1,0 +1,23 @@
+{
+  "python": "3.13.16",
+  "release": "20261013",
+  "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261013/",
+  "archives": {
+    "linux-amd64": {
+      "file": "cpython-3.13.16+20261013-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "d0080766b6b74aeb81e1949ef0d9a20e6c17f7b160fb295a69b936ccb17660be"
+    },
+    "linux-arm64": {
+      "file": "cpython-3.13.16+20261013-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "69a30ed26198178732c37b8de0b6b5191479fbacfe526954da776befe38f18e7"
+    },
+    "windows-amd64": {
+      "file": "cpython-3.13.16+20261013-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "7aba3985d4cee1c7cacb963ca6aa08a5d3e695d7f9609d9fabc56f22ddcf5a06"
+    },
+    "macos-arm64": {
+      "file": "cpython-3.13.16+20261013-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "sha256": "16a5332fb0dcb77f163fc8f8cbccd95be1644cc53e68e5d2a79f50afd6680a0e"
+    }
+  }
+}

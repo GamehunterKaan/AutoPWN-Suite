@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from modules.web.query import parameter_indexes, probe_url, query_parts
+from autopwn_suite.web.query import parameter_indexes, probe_url, query_parts
 
 
 @pytest.mark.unit

@@ -6,7 +6,7 @@ from functools import cache
 
 from flask.testing import FlaskClient
 
-from modules.web_auth import ACCOUNT_FILE, COOKIE, AccountStore, password_hash
+from autopwn_suite.web_auth import ACCOUNT_FILE, COOKIE, AccountStore, password_hash
 
 TEST_PASSWORD = "Test-only dashboard password 2026!"
 

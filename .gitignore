@@ -9,12 +9,12 @@ autopwn-daemon.conf
 exploits/
 outputs/
 __pycache__/
-modules/__pycache__
-modules/web/__pycache__
+autopwn_suite/__pycache__
+autopwn_suite/web/__pycache__
 venv/*
-modules/web_ui_profiles.json
-modules/web_ui_settings.json
-modules/web_ui_schedules.json
+autopwn_suite/web_ui_profiles.json
+autopwn_suite/web_ui_settings.json
+autopwn_suite/web_ui_schedules.json
 **/web_ui_auth.json*
 **/.web_ui_auth.json.*.tmp
 vulnerabilities.sqlite3
@@ -61,3 +61,10 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Release artifacts are produced by CI, never committed
+*.exe
+*.whl
+SHA256SUMS*
+*.sigstore.json
+*.intoto.jsonl

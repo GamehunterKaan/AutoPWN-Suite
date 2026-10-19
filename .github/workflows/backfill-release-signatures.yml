@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing published release to sign without rebuilding or replacing images
+        description: Existing published release to sign without rebuilding or replacing images (v2.7.0 or later; older tags lack the packaging files and are refused)
         required: true
         type: string
       image-digest:

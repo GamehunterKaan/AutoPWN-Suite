@@ -1,0 +1,20 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright 2022-2026 Kaan Gültekin */
+:root{color-scheme:dark;font-family:'Segoe UI',Arial,sans-serif;background:#080c0f;color:#c8dde8}
+*{box-sizing:border-box}
+body{min-height:100vh;margin:0;display:grid;place-items:center;padding:24px}
+.login-card{width:min(100%,420px);padding:36px;border:1px solid #243a4e;border-radius:12px;background:#0d1318;box-shadow:0 24px 80px #0005}
+.brand{font:15px Consolas,monospace;letter-spacing:2px;color:#00c8ff;margin-bottom:32px}
+.brand span{font-size:11px;color:#7a9db5}
+h1{font-size:26px;margin:0 0 10px;font-weight:600}
+p{font-size:14px;color:#7a9db5;line-height:1.6;margin:0 0 24px}
+label{display:block;font-size:13px;margin:18px 0 8px}
+input{width:100%;border:1px solid #243a4e;background:#111a22;color:#c8dde8;border-radius:6px;padding:12px;font:inherit}
+input:focus{outline:2px solid #00c8ff;outline-offset:2px}
+/* Keep the field's colours when the browser autofills it: Chromium and Safari repaint it with their own
+   light background (:-webkit-autofill), Firefox uses :autofill, and :is() ignores the one it does not know. */
+input:is(:-webkit-autofill,:autofill){-webkit-text-fill-color:#c8dde8;caret-color:#c8dde8;background-color:#111a22;filter:none;box-shadow:inset 0 0 0 100vmax #111a22}
+button{width:100%;border:0;border-radius:6px;padding:12px;background:#00c8ff;color:#080c0f;font:600 14px 'Segoe UI',sans-serif;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}
+#login-message{min-height:24px;margin:12px 0;color:#ff8c86;font-size:13px}
+.hint{font-size:12px;margin:24px 0 0}

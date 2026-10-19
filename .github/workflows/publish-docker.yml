@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing published release tag to build and sign (for example v2.6.0)
+        description: Existing published release tag to build and sign (for example v2.7.0; tags before v2.7.0 lack the packaging files and are refused)
         required: true
         type: string
 
@@ -53,7 +53,7 @@ jobs:
           epoch="$(git show --no-patch --format=%ct "$commit")"
           [[ "$epoch" =~ ^[0-9]+$ ]]
           {
-            printf 'commit=%s\nversion=%s\n' "$commit" "${RELEASE_TAG#v}"
+            printf 'commit=%s\nversion=%s\nsource_date_epoch=%s\n' "$commit" "${RELEASE_TAG#v}" "$epoch"
             printf 'image=%s\n' docker.io/gamehunterkaan/autopwn-suite
             if [ "$latest" = "$RELEASE_TAG" ]; then printf 'latest=true\n'; else printf 'latest=false\n'; fi
           } >> "$GITHUB_OUTPUT"
@@ -78,6 +78,15 @@ jobs:
     uses: ./.github/workflows/dynamic-analysis.yml
     with:
       source-ref: ${{ needs.validate.outputs.commit }}
+
+  binaries:
+    needs: [validate, source-security]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-binary.yml
+    with:
+      source-artifact: release-source
+      source-date-epoch: ${{ needs.validate.outputs.source_date_epoch }}
 
   build:
     needs: [validate, source-security]
@@ -150,7 +159,7 @@ jobs:
           if-no-files-found: error
 
   push:
-    needs: [validate, build, dynamic-analysis]
+    needs: [validate, build, dynamic-analysis, binaries]
     runs-on: ubuntu-latest
     permissions: {}
     outputs:
@@ -186,7 +195,7 @@ jobs:
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 
   sign:
-    needs: [validate, push]
+    needs: [validate, push, binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -205,6 +214,11 @@ jobs:
           pattern: sbom-*
           path: assets
           merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: binary-*
+          path: assets
+          merge-multiple: true
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -218,12 +232,19 @@ jobs:
           DIGEST: ${{ needs.push.outputs.digest }}
         run: |
           set -euo pipefail
-          python scripts/release_assets.py manifest --tag "$RELEASE_TAG" --output assets --image "$IMAGE" --digest "$DIGEST"
+          python scripts/release_assets.py manifest --tag "$RELEASE_TAG" --output assets --image "$IMAGE" --digest "$DIGEST" --binaries
           identity="https://github.com/$GITHUB_WORKFLOW_REF"
           cosign sign --yes "$IMAGE@$DIGEST"
           cosign verify --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$IMAGE@$DIGEST"
           cosign sign-blob --yes --bundle assets/release-manifest.sigstore.json assets/release-manifest.json
           cosign verify-blob --bundle assets/release-manifest.sigstore.json --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com assets/release-manifest.json
+          # The checksum file gets its own signature so the binaries can be verified with two standard commands.
+          cosign sign-blob --yes --bundle assets/SHA256SUMS.sigstore.json assets/SHA256SUMS
+          cosign verify-blob --bundle assets/SHA256SUMS.sigstore.json --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com assets/SHA256SUMS
+          # SLSA provenance over the release manifest, which binds the hash of every release file.
+          python scripts/release_provenance.py --manifest assets/release-manifest.json --output "$RUNNER_TEMP/provenance.json"
+          cosign attest-blob --yes --type slsaprovenance1 --predicate "$RUNNER_TEMP/provenance.json" --bundle "assets/autopwn-suite-$RELEASE_TAG.intoto.jsonl" assets/release-manifest.json
+          cosign verify-blob-attestation --type slsaprovenance1 --bundle "assets/autopwn-suite-$RELEASE_TAG.intoto.jsonl" --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com assets/release-manifest.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: signed-release

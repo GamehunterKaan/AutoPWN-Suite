@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules import nmap_backend as backend
-from modules import nmap_progress as runner
+from autopwn_suite import nmap_backend as backend
+from autopwn_suite import nmap_progress as runner
 from tests.unit.test_nmap_progress import FakeProcess
 
 XML = '''<?xml version="1.0" encoding="UTF-8"?>
@@ -90,7 +90,7 @@ def test_services_keep_protocol_state_tunnel_and_all_cpes(scanner):
 
 
 def test_host_identity_os_and_discovery_metadata(scanner):
-    from modules.scanner import InitHostInfo
+    from autopwn_suite.scanner import InitHostInfo
     scanner.load_xml(XML)
     host = scanner["192.0.2.10"]
     info = InitHostInfo(host)
@@ -260,7 +260,7 @@ def test_spawn_failure_does_not_leave_old_results(scanner, monkeypatch):
 @pytest.mark.parametrize("discovery", ["TestPing", "TestArp"])
 @pytest.mark.parametrize("monitored", [False, True])
 def test_discovery_filters_down_hosts_with_or_without_progress(scanner, monkeypatch, discovery, monitored):
-    from modules import scanner as scan_module
+    from autopwn_suite import scanner as scan_module
     monkeypatch.setattr(scan_module, "PortScanner", lambda: scanner)
     monkeypatch.setattr(runner.subprocess, "Popen", MagicMock(return_value=FakeProcess(stdout=XML)))
     kwargs = {"progress": MagicMock(), "should_stop": lambda: False} if monitored else {}
@@ -269,7 +269,7 @@ def test_discovery_filters_down_hosts_with_or_without_progress(scanner, monkeypa
 
 
 def test_python_api_keeps_resolved_hosts_udp_os_and_offline_contract(scanner, monkeypatch):
-    import api
+    import autopwn_suite.api as api
     monkeypatch.setattr(api, "PortScanner", lambda: scanner)
     monkeypatch.setattr(api, "is_root", lambda: True)
     monkeypatch.setattr(api, "VulnerabilityLookup", lambda *a: pytest.fail("Port-only scan opened CVE database"))
@@ -286,10 +286,10 @@ def test_python_api_keeps_resolved_hosts_udp_os_and_offline_contract(scanner, mo
 
 
 def test_cli_analysis_and_web_targets_keep_tls_on_nonstandard_ports(scanner, monkeypatch):
-    from modules.scanner import AnalyseScanResults
-    from modules.web.webvuln import web_endpoints
+    from autopwn_suite.scanner import AnalyseScanResults
+    from autopwn_suite.web.webvuln import web_endpoints
     scanner.load_xml(XML)
-    monkeypatch.setattr("modules.scanner.is_root", lambda: True)
+    monkeypatch.setattr("autopwn_suite.scanner.is_root", lambda: True)
     rows = AnalyseScanResults(scanner, MagicMock(), MagicMock(), "192.0.2.10")
     assert rows == [["192.0.2.10", 9443, "http", "nginx", "1.24.0"]]
     assert web_endpoints("192.0.2.10", rows, scanner) == ["https://192.0.2.10:9443/"]

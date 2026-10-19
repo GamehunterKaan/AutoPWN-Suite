@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from rich.panel import Panel
 
-from modules.banners import print_banner
+from autopwn_suite.banners import print_banner
 
 
 @pytest.mark.unit

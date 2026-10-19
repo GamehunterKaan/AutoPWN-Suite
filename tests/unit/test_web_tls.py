@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from modules.web.tls import _context, _handshake, check_tls, inspect_certificate
+from autopwn_suite.web.tls import _context, _handshake, check_tls, inspect_certificate
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def test_certificate_dates_and_san_matching(certificate_der, options, url, expec
 @pytest.mark.unit
 def test_obsolete_tls_requires_actual_exact_version_handshake(certificate_der):
     der = certificate_der()
-    with patch("modules.web.tls._handshake", side_effect=[(der, "TLSv1.3"), (der, "TLSv1"), (der, "TLSv1.1")]) as handshake:
+    with patch("autopwn_suite.web.tls._handshake", side_effect=[(der, "TLSv1.3"), (der, "TLSv1"), (der, "TLSv1.1")]) as handshake:
         results = check_tls("https://example.com:8443/", MagicMock(), MagicMock())
     assert [item["type"] for item in results] == ["TLS_PROTOCOL", "TLS_PROTOCOL"]
     assert handshake.call_count == 3
@@ -74,7 +74,7 @@ def test_tls_handshake_reads_metadata_without_application_data():
     secure = context.wrap_socket.return_value.__enter__.return_value
     secure.getpeercert.return_value = b"certificate"
     secure.version.return_value = "TLSv1"
-    with patch("modules.web.tls.socket.create_connection") as connect:
+    with patch("autopwn_suite.web.tls.socket.create_connection") as connect:
         assert _handshake(context, "example.com", 8443) == (b"certificate", "TLSv1")
     assert secure.method_calls == [call.getpeercert(binary_form=True), call.version()]
     connect.return_value.__exit__.assert_called_once()
@@ -86,7 +86,7 @@ def test_trust_failure_does_not_skip_expiry_or_hostname_checks(certificate_der):
     error = ssl.SSLCertVerificationError(1, "untrusted")
     error.verify_code = 18
     der = certificate_der(expired=True, names=("other.example",))
-    with patch("modules.web.tls._handshake", side_effect=[error, (der, "TLSv1.3"), ssl.SSLError(1, "rejected"), ssl.SSLError(1, "rejected")]):
+    with patch("autopwn_suite.web.tls._handshake", side_effect=[error, (der, "TLSv1.3"), ssl.SSLError(1, "rejected"), ssl.SSLError(1, "rejected")]):
         results = check_tls("https://example.com/", MagicMock(), MagicMock())
     assert [item["type"] for item in results] == ["TLS_TRUST", "TLS_CERTIFICATE", "TLS_CERTIFICATE"]
     assert "private CA" in results[0]["evidence"]
@@ -95,7 +95,7 @@ def test_trust_failure_does_not_skip_expiry_or_hostname_checks(certificate_der):
 @pytest.mark.unit
 def test_unavailable_protocols_are_reported_as_unverified(certificate_der):
     log = MagicMock()
-    with patch("modules.web.tls._handshake", return_value=(certificate_der(), "TLSv1.3")) as handshake, patch("modules.web.tls.ssl.HAS_TLSv1", False), patch("modules.web.tls.ssl.HAS_TLSv1_1", False):
+    with patch("autopwn_suite.web.tls._handshake", return_value=(certificate_der(), "TLSv1.3")) as handshake, patch("autopwn_suite.web.tls.ssl.HAS_TLSv1", False), patch("autopwn_suite.web.tls.ssl.HAS_TLSv1_1", False):
         assert check_tls("https://example.com/", log, MagicMock()) == []
     handshake.assert_called_once()
     assert log.logger.call_count == 2
@@ -104,6 +104,6 @@ def test_unavailable_protocols_are_reported_as_unverified(certificate_der):
 
 @pytest.mark.unit
 def test_plain_http_does_not_make_tls_connections():
-    with patch("modules.web.tls._handshake") as handshake:
+    with patch("autopwn_suite.web.tls._handshake") as handshake:
         assert check_tls("http://example.com/", MagicMock(), MagicMock()) == []
     handshake.assert_not_called()

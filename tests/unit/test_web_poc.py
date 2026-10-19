@@ -7,8 +7,10 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from modules.web.poc import browser_poc, build_plan, curl_poc, python_poc
-from modules.web.poc_runtime import verify_plan
+from autopwn_suite.web.findings import finding
+from autopwn_suite.web.poc import browser_poc, build_plan, curl_poc, python_poc
+from autopwn_suite.web.poc_runtime import _public_url, validate_plan, verify_plan
+from autopwn_suite.web.runtime import ScanContext, redact_url
 from tests.unit.test_web_dashboard import dashboard as dashboard
 from tests.unit.test_web_tls import certificate_der as certificate_der
 
@@ -60,9 +62,91 @@ def test_cors_poc_reproduces_headers_without_following_redirects(web_response):
 def test_invalid_or_redacted_plans_are_rejected_before_any_request(mutate):
     plan = build_plan(sample())
     mutate(plan)
-    with patch("modules.web.poc_runtime.requests.Session") as session, pytest.raises(ValueError):
+    with patch("autopwn_suite.web.poc_runtime.requests.Session") as session, pytest.raises(ValueError):
         verify_plan(plan)
     session.assert_not_called()
+
+
+CREDENTIAL_NAMES = ["password", "passwd", "pass", "user_pass", "userPass", "passphrase", "secret", "client_secret", "token", "access_token",
+                    "api_key", "apikey", "api-key", "auth", "auth_token", "authorization", "oauth", "authorize", "session", "sessionid",
+                    "jwt", "signature", "csrf", "csrf_token", "PASSWORD", "userpass", "adminpass", "dbpass", "newpass", "oldpass",
+                    "confirmpass", "upass", "passkey", "passhash", "PassKey", "passw",
+                    "pwd", "PWD", "newpwd", "otp", "totp", "otp_code", "sig", "x-amz-sig", "sid", "userSid", "key", "KEY", "access_key", "accessKey",
+                    "private-key", "app_key", "appKey", "client_key", "license_key", "bearer", "credentials", "x-amz-credential", "cred", "creds",
+                    "cookie", "hmac", "xsrf", "sessid", "PHPSESSID", "x-amz-security-token", "verification_code", "reset_code", "recovery_code",
+                    "mfa_code", "%74oken", "to%6Ben",
+                    # An OAuth callback holds a credential in code, a single sign-on response in SAMLResponse.
+                    "code", "CODE", "pw", "PW", "userPw", "ticket", "login_ticket", "nonce", "oauth_nonce", "SAMLResponse", "RelayState",
+                    "code_verifier", "verifier"]
+PLAIN_NAMES = ["author", "authors", "author_id", "authorId", "authored", "bypass", "bypassed", "compass", "encompass", "surpass", "trespass",
+               "passenger", "passage", "passport", "passive", "passion", "page", "id", "q",
+               "sort_key", "primary_key", "cache_key", "monkey", "keyword", "keys", "key_id", "design", "signal", "side", "inside", "credit",
+               "hotpot", "country_code", "zipcode", "error_code", "status_code", "codec", "encode", "pwned", "tickets", "nonces", "saml", "state"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("name,credential", [(name, True) for name in CREDENTIAL_NAMES] + [(name, False) for name in PLAIN_NAMES])
+def test_only_credential_parameters_are_redacted_from_urls(name, credential):
+    value = "REDACTED" if credential else "value"
+    for redact in (redact_url, _public_url):
+        assert redact(f"http://example.com/?{name}=value&page=2") == f"http://example.com/?{name}={value}&page=2"
+
+
+@pytest.mark.unit
+def test_scanner_and_standalone_poc_redact_alike():
+    from autopwn_suite.web.poc_runtime import _SENSITIVE_PARAMETER
+    from autopwn_suite.web.runtime import SENSITIVE_PARAMETER
+    assert _SENSITIVE_PARAMETER.pattern == SENSITIVE_PARAMETER.pattern and _SENSITIVE_PARAMETER.flags == SENSITIVE_PARAMETER.flags
+    for url in ["http://u:p@example.com:81/a b?x=1&token=2;key=3#f", "http://example.com/?&&=&a&b=%zz&sid=1;sig=2", "/relative?access_key=1&q=2", "?", "", "http://[::1"]:
+        assert redact_url(url) == _public_url(url)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("url,expected", [
+    # A URL with no credential-named value is returned as it was, byte for byte, so that replaying it sends the same request.
+    ("http://example.com/p?q=a,b&x=%7e&y=a+b&flag&&z=%zz&e=", "http://example.com/p?q=a,b&x=%7e&y=a+b&flag&&z=%zz&e="),
+    # ; ends a pair as well as &.
+    ("http://example.com/p?a=1;token=abc&b=2", "http://example.com/p?a=1;token=REDACTED&b=2"),
+    ("http://example.com/p?a=1&sid=abc;b=2", "http://example.com/p?a=1&sid=REDACTED;b=2"),
+    ("http://u:pw@example.com/p?%74oken=abc#access_token=1", "http://example.com/p?%74oken=REDACTED"),
+])
+def test_redacting_a_url_keeps_everything_but_the_credential_values(url, expected):
+    assert redact_url(url) == expected
+    assert _public_url(url) == expected
+
+
+@pytest.mark.unit
+def test_finding_replays_every_parameter_that_is_not_a_credential_name():
+    # The keyword list is extended (key, sig, otp ...), but a replay still has everything it needs but the credential values.
+    url = "http://example.com/page?id=1&sort_key=name&country_code=US&access_key=hunter2&sig=abc"
+    with ScanContext(url, MagicMock(), controls={"speed": 5}).activate():
+        result = finding("SQLI", url, "Repeatable database error", parameter="id",
+                         reproduction={"strategy": "response", "requests": [{"url": url}]})
+    result["endpoint"] = redact_url(url)
+    plan = build_plan(result)
+    assert plan["requests"][0]["url"] == "http://example.com/page?id=1&sort_key=name&country_code=US&access_key=REDACTED&sig=REDACTED"
+    assert plan["target"] == "http://example.com/page?id=REDACTED&sort_key=REDACTED&country_code=REDACTED&access_key=REDACTED&sig=REDACTED"
+    with pytest.raises(ValueError, match="redacted query values"):
+        validate_plan(plan)
+    plan["requests"][0]["url"] = plan["requests"][0]["url"].replace("REDACTED", "restored")
+    # The target of the plan is only an origin to a replay: its redacted values do not stand in the way.
+    assert validate_plan(plan) == ("http", "example.com", 80)
+
+
+@pytest.mark.unit
+def test_finding_on_an_author_parameter_keeps_a_replayable_plan():
+    url = "http://example.com/?author=1&token=private"
+    with ScanContext(url, MagicMock(), controls={"speed": 5}).activate():
+        result = finding("XSS", url, "Unescaped reflection", parameter="author",
+                         reproduction={"strategy": "xss_reflection", "marker": "m", "payload": "m", "requests": [{"url": url}]})
+    result["endpoint"] = redact_url(url)
+    plan = build_plan(result)
+    assert plan["requests"][0]["url"] == "http://example.com/?author=1&token=REDACTED"
+    with pytest.raises(ValueError, match="redacted query values"):
+        validate_plan(plan)
+    # Only the credential has to be restored locally, not the author.
+    plan["requests"][0]["url"] = plan["requests"][0]["url"].replace("REDACTED", "private")
+    validate_plan(plan)
 
 
 @pytest.mark.unit
@@ -80,10 +164,10 @@ def test_sql_poc_requires_baseline_difference_and_repeat(web_response):
 def test_redirected_findings_record_final_evidence_and_reproduce_without_redirects(web_response, kind):
     from urllib.parse import parse_qs, urlsplit, urlunsplit
 
-    from modules.web.lfi import LFIScanner
-    from modules.web.runtime import ScanContext, redact_url
-    from modules.web.sqli import SQLIScanner
-    from modules.web.xss import XSSScanner
+    from autopwn_suite.web.lfi import LFIScanner
+    from autopwn_suite.web.runtime import ScanContext, redact_url
+    from autopwn_suite.web.sqli import SQLIScanner
+    from autopwn_suite.web.xss import XSSScanner
     scanners = {"sqli": (SQLIScanner, "test_sqli"), "lfi": (LFIScanner, "test_lfi"), "xss": (XSSScanner, "test_xss")}
     url = "http://example.com/read?file=one&token=private"
     def site(requested, **kwargs):
@@ -101,7 +185,7 @@ def test_redirected_findings_record_final_evidence_and_reproduce_without_redirec
         return web_response(body, url=requested)
     context = ScanContext(url, MagicMock(), controls={"speed": 5})
     scanner, method = scanners[kind]
-    with context.activate(), patch(f"modules.web.{kind}.get", side_effect=site):
+    with context.activate(), patch(f"autopwn_suite.web.{kind}.get", side_effect=site):
         result = getattr(scanner(MagicMock(), MagicMock()), method)(url)[0]
     result["endpoint"] = redact_url(url)
     assert "private" not in str(result)
@@ -151,7 +235,7 @@ def test_downloads_are_read_only_and_work_in_offline_mode(dashboard):
     job.add_web_finding("example.com", "http://example.com/", sample())
     wu._register_scan(job)
     wu._settings["offline_mode"] = True
-    with patch("modules.web.poc_runtime.requests.Session") as session:
+    with patch("autopwn_suite.web.poc_runtime.requests.Session") as session:
         response = client.get("/api/web/findings/job/finding/poc?format=python")
         assert response.status_code == 200
         assert "attachment" in response.headers["Content-Disposition"]
@@ -169,7 +253,7 @@ def test_verification_has_explicit_post_and_stores_result(dashboard):
     wu._register_scan(job)
     def thread(**kwargs):
         return MagicMock(start=lambda: kwargs["target"]())
-    with patch.object(wu.threading, "Thread", side_effect=thread), patch("modules.web.poc_runtime.verify_plan", return_value={"status": "reproduced", "impact_verified": False}) as verify:
+    with patch.object(wu.threading, "Thread", side_effect=thread), patch("autopwn_suite.web.poc_runtime.verify_plan", return_value={"status": "reproduced", "impact_verified": False}) as verify:
         assert client.get("/api/web/findings/job/finding/verify").status_code in (404, 405)
         assert client.post("/api/web/findings/job/finding/verify", json={"url": "http://external.com/"}).status_code == 400
         assert client.post("/api/web/findings/job/finding/verify", json={}).status_code == 202
@@ -237,7 +321,7 @@ def test_tls_poc_never_uses_http_transport():
     result["evidence"] = "Server negotiated obsolete TLSv1.1"
     result["reproduction"]["target"] = "https://example.com/"
     transport = MagicMock()
-    with patch("modules.web.poc_runtime._check_tls", return_value=True):
+    with patch("autopwn_suite.web.poc_runtime._check_tls", return_value=True):
         assert verify_plan(build_plan(result), transport=transport)["status"] == "reproduced"
     transport.assert_not_called()
 
@@ -250,8 +334,8 @@ def test_legacy_tls_poc_only_checks_the_exact_negotiated_version(label, version)
     context = MagicMock()
     secure = context.wrap_socket.return_value.__enter__.return_value
     secure.version.return_value = label
-    with patch("modules.web.poc_runtime.ssl.create_default_context", return_value=context), \
-         patch("modules.web.poc_runtime.socket.create_connection") as connect:
+    with patch("autopwn_suite.web.poc_runtime.ssl.create_default_context", return_value=context), \
+         patch("autopwn_suite.web.poc_runtime.socket.create_connection") as connect:
         assert verify_plan(build_plan(result))["status"] == "reproduced"
     assert context.minimum_version == context.maximum_version == version
     assert secure.method_calls == [call.version()]
@@ -267,6 +351,7 @@ def test_legacy_tls_poc_only_checks_the_exact_negotiated_version(label, version)
     ("DEBUG_DISCLOSURE", "/phpinfo", "diagnostic", '<title>phpinfo()</title>PHP Version 8', {"Content-Type": "text/html"}, 200, "reproduced"),
     ("ERROR_DISCLOSURE", "/error", "trace", "Reference: Source Error:", {}, 500, "not_reproduced"),
     ("ERROR_DISCLOSURE", "/error", "trace", 'Traceback (most recent call last):\nFile "app.py", line 2', {}, 500, "reproduced"),
+    ("ERROR_DISCLOSURE", "/error", "trace", "java.lang.IllegalStateException: boom\n\tat com.example.App.run(App.java:42)", {}, 500, "reproduced"),
     ("EXPOSED_FILE", "/.env", "configuration", "<html><body>DB_PASSWORD=example\nDB_HOST=example</body></html>", {}, 200, "not_reproduced"),
     ("EXPOSED_FILE", "/.env", "configuration", "DB_PASSWORD=example\nDB_PASSWORD=example", {}, 200, "not_reproduced"),
     ("EXPOSED_FILE", "/.env", "configuration", "export DB_PASSWORD=example\n  DB_HOST=example", {}, 200, "reproduced"),
@@ -335,7 +420,7 @@ def test_tls_certificate_poc_checks_actual_certificate_metadata(certificate_der,
     result["reproduction"]["target"] = target
     context = MagicMock()
     context.wrap_socket.return_value.__enter__.return_value.getpeercert.return_value = certificate_der(**options)
-    with patch("modules.web.poc_runtime.ssl.create_default_context", return_value=context), patch("modules.web.poc_runtime.socket.create_connection"):
+    with patch("autopwn_suite.web.poc_runtime.ssl.create_default_context", return_value=context), patch("autopwn_suite.web.poc_runtime.socket.create_connection"):
         assert verify_plan(build_plan(result))["status"] == expected
     assert context.verify_mode == ssl.CERT_NONE
 
@@ -345,7 +430,7 @@ def test_tls_poc_distinguishes_untrusted_certificates_from_connection_failures()
     result = sample("TLS_TRUST")
     result["reproduction"]["target"] = "https://example.com/"
     context = MagicMock()
-    with patch("modules.web.poc_runtime.ssl.create_default_context", return_value=context), patch("modules.web.poc_runtime.socket.create_connection"):
+    with patch("autopwn_suite.web.poc_runtime.ssl.create_default_context", return_value=context), patch("autopwn_suite.web.poc_runtime.socket.create_connection"):
         context.wrap_socket.side_effect = ssl.SSLCertVerificationError("untrusted")
         assert verify_plan(build_plan(result))["status"] == "reproduced"
         context.wrap_socket.side_effect = OSError("unreachable")

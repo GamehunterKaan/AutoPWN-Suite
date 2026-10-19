@@ -40,7 +40,7 @@ jobs:
           python-version: '3.11'
       - name: Install pinned security tooling
         run: |
-          python -m pip install bandit==1.9.4
+          python -m pip install --require-hashes --only-binary=:all: --no-deps -r .security/requirements-bandit.txt
           python scripts/install_security_tools.py --directory "$RUNNER_TEMP/security-tools"
       - name: Evaluate every change against SCA and SAST policy
         run: |
