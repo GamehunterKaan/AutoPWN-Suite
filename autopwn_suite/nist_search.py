@@ -69,6 +69,7 @@ def FindVars(vuln: dict) -> tuple:
     exploitability = 0.0
     severity_score = 0.0
     severity = "UNKNOWN"
+    scored = False
 
     metrics = vuln["cve"].get("metrics")
     if metrics is not None and len(metrics) > 0:
@@ -87,10 +88,15 @@ def FindVars(vuln: dict) -> tuple:
                 continue
             # Take severity and score from the same preferred metric. A valid
             # zero score must not be overwritten by an older CVSS version.
-            exploitability = metric.get("exploitabilityScore", 0.0)
-            severity_score = metric["cvssData"]["baseScore"]
-            severity = metric["cvssData"].get("baseSeverity", metric.get("baseSeverity", "UNKNOWN"))
-            break
+            if not scored:
+                severity_score = metric["cvssData"]["baseScore"]
+                severity = metric["cvssData"].get("baseSeverity", metric.get("baseSeverity", "UNKNOWN"))
+                scored = True
+            # CVSS v4 metrics carry no exploitabilityScore, and 0.0 would read as "not
+            # exploitable": take it from the newest version that has one.
+            if isinstance(metric.get("exploitabilityScore"), (int, float)):
+                exploitability = metric["exploitabilityScore"]
+                break
 
         if severity == "UNKNOWN" and severity_score > 0.0:
             if severity_score >= 9.0:

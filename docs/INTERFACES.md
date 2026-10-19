@@ -63,7 +63,9 @@ It returns a mapping keyed by resolved host addresses. Each host contains `ports
 by product/CVE. A host that hit `host_timeout` also has `timedout: True` (the key
 is absent otherwise) and the call logs a warning: its ports and vulnerabilities
 are incomplete. Vulnerability records include description, severity, score,
-reference URL, exploitability, data source and database update time. They are
+reference URL, exploitability, data source and database update time. Severity and
+score come from the newest CVSS version NVD lists; exploitability is the sub-score of
+the newest version that has one (CVSS v4 has none) and is 0.0 when no version does. They are
 version-based candidates. Failures may raise scanner/database exceptions;
 callers must handle them and protect output paths and sensitive results.
 `save_to_file(filename="autopwn.json")` overwrites the selected file with JSON.

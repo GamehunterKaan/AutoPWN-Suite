@@ -224,6 +224,31 @@ class TestFindVars:
         assert score == 7.5
         assert exploitability == 10.0
 
+    def test_find_vars_cvss_v4_takes_exploitability_from_the_newest_version_that_has_one(self):
+        """CVSS v4 metrics carry no exploitabilityScore; 0.0 would read as 'not exploitable'."""
+        vuln_data = {
+            "cve": {
+                "id": "CVE-TEST-V4",
+                "descriptions": [{"lang": "en", "value": "V4 Test"}],
+                "metrics": {
+                    "cvssMetricV40": [{"type": "Secondary", "cvssData": {"version": "4.0", "baseScore": 8.7, "baseSeverity": "HIGH"}}],
+                    "cvssMetricV31": [{"type": "Primary", "exploitabilityScore": 3.9, "cvssData": {"baseScore": 9.8, "baseSeverity": "CRITICAL"}}],
+                    "cvssMetricV2": [{"exploitabilityScore": 10.0, "cvssData": {"baseScore": 7.5, "baseSeverity": "HIGH"}}],
+                },
+            }
+        }
+        _, _, severity, score, _, exploitability = FindVars(vuln_data)
+        assert (severity, score, exploitability) == ("HIGH", 8.7, 3.9)
+
+    def test_find_vars_cvss_v4_alone_has_no_exploitability_and_its_own_value_is_kept(self):
+        v4_only = {"cve": {"id": "CVE-TEST-V4-ONLY", "metrics": {
+            "cvssMetricV40": [{"cvssData": {"baseScore": 8.7, "baseSeverity": "HIGH"}}]}}}
+        assert FindVars(v4_only)[2:4] == ("HIGH", 8.7) and FindVars(v4_only)[5] == 0.0
+        with_value = {"cve": {"id": "CVE-TEST-V4-VALUE", "metrics": {
+            "cvssMetricV40": [{"exploitabilityScore": 2.5, "cvssData": {"baseScore": 8.7, "baseSeverity": "HIGH"}}],
+            "cvssMetricV31": [{"exploitabilityScore": 3.9, "cvssData": {"baseScore": 9.8, "baseSeverity": "CRITICAL"}}]}}}
+        assert FindVars(with_value)[5] == 2.5
+
     def test_find_vars_with_no_metrics(self):
         """Verify it handles missing metrics gracefully."""
         vuln_data = {
