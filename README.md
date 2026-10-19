@@ -373,6 +373,8 @@ The **Offline mode — whole dashboard** toggle in Settings saves this preferenc
 and overrides the source for all new and scheduled scans. It also blocks downloads and notifications.
 Turn it off when you want to download updates. Finish or stop active online scans and let any database
 update or pending notification finish before turning it on. A server started with `--offline` keeps offline mode enforced.
+On Windows a database that a running scan has open cannot be replaced: the update stops before it downloads
+anything, keeps the previous database and asks you to close running scans first.
 
 The default file is `vulnerabilities.sqlite3` in the per-user data directory (`~/.local/share/autopwn-suite`,
 `%LOCALAPPDATA%\autopwn-suite` or `~/Library/Application Support/autopwn-suite`), or

@@ -267,6 +267,19 @@ def test_update_error_is_reported_and_not_left_running(web, monkeypatch):
     assert "private path" not in status["update"]["error"]
 
 
+def test_update_blocked_by_a_running_scan_asks_to_stop_scans_not_to_check_the_connection(web, monkeypatch):
+    from autopwn_suite.vulnerability_db import DatabaseInUse
+    wu, client = web
+    monkeypatch.setattr(wu, "update_database", MagicMock(side_effect=DatabaseInUse("private path details")))
+    wu._database_update["running"] = True
+    wu._update_vulnerability_database()
+    status = client.get("/api/vulnerability-database").json
+    assert not status["update"]["running"]
+    error = status["update"]["error"]
+    assert "running scan" in error and "preserved" in error
+    assert "connection" not in error and "private path" not in error
+
+
 @pytest.mark.parametrize("source", ["bogus", {}, [], None, True])
 def test_invalid_source_is_rejected(web, source):
     _, client = web

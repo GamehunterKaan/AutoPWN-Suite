@@ -78,7 +78,7 @@ from autopwn_suite.credential_files import (
 from autopwn_suite.nist_search import VulnerabilityLookup
 from autopwn_suite.nmap_progress import ScanCancelled
 from autopwn_suite.paths import data_dir
-from autopwn_suite.vulnerability_db import database_path, database_status, update_database
+from autopwn_suite.vulnerability_db import DatabaseInUse, database_path, database_status, update_database
 from autopwn_suite.web.options import CHECKS as WEB_CHECKS
 from autopwn_suite.web.options import normalize_options
 from autopwn_suite.web.runtime import redact_url
@@ -175,11 +175,14 @@ def _database_progress(message, current, total):
 def _update_vulnerability_database():
     try:
         update_database(_VULNERABILITY_DB, _database_progress)
-    except Exception:
+    except Exception as error:
         logging.exception("Vulnerability database update failed; retaining the previous database")
+        text = ("A running scan is using the database. Stop running scans and update again; "
+                "the previous database is preserved." if isinstance(error, DatabaseInUse) else
+                "Download failed. Check your connection and available disk space; "
+                "the previous database is preserved.")
         with _database_update_lock:
-            _database_update.update(error="Download failed. Check your connection and available disk space; "
-                                    "the previous database is preserved.", message="Update failed")
+            _database_update.update(error=text, message="Update failed")
     finally:
         with _database_update_lock:
             _database_update["running"] = False
