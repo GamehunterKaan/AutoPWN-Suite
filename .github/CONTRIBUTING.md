@@ -135,7 +135,7 @@ maintainers label starter issues `good first issue` and `help wanted`.
 | Add a "skip to main content" link and check keyboard tab order | `autopwn_suite/web_ui_static/index.html` | HTML, CSS |
 | Honor `prefers-reduced-motion` for dashboard animations | `autopwn_suite/web_ui_static/styles.css` | CSS |
 | Raise the contrast of the muted `--text3` text color to at least 4.5:1 | `autopwn_suite/web_ui_static/styles.css` | CSS |
-| Add `aria-live` to toast messages so screen readers announce them | `autopwn_suite/web_ui_static/app.js` (`toast`) | JavaScript |
+| Announce scan progress and completion to screen readers with a polite live region (not every terminal line) | `autopwn_suite/web_ui_static/app.js` (scan cards), gap list in [ACCESSIBILITY.md](../docs/ACCESSIBILITY.md) | JavaScript |
 | Add tests for the uncovered lines of `autopwn_suite/random_user_agent.py` (error and empty-file paths) | `tests/unit/`, `python -m pytest --cov=autopwn_suite.random_user_agent` | Python, pytest |
 | Add tests for the uncovered branches of `autopwn_suite/nist_search.py` | `tests/unit/test_nist_search.py` | Python, pytest |
 | Improve an unclear error message or help text in `autopwn_suite/utils.py` (`cli()`), keeping the existing wording style | `autopwn_suite/utils.py` | Python |

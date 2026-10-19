@@ -233,7 +233,7 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
 ::-webkit-scrollbar-thumb:hover{background:var(--accent2)}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;flex:1;color:var(--text3);font-family:var(--mono);font-size:12px;text-align:center;padding:40px}
 .empty-state svg{opacity:.15}
-.toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--text);z-index:999;transition:opacity .3s;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.toast{position:fixed;bottom:20px;right:20px;opacity:0;pointer-events:none;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--text);z-index:999;transition:opacity .3s;box-shadow:0 4px 16px rgba(0,0,0,.4)}
 .toast.ok{border-left:3px solid var(--green2);color:var(--green2)}
 .toast.err{border-left:3px solid var(--red);color:var(--red)}
 

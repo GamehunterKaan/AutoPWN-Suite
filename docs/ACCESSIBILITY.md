@@ -33,6 +33,8 @@ Only features that exist in the source are listed.
   buttons have `aria-label`.
 - Scan progress bars expose `role="progressbar"` with `aria-valuemin`, `aria-valuemax`,
   `aria-valuenow`, `aria-valuetext` and an `aria-label`.
+- Toast messages (confirmations and errors) are announced through a polite live region
+  (`role="status"`, `aria-live="polite"`) that is in `index.html` before the first message.
 - The Web Security page uses real `<button>` elements for finding rows and
   detail tabs, with a visible `:focus-visible` outline (2 px accent color) and an
   `aria-label` for the tab group.
@@ -56,7 +58,7 @@ contributors at any time.
 | High | Most scan-form fields use a `<div class="fl">` caption instead of a `<label>`, so screen readers do not announce a name for them (the file has far fewer `<label>` elements than `<input>`/`<select>` controls). | `index.html` scan form | Associate each caption with its control using `<label for>` or `aria-labelledby`. |
 | High | Text input, select and textarea focus is shown only by a border-color change after `outline:none`; the focus color against its background is about 4:1 and the unfocused border is nearly invisible. Buttons, toggles and tabs lack a custom focus indicator. | `styles.css` | Restore a high-contrast `:focus-visible` outline for all interactive elements. |
 | High | Secondary text colors fail contrast: the "muted" tab, caption and footer color (`--text3`) is about 2.8:1 to 2.9:1 on the panel backgrounds, below the 4.5:1 normal-text minimum. Many labels are 10-11 px uppercase monospace. | `styles.css` | Raise muted text contrast to at least 4.5:1 and avoid text smaller than about 12 px. |
-| Medium | Live scan output and toast messages are not in `aria-live` regions, so progress changes, errors and completed scans are not announced. | `app.js` (`toast`, terminal view, scan cards) | Add polite live regions for status, errors and completion (avoid announcing every terminal line). |
+| Medium | Live scan output is not in an `aria-live` region, so scan progress changes and completed scans are not announced (toast messages are, see above). | `app.js` (terminal view, scan cards) | Add polite live regions for scan status and completion (avoid announcing every terminal line). |
 | Medium | Status is communicated mostly by color (severity, scan state pills, progress). Text labels exist for many but not all states. | `styles.css`, `app.js` | Ensure every color-coded state has a text or icon equivalent. |
 | Medium | No skip link, and keyboard focus order across the three-panel layout has not been tested. | `index.html` | Add a skip-to-main link; verify tab order. |
 | Medium | Icon-only links in the left footer use the `title` attribute only; the dashboard logo SVG and some decorative icons have no text alternative or `aria-hidden`. Links with `target="_blank"` do not warn that they open a new window. | `index.html` | Provide accessible names and mark decorative SVGs `aria-hidden`. |

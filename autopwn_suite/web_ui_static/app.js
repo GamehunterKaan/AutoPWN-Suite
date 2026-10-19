@@ -454,8 +454,9 @@ function cvssColor(s){ if(!s) return 'var(--text2)'; if(s>=9)return'var(--red)';
 
 let _toastTimer = null;
 function toast(msg, ok=true){
-  let el = document.getElementById('toast-el');
-  if(!el){ el=document.createElement('div'); el.id='toast-el'; el.className='toast'; document.body.appendChild(el); }
+  // #toast-el is a polite live region (role="status") in index.html; it must already be in the page for
+  // assistive technology to announce a change, so it is filled here and never created here.
+  const el = document.getElementById('toast-el');
   el.textContent = msg;
   el.className = 'toast ' + (ok?'ok':'err');
   el.style.opacity='1';
