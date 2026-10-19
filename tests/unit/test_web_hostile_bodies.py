@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from autopwn_suite.web import poc_runtime
+from autopwn_suite.web import similarity as similarity_module
 from autopwn_suite.web.boolean_sqli import _similar
 from autopwn_suite.web.content import inspect_content
 from autopwn_suite.web.dirbust import _catch_all
@@ -123,6 +124,74 @@ def test_similarity_stays_fast_on_hostile_bodies_and_stays_meaningful(compare):
     assert seconds(compare, one, other) < LIMIT_SECONDS
     assert compare(one, one) == 1.0
     assert compare(one, other) < .5
+
+
+def periodic_pair(size, period=101):
+    """Every character occurs about size / period times in the other body, so difflib finds thousands of small
+    blocks and searches the whole range again for each one: minutes for 20,000 characters."""
+    return ("".join(chr(0x4E00 + index * 7 % period) for index in range(size)),
+            "".join(chr(0x4E00 + index * 11 % period) for index in range(size)))
+
+
+def varied_text(seed, size):
+    """Like prose or code: common letters, and a dozen characters of under 1% each, which difflib cannot ignore."""
+    return "".join(random.Random(seed).choices("abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKL", weights=[3.4] * 27 + [.7] * 12, k=size))
+
+
+def listing(count, changed=()):
+    return "<html><body><ul>" + "".join(f"<li class='item'>Item {number} costs {number * 3} dollars{'!' if number in changed else ''}</li>"
+                                         for number in range(count)) + "</ul></body></html>"
+
+
+COMPARISONS = [(similarity, similarity_module), (poc_runtime._similarity, poc_runtime)]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("size", [20_000, 100_000])
+@pytest.mark.parametrize("compare", [similarity, _similar, poc_runtime._similarity], ids=["similarity", "boolean_sqli", "poc_runtime"])
+def test_similarity_stays_fast_on_periodic_bodies(compare, size):
+    one, other = periodic_pair(size)
+    started = time.perf_counter()
+    ratio = compare(one, other)
+    assert time.perf_counter() - started < LIMIT_SECONDS
+    assert ratio < .5
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("compare,module", COMPARISONS, ids=["similarity", "poc_runtime"])
+def test_the_search_for_common_blocks_stops_at_its_deadline_and_counts_what_it_found(compare, module, monkeypatch):
+    left, right = "1111x22y333", "1111z22w333"
+    assert compare(left, right) == SequenceMatcher(None, left, right).ratio() == 18 / 22
+    clock, search = [0.0], SequenceMatcher.find_longest_match
+
+    def slow_search(matcher, *bounds):
+        clock[0] += .3
+        return search(matcher, *bounds)
+
+    monkeypatch.setattr(module, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(SequenceMatcher, "find_longest_match", slow_search)
+    # The deadline (half a second) allows two searches, which find "1111" and "333", but not the third for "22".
+    assert compare(left, right) == 14 / 22
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("compare,module", COMPARISONS, ids=["similarity", "poc_runtime"])
+def test_markup_and_twenty_thousand_characters_of_varied_text_are_compared_in_full(compare, module, monkeypatch):
+    monkeypatch.setattr(module, "monotonic", lambda: 0.0)  # no deadline: the result is what difflib itself computes
+    page = listing(2000)  # about 100,000 characters, nearly all of them repeated markup
+    pairs = [(page, listing(2000, {7, 1500})), (page, page[:50_000]), (varied_text(1, 20_000), varied_text(1, 14_000) + varied_text(2, 6_000))]
+    for left, right in pairs:
+        assert compare(left, right) == SequenceMatcher(None, left, right).ratio()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("compare", [similarity, poc_runtime._similarity], ids=["similarity", "poc_runtime"])
+def test_large_pages_of_varied_text_are_compared_on_their_first_characters(compare):
+    # difflib needs seconds for 100,000 characters like these, so one comparison reads about the first 30,000 of
+    # them: a change in that part is seen, a change after it is not (docs/ASSURANCE_CASE.md says so).
+    page = varied_text(1, 100_000)
+    assert compare(page, varied_text(2, 30_000) + page[30_000:]) < .5
+    assert compare(page, page[:70_000] + varied_text(2, 30_000)) > .98
 
 
 @pytest.mark.unit

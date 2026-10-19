@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from html import escape
 from html.parser import HTMLParser
+from time import monotonic
 from urllib.parse import parse_qs, parse_qsl, quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
 
 import requests
@@ -141,15 +142,27 @@ def _files(text):
 
 
 def _similarity(left, right):
-    # Same as similarity() in similarity.py, which a downloaded PoC does not have: difflib's ratio, on shorter
-    # prefixes when a hostile body of many different characters would make it take minutes.
+    # Same as similarity() in similarity.py, which a downloaded PoC does not have: difflib's ratio, on a shorter
+    # prefix when a hostile body of many different characters would make one search take minutes, and counting
+    # only the blocks found within half a second when a periodic body would make it search for thousands.
     counts = Counter(right)
     popular = len(right) // 100 + 1 if len(right) >= 200 else len(right)
     work = sum(counts[char] for char in left if counts[char] <= popular)
     if work > 500_000:
         keep = max(1000, int(len(left) * (500_000 / work) ** .5))
         left, right = left[:keep], right[:keep]
-    return SequenceMatcher(None, left, right).ratio()
+    matcher = SequenceMatcher(None, left, right)
+    ranges, matched, deadline = [(0, len(left), 0, len(right))], 0, monotonic() + .5
+    while ranges and monotonic() < deadline:
+        left_start, left_end, right_start, right_end = ranges.pop()
+        left_at, right_at, size = matcher.find_longest_match(left_start, left_end, right_start, right_end)
+        if size:
+            matched += size
+            if left_start < left_at and right_start < right_at:
+                ranges.append((left_start, left_at, right_start, right_at))
+            if left_at + size < left_end and right_at + size < right_end:
+                ranges.append((left_at + size, left_end, right_at + size, right_end))
+    return 2 * matched / (len(left) + len(right)) if left or right else 1.0
 
 
 def _normalized(response, row, plan):

@@ -4,20 +4,28 @@
 
 from collections import Counter
 from difflib import SequenceMatcher
+from time import monotonic
 
-# Rough number of character pairs difflib may visit (about a quarter of a second at most). The tens of kilobytes
-# of an ordinary page stay under it, because difflib ignores the characters that make up more than 1% of a text,
-# which in markup or prose is most of them.
+# Rough number of character pairs one search for the longest common block may visit (about a tenth of a second).
+# Markup, which is mostly a few characters repeated, and about 20,000 characters of varied text stay under it,
+# because difflib ignores the characters that make up more than 1% of a text. Longer varied text is compared on
+# its first characters.
 WORK_BUDGET = 500_000
+# Seconds after which the search for more common blocks stops, so a body that splits into thousands of small
+# blocks (a periodic one, for example) cannot keep the scan busy through one comparison.
+SECONDS = .5
 
 
 def similarity(left, right):
-    """difflib's ratio, on shorter prefixes when the two texts would take it far longer than a page needs.
+    """difflib's ratio, bounded in work and in time.
 
     A body of many different characters (for example 100 KB of random Unicode) leaves difflib nothing to
     ignore, so it compares every character of one text with each place the same character occurs in the other:
-    tens of seconds for one comparison, during which the scan cannot be stopped. Keep this in step with
-    `_similarity` in poc_runtime.py, which downloaded PoCs carry without this package.
+    tens of seconds for one search, during which the scan cannot be stopped. Texts that would take one search
+    more than WORK_BUDGET are cut to the prefix that fits it (a difference after that prefix is not seen). A
+    periodic body makes difflib repeat the search for thousands of small blocks, so the blocks are searched for
+    here, as SequenceMatcher.get_matching_blocks does, stopping after SECONDS and counting the blocks found so
+    far. Keep this in step with `_similarity` in poc_runtime.py, which downloaded PoCs carry without this package.
     """
     counts = Counter(right)
     popular = len(right) // 100 + 1 if len(right) >= 200 else len(right)
@@ -25,4 +33,15 @@ def similarity(left, right):
     if work > WORK_BUDGET:
         keep = max(1000, int(len(left) * (WORK_BUDGET / work) ** .5))
         left, right = left[:keep], right[:keep]
-    return SequenceMatcher(None, left, right).ratio()
+    matcher = SequenceMatcher(None, left, right)
+    ranges, matched, deadline = [(0, len(left), 0, len(right))], 0, monotonic() + SECONDS
+    while ranges and monotonic() < deadline:
+        left_start, left_end, right_start, right_end = ranges.pop()
+        left_at, right_at, size = matcher.find_longest_match(left_start, left_end, right_start, right_end)
+        if size:
+            matched += size
+            if left_start < left_at and right_start < right_at:
+                ranges.append((left_start, left_at, right_start, right_at))
+            if left_at + size < left_end and right_at + size < right_end:
+                ranges.append((left_at + size, left_end, right_at + size, right_end))
+    return 2 * matched / (len(left) + len(right)) if left or right else 1.0
