@@ -71,7 +71,12 @@ earlier, open an issue to discuss starting with step 3.
   (the existing code does so for settings, profiles, schedules and reports). Serve
   and declare HTML/JSON as UTF-8, and do not assume ASCII hostnames, banners or
   evidence. Treat target-supplied text as arbitrary bytes that may not be valid
-  UTF-8 and decode with a replacement strategy rather than crashing.
+  UTF-8 and decode with a replacement strategy rather than crashing. Scanned
+  text keeps every printable character of every script, but `printable` removes
+  its control, bidirectional and zero-width characters, including the zero-width
+  joiner and non-joiner that some scripts use for shaping, so that a target cannot
+  forge a line or reorder what the operator reads; the text shown can differ from
+  the bytes the host sent in that respect.
 - **Locale-independent behavior.** Do not depend on the system locale for
   parsing, sorting or comparison. Sort by stable keys (IP address, severity rank,
   timestamp), not by localized text. Do not use locale-dependent `strftime("%b")`

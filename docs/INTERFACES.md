@@ -73,6 +73,10 @@ version's sub-score keeps its own scale (0 to 3.9 for CVSS v3, up to 10.0 for v2
 differ from the scale of the version that supplies the severity. Vulnerability
 records are version-based candidates. Failures may raise scanner/database exceptions;
 callers must handle them and protect output paths and sensitive results.
+Text from the scanned host or the vulnerability source (service, product, version, OS and vendor
+names, hostnames, CVE identifiers, descriptions and severities) is one line without control, bidirectional
+or zero-width characters: a tab, a line feed and the Unicode line and paragraph separators become a space and
+every other such character is removed. The output of an NSE script (`script`) keeps its line feeds and nothing else.
 `save_to_file(filename="autopwn.json")` overwrites the selected file with JSON.
 
 The web-check module additionally exposes

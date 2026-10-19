@@ -48,10 +48,10 @@ whoever holds it controls every scan, profile, schedule and setting.
 | CLI and configuration | `autopwn_suite/cli.py` `StartScanning` and `main`, `autopwn_suite/utils.py` `cli` and `InitArgsConf` |
 | Synchronous library | `autopwn_suite/api.py:100`, `autopwn_suite/api.py:172` |
 | Dashboard, scheduler, browser | `autopwn_suite/web_ui.py` `_scheduler_loop` and `_build_app`, `autopwn_suite/web_auth.py` `install_auth`, `autopwn_suite/web_ui_static/app.js` `initDashboard` and `connectSSE` |
-| Native scanning and XML | `autopwn_suite/nmap_backend.py:139`, `autopwn_suite/nmap_progress.py:97` |
+| Native scanning and XML | `autopwn_suite/nmap_backend.py:155`, `autopwn_suite/nmap_progress.py:97` |
 | Web probes and recorded-evidence replay | `autopwn_suite/web/http.py` `bounded_request`, `autopwn_suite/web/poc_runtime.py` `verify_plan` |
-| Providers and database | `autopwn_suite/nist_search.py:116`, `autopwn_suite/vulnerability_db.py:58` |
-| Notifications, credential files and downloads | `autopwn_suite/report.py:37`, `autopwn_suite/credential_files.py` `read_credential_file`, `autopwn_suite/getexploits.py:126` |
+| Providers and database | `autopwn_suite/nist_search.py:124`, `autopwn_suite/vulnerability_db.py:59` |
+| Notifications, credential files and downloads | `autopwn_suite/report.py:37`, `autopwn_suite/credential_files.py` `read_credential_file`, `autopwn_suite/getexploits.py:130` |
 | Installed/service/container startup | `install.sh` (command link step), `autopwn_suite/daemon/daemon_installer.py` (`_root_controlled`, `CopyFiles`, `UninstallDaemon`), `Dockerfile` (`ENV`/`ENTRYPOINT`), `docker-compose.yml:6` |
 | CI and release | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:24`, `scripts/release_assets.py:97` |
 | Existing-release authenticity backfill | `.github/workflows/backfill-release-signatures.yml:27`, `scripts/release_assets.py:23`, `scripts/release_assets.py:60` |
@@ -232,10 +232,21 @@ validated again as a whole, so each stored record is inflated with a size limit
 records cannot add up to gigabytes of results) and type-checked when read, and a
 malformed or oversized one fails the lookup as incomplete instead of crashing the scan. Advertised feed hashes and feed bytes share the
 same provider HTTPS boundary, not an independent signature
-(`autopwn_suite/vulnerability_db.py:280`). Downloads save bytes without executing them.
+(`autopwn_suite/vulnerability_db.py:283`). Downloads save bytes without executing them.
 Replay validates a generated recorded-evidence plan; it does not accept arbitrary
 client-supplied code/plans. Those controls do not extend automatically to core web
 requests, browser rendering, SMTP or host storage.
+
+Text that a scanned host or a data provider controls is untrusted output as well as untrusted input: response
+headers and crawled links, Nmap banners, hostnames and script output, NVD and local-database records, Exploit-DB
+metadata. Since v2.7.0 it becomes one line without control, bidirectional or zero-width characters where it enters
+(`printable` in `autopwn_suite/web/findings.py`: the web finding, the web log line and coverage note, the Nmap XML
+parse, the NVD record and the local database's update time) and again where the CLI prints it (`console_safe` in
+`autopwn_suite/logger.py`, which also escapes Rich markup), so the console, the saved txt, svg and html reports, the
+webhook and email reports, the dashboard job log and the JSON a client reads carry the same text. Nmap script
+output keeps its newlines and nothing else. A target can therefore no longer forge a result line or drive the
+operator's terminal through this text; it can still write misleading words, and what a given terminal does with
+other Unicode characters is not covered.
 
 Security objectives are: preserve data/code separation; prevent unsolicited
 credential disclosure and target-to-host/browser authority gains; restrict
