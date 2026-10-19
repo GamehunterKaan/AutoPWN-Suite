@@ -1185,7 +1185,7 @@ async function saveProfile(){
   const url=pid?`/api/profiles/${pid}`:'/api/profiles';
   const method=pid?'PUT':'POST';
   const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(r.ok){ hideProfileForm(); await loadProfilesFromServer(); toast('Profile saved.'); }
+  if(r.ok){ hideProfileForm(); await loadProfilesFromServer(); if(pid) await loadSchedulesFromServer(); toast('Profile saved.'); }
   else{ const d=await r.json(); toast(d.error||'Failed.',false); }
 }
 async function deleteProfile(pid){

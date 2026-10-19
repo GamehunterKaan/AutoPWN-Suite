@@ -756,6 +756,29 @@ assert.equal(refreshed.join(','),'profiles,schedules');
 """)
 
 
+def test_profile_edit_refreshes_the_schedules_it_disabled():
+    run_js("""
+const refreshed=[];
+loadProfilesFromServer=async()=>refreshed.push('profiles');
+loadSchedulesFromServer=async()=>refreshed.push('schedules');
+toast=()=>{};
+document.getElementById('pf-name').value='Web only';
+fetch=async()=>({ok:true});
+document.getElementById('pf-id').value='saved';
+await saveProfile();  // the server turns off the schedules an edited profile no longer fits
+assert.equal(refreshed.join(','),'profiles,schedules');
+refreshed.length=0;
+document.getElementById('pf-id').value='';
+await saveProfile();  // a new profile has no schedules yet
+assert.equal(refreshed.join(','),'profiles');
+refreshed.length=0;
+document.getElementById('pf-id').value='saved';
+fetch=async()=>({ok:false,json:async()=>({error:'Invalid scan configuration'})});
+await saveProfile();
+assert.equal(refreshed.length,0);
+""")
+
+
 def test_host_json_preserves_tcp_udp_separation():
     run_js("""
 hosts={ip:{ip:'ip',ports:[{port:53,protocol:'tcp'},{port:53,protocol:'udp'}],
