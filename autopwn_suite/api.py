@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 import logging
+import shlex
 from json import dumps
 from typing import Any, Dict, List, Type, Union
 
@@ -64,13 +65,14 @@ class AutoScanner:
         elif os_scan:
             raise Exception("Root privileges are required for os scan.")
 
+        # The scanner splits this string again with shlex; quoting keeps a list item such as "a b" or
+        # "C:\Program Files" one argument instead of turning its parts into extra arguments or targets.
         if isinstance(nmap_args, list):
-            for arg in nmap_args:
-                scan_args.append(arg)
+            scan_args.extend(nmap_args)
         elif isinstance(nmap_args, str):
-            scan_args.append(nmap_args)
+            scan_args.extend(shlex.split(nmap_args))
 
-        scan_arguments = " ".join(scan_args)
+        scan_arguments = shlex.join(scan_args)
 
         return scan_arguments
 

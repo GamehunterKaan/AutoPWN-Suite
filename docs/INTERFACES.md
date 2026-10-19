@@ -57,7 +57,9 @@ scanner.save_to_file("scan.json")
 `AutoScanner.scan(target, host_timeout=None, scan_speed=None, apiKey=None,
 os_scan=False, scan_vulns=True, nmap_args=None, debug=False, *, offline=False,
 vulnerability_source="auto", vuln_db=None)` is synchronous. `target` is a string
-or list of target strings; `nmap_args` is operator-selected Nmap arguments.
+or list of target strings; `nmap_args` is operator-selected Nmap arguments, either a string split
+like a POSIX shell line or a list whose items each stay one argument (pass a list for a value with spaces or
+a Windows path).
 It returns a mapping keyed by resolved host addresses. Each host contains `ports`
 (TCP port mapping), optional `udp_ports`, optional OS data and `vulns` grouped
 by product/CVE. A host that hit `host_timeout` also has `timedout: True` (the key

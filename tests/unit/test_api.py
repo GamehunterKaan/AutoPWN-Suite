@@ -4,11 +4,13 @@
 Unit tests for the api.py module.
 """
 import json
+import shlex
 from unittest.mock import ANY, MagicMock, mock_open, patch
 
 import pytest
 
 from autopwn_suite.api import AutoScanner, GenerateKeyword
+from autopwn_suite.nmap_progress import _tokens
 
 
 @pytest.mark.unit
@@ -28,6 +30,20 @@ class TestAutoScanner:
         assert "-T 4" in args
         assert "-O" not in args  # os_scan is False
         assert "-sC" in args
+
+    @pytest.mark.parametrize("nmap_args", [
+        ["--script-args", "user=a b"],
+        ["--datadir", r"C:\Program Files\Nmap"],
+        ["--script=http-*", "-p", "80,443"],
+        ["--script-args", "a='b'"],
+        "-sC -p 1-1000",
+    ])
+    def test_nmap_arguments_reach_nmap_as_the_caller_wrote_them(self, scanner, nmap_args):
+        """The arguments are joined into a string that the scanner splits again; a list item with a space or a
+        backslash must come out as the same single argument, not as extra arguments or targets."""
+        expected = shlex.split(nmap_args) if isinstance(nmap_args, str) else nmap_args
+        arguments = scanner.CreateScanArgs(None, None, False, nmap_args)
+        assert _tokens(arguments) == ["-sV", *expected]
 
     def test_create_scan_args_invalid_speed(self, scanner):
         """Verify that an invalid scan speed raises an exception."""
