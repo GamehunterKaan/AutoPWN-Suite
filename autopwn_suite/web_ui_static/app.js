@@ -545,6 +545,7 @@ async function startScan(){
     addTermFilterOption(d.scan_id, target);
     if(body.scan_web && body.scan_ports === false) switchTab('web', document.getElementById('web-tab-button'));
     else switchTab('scans', document.querySelector('.tab'));
+    poll();
   }catch(e){ reportUnreachable(e); }
   finally{ startingScan = false; document.getElementById('start-scan').disabled = false; }
 }
@@ -594,11 +595,22 @@ function connectSSE(){
     if(d.level==='__scan_done__'){ poll(); window.webSecurity?.refresh(); return; }
     if(d.level==='__web_finding__'){ window.webSecurity?.refresh(); return; }
     addLog(d.scan_id, d.msg, d.level, d.ts);
-    if(d.msg && d.msg.includes('Scheduled scan fired')) loadSchedulesFromServer();
+    if(d.msg && d.msg.includes('Scheduled scan fired')){ loadSchedulesFromServer(); poll(); }
   };
 }
 
 // ── Poll ───────────────────────────────────────────────────────────────────────
+// Every poll downloads all scans and every host with its CVEs. Progress and completion arrive over the event
+// stream, so polling is quick (1.5 s) only while a scan is active, slow (10 s) otherwise, and skipped while
+// the tab is hidden. A scan this page starts, or a schedule that fires, is fetched at once (see startScan and
+// connectSSE), and a tab that becomes visible polls immediately.
+function pollDelay(){
+  return Object.values(scans).some(j=>j.status==='running'||j.status==='stopping') ? 1500 : 10000;
+}
+function schedulePoll(){
+  pollT = setTimeout(async()=>{ if(!document.hidden) await poll(); schedulePoll(); }, pollDelay());
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) poll(); });
 async function poll(){
   if(pollBusy) return;
   pollBusy = true;
@@ -1301,6 +1313,6 @@ async function initDashboard(){
 (async()=>{
   await initDashboard();
   connectSSE();
-  pollT=setInterval(poll,1500);
+  schedulePoll();
   setInterval(()=>loadDatabaseStatus().catch(()=>{}), 5000);
 })();

@@ -20,6 +20,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const nodes = new Map();
+const listeners = {};  // what the script registered with document.addEventListener, by event type
 function node() {
   return {value:'', checked:false, innerHTML:'', textContent:'', style:{}, dataset:{}, children:[],
     classList:{add(){}, remove(){}, toggle(){}}, addEventListener(){}, querySelectorAll(){return []},
@@ -27,8 +28,8 @@ function node() {
 }
 const document = {getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)},
   createElement(){return node()}, querySelectorAll(){return []}, querySelector(){return node()},
-  addEventListener(){}, body:node()};
-const context = vm.createContext({assert, nodes, document, window:{location:{origin:'http://localhost'}},
+  addEventListener(type, handler){(listeners[type] ||= []).push(handler)}, body:node()};
+const context = vm.createContext({assert, nodes, listeners, document, window:{location:{origin:'http://localhost'}},
   setTimeout(){}, clearTimeout(){}, Blob, URL, console});
 const source = fs.readFileSync(process.argv[1], 'utf8');
 vm.runInContext(source.slice(0, source.lastIndexOf('\n(async()=>{')), context);
@@ -249,7 +250,7 @@ def test_double_click_on_start_scan_sends_one_request_and_the_button_recovers():
     run_js("""
 document.getElementById('f-target').value='192.0.2.1';
 let requests=0, answer;
-fetch=()=>{requests++;return new Promise(resolve=>{answer=resolve})};
+fetch=url=>{if(url==='/api/scan/start'){requests++;return new Promise(resolve=>{answer=resolve})}return Promise.resolve({ok:true,json:async()=>[]})};
 const button=document.getElementById('start-scan');
 const first=startScan();
 const second=startScan();
@@ -439,6 +440,61 @@ assert.equal(pollBusy,false);
 fetch=async()=>({ok:true,json:async()=>[]});
 await poll();
 assert.equal(Object.keys(hosts).length,0);
+""")
+
+
+def test_polling_is_quick_only_while_a_scan_is_active():
+    run_js("""
+assert.equal(pollDelay(),10000);
+scans={a:{status:'completed'},b:{status:'error'}};
+assert.equal(pollDelay(),10000);
+scans={a:{status:'completed'},b:{status:'stopping'}};
+assert.equal(pollDelay(),1500);
+scans={b:{status:'running'}};
+assert.equal(pollDelay(),1500);
+""")
+
+
+def test_hidden_tab_skips_its_polls_and_polls_at_once_when_shown_again():
+    run_js("""
+renderScans=renderHosts=renderVulnTable=updateBadges=()=>{};
+const timers=[];
+setTimeout=(callback,delay)=>{timers.push([callback,delay]);return timers.length};
+let requests=0;
+fetch=async()=>{requests++;return {ok:true,json:async()=>[]}};
+document.hidden=true;
+schedulePoll();
+assert.equal(timers.at(-1)[1],10000);
+await timers.at(-1)[0]();
+assert.equal(requests,0);
+assert.equal(timers.length,2);                 // it keeps scheduling while hidden
+document.hidden=false;
+await timers.at(-1)[0]();
+assert.equal(requests,2);                      // /api/scans and /api/hosts
+assert.equal(timers.length,3);
+requests=0;
+listeners.visibilitychange.forEach(handler=>handler());
+assert.equal(requests,2);
+document.hidden=true; requests=0;
+listeners.visibilitychange.forEach(handler=>handler());
+assert.equal(requests,0);
+""")
+
+
+def test_a_started_or_scheduled_scan_shows_up_without_waiting_for_the_idle_poll():
+    run_js(EVENT_SOURCE_SCRIPT + """
+renderScans=renderHosts=renderVulnTable=updateBadges=()=>{};
+const requested=[];
+fetch=async url=>{requested.push(url);return {ok:true,json:async()=>url==='/api/scan/start'?{scan_id:'0123456789abcdef'}:[]}};
+document.getElementById('f-target').value='192.0.2.1';
+await startScan();
+assert.ok(requested.includes('/api/scans'),requested.join());
+while(pollBusy) await Promise.resolve();
+requested.length=0;
+connectSSE();
+eventSource.onmessage(message(1,'[*] Scheduled scan fired: Nightly → 192.0.2.0/24'));
+assert.ok(requested.includes('/api/scans'),requested.join());
+assert.ok(requested.includes('/api/schedules'));
 """)
 
 
