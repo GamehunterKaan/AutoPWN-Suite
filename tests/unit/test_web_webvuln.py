@@ -1,10 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
+import io
+import logging
+import re
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlsplit
 
 import pytest
 from requests.exceptions import ConnectionError
+from rich.console import Console
+from rich.logging import RichHandler
 
 from autopwn_suite.web.crawler import link_finder
 from autopwn_suite.web.options import CHECKS
@@ -172,6 +177,31 @@ def test_crawl_failures_are_logged_with_fixed_text_not_the_exception():
     ("Unable to crawl http://user:pw@app.test/x: HTTP 500; coverage is incomplete.", "Unable to crawl http://app.test/x: HTTP 500; coverage is incomplete."),
     ("Two urls (http://a.test/?jwt=1) and http://b.test/?q=2", "Two urls (http://a.test/?jwt=REDACTED) and http://b.test/?q=2"),
     ("No reachable in-scope web endpoint on 127.0.0.1.", "No reachable in-scope web endpoint on 127.0.0.1."),
+    ("Unable to crawl http://a.test/x\x1b[2J\x1b]0;pwned\x07y?token=1: HTTP 500", "Unable to crawl http://a.test/x[2J]0;pwnedy?token=REDACTED: HTTP 500"),
+    ("one\ntwo\tthree\r\x85\x7f", "one\ntwo\tthree"),
 ])
 def test_redact_text_hides_query_secrets_in_every_url_of_a_message(message, expected):
     assert redact_text(message) == expected
+
+
+@pytest.mark.unit
+def test_terminal_control_characters_in_a_crawled_url_never_reach_the_console_or_the_issues(web_response):
+    page = web_response('<a href="/x\x1b[2J\x1b]0;pwned\x07y">link</a>', headers={"Content-Type": "text/html"})
+    output = io.StringIO()
+    sink = logging.getLogger("autopwn-test-terminal-escapes")
+    sink.handlers, sink.propagate = [RichHandler(console=Console(file=output, force_terminal=True, color_system=None, width=300))], False
+
+    class ConsoleLog:
+        def logger(self, level, message):
+            sink.warning(message)
+
+    def fetch(url, **kwargs):
+        return page if url == "http://example.com/" else web_response("", status=500, url=url)
+
+    summary = {}
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response()), patch("autopwn_suite.web.crawler.get", side_effect=fetch):
+        webvuln("http://example.com/", ConsoleLog(), MagicMock(), controls={"speed": 5, "checks": {name: name == "lfi" for name in CHECKS}}, on_complete=summary.update)
+    expected = "Unable to crawl http://example.com/x[2J]0;pwnedy: HTTP 500; coverage is incomplete."
+    assert expected in summary["issues"]
+    assert expected in output.getvalue()
+    assert not re.search(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]", output.getvalue() + str(summary["issues"]))

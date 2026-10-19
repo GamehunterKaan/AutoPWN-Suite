@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from autopwn_suite.nmap_progress import ScanCancelled
+from autopwn_suite.web.findings import printable
 from autopwn_suite.web.options import CHECKS as CHECKS
 from autopwn_suite.web.options import TYPE_CHECK, normalize_options
 
@@ -54,11 +55,12 @@ def redact_url(url):
 
 
 def redact_text(message):
-    """Redact every URL in a log line or coverage issue, which reach the console, exports and saved reports."""
+    """Redact every URL in a log line or coverage issue, which reach the console, exports and saved reports,
+    and drop the control characters a crawled URL can carry (see `printable`)."""
     def redact(match):
         url = match[0].rstrip(".,;:)")
         return redact_url(url) + match[0][len(url):]
-    return re.sub(r"https?://[^\s<>\"']+", redact, str(message))
+    return re.sub(r"https?://[^\s<>\"']+", redact, printable(str(message)))
 
 
 def public_request(method, url, headers=None, role="probe"):
