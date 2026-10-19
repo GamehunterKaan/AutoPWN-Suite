@@ -227,3 +227,28 @@ def test_links_the_crawl_never_follows_do_not_use_up_the_stored_list():
         with ScanContext(root, MagicMock(), checkpoint=state).activate():
             assert crawl(root, MagicMock(), max_pages=1, max_urls=5) == {root, *pages}
     assert state["crawl"][root] == pages
+
+
+@pytest.mark.unit
+def test_a_budget_limited_crawl_picks_the_same_urls_as_before_the_list_was_bounded_and_so_does_its_resume():
+    root = "http://example.com/"
+    # Prioritized as a whole, the links come in the order delete (never followed), m, zeta, zulu: the crawl takes m.
+    # Dropping the link it never follows before prioritizing would put zeta first.
+    links = {f"{root}p?page=delete", f"{root}p?page=zeta", f"{root}p?page=zulu", f"{root}q?page=m"}
+    state = {}
+    with patch("autopwn_suite.web.crawler.link_finder", return_value=set(links)):
+        for _ in range(2):  # the second crawl reads the stored list of the root page
+            with ScanContext(root, MagicMock(), checkpoint=state).activate():
+                assert crawl(root, MagicMock(), max_pages=1, max_urls=2) == {root, f"{root}q?page=m"}
+
+
+@pytest.mark.unit
+def test_links_to_other_origins_do_not_use_up_the_stored_list():
+    root = "http://example.com/"
+    # They sort before the one link the crawl can follow, and a page can offer more of them than the list holds.
+    links = {f"http://a{i:05}.test/" for i in range(LIMITS["max_urls"][2] + 500)} | {root + "one"}
+    state = {}
+    with patch("autopwn_suite.web.crawler.link_finder", return_value=links):
+        with ScanContext(root, MagicMock(), checkpoint=state).activate():
+            assert crawl(root, MagicMock(), max_pages=1, max_urls=5) == {root, root + "one"}
+    assert state["crawl"][root] == [root + "one"]

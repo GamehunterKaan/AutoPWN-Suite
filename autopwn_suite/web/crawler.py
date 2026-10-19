@@ -3,6 +3,7 @@
 """Discover same-origin links and GET forms within configured crawl limits."""
 
 from collections import deque
+from itertools import islice
 from urllib.parse import urldefrag, urlencode, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
@@ -47,13 +48,17 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
             links = link_finder(page, log)
             fetched += 1
             if not current or current.problem_revision == revision:
-                # Keep what this page can still add to the crawl: its links in crawl order, up to one past the
-                # largest URL budget a scan can have (a resume with raised limits reads this list again, and the
-                # extra link tells the crawl its budget ran out). A hostile page with 55,000 links would otherwise
-                # leave about 11 MB in the job's checkpoint for every page it serves.
-                links = graph[page] = prioritize_urls(url for url in links if not skip_discovered_url(url))[:LIMITS["max_urls"][2] + 1]
+                # Keep what this page can still add to the crawl: the links the crawl can follow, in the order it
+                # follows them, up to one past the largest URL budget a scan can have (at most that many URLs are
+                # known when the page is read, so one of them is always new, and the extra one tells the crawl its
+                # budget ran out). The crawl and a resume with raised limits read this list as it is. A hostile
+                # page with 55,000 links would otherwise leave about 11 MB in the job's checkpoint for every page.
+                followable = (url for url in prioritize_urls(links) if same_origin(target_url, url) and not skip_discovered_url(url))
+                links = graph[page] = list(islice(followable, LIMITS["max_urls"][2] + 1))
+            else:
+                links = prioritize_urls(links)
         discovered = set()
-        for url in prioritize_urls(links):
+        for url in links:
             if not same_origin(target_url, url) or url in urls or skip_discovered_url(url):
                 continue
             if depth >= max_depth:
