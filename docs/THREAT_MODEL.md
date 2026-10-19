@@ -169,7 +169,8 @@ Uninstalling (`uninstall.sh`, `pip uninstall`, deleting a binary) never removes 
 data directory, which holds the administrator hash and plaintext integration settings; delete it
 explicitly. Importing the CLI imports web_ui and creates its effective data directory (owner-only
 where the platform supports it) before
-argument parsing; dashboard startup loads the JSON files later
+argument parsing, unless it cannot (an unwritable `HOME` does not stop `--version` or `--help`; the
+dashboard then fails when it first writes there); dashboard startup loads the JSON files later
 (the imports in `autopwn_suite/cli.py`, `_DATA_DIR` in `autopwn_suite/web_ui.py`, `start_server`).
 The administrator account file is created, and its random first password printed
 once, when the dashboard application is built (`install_auth`), before the

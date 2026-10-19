@@ -48,6 +48,24 @@ def test_windows_default_is_local_app_data(monkeypatch, tmp_path):
     assert paths.default_data_dir() == tmp_path / "AppData" / "Local" / "autopwn-suite"
 
 
+def test_importing_the_dashboard_does_not_need_a_writable_data_directory(monkeypatch, tmp_path):
+    """--version and --help import the dashboard; an unwritable HOME or AUTOPWN_DATA_DIR must not break them."""
+    import importlib
+
+    import autopwn_suite.web_ui as web_ui
+
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file where a directory is needed", encoding="utf-8")
+    monkeypatch.setenv("AUTOPWN_DATA_DIR", str(blocker / "state"))
+    try:
+        importlib.reload(web_ui)
+        assert web_ui._DATA_DIR == blocker / "state"
+        assert not (blocker / "state").exists()
+    finally:
+        monkeypatch.undo()
+        importlib.reload(web_ui)
+
+
 def test_dashboard_creates_the_configured_data_directory(monkeypatch, tmp_path):
     import importlib
 

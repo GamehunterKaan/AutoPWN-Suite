@@ -160,7 +160,12 @@ def _validate_job_target(target, config):
 _MODULE_DIR  = Path(__file__).parent
 _STATIC_DIR  = _MODULE_DIR / "web_ui_static"
 _DATA_DIR    = data_dir()
-_DATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+try:
+    _DATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+except OSError:
+    # Importing the CLI must not need a writable data directory (--version, --help); the dashboard fails when it
+    # first writes there.
+    pass
 _SETTINGS_FILE = _DATA_DIR / "web_ui_settings.json"
 _OFFLINE_ONLY = False
 _mode_lock = threading.RLock()
