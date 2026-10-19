@@ -7,7 +7,7 @@ try:
 except ImportError:
     from ctypes import windll
 import os
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentTypeError
 from configparser import ConfigParser
 from configparser import Error as ConfigError
 from datetime import datetime
@@ -44,6 +44,16 @@ DontAskForConfirmation = False
 class ScanType(Enum):
     Ping = 0
     ARP = 1
+
+
+def _port(value) -> int:
+    try:
+        port = int(value)
+    except ValueError:
+        port = 0
+    if not 1 <= port <= 65535:
+        raise ArgumentTypeError(f"invalid port {value!r} (--web-port or AUTOPWN_WEB_PORT): use a number from 1 to 65535")
+    return port
 
 
 def cli():
@@ -344,8 +354,8 @@ def cli():
     webuiargs.add_argument(
         "--web-port",
         help="Web UI port. (Default: 8080, env: AUTOPWN_WEB_PORT)",
-        default=int(os.environ.get("AUTOPWN_WEB_PORT", "8080")),
-        type=int,
+        default=os.environ.get("AUTOPWN_WEB_PORT", "8080"),
+        type=_port,
         required=False,
         metavar="PORT",
     )

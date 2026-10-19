@@ -194,7 +194,8 @@ Schedules use the selected profile when firing and must satisfy offline policy.
 
 ## Files, configuration and integrations
 
-- Environment: `AUTOPWN_WEB_HOST` (default `127.0.0.1`), `AUTOPWN_WEB_PORT`,
+- Environment: `AUTOPWN_WEB_HOST` (default `127.0.0.1`), `AUTOPWN_WEB_PORT` (default 8080;
+  like `--web-port`, a number from 1 to 65535, otherwise the command exits with a usage error),
   `AUTOPWN_DATA_DIR`, and (since v2.6.1) `AUTOPWN_WEB_SECURE_COOKIE=1` for a
   TLS-terminating proxy plus `AUTOPWN_NIST_API_KEY_FILE`,
   `AUTOPWN_SMTP_PASSWORD_FILE` and `AUTOPWN_WEBHOOK_URL_FILE`, each naming a

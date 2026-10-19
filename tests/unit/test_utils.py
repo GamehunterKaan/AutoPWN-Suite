@@ -170,6 +170,43 @@ class TestSaveOutput:
 
 
 @pytest.mark.unit
+class TestWebPortOption:
+    """--web-port and AUTOPWN_WEB_PORT are validated, not allowed to crash the parser."""
+
+    def parse(self, monkeypatch, *argv, env=None):
+        from autopwn_suite.utils import cli
+        if env is None:
+            monkeypatch.delenv("AUTOPWN_WEB_PORT", raising=False)
+        else:
+            monkeypatch.setenv("AUTOPWN_WEB_PORT", env)
+        with patch("sys.argv", ["autopwn.py", *argv]):
+            return cli()
+
+    def test_default_is_8080(self, monkeypatch):
+        assert self.parse(monkeypatch).web_port == 8080
+
+    def test_environment_and_option_set_the_port(self, monkeypatch):
+        assert self.parse(monkeypatch, env="9090").web_port == 9090
+        assert self.parse(monkeypatch, "--web-port", "9191", env="9090").web_port == 9191
+
+    @pytest.mark.parametrize("value", ["abc", "", "0", "-1", "65536", "99999", "80.5"])
+    def test_malformed_or_out_of_range_environment_port_is_a_usage_error(self, monkeypatch, capsys, value):
+        with pytest.raises(SystemExit) as exit_:
+            self.parse(monkeypatch, env=value)
+        assert exit_.value.code == 2
+        assert "AUTOPWN_WEB_PORT" in capsys.readouterr().err
+
+    @pytest.mark.parametrize("value", ["abc", "0", "-5", "65536", "99999"])
+    def test_malformed_or_out_of_range_option_port_is_a_usage_error(self, monkeypatch, value):
+        with pytest.raises(SystemExit) as exit_:
+            self.parse(monkeypatch, "--web-port", value)
+        assert exit_.value.code == 2
+
+    def test_a_bad_environment_value_does_not_override_a_good_option(self, monkeypatch):
+        assert self.parse(monkeypatch, "--web-port", "8081", env="abc").web_port == 8081
+
+
+@pytest.mark.unit
 class TestInitArgsConf:
     """Tests for the InitArgsConf function."""
 
