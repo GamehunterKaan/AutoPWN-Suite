@@ -22,6 +22,7 @@ from sys import platform as sys_platform
 from requests import get
 from rich.text import Text
 
+from modules import update_checker
 from modules.credential_files import (
     NIST_API_KEY,
     SMTP_PASSWORD,
@@ -112,6 +113,18 @@ def cli():
                              help="Download/update the complete NVD database, then exit. Requires internet.")
     databaseargs.add_argument("--vuln-db-status", action="store_true",
                              help="Show local vulnerability database status, then exit.")
+    updateargs = argparser.add_argument_group("Self-update", "Check for a newer AutoPWN Suite")
+    updateargs.add_argument("--check-update", action="store_true",
+                           help="Check GitHub for a newer AutoPWN Suite, then exit. Requires internet.")
+    updateargs.add_argument("--update-channel", dest="update_channel", default="release",
+                           choices=["release", "commit"],
+                           help="Compare against the latest GitHub release tag or the latest "
+                                "commit on --update-branch (default: release).")
+    updateargs.add_argument("--update-branch", dest="update_branch", default="main", metavar="BRANCH",
+                           help="Branch to compare against in commit mode. (Default: main)")
+    updateargs.add_argument("--update-repo", dest="update_repo", default=None, metavar="OWNER/REPO",
+                           help="GitHub repo to check for updates. (Default: "
+                                f"{update_checker.DEFAULT_REPO})")
     scanargs.add_argument(
         "-t",
         "--target",

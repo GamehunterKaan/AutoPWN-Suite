@@ -357,6 +357,21 @@ packages from a connected machine. The dashboard uses local assets and system fo
 The default `--vuln-source auto` tries online NVD lookups and falls back to a ready local database
 if NVD is unavailable, staying local for the rest of that scan. `--vuln-source online` requires
 online lookups. Use `--offline` (or `--vuln-source offline`) to avoid trying NVD at all.
+
+## Checking for updates
+
+```bash
+python autopwn.py --check-update
+python autopwn.py --check-update --update-channel commit --update-branch main
+```
+
+`--check-update` asks GitHub for a newer AutoPWN Suite, prints the result, then exits; it never
+runs automatically during a scan. By default it compares the running version against the repo's
+latest GitHub release tag (`--update-channel release`, the default). Pass
+`--update-channel commit` to instead compare the local git `HEAD` against the latest commit on
+`--update-branch` (default `main`) — this requires running from a git checkout. Use
+`--update-repo OWNER/REPO` (or the `AUTOPWN_UPDATE_REPO` environment variable) to point the check
+at a different fork. Requires internet access.
 Missing or invalid local data fails explicitly rather than reporting a clean vulnerability scan.
 Stored data remains usable without an expiry; its update time is shown in scan logs and dashboard
 results. Offline matching uses description keyword prefixes, with all query terms required,

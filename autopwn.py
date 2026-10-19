@@ -13,6 +13,7 @@ from modules.nist_search import VulnerabilityLookup
 from modules.report import InitializeReport
 from modules.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, ResolveScanHosts
 from modules.searchvuln import SearchSploits
+from modules.update_checker import UpdateCheckError, check_for_updates, format_status
 from modules.utils import (
     CheckConnection as CheckConnection,
 )
@@ -120,6 +121,19 @@ def main() -> None:
 
     if args.version:
         print(f"AutoPWN Suite v{__version__}")
+        raise SystemExit
+    elif getattr(args, "check_update", False) is True:
+        try:
+            status = check_for_updates(
+                __version__,
+                channel=args.update_channel,
+                branch=args.update_branch,
+                repo=args.update_repo,
+            )
+        except UpdateCheckError as exc:
+            log.logger("error", str(exc))
+            raise SystemExit(1) from exc
+        console.print(format_status(status))
         raise SystemExit
     elif args.daemon_install:
         InstallDaemon(console)
