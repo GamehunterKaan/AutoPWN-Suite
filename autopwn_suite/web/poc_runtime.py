@@ -52,7 +52,7 @@ def validate_plan(plan):
 
 
 # Same as SENSITIVE_PARAMETER in runtime.py, which a downloaded PoC does not have.
-_SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?-i:(?<![a-zA-Z])pass|Pass|PASS)(?![a-z])|pass(?:word|wd|phrase|code)"
+_SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?<!by)(?<!com)(?<!sur)(?<!tres)pass(?!age|enger|port|ive|ion|able|over)"
                                   r"|secret|token|api.?key|session|jwt|signature|csrf", re.I)
 
 

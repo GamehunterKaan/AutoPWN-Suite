@@ -69,8 +69,10 @@ def test_invalid_or_redacted_plans_are_rejected_before_any_request(mutate):
 
 CREDENTIAL_NAMES = ["password", "passwd", "pass", "user_pass", "userPass", "passphrase", "secret", "client_secret", "token", "access_token",
                     "api_key", "apikey", "api-key", "auth", "auth_token", "authorization", "oauth", "authorize", "session", "sessionid",
-                    "jwt", "signature", "csrf", "csrf_token", "PASSWORD"]
-PLAIN_NAMES = ["author", "authors", "author_id", "authorId", "authored", "bypass", "compass", "passenger", "passage", "passport", "page", "id", "q"]
+                    "jwt", "signature", "csrf", "csrf_token", "PASSWORD", "userpass", "adminpass", "dbpass", "newpass", "oldpass",
+                    "confirmpass", "upass", "passkey", "passhash", "PassKey", "passw"]
+PLAIN_NAMES = ["author", "authors", "author_id", "authorId", "authored", "bypass", "bypassed", "compass", "encompass", "surpass", "trespass",
+               "passenger", "passage", "passport", "passive", "passion", "page", "id", "q"]
 
 
 @pytest.mark.unit

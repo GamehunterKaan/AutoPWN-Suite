@@ -38,9 +38,10 @@ def allowed(kind):
     return enabled(TYPE_CHECK.get(kind, "headers"))
 
 
-# Query parameters that hold a credential. A redacted value cannot be replayed, so words that only contain a keyword
-# are left alone: "author" (but not "authorization"), "bypass" or "passenger" (but "pass", "user_pass", "userPass").
-SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?-i:(?<![a-zA-Z])pass|Pass|PASS)(?![a-z])|pass(?:word|wd|phrase|code)"
+# Query parameters that hold a credential. A redacted value cannot be replayed, so a few ordinary words that contain
+# a keyword are left alone: "author" (but not "authorization") and "bypass" or "passenger" (but "pass", "userpass",
+# "newPass"). Every other name containing "pass" is redacted, because credential names are not words.
+SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?<!by)(?<!com)(?<!sur)(?<!tres)pass(?!age|enger|port|ive|ion|able|over)"
                                  r"|secret|token|api.?key|session|jwt|signature|csrf", re.I)
 
 
