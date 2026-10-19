@@ -6,8 +6,10 @@ import importlib
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
+import time
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,9 +21,9 @@ from autopwn_suite.web_auth import (
     ACCOUNT_FILE,
     COOKIE,
     LOGIN_COOKIE,
-    PENDING_CHALLENGES_PER_ADDRESS,
     AccountStore,
     AccountUnavailable,
+    DashboardAuth,
     password_matches,
 )
 
@@ -228,8 +230,7 @@ def test_expired_session_and_forged_cookie_fail_closed(dashboard_login):
     d = dashboard_login
     client, _ = logged_in(d)
     for key, entry in list(d.auth.sessions.items()):
-        if entry.authenticated:
-            d.auth.sessions[key] = replace(entry, expires=0)
+        d.auth.sessions[key] = replace(entry, expires=0)
     assert client.get("/api/settings").status_code == 401
     client.set_cookie(COOKIE, "forged-session-token-" * 3)
     assert client.get("/api/settings").status_code == 401
@@ -361,17 +362,172 @@ def test_login_throttling_cannot_be_bypassed_by_new_challenges(dashboard_login):
     assert sign_in(d.app.test_client(), d.password, environ_overrides={"REMOTE_ADDR": "127.0.0.2"}).status_code == 200
 
 
-def test_cookieless_challenge_flood_cannot_evict_another_clients_pending_sign_in(dashboard_login):
+SIGN_IN_EXPIRED = {"error": "Sign-in expired. Refresh the page and retry."}
+
+
+def present(client, cookie, csrf, password, **where):
+    """Submit a sign-in with the given challenge cookie and CSRF token, as a client that holds just those."""
+    client.set_cookie(LOGIN_COOKIE, cookie)
+    return client.post("/api/auth/login", json={"username": "admin", "password": password},
+                       headers={"X-CSRF-Token": csrf}, **where)
+
+
+def start_sign_in(client, **where):
+    csrf = client.get("/api/auth/login", **where).json["csrf_token"]
+    return client.get_cookie(LOGIN_COOKIE).value, csrf
+
+
+@pytest.mark.parametrize("peers", ["one shared address", "a thousand addresses"])
+def test_a_flood_of_challenge_requests_never_invalidates_another_clients_pending_sign_in(dashboard_login, peers):
     d = dashboard_login
+
+    def address(number):  # loopback, so the flood passes the HTTPS rule without a proxy
+        return "127.0.0.1" if peers == "one shared address" else f"127.0.{number // 250}.{number % 250 + 1}"
+
     operator = d.app.test_client()
-    challenge = operator.get("/api/auth/login").json["csrf_token"]
-    for _ in range(200):  # far beyond the 128 pending challenges the server keeps
-        d.app.test_client().get("/api/auth/login", environ_overrides={"REMOTE_ADDR": "127.0.0.2"})
-    pending = [entry for entry in d.auth.sessions.values() if not entry.authenticated and entry.address == "127.0.0.2"]
-    assert len(pending) == PENDING_CHALLENGES_PER_ADDRESS
+    operator_csrf = start_sign_in(operator)[1]  # the cookie stays in the operator's jar, as in a browser
+    oldest_cookie, oldest_csrf = start_sign_in(d.app.test_client(), environ_overrides={"REMOTE_ADDR": address(0)})
+    for number in range(1000):
+        d.app.test_client().get("/api/auth/login", environ_overrides={"REMOTE_ADDR": address(number)})
+    # Nothing was evicted: not the operator's challenge and not even the oldest one the flood overtook.
     response = operator.post("/api/auth/login", json={"username": "admin", "password": d.password},
-                             headers={"X-CSRF-Token": challenge})
+                             headers={"X-CSRF-Token": operator_csrf})
     assert response.status_code == 200
+    assert present(d.app.test_client(), oldest_cookie, oldest_csrf, d.password,
+                   environ_overrides={"REMOTE_ADDR": address(0)}).status_code == 200
+
+
+def test_issuing_challenges_keeps_no_server_side_state(dashboard_login):
+    d = dashboard_login
+
+    def sizes():
+        # Every collection the object holds, so a new store for challenges could not hide from this check.
+        return {name: len(value) for name, value in vars(d.auth).items() if isinstance(value, (dict, list, set, tuple))}
+
+    assert {"sessions", "failures"} <= sizes().keys()
+    before = sizes()
+    client = d.app.test_client()
+    for number in range(1000):
+        client.get("/api/auth/login", environ_overrides={"REMOTE_ADDR": f"127.0.{number // 250}.{number % 250 + 1}"})
+    assert sizes() == before == {"sessions": 0, "failures": 0}
+
+
+def test_challenge_is_valid_only_for_the_process_token_and_account_it_was_issued_for(dashboard_login):
+    auth = dashboard_login.auth
+    revision = auth.store.load()["revision"]
+    cookie, csrf = auth.new_challenge(revision)
+    assert auth.challenge_valid(cookie, csrf, revision)
+    assert not auth.challenge_valid(cookie, csrf, "0" * 32)  # another account revision
+    assert not auth.challenge_valid(cookie, auth.new_challenge(revision)[1], revision)  # another challenge's token
+    assert not DashboardAuth(auth.store).challenge_valid(cookie, csrf, revision)  # another process has another key
+    for junk in (None, 5, b"x", [], {}, ""):
+        assert not auth.challenge_valid(junk, csrf, revision) and not auth.challenge_valid(cookie, junk, revision)
+
+
+def restart(d, cookie, csrf):
+    d.auth.challenge_key = secrets.token_bytes(32)  # what a new process has: another random key
+    return cookie, csrf
+
+
+TAMPERED_CHALLENGES = {
+    "longer lifetime": lambda d, cookie, csrf: (str(int(cookie.split(".")[0]) + 10 ** 6) + "." + cookie.split(".")[1], csrf),
+    "one character of the signature changed": lambda d, cookie, csrf: (cookie[:-1] + ("A" if cookie[-1] != "A" else "B"), csrf),
+    "signature cut short": lambda d, cookie, csrf: (cookie[:-1], csrf),
+    "signature removed": lambda d, cookie, csrf: (cookie.split(".")[0] + ".", csrf),
+    "text added": lambda d, cookie, csrf: (cookie + "A", csrf),
+    "extra part": lambda d, cookie, csrf: (cookie + ".x", csrf),
+    "empty": lambda d, cookie, csrf: ("", csrf),
+    "token shaped like a session": lambda d, cookie, csrf: ("forged-session-token-" * 3, csrf),
+    "well formed and signed by nobody": lambda d, cookie, csrf: (f"{int(time.time()) + 300}.{'A' * 43}", csrf),
+    "issued by another dashboard process": lambda d, cookie, csrf: start_sign_in(d.wu._build_app(d.wu._STATIC_DIR).test_client()),
+    "issued before a restart": restart,
+}
+
+
+@pytest.mark.parametrize("name", TAMPERED_CHALLENGES)
+def test_tampered_forged_foreign_and_restarted_challenges_answer_403(dashboard_login, name):
+    d = dashboard_login
+    cookie, csrf = start_sign_in(d.app.test_client())
+    client = d.app.test_client()
+    response = present(client, *TAMPERED_CHALLENGES[name](d, cookie, csrf), d.password)
+    assert response.status_code == 403 and response.json == SIGN_IN_EXPIRED
+    assert client.get_cookie(COOKIE) is None and not d.auth.sessions
+    assert not d.auth.failures  # a refused challenge never reaches the credentials, so it is not a failed sign-in
+
+
+def test_a_restart_ends_open_challenges_and_a_fresh_one_works(dashboard_login):
+    d = dashboard_login
+    cookie, csrf = start_sign_in(d.app.test_client())
+    restarted = d.wu._build_app(d.wu._STATIC_DIR)
+    assert present(restarted.test_client(), cookie, csrf, d.password).status_code == 403
+    assert sign_in(restarted.test_client(), d.password).status_code == 200
+
+
+def test_a_challenge_lasts_five_minutes(dashboard_login):
+    d = dashboard_login
+    for elapsed, expected in ((0, 200), (290, 200), (301, 403), (86400, 403)):
+        cookie, csrf = start_sign_in(d.app.test_client())
+        with patch("autopwn_suite.web_auth.time.time", return_value=time.time() + elapsed):
+            response = present(d.app.test_client(), cookie, csrf, d.password)
+        assert response.status_code == expected, elapsed
+        if expected == 403:
+            assert response.json == SIGN_IN_EXPIRED
+
+
+def test_challenge_cookie_alone_is_not_enough_the_csrf_token_must_match(dashboard_login):
+    d = dashboard_login
+    client = d.app.test_client()
+    cookie, csrf = start_sign_in(client)
+    other = start_sign_in(d.app.test_client())[1]  # a valid token of another client's challenge
+    credentials = {"username": "admin", "password": d.password}
+    for header in ({}, {"X-CSRF-Token": ""}, {"X-CSRF-Token": other}, {"X-CSRF-Token": csrf[:-1]}, {"X-CSRF-Token": csrf + "A"},
+                   {"X-CSRF-Token": csrf.swapcase()}, {"X-CSRF-Token": "é" * 43}):
+        response = client.post("/api/auth/login", json=credentials, headers=header)
+        assert response.status_code == 403 and response.json == SIGN_IN_EXPIRED, header
+    assert not d.auth.failures
+    assert client.post("/api/auth/login", json=credentials, headers={"X-CSRF-Token": csrf}).status_code == 200
+
+
+def test_changing_the_account_ends_the_pending_challenges(dashboard_login):
+    d = dashboard_login
+    cookie, csrf = start_sign_in(d.app.test_client())
+    d.auth.store.reset()  # what --web-reset-account does to the running dashboard's account
+    response = present(d.app.test_client(), cookie, csrf, d.password)
+    assert response.status_code == 403 and response.json == SIGN_IN_EXPIRED
+
+
+def test_a_replayed_challenge_only_permits_a_throttled_sign_in_attempt_and_never_reuses_a_session(dashboard_login):
+    # A challenge grants no authority: any client can fetch a new one. So the server does not record used
+    # challenges, which would need a store; a replayed pair can only try credentials, and the throttle counts those.
+    d = dashboard_login
+    client = d.app.test_client()
+    cookie, csrf = start_sign_in(client)
+    first = client.post("/api/auth/login", json={"username": "admin", "password": d.password}, headers={"X-CSRF-Token": csrf})
+    assert first.status_code == 200 and client.get_cookie(LOGIN_COOKIE) is None
+    first_session = client.get_cookie(COOKIE).value
+    replayer = d.app.test_client()
+    second = present(replayer, cookie, csrf, d.password)
+    assert second.status_code == 200
+    # The session is new and random each time (no fixation); it is not derived from the challenge.
+    assert len({first_session, replayer.get_cookie(COOKIE).value, cookie}) == 3
+    assert len({first.json["csrf_token"], second.json["csrf_token"], csrf}) == 3
+    assert replayer.get_cookie(LOGIN_COOKIE) is None  # the response clears the challenge cookie
+    for _ in range(5):
+        assert present(d.app.test_client(), cookie, csrf, "incorrect-password").status_code == 401
+    with patch("autopwn_suite.web_auth.password_matches") as verify:
+        assert present(d.app.test_client(), cookie, csrf, d.password).status_code == 429
+        verify.assert_not_called()
+
+
+def test_challenge_cookie_is_http_only_strict_and_reveals_neither_the_token_nor_the_account_revision(dashboard_login):
+    d = dashboard_login
+    response = d.app.test_client().get("/api/auth/login")
+    header = next(value for value in response.headers.getlist("Set-Cookie") if value.startswith(LOGIN_COOKIE + "="))
+    value, *attributes = [part.strip() for part in header.split(";")]
+    assert {"HttpOnly", "SameSite=Strict", "Path=/", "Max-Age=300"} <= set(attributes)
+    cookie = value.split("=", 1)[1]
+    assert response.json["csrf_token"] not in cookie and d.auth.store.load()["revision"] not in cookie
+    assert re.fullmatch(r"[0-9]{10}\.[A-Za-z0-9_-]{43}", cookie)
 
 
 def test_login_input_is_bounded_and_malformed_values_are_safe(dashboard_login):

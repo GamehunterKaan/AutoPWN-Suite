@@ -371,6 +371,21 @@ def test_login_and_account_endpoints_never_return_server_errors(web_ui):
             assert response.status_code in {401, 403, 404, 405, 429}
 
 
+def test_sign_in_challenge_check_never_raises_and_only_accepts_the_issued_cookie_and_token(web_ui):
+    auth = web_ui.app.extensions["dashboard_auth"]
+    revision = auth.store.load()["revision"]
+    cookie, csrf = auth.new_challenge(revision)
+    assert auth.challenge_valid(cookie, csrf, revision) is True
+    rng = random.Random(SEED + 9)
+    for _ in range(3000):
+        changed_cookie, changed_csrf = mutate(cookie, rng), mutate(csrf, rng)
+        assert auth.challenge_valid(changed_cookie, csrf, revision) is (changed_cookie == cookie)
+        assert auth.challenge_valid(cookie, changed_csrf, revision) is (changed_csrf == csrf)
+        for value in (random_value(rng), random_value(rng)):
+            assert auth.challenge_valid(value, csrf, revision) is False
+            assert auth.challenge_valid(cookie, value, revision) is False
+
+
 def test_text_a_target_controls_is_cleaned_and_compared_without_raising(monkeypatch):
     from difflib import SequenceMatcher
 

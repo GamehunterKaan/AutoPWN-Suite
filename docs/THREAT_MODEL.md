@@ -96,10 +96,17 @@ HTTPS (or the operator sets `AUTOPWN_WEB_SECURE_COOKIE=1` behind a
 TLS-terminating proxy); providing that HTTPS and network restriction remains an
 operator obligation. A request relayed by a reverse proxy on the same host
 arrives from a loopback address and is treated as local, and failed-login
-throttling and the cap of 16 pending sign-in challenges are keyed by that peer
-address, so restrict such a proxy's backend and exposure. Through such a proxy (or a
-Docker bridge) a flood of sign-in challenges is not isolated per client: it can evict the
-operator's pending sign-in, so rate-limit sign-in requests at the proxy. v2.6.0 has none of this. GitHub protection and provider credentials are
+throttling is keyed by that peer address, so restrict such a proxy's backend and
+exposure. A sign-in challenge is a signed cookie (HMAC-SHA256 with a random key that
+exists only in the running process, over an expiry, the CSRF token and the account
+revision) and the server stores nothing for it, so a flood of challenge requests cannot
+evict another client's pending sign-in or use memory, whatever the peer addresses or
+proxy; it costs only the work of answering. The challenge carries no authority, so it
+is not single-use: replaying one only permits another sign-in attempt, which the
+throttle counts. A restart or an account change ends the open challenges. The
+throttle still lets any client that can reach the sign-in delay a sign-in by failing it
+(five failures per address and 30 in all within a minute), so rate-limit sign-in
+requests at the proxy. v2.6.0 has none of this. GitHub protection and provider credentials are
 independently enforced external controls; a diagram does not establish their live
 configuration.
 

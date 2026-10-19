@@ -2,7 +2,9 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Single administrator account, private password hashes and revocable sessions."""
 
+import base64
 import hashlib
+import hmac
 import ipaddress
 import json
 import os
@@ -18,9 +20,7 @@ ACCOUNT_FILE = "web_ui_auth.json"
 COOKIE = "autopwn_session"
 LOGIN_COOKIE = "autopwn_login"
 SESSION_SECONDS = 8 * 60 * 60
-# One client address cannot hold more pending sign-in challenges than this, so a flood of cookie-less
-# GET /api/auth/login requests only evicts its own challenges rather than the operator's.
-PENDING_CHALLENGES_PER_ADDRESS = 16
+CHALLENGE_SECONDS = 5 * 60
 LOGIN_ASSETS = frozenset({"/login", "/login.js", "/login.css"})
 # The sign-in page uses no inline script or style, so it gets a strict policy.
 LOGIN_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
@@ -34,6 +34,8 @@ DASHBOARD_CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-s
 PERMISSIONS_POLICY = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=(), interest-cohort=()"
 _USERNAME = re.compile(r"[A-Za-z0-9_.@-]{1,64}")
 _HASH = re.compile(r"scrypt\$32768\$8\$3\$[0-9a-f]{32}\$[0-9a-f]{128}")
+_CSRF = re.compile(r"[A-Za-z0-9_-]{43}")
+_CHALLENGE = re.compile(r"([0-9]{1,12})\.([A-Za-z0-9_-]{43})")
 
 
 class AccountUnavailable(RuntimeError):
@@ -193,8 +195,6 @@ class LoginSession:
     revision: str
     csrf: str
     expires: float
-    authenticated: bool
-    address: str = ""
 
 
 class DashboardAuth:
@@ -204,31 +204,50 @@ class DashboardAuth:
         self.failures = {}
         self.lock = threading.RLock()
         self.hash_slots = threading.BoundedSemaphore(2)
+        # Sign-in challenges are signed with this key and never stored, so no number of requests can fill or
+        # evict them. A new process has a new key, which ends every challenge that is still open.
+        self.challenge_key = secrets.token_bytes(32)
 
-    def new_session(self, revision, *, authenticated, address=""):
+    def new_session(self, revision):
         token = secrets.token_urlsafe(32)
-        entry = LoginSession(revision, secrets.token_urlsafe(32), time.monotonic() + (SESSION_SECONDS if authenticated else 300), authenticated, address)
+        entry = LoginSession(revision, secrets.token_urlsafe(32), time.monotonic() + SESSION_SECONDS)
         with self.lock:
             self.sessions = {key: value for key, value in self.sessions.items() if value.expires > time.monotonic()}
-            # Keep unauthenticated challenge floods from evicting logged-in users.
-            matching = [key for key, value in self.sessions.items() if value.authenticated == authenticated]
-            if not authenticated:
-                own = [key for key in matching if self.sessions[key].address == address]
-                if len(own) >= PENDING_CHALLENGES_PER_ADDRESS:
-                    self.sessions.pop(own[0])
-                    matching.remove(own[0])
-            if len(matching) >= 128:
-                self.sessions.pop(matching[0])
+            if len(self.sessions) >= 128:
+                self.sessions.pop(next(iter(self.sessions)))
             self.sessions[hashlib.sha256(token.encode()).hexdigest()] = entry
         return token, entry
 
-    def find(self, token, *, authenticated=True):
+    def _challenge_mac(self, expires, csrf, revision):
+        message = f"autopwn-login-challenge\n{expires}\n{csrf}\n{revision}".encode()
+        return base64.urlsafe_b64encode(hmac.new(self.challenge_key, message, hashlib.sha256).digest()).rstrip(b"=").decode()
+
+    def new_challenge(self, revision):
+        """Return the cookie value and the CSRF token of a sign-in challenge; the server keeps nothing."""
+        csrf = secrets.token_urlsafe(32)
+        # Wall-clock time, not time.monotonic(), because the expiry is visible to the client and the monotonic
+        # clock would disclose how long the host has been up. The clock only bounds a challenge, which carries no
+        # authority: any client can fetch a new one.
+        expires = int(time.time()) + CHALLENGE_SECONDS
+        return f"{expires}.{self._challenge_mac(expires, csrf, revision)}", csrf
+
+    def challenge_valid(self, cookie, csrf, revision):
+        """True for a cookie this process issued for this CSRF token and account revision, within its lifetime."""
+        if not isinstance(cookie, str) or not isinstance(csrf, str):
+            return False
+        parsed = _CHALLENGE.fullmatch(cookie)
+        if not parsed or not _CSRF.fullmatch(csrf):
+            return False
+        expires, mac = parsed.groups()
+        return hmac.compare_digest(mac, self._challenge_mac(expires, csrf, revision)) and int(expires) > time.time()
+
+    def find(self, token):
         if not isinstance(token, str) or not 32 <= len(token) <= 128:
             return None
         key = hashlib.sha256(token.encode()).hexdigest()
         with self.lock:
             entry = self.sessions.get(key)
-        if not entry or entry.authenticated != authenticated:
+        if not entry:
             return None
         if entry.expires <= time.monotonic() or entry.revision != self.store.load()["revision"]:
             self.revoke(token)
@@ -283,12 +302,12 @@ def install_auth(app, static_dir, account_path):
     public = {"/login", "/login.js", "/login.css", "/favicon.ico", "/api/auth/login"}
 
     def set_cookie(response, token, *, login=False):
-        response.set_cookie(LOGIN_COOKIE if login else COOKIE, token, max_age=300 if login else SESSION_SECONDS,
+        response.set_cookie(LOGIN_COOKIE if login else COOKIE, token, max_age=CHALLENGE_SECONDS if login else SESSION_SECONDS,
                             httponly=True, secure=secure_cookie or request.is_secure, samesite="Strict", path="/")
 
     def csrf_valid(entry):
         token = request.headers.get("X-CSRF-Token", "")
-        return bool(entry and re.fullmatch(r"[A-Za-z0-9_-]{43}", token) and secrets.compare_digest(entry.csrf, token))
+        return bool(entry and _CSRF.fullmatch(token) and secrets.compare_digest(entry.csrf, token))
 
     @app.before_request
     def authenticate_request():
@@ -349,13 +368,11 @@ def install_auth(app, static_dir, account_path):
         try:
             data = store.load()
             if request.method == "GET":
-                auth.revoke(request.cookies.get(LOGIN_COOKIE))
-                token, entry = auth.new_session(data["revision"], authenticated=False, address=request.remote_addr or "unknown")
-                response = jsonify({"csrf_token": entry.csrf})
-                set_cookie(response, token, login=True)
+                cookie, csrf = auth.new_challenge(data["revision"])
+                response = jsonify({"csrf_token": csrf})
+                set_cookie(response, cookie, login=True)
                 return response
-            challenge = auth.find(request.cookies.get(LOGIN_COOKIE), authenticated=False)
-            if not csrf_valid(challenge):
+            if not auth.challenge_valid(request.cookies.get(LOGIN_COOKIE), request.headers.get("X-CSRF-Token", ""), data["revision"]):
                 return jsonify({"error": "Sign-in expired. Refresh the page and retry."}), 403
             if not request.is_json:
                 return jsonify({"error": "Sign-in requires JSON."}), 400
@@ -376,8 +393,7 @@ def install_auth(app, static_dir, account_path):
                 auth.failed(address)
                 return jsonify({"error": "Incorrect username or password."}), 401
             auth.revoke(request.cookies.get(COOKIE))
-            auth.revoke(request.cookies.get(LOGIN_COOKIE))
-            token, entry = auth.new_session(data["revision"], authenticated=True)
+            token, entry = auth.new_session(data["revision"])
             response = jsonify({"username": data["username"], "csrf_token": entry.csrf})
             set_cookie(response, token)
             response.delete_cookie(LOGIN_COOKIE, path="/")
@@ -411,7 +427,7 @@ def install_auth(app, static_dir, account_path):
             return jsonify({"error": "Too many attempts. Try again in a minute."}), 429
         try:
             data = store.change(g.dashboard_session.revision, body["current_password"], body["username"], body["new_password"])
-            token, entry = auth.new_session(data["revision"], authenticated=True)
+            token, entry = auth.new_session(data["revision"])
             auth.revoke(request.cookies.get(COOKIE))
             response = jsonify({"username": data["username"], "csrf_token": entry.csrf})
             set_cookie(response, token)
