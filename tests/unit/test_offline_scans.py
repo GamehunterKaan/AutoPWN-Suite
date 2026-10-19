@@ -258,7 +258,7 @@ def test_dashboard_nvd_fallback_does_not_make_the_scan_offline(web, local_databa
     unreachable = MagicMock(side_effect=RuntimeError("NVD unreachable"))
     monkeypatch.setattr("autopwn_suite.nist_search.searchCVE", unreachable)
     web_checks = MagicMock()
-    monkeypatch.setattr("autopwn_suite.web.webvuln.webvuln", web_checks)
+    monkeypatch.setattr(importlib.import_module("autopwn_suite.web.webvuln"), "webvuln", web_checks)
     notifications = MagicMock()
     monkeypatch.setattr(wu, "_send_email", notifications)
     monkeypatch.setattr(wu, "_send_webhook", notifications)
