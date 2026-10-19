@@ -246,6 +246,45 @@ def test_web_offline_job_uses_database_and_skips_notifications(web, local_databa
     export.close()
 
 
+def test_scan_thread_changes_the_job_config_only_under_the_job_lock(web, local_database, monkeypatch):
+    """/api/scans copies the config under that lock; an unlocked insert could break its iteration."""
+    import threading
+    wu, _ = web
+    monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
+    monkeypatch.setattr(wu.shutil, "which", lambda name: "nmap")
+    scanner = importlib.import_module("autopwn_suite.scanner")
+    monkeypatch.setattr(scanner, "PortScan", MagicMock(return_value=nmap_observation()))
+    monkeypatch.setattr(scanner, "AnalyseScanResults", lambda *a: [["192.168.1.10", 22, "ssh", "OpenSSH", "8.2p1", "tcp"]])
+    monkeypatch.setattr(wu, "_notify", MagicMock())
+    unlocked = []
+
+    def held_by_this_thread():
+        answer = []
+
+        def probe():
+            free = job._lock.acquire(blocking=False)
+            if free:
+                job._lock.release()
+            answer.append(not free)
+
+        thread = threading.Thread(target=probe)
+        thread.start()
+        thread.join()
+        return answer[0]
+
+    class Config(dict):
+        def __setitem__(self, key, value):
+            if not held_by_this_thread():
+                unlocked.append(key)
+            super().__setitem__(key, value)
+
+    job = wu.ScanJob("offline", "192.168.1.10", Config(target="192.168.1.10", skip_discovery=True,
+                                                       vulnerability_source="offline"))
+    wu._run_scan(job)
+    assert job.status == "completed" and job.config["vulnerability_database_updated_at"]
+    assert unlocked == []
+
+
 def test_missing_local_database_rejected_before_launch(web, monkeypatch):
     wu, client = web
     launch = MagicMock()

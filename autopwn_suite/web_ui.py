@@ -591,10 +591,12 @@ class ScanJob:
             progress = deepcopy(self._progress)
             web_count = len(self._web_findings)
             web_coverage = deepcopy(self._web_coverage)
+            # The scan thread adds keys to the config under this lock; iterating it outside would raise.
+            config = {k: deepcopy(v) for k, v in self.config.items() if k != "api_key"}
         return {
             "id":          self.id,
             "target":      self.target,
-            "config":      {k: deepcopy(v) for k, v in self.config.items() if k != "api_key"},
+            "config":      config,
             "status":      status,
             "started_at":  self.started_at,
             "finished_at": finished_at,
@@ -1055,7 +1057,8 @@ def _run_scan(job: ScanJob) -> None:
         if scan_vulns:
             lookup = VulnerabilityLookup(source, _VULNERABILITY_DB)
             if lookup.local:
-                config["vulnerability_database_updated_at"] = lookup.local.metadata["updated_at"]
+                with job._lock:
+                    config["vulnerability_database_updated_at"] = lookup.local.metadata["updated_at"]
                 _log(job, f"[*] Using local NVD database updated {lookup.local.metadata['updated_at']}; findings are possible vulnerabilities.")
         from rich.console import Console
         silent = Console(file=io.StringIO(), color_system=None)

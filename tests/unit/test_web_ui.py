@@ -369,6 +369,35 @@ class TestScanJob:
         assert d["port_count"] == 0
         assert d["vuln_count"] == 0
 
+    def test_to_dict_copies_the_config_while_holding_the_job_lock(self, wu):
+        """The scan thread adds config keys under the lock; iterating them outside raised during /api/scans."""
+        import threading
+        held = []
+
+        def held_by_this_thread():
+            """Another thread cannot take the lock exactly when the calling thread holds it."""
+            answer = []
+
+            def probe():
+                free = job._lock.acquire(blocking=False)
+                if free:
+                    job._lock.release()
+                answer.append(not free)
+
+            thread = threading.Thread(target=probe)
+            thread.start()
+            thread.join()
+            return answer[0]
+
+        class Config(dict):
+            def items(self):
+                held.append(held_by_this_thread())
+                return super().items()
+
+        job = wu.ScanJob("id1", "target", Config(target="target", api_key="secret"))
+        assert job.to_dict()["config"] == {"target": "target"}
+        assert held and all(held)
+
     def test_to_full_dict(self, wu):
         job = wu.ScanJob("id1", "target", {})
         h = job.get_or_create_host("10.0.0.1")
