@@ -665,9 +665,14 @@ def WebScan() -> bool:
     return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
 
 
+class NoHostsFound(SystemExit):
+    """Discovery found nothing to scan. Uncaught it still ends the run with the message and status 1; the
+    daemon loop catches it to wait for its next round instead of exiting."""
+
+
 def GetHostsToScan(hosts, console) -> list[str]:
     if len(hosts) == 0:
-        raise SystemExit(
+        raise NoHostsFound(
             "No hosts found! {time} - Scan completed.".format(
                 time=datetime.now().strftime("%b %d %Y %H:%M:%S")
             )

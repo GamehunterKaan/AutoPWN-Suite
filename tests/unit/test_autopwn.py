@@ -3,11 +3,12 @@
 """
 Unit tests for the main autopwn.py script.
 """
-from unittest.mock import MagicMock, patch
+from unittest.mock import DEFAULT, MagicMock, patch
 
 import pytest
 
 from autopwn_suite.cli import StartScanning, main
+from autopwn_suite.utils import GetHostsToScan, NoHostsFound
 
 
 @pytest.mark.unit
@@ -149,6 +150,48 @@ class TestMainExecution:
 
         # Verify that cli was called to get the arguments
         mock_cli.assert_called_once()
+
+
+@pytest.mark.unit
+class TestEmptyDiscovery:
+    """With a scan interval (the daemon) an empty discovery is a finished round: the process waits for the
+    next one instead of exiting, because systemd restarts an exited service after 5 seconds."""
+
+    @staticmethod
+    def run_main(scan_interval):
+        args = MagicMock(
+            version=False, config=None, daemon_install=False, daemon_uninstall=False, create_config=False,
+            no_color=True, web=False, web_reset_account=False, offline=False, update_vuln_db=False,
+            vuln_db_status=False, vulnerability_source="auto", vuln_db=None, scan_interval=scan_interval)
+        with patch("autopwn_suite.cli.cli", return_value=args), patch.multiple(
+                "autopwn_suite.cli", print_banner=DEFAULT, InitAutomation=DEFAULT, InitArgsTarget=DEFAULT,
+                InitArgsScanType=DEFAULT, InitArgsMode=DEFAULT, InitArgsAPI=DEFAULT, InitReport=DEFAULT,
+                ParamPrint=DEFAULT, StartScanning=DEFAULT, InitializeReport=DEFAULT, SaveOutput=DEFAULT,
+                sleep=DEFAULT) as mocks:
+            mocks["InitReport"].return_value = (None, None)
+            mocks["StartScanning"].side_effect = NoHostsFound("No hosts found! Oct 19 2026 12:00:00 - Scan completed.")
+            main()
+        return mocks
+
+    def test_a_daemon_waits_for_its_next_round(self):
+        mocks = self.run_main(3600)
+
+        mocks["sleep"].assert_called_once_with(3600)
+        # Nothing was scanned: no empty report is sent and no empty output file is written.
+        mocks["InitializeReport"].assert_not_called()
+        mocks["SaveOutput"].assert_not_called()
+
+    @pytest.mark.parametrize("scan_interval", [None, 0])
+    def test_a_single_run_still_ends_with_the_message_and_a_failure_status(self, scan_interval):
+        with pytest.raises(SystemExit) as stopped:
+            self.run_main(scan_interval)
+
+        assert isinstance(stopped.value, NoHostsFound)
+        assert "No hosts found!" in str(stopped.value) and stopped.value.code
+
+    def test_discovery_without_hosts_raises_the_dedicated_exit(self):
+        with pytest.raises(NoHostsFound, match="No hosts found!"):
+            GetHostsToScan([], MagicMock())
 
 
 @pytest.mark.unit

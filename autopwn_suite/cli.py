@@ -28,6 +28,7 @@ from autopwn_suite.utils import (
     InitArgsTarget,
     InitAutomation,
     InitReport,
+    NoHostsFound,
     ParamPrint,
     SaveOutput,
     ScanMode,
@@ -189,29 +190,39 @@ def main() -> None:
 
     ParamPrint(args, targetarg, scantype, scanmode, apiKey, console, log)
 
+    if not hasattr(args, "scan_interval"):
+        args.scan_interval = None
     source = "offline" if offline else args.vulnerability_source
     try:
         lookup = VulnerabilityLookup(source, db_path, lazy=True)
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
+    no_hosts = None
     try:
         if lookup.local:
             console.print(f"Local NVD database: {lookup.local.metadata['count']} CVEs; "
                           f"updated {lookup.local.metadata['updated_at']}. Findings are possible vulnerabilities.")
         StartScanning(args, targetarg, scantype, scanmode, apiKey, console, console2, log, lookup=lookup)
+    except NoHostsFound as exc:
+        # With a scan interval (the daemon) an empty discovery is a finished round: exiting would make systemd
+        # restart the service after 5 seconds, which discovers again and again instead of waiting.
+        if not (args.scan_interval and args.scan_interval > 0):
+            raise
+        no_hosts = exc
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
     finally:
         lookup.close()
 
-    # Only an offline mode the operator chose suppresses the report; an automatic fallback to the local
-    # database (lookup.source) concerns NVD, not SMTP or the webhook.
-    if not offline:
-        InitializeReport(ReportMethod, ReportObject, log, console)
-    SaveOutput(console, args.output_type, args.output, args.output_folder, targetarg)
+    if no_hosts is not None:
+        console.print(str(no_hosts))  # nothing was scanned: no report and no output file
+    else:
+        # Only an offline mode the operator chose suppresses the report; an automatic fallback to the local
+        # database (lookup.source) concerns NVD, not SMTP or the webhook.
+        if not offline:
+            InitializeReport(ReportMethod, ReportObject, log, console)
+        SaveOutput(console, args.output_type, args.output, args.output_folder, targetarg)
 
-    if not hasattr(args, "scan_interval"):
-        args.scan_interval = None
     if args.scan_interval and args.scan_interval > 0:
         console.print(f"Sleeping for {args.scan_interval} seconds...")
         sleep(args.scan_interval)
