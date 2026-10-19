@@ -272,7 +272,7 @@ class ScanContext:
             if name.lower() in ("content-type", "content-length", "location", "server", "allow", "cache-control",
                                 "access-control-allow-origin", "access-control-allow-credentials", "content-security-policy",
                                 "strict-transport-security", "x-frame-options", "x-content-type-options", "referrer-policy"):
-                response_headers[name] = redact_url(value)[:2048] if name.lower() == "location" else str(value)[:2048]
+                response_headers[name] = printable(redact_url(value)[:2048] if name.lower() == "location" else str(value)[:2048])
         captured = {"request": request, "phase": self.phase, "response": {"status": response.status_code, "headers": response_headers,
                     "bytes_captured": len(response.content), "sha256": hashlib.sha256(response.content).hexdigest(),
                     "truncated": response.autopwn_truncated,

@@ -110,10 +110,10 @@ def test_terminal_control_characters_in_a_redirect_never_reach_the_console(web_r
 
 
 @pytest.mark.unit
-def test_findings_keep_newlines_and_tabs_and_drop_other_control_characters():
+def test_findings_are_one_line_and_drop_control_characters():
     result = finding("X", "http://example.com/a\x1bb", "one\ntwo\tthree\r\x07\x7f\x85", parameter="q\x1b")
     assert result["url"] == "http://example.com/ab" and result["parameter"] == "q"
-    assert result["evidence"] == "one\ntwo\tthree"
+    assert result["evidence"] == "one two three"
     assert finding("X", "http://example.com/", "plain", parameter=None)["parameter"] is None
 
 

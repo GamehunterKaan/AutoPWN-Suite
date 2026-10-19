@@ -180,7 +180,7 @@ def test_crawl_failures_are_logged_with_fixed_text_not_the_exception():
     ("Two urls (http://a.test/?jwt=1) and http://b.test/?q=2", "Two urls (http://a.test/?jwt=REDACTED) and http://b.test/?q=REDACTED"),
     ("No reachable in-scope web endpoint on 127.0.0.1.", "No reachable in-scope web endpoint on 127.0.0.1."),
     ("Unable to crawl http://a.test/x\x1b[2J\x1b]0;pwned\x07y?token=1: HTTP 500", "Unable to crawl http://a.test/x[2J]0;pwnedy?token=REDACTED: HTTP 500"),
-    ("one\ntwo\tthree\r\x85\x7f", "one\ntwo\tthree"),
+    ("one\ntwo\tthree\r\x85\x7f", "one two three"),
 ])
 def test_redact_text_hides_query_secrets_in_every_url_of_a_message(message, expected):
     assert redact_text(message) == expected
