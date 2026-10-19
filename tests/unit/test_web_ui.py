@@ -139,43 +139,93 @@ class TestValidateTarget:
         assert wu._validate_target("$(whoami)") is not None
 
 
-class TestValidateNmapFlags:
-    def test_empty_flags(self, wu):
-        assert wu._validate_nmap_flags("") is None
+class TestStructuredNmapSettings:
+    """The dashboard has no free-text Nmap options; it builds the arguments from structured fields it checks itself."""
 
-    def test_valid_flags(self, wu):
-        assert wu._validate_nmap_flags("-sS -sV -O -T 4") is None
+    @pytest.mark.parametrize("ports", [
+        "", "   ", "80", "22,80,443", "1-1000", "22,80,1-1000", "1-65535", "65535", "1,2,3,4,5", "80-80", "  22,80  ", "80\n", "\t80,443\n"])
+    def test_a_port_specification_of_numbers_ranges_and_lists_is_accepted(self, wu, ports):
+        assert wu._profile_config({"ports": ports})["ports"] == ports.strip()
 
-    def test_valid_port_range(self, wu):
-        assert wu._validate_nmap_flags("-p 1-1000 --version-intensity 3") is None
+    @pytest.mark.parametrize("ports", [
+        "0", "65536", "99999", "100000", "1-65536", "0-10", "80-22", "-", "-p", "-80", "80-", "-80-90", "80--90", "1-2-3",
+        ",80", "80,", "80,,443", "22, 80", "22 80", "80\t443", "80\n443", "T:80", "U:53", "T:80,U:53", "http",
+        "80;id", "80|id", "80`id`", "$(id)", "80 -oN /etc/cron.d/x", "80 --script=x", "--script=banner", "-oN x", "-sV",
+        "080", chr(0x668) + chr(0x660), chr(0xFF18) + chr(0xFF10), "80.5", "+80", "1e3", "0x50", "80/tcp", "*", "?", pytest.param("9" * 40, id="40-digits"), pytest.param(",".join(["80"] * 800), id="800-ports"),
+        pytest.param("1-" + "9" * 60, id="range-of-60-digits")])
+    def test_anything_else_in_the_ports_field_is_refused(self, wu, ports):
+        with pytest.raises(ValueError, match="'ports'"):
+            wu._profile_config({"ports": ports})
 
-    def test_shell_injection(self, wu):
-        assert wu._validate_nmap_flags("-sS; rm -rf /") is not None
+    @pytest.mark.parametrize("technique", ["", "-sS", "-sT", "-sA", "-sW", "-sM", "-sU", "-sN", "-sF", "-sX"])
+    def test_every_technique_the_forms_offer_is_accepted(self, wu, technique):
+        assert wu._profile_config({"scan_technique": technique})["scan_technique"] == technique
 
-    def test_pipe_injection(self, wu):
-        assert wu._validate_nmap_flags("-sV | cat /etc/passwd") is not None
+    def test_the_allowlist_is_exactly_what_the_forms_offer(self, wu):
+        import re
+        html = (PROJECT_ROOT / "autopwn_suite" / "web_ui_static" / "index.html").read_text(encoding="utf-8")
+        for select in ("f-scantech", "pf-scantech"):
+            block = re.search(rf'<select id="{select}".*?</select>', html, re.S).group(0)
+            assert sorted(re.findall(r'<option value="(-s[A-Za-z])"', block)) == sorted(t for t in wu._SCAN_TECHNIQUES if t)
+
+    @pytest.mark.parametrize("technique", [
+        "-sV", "-sC", "-sL", "-sn", "-sI", "-sO", "-sY", "-sZ", "-ss", "sS", "-s", "-sS ", " -sS", "-sS -sV", "-sS\n", "-sSS",
+        "--script=banner", "--script", "-oN /etc/cron.d/x", "-oN", "-iL", "-p 22", "-O", "-A", "-Pn", "-T5", "--version-intensity 9",
+        "-sS;id", "$(id)", "-sS\u0000", chr(0x2212) + "sS", chr(0x2011) + "sS", "-" + chr(0x455) + "S", pytest.param("x" * 5000, id="5000-characters")])
+    def test_a_technique_the_forms_do_not_offer_is_refused(self, wu, technique):
+        with pytest.raises(ValueError, match="'scan_technique'"):
+            wu._profile_config({"scan_technique": technique})
+
+    @pytest.mark.parametrize("field,value", [("scan_technique", 5), ("scan_technique", None), ("scan_technique", ["-sS"]),
+                                             ("ports", 80), ("ports", None), ("ports", [80]), ("ports", {"a": 1}),
+                                             ("nmap_flags", None), ("nmap_flags", 0), ("nmap_flags", ["-sV"]),
+                                             ("nmap_flags", {"a": 1}), ("nmap_flags", True)])
+    def test_structured_fields_must_be_strings(self, wu, field, value):
+        with pytest.raises(ValueError, match="must be a string"):
+            wu._profile_config({field: value})
+
+    @pytest.mark.parametrize("flags", ["", " ", "\t", " \n "])
+    def test_an_empty_nmap_flags_stays_fine_and_is_stored_empty(self, wu, flags):
+        assert wu._profile_config({"nmap_flags": flags})["nmap_flags"] == ""
+        assert wu._profile_config({})["nmap_flags"] == ""
 
     @pytest.mark.parametrize("flags", [
-        "-oN /etc/cron.d/x", "-oG out", "-oS out", "-oX out", "--oX out", "-oA out", "--oA out", "-o out", "-ox out",
-        "-sV -6o out", "-Rno out", "-iL /etc/shadow", "-iL=hosts", "-iLhosts", "-6i hosts", "--excludefile hosts",
-        "--datadir /tmp/x", "--servicedb=x", "--versiondb=x", "--stylesheet=x.xsl", "--resume scan.log",
-        "--appe", "-appe", "-p 80 -oN out", "-m /etc/cron.d/x", "-m=out", "-6m out", "-nm out",
-    ])
-    def test_flags_that_read_or_write_files_are_rejected(self, wu, flags):
-        assert wu._validate_nmap_flags(flags) == "nmap_flags cannot read or write files"
+        "-sS", "-p 80", "-oN /etc/cron.d/x", "-oN", "--oX out.xml", "-iL /etc/shadow", "--script=banner", "--script banner",
+        "--script-args=a=b", "--script-args-file=x", "--excludefile hosts", "--datadir /tmp/x", "-6o out", "-A", "-T5",
+        "--version-intensity 3", "--max-retries 2", "x", "-", "--", " -sS ", "-sS; rm -rf /", "-sV | cat /etc/passwd", "$(id)",
+        "\xe9", chr(0x202E) + "-sS", pytest.param("-sS " * 500, id="repeated-technique"),
+        pytest.param("A" * 100000, id="100000-characters")])
+    def test_any_nmap_flags_text_is_refused_with_the_fixed_message(self, wu, flags):
+        with pytest.raises(wu._OptionsRefused) as refused:
+            wu._profile_config({"nmap_flags": flags})
+        assert str(refused.value) == wu._NMAP_OPTIONS_REFUSED
+        assert isinstance(refused.value, ValueError)
 
-    @pytest.mark.parametrize("flags", [
-        "-sS -sV -O -T 4", "-p 1-1000 --version-intensity 3", "--open --osscan-limit", "--exclude 192.0.2.9 --data-length 10",
-        "--script=http-title --script-args=a=b", "-Pn -n -r -vv", "-6 -sn", "-iR 0", "--version",
-        "--max-retries 2 --min-rate=100 --mtu 8 --max-rtt-timeout 100 --min-parallelism 3", "-M 5",
-    ])
-    def test_ordinary_scan_flags_are_still_accepted(self, wu, flags):
-        assert wu._validate_nmap_flags(flags) is None
+    def test_options_are_refused_whichever_source_carries_them(self, wu):
+        with pytest.raises(wu._OptionsRefused):
+            wu._profile_config({}, {"nmap_flags": "-sV --script banner"})  # as stored by an earlier release
+        with pytest.raises(wu._OptionsRefused):
+            wu._profile_config({"nmap_flags": "-sV"}, {"nmap_flags": ""})
 
-    def test_a_profile_cannot_smuggle_file_options_through_the_structured_fields(self, wu):
-        for field in ("scan_technique", "ports", "nmap_flags"):
-            with pytest.raises(ValueError, match="read or write files"):
-                wu._profile_config({field: "-oN /etc/cron.d/x"})
+    def test_options_are_refused_even_when_another_field_is_invalid_too(self, wu):
+        with pytest.raises(wu._OptionsRefused):
+            wu._profile_config({"nmap_flags": "-sV", "mode": "bad", "speed": 99})
+
+    def test_a_profile_cannot_smuggle_options_through_the_structured_fields(self, wu):
+        for field in ("scan_technique", "ports"):
+            for value in ("-oN /etc/cron.d/x", "--script=http-fetch", "-sS --script banner", "-sS -oN x", "22 -oN x", "22,-oN"):
+                with pytest.raises(ValueError):
+                    wu._profile_config({field: value})
+
+    @pytest.mark.parametrize("target", ["-oN", "-oN /etc/cron.d/x", "192.0.2.1 -oN", "192.0.2.1 --script=x", "192.0.2.1,-sS",
+                                        "-iL hosts", "--excludefile=x", "  -sS", "192.0.2.1  -A", "192.0.2.1,\t-A"])
+    def test_a_target_that_starts_an_nmap_option_is_refused(self, wu, target):
+        assert wu._validate_target(target) is not None
+
+    @pytest.mark.parametrize("target", ["192.0.2.1", "192.0.2.0/24", "192.0.2.1-20", "192.0.2.1 192.0.2.2", "192.0.2.1, 192.0.2.2",
+                                        "host-1.example.test", "2001:db8::1", "a-b"])
+    def test_ordinary_targets_with_dashes_inside_stay_accepted(self, wu, target):
+        assert wu._validate_target(target) is None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -883,9 +933,8 @@ class TestBuildNmapFlags:
         result = wu._build_nmap_flags({"os_detection": True})
         assert "-O" in result
 
-    def test_custom_flags(self, wu):
-        result = wu._build_nmap_flags({"nmap_flags": "--script banner"})
-        assert "--script banner" in result
+    def test_free_text_flags_are_never_added(self, wu):
+        assert wu._build_nmap_flags({"nmap_flags": "--script banner"}) == ""
 
     def test_all_combined(self, wu):
         result = wu._build_nmap_flags({
@@ -893,13 +942,8 @@ class TestBuildNmapFlags:
             "ports": "80-443",
             "version_intensity": 3,
             "os_detection": True,
-            "nmap_flags": "--script banner",
         })
-        assert "-sW" in result
-        assert "-p 80-443" in result
-        assert "--version-intensity 3" in result
-        assert "-O" in result
-        assert "--script banner" in result
+        assert result == "-sW -p 80-443 --version-intensity 3 -O"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1225,18 +1269,53 @@ class TestAPIScans:
                            content_type="application/json")
         assert resp.status_code == 400
 
-    def test_start_scan_invalid_flags(self, client):
-        resp = client.post("/api/scan/start",
-                           data=json.dumps({"target": "192.168.1.1", "nmap_flags": "; whoami"}),
-                           content_type="application/json")
-        assert resp.status_code == 400
-
     @patch("autopwn_suite.web_ui._launch_scan")
-    @pytest.mark.parametrize("flags", ["-oN /etc/cron.d/x", "--oX out.xml", "-iL /etc/shadow", "-6o out", "--appe"])
-    def test_start_scan_rejects_flags_that_read_or_write_files(self, mock_launch, client, flags):
+    @pytest.mark.parametrize("flags", [
+        "; whoami", "-oN /etc/cron.d/x", "--oX out.xml", "-iL /etc/shadow", "-6o out", "--appe", "--script=http-fetch",
+        "--script http-put --script-args http-put.url=/x,http-put.file=/etc/passwd", "-sS", "-sV -O", "-p 22", "-T5",
+        pytest.param("-sS " * 300, id="repeated-technique"), "\u00e9\u4e2d\u202e", "x"])
+    def test_start_scan_refuses_any_nmap_flags_text(self, mock_launch, client, flags):
         resp = client.post("/api/scan/start",
                            data=json.dumps({"target": "192.168.1.1", "nmap_flags": flags}),
                            content_type="application/json")
+        assert resp.status_code == 400
+        assert resp.get_json() == {"error": "Nmap options are not accepted; use the scan technique, ports and detection settings"}
+        mock_launch.assert_not_called()
+
+    @patch("autopwn_suite.web_ui._launch_scan")
+    @pytest.mark.parametrize("extra", [{}, {"nmap_flags": ""}, {"nmap_flags": "  "}])
+    def test_start_scan_without_flags_text_is_accepted(self, mock_launch, client, wu, extra):
+        mock_launch.return_value = wu.ScanJob("test-id", "192.168.1.1", {})
+        resp = client.post("/api/scan/start", json={"target": "192.168.1.1", "scan_technique": "-sT", "ports": "22,80", **extra})
+        assert resp.status_code == 200
+        assert mock_launch.call_args.args[0]["nmap_flags"] == "-sT -p 22,80"
+
+    @patch("autopwn_suite.web_ui._launch_scan")
+    def test_start_scan_builds_the_arguments_from_the_structured_fields_only(self, mock_launch, client, wu):
+        mock_launch.return_value = wu.ScanJob("test-id", "192.168.1.1", {})
+        resp = client.post("/api/scan/start", json={
+            "target": "192.168.1.1", "scan_technique": "-sU", "ports": "53,161,1000-2000", "version_intensity": 4,
+            "os_detection": True, "host_timeout": 90, "speed": 4})
+        assert resp.status_code == 200
+        config = mock_launch.call_args.args[0]
+        assert config["nmap_flags"] == "-sU -p 53,161,1000-2000 --version-intensity 4 -O"
+
+    @patch("autopwn_suite.web_ui._launch_scan")
+    @pytest.mark.parametrize("body", [
+        {"scan_technique": "-sS --script=banner"}, {"scan_technique": "--script=banner"}, {"scan_technique": "-oN x"},
+        {"ports": "22 -oN /etc/cron.d/x"}, {"ports": "22,80;id"}, {"ports": "--script=banner"}, {"ports": "70000"},
+        {"version_intensity": "9 -oN x"}, {"version_intensity": "-oN"}, {"version_intensity": 10}, {"version_intensity": -1},
+        {"speed": "3 -oN x"}, {"host_timeout": "30 --script=x"}, {"mode": "evade -oN x"}, {"scan_type": "arp -oN x"},
+        {"os_detection": "-oN x"}, {"os_detection": "true"}])
+    def test_start_scan_refuses_structured_values_that_would_carry_an_option(self, mock_launch, client, body):
+        resp = client.post("/api/scan/start", json={"target": "192.168.1.1", **body})
+        assert resp.status_code == 400
+        mock_launch.assert_not_called()
+
+    @patch("autopwn_suite.web_ui._launch_scan")
+    @pytest.mark.parametrize("target", ["-oN", "-oN /etc/cron.d/x", "192.168.1.1 --script=x", "192.168.1.1,-A"])
+    def test_start_scan_refuses_a_target_that_starts_an_option(self, mock_launch, client, target):
+        resp = client.post("/api/scan/start", json={"target": target})
         assert resp.status_code == 400
         mock_launch.assert_not_called()
 
@@ -1747,7 +1826,6 @@ class TestAPIProfileEdgeCases:
                                "ports": "1-1000",
                                "version_intensity": 5,
                                "os_detection": True,
-                               "nmap_flags": "--script banner",
                                "host_timeout": 300,
                                "scan_ports": True,
                                "scan_vulns": False,
@@ -1761,6 +1839,7 @@ class TestAPIProfileEdgeCases:
         assert cfg["version_intensity"] == 5
         assert cfg["os_detection"] is True
         assert cfg["skip_discovery"] is True
+        assert cfg["nmap_flags"] == ""
 
     def test_update_profile_boolean_and_intensity_fields(self, client):
         # Create

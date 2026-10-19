@@ -11,6 +11,7 @@ import importlib
 import json
 import random
 import re
+import shlex
 import sqlite3
 import string
 import sys
@@ -19,6 +20,7 @@ from argparse import ArgumentTypeError
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 from rich.text import Text
@@ -215,19 +217,21 @@ def web_ui(tmp_path, monkeypatch, capsys):
     return SimpleNamespace(module=module, app=app, password=password, path=tmp_path / ACCOUNT_FILE)
 
 
-def test_target_and_flag_allowlists_never_raise_and_reject_shell_syntax(web_ui):
+def test_target_allowlist_never_raises_and_rejects_shell_syntax_and_option_looking_targets(web_ui):
     rng = random.Random(SEED + 2)
-    alphabet = string.printable + "éß \u0000;|&`$(){}"
+    alphabet = string.printable + "\xe9\xdf \x00;|&`$(){}-,-"
+    accepted = 0
     for _ in range(3000):
         text = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 40)))
-        for check in (web_ui.module._validate_target, web_ui.module._validate_nmap_flags):
-            verdict = check(text)
-            assert verdict is None or isinstance(verdict, str)
-            if verdict is None:
-                assert not set(text) & web_ui.module._SHELL_DANGEROUS
+        verdict = web_ui.module._validate_target(text)
+        assert verdict is None or isinstance(verdict, str)
+        if verdict is None:
+            accepted += 1
+            assert not set(text) & web_ui.module._SHELL_DANGEROUS
+            assert not any(token.startswith("-") for token in re.split(r"[\s,]+", text)), text  # never an Nmap option
+    assert accepted
     for value in (None, 1, 1.5, [], {}, b"x", True):
         assert isinstance(web_ui.module._validate_target(value), str)
-        assert isinstance(web_ui.module._validate_nmap_flags(value), (str, type(None)))
 
 
 def test_event_stream_resume_point_is_the_first_short_ascii_number_and_never_raises(web_ui):
@@ -251,18 +255,123 @@ def test_event_stream_resume_point_is_the_first_short_ascii_number_and_never_rai
     assert accepted and rejected  # the corpus exercises both outcomes
 
 
-def test_flag_allowlist_rejects_every_file_option_spelling_among_random_flags(web_ui):
+def test_dashboard_refuses_every_nmap_flags_text_whatever_the_option(web_ui):
+    """File options, NSE options, ordinary options and noise alike: a request (or a stored profile) with any
+    non-blank nmap_flags is refused with the one fixed message, and a blank one is stored as empty."""
     rng = random.Random(SEED + 40)
+    wu = web_ui.module
     file_options = ["-oN", "-oXout", "--oX", "--oA", "-6o", "-Rno", "-ox", "-iL", "--iL", "-6i", "--resu", "--appe",
                     "--datad", "--stylesheet", "--excludef", "--servicedb", "--versiondb", "-m", "-6m", "-nm"]
+    nse = ["--script", "--script=default", "--script-args", "--script-args-file=x", "--script-updatedb", "http-fetch.destination=/tmp"]
     ordinary = ["-sV", "-sS", "-Pn", "-n", "-T4", "-p", "80,443", "--open", "--exclude", "192.0.2.9", "--version-intensity",
-                "5", "--script=default", "--data-length", "10", "-vv", "-6", "out.txt", "-O", "--max-retries", "--mtu", "-M"]
-    check = web_ui.module._validate_nmap_flags
-    for _ in range(2000):
-        tokens = [rng.choice(ordinary) for _ in range(rng.randint(0, 5))]
-        assert check(" ".join(tokens)) is None
-        tokens.insert(rng.randint(0, len(tokens)), rng.choice(file_options) + rng.choice(["", "=out.txt", " out.txt", "\t."]))
-        assert check(" ".join(tokens)) == "nmap_flags cannot read or write files"
+                "5", "--data-length", "10", "-vv", "-6", "out.txt", "-O", "--max-retries", "--mtu", "-M", "-A", "-"]
+    refused = blank = 0
+    for _ in range(3000):
+        kind = rng.random()
+        if kind < .4:
+            text = " ".join(rng.choice(ordinary + nse + file_options) for _ in range(rng.randint(1, 6)))
+        elif kind < .7:
+            text = mutate(" ".join(rng.choice(ordinary + nse + file_options) for _ in range(rng.randint(0, 4))), rng)
+        else:
+            text = "".join(rng.choice(string.printable + "\xe9\u4e2d\u202e\x00") for _ in range(rng.randint(0, 30)))
+        for source in ({"nmap_flags": text}, {"mode": "normal", "nmap_flags": text, "scan_technique": "-sS", "ports": "80"}):
+            if text.strip():
+                refused += 1
+                with pytest.raises(wu._OptionsRefused) as error:
+                    wu._profile_config(source)
+                assert str(error.value) == wu._NMAP_OPTIONS_REFUSED
+                with pytest.raises(wu._OptionsRefused):
+                    wu._profile_config({}, source)
+            else:
+                blank += 1
+                assert wu._profile_config(source)["nmap_flags"] == ""
+    assert refused > 2000 and blank
+
+
+def test_structured_scan_fields_can_only_produce_the_fixed_nmap_arguments(web_ui):
+    """Whatever the structured fields hold, an accepted configuration yields exactly: an offered technique, "-p" and
+    a port specification, "--version-intensity" and one digit, "-O"; nothing else, nothing with whitespace, and the
+    arguments Nmap is started with carry no other option than the scanner's own."""
+    rng = random.Random(SEED + 41)
+    wu = web_ui.module
+    techniques = [t for t in wu._SCAN_TECHNIQUES if t]
+    injections = ["-oN /etc/cron.d/x", "--script=http-fetch", "-iL hosts", "--excludefile x", "-sS -sV", "-p 1-65535", "-A", "-O",
+                  "--version-intensity 9", "-T5", "22 -oN x", "22,--script=x", "80\n-oN", ";id", "$(id)", "`id`", "../../etc",
+                  "22\n80", "T:80", "-", "--", "1-", "-1", " ", "\t", "0", "65536", "1e3", "+80", "0x50", "1_000", "\x00", "\xe9"]
+    port_pieces = list("0123456789") * 4 + ["-", ",", " ", ":", "T", "U", "\n"] + injections
+
+    def structured(valid):
+        pick = rng.random()
+        if pick < .45:
+            return rng.choice(valid)
+        if pick < .7:
+            return mutate(str(rng.choice(valid)), rng)
+        if pick < .85:
+            return rng.choice(injections)
+        return random_value(rng)
+
+    valid = {"scan_technique": techniques + [""], "ports": ["80", "22,80,443", "1-1000", "1-65535", "22,80,1-1000", "65535", "", "53,161,1000-2000"],
+             "version_intensity": [0, 1, 5, 9, None, "", "7"], "os_detection": [True, False], "speed": [0, 1, 3, 5, "2"],
+             "host_timeout": [1, 30, 240, "60"], "mode": ["normal", "evade", "noise"], "scan_type": [None, "arp", "ping", ""]}
+    accepted = rejected = 0
+    for _ in range(4000):
+        body = {name: rng.choice(choices) for name, choices in valid.items()}
+        for name in rng.sample(sorted(valid), rng.choice([0, 1, 1, 2])):  # most requests are wrong in one or two fields
+            body[name] = structured(valid[name])
+        if rng.random() < .3:
+            body["ports"] = "".join(rng.choice(port_pieces) for _ in range(rng.randint(0, 12)))
+        try:
+            config = wu._profile_config(body)
+        except ValueError:
+            rejected += 1
+            continue
+        accepted += 1
+        flags = wu._build_nmap_flags(config)
+        tokens = shlex.split(flags)
+        assert " ".join(tokens) == flags
+        assert not any(re.search(r"\s", token) or "\x00" in token for token in tokens), flags
+        technique, ports = config["scan_technique"], config["ports"]
+        assert technique in wu._SCAN_TECHNIQUES and not re.search(r"\s", technique)
+        assert ports == "" or (re.fullmatch(r"[0-9]+(?:-[0-9]+)?(?:,[0-9]+(?:-[0-9]+)?)*", ports) and len(ports) <= 2048)
+        for number in re.findall(r"[0-9]+", ports):
+            assert 1 <= int(number) <= 65535 and not number.startswith("0")
+        expected = [technique] if technique else []
+        expected += ["-p", ports] if ports else []
+        if config["version_intensity"] is not None:
+            assert isinstance(config["version_intensity"], int) and 0 <= config["version_intensity"] <= 9
+            expected += ["--version-intensity", str(config["version_intensity"])]
+        expected += ["-O"] if config["os_detection"] else []
+        assert tokens == expected, (body, flags)
+        # The only tokens that start with a dash are the fixed option names and the offered technique.
+        assert {token for token in tokens if token.startswith("-")} <= set(techniques) | {"-p", "--version-intensity", "-O"}
+        if accepted % 40 == 0:  # through the real argument builder of the scanner, with Nmap itself stubbed out
+            for root in (True, False):
+                with patch("autopwn_suite.scanner.PortScanner") as scanner, patch("autopwn_suite.scanner.is_root", return_value=root):
+                    from autopwn_suite.scanner import PortScan
+                    PortScan("192.0.2.1", MagicMock(), config["speed"], config["host_timeout"], customflags=flags)
+                    arguments = shlex.split(scanner.return_value.scan.call_args.kwargs["arguments"])
+                owned = set(techniques) | {"-p", "--version-intensity", "-O", "-sV", "--host-timeout", "-Pn", "-T"}
+                assert {token for token in arguments if token.startswith("-")} <= owned, arguments
+                assert "192.0.2.1" not in arguments  # the target is not among the arguments
+    assert accepted > 300 and rejected > 300
+
+
+def test_profile_validation_never_raises_anything_but_value_error_for_hand_edited_records(web_ui):
+    rng = random.Random(SEED + 43)
+    wu = web_ui.module
+    for _ in range(3000):
+        record = {key: random_value(rng) for key in rng.sample(
+            ["scan_technique", "ports", "nmap_flags", "version_intensity", "os_detection", "speed", "host_timeout", "mode",
+             "scan_type", "scan_ports", "scan_vulns", "vulnerability_source", "web_options"], rng.randint(0, 8))}
+        for call in (lambda: wu._profile_config(record), lambda: wu._profile_config({}, record), lambda: wu._profile_config(record, record)):
+            try:
+                call()
+            except ValueError:
+                pass
+        assert isinstance(wu._holds_options(record), bool)
+    for stored in (1, "x", [], [1], True):  # a stored configuration that is not an object
+        with pytest.raises(ValueError):
+            wu._profile_config({}, stored)
 
 
 TIMESTAMPS = ["2026-10-19T02:00:00Z", "2026-10-19T02:00:00", "2026-10-19T02:00:00+05:30", "2026-10-19"]

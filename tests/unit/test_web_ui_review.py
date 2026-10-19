@@ -168,24 +168,158 @@ def test_missing_saved_profile_does_not_fall_back_to_default_scan(client_review,
     wu_review._launch_scan.assert_not_called()
 
 
-def test_stored_profile_with_a_refused_flag_disables_its_schedule_until_the_flag_is_removed_and_it_is_enabled_again(client_review, wu_review):
+REFUSED = {"error": "Nmap options are not accepted; use the scan technique, ports and detection settings"}
+# What an earlier release accepted and stored: free-text options, among them file and NSE options.
+STORED_OPTIONS = ["-sV -oN refused.txt", "--script banner", "--script http-put --script-args http-put.url=/x,http-put.file=/etc/passwd",
+                  "-sS", "-p 22", " -T5 "]
+
+
+@pytest.mark.parametrize("options", STORED_OPTIONS)
+def test_stored_profile_with_nmap_options_disables_its_schedule_once_and_saving_it_again_removes_them(
+        client_review, wu_review, caplog, options):
     profile_id = _profile(client_review)
     schedule_id = _schedule(client_review, profile_id)
-    # As saved by a release that still accepted file options.
-    wu_review._profiles[profile_id]["config"]["nmap_flags"] = "-sV -oN refused.txt"
-    _one_scheduler_tick(wu_review)
-    wu_review._launch_scan.assert_not_called()
+    wu_review._profiles[profile_id]["config"]["nmap_flags"] = options
+    for _ in range(3):
+        _one_scheduler_tick(wu_review)
+    wu_review._launch_scan.assert_not_called()  # the options are neither applied nor dropped silently: nothing scans
     assert schedule_id not in wu_review._schedule_last_run
     assert wu_review._schedules[schedule_id]["enabled"] is False  # disabled once, not retried every minute
-    assert client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed"}).status_code == 400
-    assert wu_review._profiles[profile_id]["name"] == "Offline profile"
-    repaired = client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed", "nmap_flags": "-sV"})
+    assert json.loads(wu_review._SCHEDULES_FILE.read_text())[schedule_id]["enabled"] is False
+    errors = [entry["msg"] for entry in wu_review._log_history if entry["level"] == "error"]
+    assert len(errors) == 1 and "holds Nmap options, which the dashboard no longer accepts" in errors[0]
+    assert options.strip() not in errors[0]  # the log names the reason, not the options
+    assert [record.getMessage() for record in caplog.records if record.levelname == "WARNING"] == [
+        f"Scheduled scan disabled after stored Nmap options (schedule '{schedule_id}')"]
+    # Saving the profile again is the repair: the form has no options field, so the stored ones are replaced.
+    repaired = client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed", "scan_technique": "-sT", "ports": "22,80"})
     assert repaired.status_code == 200
+    assert repaired.get_json()["config"]["nmap_flags"] == ""
+    assert wu_review._profiles[profile_id]["config"]["nmap_flags"] == ""
     _one_scheduler_tick(wu_review)
     wu_review._launch_scan.assert_not_called()  # repairing the profile does not switch the schedule back on
     assert client_review.put(f"/api/schedules/{schedule_id}", json={"enabled": True}).status_code == 200
     _one_scheduler_tick(wu_review)
     wu_review._launch_scan.assert_called_once()
+    config = wu_review._launch_scan.call_args.args[0]
+    assert config["nmap_flags"] == "-sT -p 22,80"  # built from the structured fields alone
+
+
+def test_stored_profile_that_a_request_still_sends_options_for_is_refused_not_repaired(client_review, wu_review):
+    profile_id = _profile(client_review)
+    wu_review._profiles[profile_id]["config"]["nmap_flags"] = "--script banner"
+    before = json.loads(json.dumps(wu_review._profiles))
+    for options in ("--script banner", "-sV", "x"):
+        response = client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed", "nmap_flags": options})
+        assert (response.status_code, response.get_json()) == (400, REFUSED)
+    assert wu_review._profiles == before
+    assert client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed", "nmap_flags": ""}).status_code == 200
+    assert wu_review._profiles[profile_id]["config"]["nmap_flags"] == ""
+
+
+@pytest.mark.parametrize("flags", [
+    "-oN /etc/cron.d/x", "--script=http-fetch", "-sS", "-sS -p 22", "\xe9" + chr(0x4E2D) + chr(0x202E) + "-sS", pytest.param("-sS " * 2000, id="repeated-technique"), pytest.param("A" * 200000, id="200000-characters"),
+    "--script http-put --script-args-file=/etc/shadow", "; id", "$(id)"])
+def test_profile_routes_refuse_any_nmap_flags_text_with_the_fixed_message(client_review, wu_review, flags):
+    profile_id = _profile(client_review)
+    before = json.loads(json.dumps(wu_review._profiles))
+    created = client_review.post("/api/profiles", json={"name": "Options", "nmap_flags": flags})
+    updated = client_review.put(f"/api/profiles/{profile_id}", json={"nmap_flags": flags})
+    assert (created.status_code, created.get_json()) == (400, REFUSED)
+    assert (updated.status_code, updated.get_json()) == (400, REFUSED)
+    assert wu_review._profiles == before
+    assert flags[:20] not in json.dumps(created.get_json()) + json.dumps(updated.get_json())
+
+
+@pytest.mark.parametrize("flags", ["-sS", "--script=banner", "\xe9" + chr(0x4E2D), pytest.param("x" * 5000, id="5000-characters")])
+def test_schedule_routes_refuse_nmap_flags_text_too(client_review, wu_review, flags):
+    profile_id = _profile(client_review)
+    schedule_id = _schedule(client_review, profile_id)
+    before = json.loads(json.dumps(wu_review._schedules))
+    created = client_review.post("/api/schedules", json={"target": "192.0.2.10", "profile_id": profile_id, "nmap_flags": flags})
+    updated = client_review.put(f"/api/schedules/{schedule_id}", json={"nmap_flags": flags})
+    assert (created.status_code, created.get_json()) == (400, REFUSED)
+    assert (updated.status_code, updated.get_json()) == (400, REFUSED)
+    assert wu_review._schedules == before
+    for blank in ("", "  "):
+        assert client_review.put(f"/api/schedules/{schedule_id}", json={"nmap_flags": blank}).status_code == 200
+
+
+def test_stored_schedule_that_carries_options_is_disabled_when_due_and_an_edit_removes_them(client_review, wu_review, caplog):
+    profile_id = _profile(client_review)
+    schedule_id = _schedule(client_review, profile_id)
+    wu_review._schedules[schedule_id]["nmap_flags"] = "-oN refused.txt"
+    for _ in range(2):
+        _one_scheduler_tick(wu_review)
+    wu_review._launch_scan.assert_not_called()
+    assert wu_review._schedules[schedule_id]["enabled"] is False
+    assert [record.getMessage() for record in caplog.records if record.levelname == "WARNING"] == [
+        f"Scheduled scan disabled after stored Nmap options (schedule '{schedule_id}')"]
+    edited = client_review.put(f"/api/schedules/{schedule_id}", json={"enabled": True})
+    assert edited.status_code == 200 and "nmap_flags" not in edited.get_json()
+    _one_scheduler_tick(wu_review)
+    assert wu_review._launch_scan.call_args.args[0]["nmap_flags"] == ""
+
+
+def _write_stored(path, entries):
+    path.write_text(json.dumps(entries), encoding="utf-8")
+    return path.read_text(encoding="utf-8")
+
+
+def test_loading_profiles_saved_with_nmap_options_keeps_them_and_a_copy_of_the_file(wu_review, caplog):
+    path = wu_review._PROFILES_FILE
+    original = _write_stored(path, {
+        "ok": {"id": "ok", "name": "Fine", "config": {"scan_technique": "-sT", "ports": "22,80"}},
+        "flags": {"id": "flags", "name": "Flags", "config": {"nmap_flags": "--script banner"}},
+        "technique": {"id": "technique", "name": "Technique", "config": {"scan_technique": "-sS --script=banner"}},
+        "ports": {"id": "ports", "name": "Ports", "config": {"ports": "22 -oN x"}},
+        "shape": {"id": "shape", "name": "Shape", "config": "not an object"},
+        "flagtype": {"id": "flagtype", "name": "Type", "config": {"nmap_flags": ["-sV"]}},
+        "bare": {"id": "bare", "name": "No config at all"}})
+    wu_review._load_profiles()
+    assert sorted(wu_review._profiles) == ["bare", "flags", "flagtype", "ok", "ports", "shape", "technique"]  # none dropped
+    kept = list(path.parent.glob(path.name + ".corrupt-*"))
+    assert len(kept) == 1 and kept[0].read_text(encoding="utf-8") == original
+    assert "Kept 5 profile(s)" in caplog.text and kept[0].name in caplog.text
+    assert "--script banner" not in caplog.text  # the log carries counts and file names, not their content
+    wu_review._load_profiles()  # a restart does not pile up copies of the same file
+    assert list(path.parent.glob(path.name + ".corrupt-*")) == kept
+    wu_review._save_profiles()
+    assert kept[0].read_text(encoding="utf-8") == original
+
+
+def test_loading_profiles_without_nmap_options_sets_nothing_aside(wu_review, caplog):
+    path = wu_review._PROFILES_FILE
+    _write_stored(path, {"ok": {"id": "ok", "config": {"scan_technique": "-sU", "ports": "53,161", "nmap_flags": "", "speed": 0}},
+                         "blank": {"id": "blank", "config": {"nmap_flags": "  "}}})
+    wu_review._load_profiles()
+    assert sorted(wu_review._profiles) == ["blank", "ok"]
+    assert not list(path.parent.glob(path.name + ".corrupt-*"))
+    assert "refuses" not in caplog.text
+
+
+def test_a_loaded_profile_with_options_cannot_start_a_scan_through_the_scheduler(client_review, wu_review):
+    wu_review._PROFILES_FILE.write_text(json.dumps(
+        {"p": {"id": "p", "name": "Old", "config": {"nmap_flags": "--script http-put", "scan_technique": "-sT"}}}), encoding="utf-8")
+    wu_review._load_profiles()
+    schedule = {"id": "s", "name": "Old schedule", "enabled": True, "profile_id": "p", "target": "192.0.2.10",
+                "type": "interval", "interval_value": 1, "interval_unit": "hours"}
+    wu_review._schedules = {"s": schedule}
+    _one_scheduler_tick(wu_review)
+    wu_review._launch_scan.assert_not_called()
+    assert wu_review._schedules["s"]["enabled"] is False
+
+
+def test_loading_schedules_that_carry_options_keeps_them_and_a_copy_of_the_file(wu_review, caplog):
+    path = wu_review._SCHEDULES_FILE
+    original = _write_stored(path, {"a": {"id": "a", "profile_id": "p", "nmap_flags": "--script banner"},
+                                    "b": {"id": "b", "profile_id": "p", "nmap_flags": ""},
+                                    "c": {"id": "c", "profile_id": "p"}})
+    wu_review._load_schedules()
+    assert sorted(wu_review._schedules) == ["a", "b", "c"]
+    kept = list(path.parent.glob(path.name + ".corrupt-*"))
+    assert len(kept) == 1 and kept[0].read_text(encoding="utf-8") == original
+    assert "Kept 1 schedule(s)" in caplog.text
 
 
 def test_naive_saved_last_run_is_restored_as_utc(client_review, wu_review):

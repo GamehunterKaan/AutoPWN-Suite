@@ -122,7 +122,7 @@ updates return 202.
 | `GET /api/scans` | None | Array of job summaries including config, status, timestamps, counts, hosts, progress, web findings/coverage. |
 | `GET /api/scans/<scan_id>` | Job ID | One job summary; 404 if absent. |
 | `GET /api/scans/<scan_id>/download` | Job ID | JSON attachment with complete serializable job/results. Private resume checkpoints are excluded. |
-| `POST /api/scan/start` | `target`, scan configuration, optional `api_key` | `{ok,scan_id,message}`; launches background work. |
+| `POST /api/scan/start` | `target`, scan configuration, optional `api_key` | `{ok,scan_id,message}`; launches background work. 400 for a non-empty `nmap_flags` or a technique or ports outside the structured fields (see Scan and web controls). |
 | `POST /api/scan/stop` | `{scan_id}` | `{ok}`; requests cancellation of a running/stopping job. |
 | `POST /api/scans/<scan_id>/resume` | Optional `{web_options:{...}}` | `{ok,scan_id,resume_count}`; only incomplete/stopped/error jobs, retaining target and selected checks. |
 | `GET /api/web/catalog` | None | Check descriptions, normalized default controls, numeric bounds, effective offline state. |
@@ -141,11 +141,11 @@ updates return 202.
 | `POST /api/settings/test_email` | Empty object | `{ok}` after configured test mail, or error. Disabled offline. |
 | `POST /api/settings/test_webhook` | Empty object | `{ok,status_code}` after configured test POST, or error. Disabled offline. |
 | `GET /api/profiles` | None | Profile array: `id,name,description,created_at,config`. |
-| `POST /api/profiles` | `name`, optional `description`, scan configuration | 201 created profile; persists it. |
-| `PUT /api/profiles/<pid>` | Partial name/description/configuration | Updated profile; 404 if missing. Disables enabled schedules that no longer validate against the edited profile (a CIDR target on a web-only profile). |
+| `POST /api/profiles` | `name`, optional `description`, scan configuration | 201 created profile; persists it. 400 for a non-empty `nmap_flags`. |
+| `PUT /api/profiles/<pid>` | Partial name/description/configuration | Updated profile; 404 if missing. Disables enabled schedules that no longer validate against the edited profile (a CIDR target on a web-only profile). 400 for a non-empty `nmap_flags`; saving replaces any Nmap options an earlier release stored. |
 | `DELETE /api/profiles/<pid>` | None | `{ok}`; disables dependent schedules. |
 | `GET /api/schedules` | None | Saved schedule array. |
-| `POST /api/schedules` | Schedule object | 201 created schedule; referenced profile must exist. |
+| `POST /api/schedules` | Schedule object | 201 created schedule; referenced profile must exist. A schedule carries no Nmap options: 400 for a non-empty `nmap_flags`. |
 | `PUT /api/schedules/<sid>` | Partial schedule object | Updated schedule. The merged record must validate, except that `{"enabled": false}` alone always applies. |
 | `DELETE /api/schedules/<sid>` | None | `{ok}`; removes saved schedule and in-memory last-run state. |
 
@@ -155,11 +155,25 @@ Configuration fields are `mode` (normal/evade/noise), `speed` (0–5), `scan_typ
 (arp/ping/null), `scan_technique`, `ports`, `version_intensity` (0–9/null),
 `os_detection`, `nmap_flags`, `host_timeout` (positive seconds), `scan_ports`,
 `scan_vulns`, `skip_discovery`, `scan_web`, `vulnerability_source` and
-`web_options`. The three Nmap fields (`scan_technique`, `ports`, `nmap_flags`) are rejected with HTTP 400
-when they name a file: output options (`-oN`, `-oG`, `-oS`, `-oM`, `-oX`, `-oA`, `-o`, `-m`, however
-spelled or clustered, as in `-6o`), `-iL`, `--excludefile`, `--datadir`, `--servicedb`, `--versiondb`,
-`--stylesheet`, `--resume` and `--append-output`. A single-dash spelling of a long option that starts with
-`o`, `i` or `m` (`-max-retries`) is refused as well; write long options with `--`. A profile saved earlier with such an option is held to the same rule: `PUT /api/profiles/<pid>` answers 400 for any change until `nmap_flags` is edited to drop the option, and a schedule that uses it is disabled when it next comes due (enable it again after the edit). Boolean fields require JSON booleans. Web-only mode sets
+`web_options`. Since v2.7.0 the dashboard has no free-text Nmap options: a scan, profile or schedule
+request whose `nmap_flags` is not empty is refused with HTTP 400 and the fixed message `Nmap options
+are not accepted; use the scan technique, ports and detection settings`, whatever the option (file
+options such as `-oN` and `-iL`, NSE options such as `--script` and `--script-args`, or any other); an
+absent, empty or blank one is what defaults and earlier clients send and is stored as `""`. The Nmap
+arguments are built only from the structured fields, which are checked against fixed lists: `scan_technique`
+is `""` (Nmap's default) or one of the techniques the Scan Technique list offers (`-sS`, `-sT`, `-sA`,
+`-sW`, `-sM`, `-sU`, `-sN`, `-sF`, `-sX`); `ports` is empty or a comma list of port numbers 1–65535 and
+ranges `first-last` (first at most last) such as `22,80,1-1000`, at most 2048 characters, without
+spaces inside, `T:`/`U:` prefixes or `-` shorthand; `version_intensity` is an integer 0–9; the numeric
+fields are integers. A value outside these lists is refused with
+400, so no field can carry an Nmap option or a second argument, and a target whose parts start with `-`
+is refused as well. In a job's `config`, `nmap_flags` is the argument string the dashboard built from
+those fields. A profile or schedule saved by an earlier release that holds Nmap options, or a technique
+or ports outside the lists above, is kept as it was and never used: at startup a copy of the file is
+set aside as `<name>.corrupt-<UTC timestamp>` (one copy of an identical file), a schedule that uses it is
+disabled when it next comes due with one log line that names the reason, and nothing scans with it.
+`PUT /api/profiles/<pid>` (the form's Save) replaces the stored options, so saving the profile again
+removes them; the schedule is then enabled again by hand. Boolean fields require JSON booleans. Web-only mode sets
 `scan_ports:false,scan_web:true` and disables discovery/CVE lookup. Noise mode
 falls back to normal in the dashboard. Job statuses are `running`, `stopping`,
 `completed`, `partial`, `stopped` or `error`; progress can have a null percentage.

@@ -78,7 +78,7 @@ from autopwn_suite.credential_files import (
     delivery_error_summary,
 )
 from autopwn_suite.nist_search import VulnerabilityLookup
-from autopwn_suite.nmap_progress import ScanCancelled, uses_files
+from autopwn_suite.nmap_progress import ScanCancelled
 from autopwn_suite.paths import data_dir
 from autopwn_suite.vulnerability_db import DatabaseInUse, database_path, database_status, update_database
 from autopwn_suite.web.options import CHECKS as WEB_CHECKS
@@ -105,10 +105,20 @@ import re as _re
 
 # Characters allowed in nmap targets: IPs, CIDR, hostnames, ranges
 _TARGET_RE = _re.compile(r'^[a-zA-Z0-9\.\-\:\/\, ]+$')
-# Allowed nmap flag patterns: dash-prefixed flags, numbers, commas, equals, colons, slashes
-_NMAP_FLAG_RE = _re.compile(r'^[\sa-zA-Z0-9\.\-\_\=\,\:\/\*\?]+$')
 # Shell metacharacters that must never appear in nmap arguments
 _SHELL_DANGEROUS = set(';|&`$(){}[]<>!\n\r\\\'\"~')
+
+# The dashboard has no free-text Nmap options: it builds the arguments itself from the structured scan settings.
+_NMAP_OPTIONS_REFUSED = "Nmap options are not accepted; use the scan technique, ports and detection settings"
+# The scan techniques the Scan Technique list of the scan and profile forms offers; "" leaves the default.
+_SCAN_TECHNIQUES = ("", "-sS", "-sT", "-sA", "-sW", "-sM", "-sU", "-sN", "-sF", "-sX")
+# A port specification: port numbers (1-65535), ranges and comma lists. Nothing in it is whitespace or starts an option.
+_PORT_SPEC_RE = _re.compile(r"[1-9][0-9]{0,4}(?:-[1-9][0-9]{0,4})?(?:,[1-9][0-9]{0,4}(?:-[1-9][0-9]{0,4})?)*")
+_PORT_SPEC_MAX = 2048
+
+
+class _OptionsRefused(ValueError):
+    """Free-text Nmap options in a request, or in a profile or schedule that an earlier release stored."""
 
 
 def _validate_target(target: str) -> Optional[str]:
@@ -121,22 +131,29 @@ def _validate_target(target: str) -> Optional[str]:
         return "target contains invalid characters"
     if not _TARGET_RE.match(target):
         return "target contains invalid characters"
+    if any(token.startswith("-") for token in _re.split(r"[\s,]+", target)):
+        return "target contains invalid characters"  # a target that starts with a dash is an Nmap option
     return None
 
 
-def _validate_nmap_flags(flags: str) -> Optional[str]:
-    """Return an error string if nmap flags are invalid, else None."""
-    if not isinstance(flags, str):
-        return "nmap_flags must be a string"
-    if not flags:
-        return None
-    if any(c in _SHELL_DANGEROUS for c in flags):
-        return "nmap_flags contains invalid characters"
-    if not _NMAP_FLAG_RE.match(flags):
-        return "nmap_flags contains invalid characters"
-    if any(uses_files(token) for token in flags.split()):
-        return "nmap_flags cannot read or write files"
-    return None
+def _refuse_options(value) -> None:
+    """Nmap options are not accepted as text: only an empty (or blank) string is the default."""
+    if not isinstance(value, str):
+        raise ValueError("'nmap_flags' must be a string")
+    if value.strip():
+        raise _OptionsRefused(_NMAP_OPTIONS_REFUSED)
+
+
+def _checked_ports(ports: str) -> str:
+    """The port specification without surrounding blanks, or ValueError unless it is numbers, ranges and lists."""
+    ports = ports.strip()
+    if not ports:
+        return ""
+    if (len(ports) > _PORT_SPEC_MAX or not _PORT_SPEC_RE.fullmatch(ports)
+            or any(int(number) > 65535 for number in _re.findall(r"[0-9]+", ports))
+            or any(int(first) > int(last) for first, last in _re.findall(r"([0-9]+)-([0-9]+)", ports))):
+        raise ValueError("'ports' must be port numbers and ranges such as 22,80,1-1000")
+    return ports
 
 
 def _validate_job_target(target, config):
@@ -442,6 +459,18 @@ def _set_aside(path: Path, *, move: bool) -> str:
     return f"The original of {path.name} is kept as {kept.name}."
 
 
+def _refused_profiles(profiles: dict) -> list:
+    """Ids of the stored profiles that this release's validation refuses: those saved with Nmap options, which the
+    dashboard no longer accepts, or with a technique or ports outside the structured fields."""
+    refused = []
+    for pid, profile in profiles.items():
+        try:
+            _profile_config({}, profile.get("config", {}))
+        except Exception:  # a hand-edited file can hold anything; loading must not stop on it
+            refused.append(pid)
+    return refused
+
+
 def _load_profiles() -> None:
     global _profiles
     if _PROFILES_FILE.exists():
@@ -453,6 +482,11 @@ def _load_profiles() -> None:
             if len(valid) != len(data):
                 logging.error("Skipped %d invalid entries of %s. %s", len(data) - len(valid), _PROFILES_FILE.name,
                               _set_aside(_PROFILES_FILE, move=False))
+            refused = _refused_profiles(valid)
+            if refused:  # kept as they are: nothing scans with them until they are saved again
+                logging.error("Kept %d profile(s) of %s that this release refuses (Nmap options, or a technique or ports "
+                              "outside the structured fields); scheduled scans that use them are disabled when due. %s",
+                              len(refused), _PROFILES_FILE.name, _set_aside(_PROFILES_FILE, move=False))
             with _profiles_lock:
                 _profiles = valid
             return
@@ -483,6 +517,16 @@ _schedule_jobs: dict = {}
 _schedule_overlap_logged: set = set()
 
 
+def _holds_options(record: dict) -> bool:
+    """Whether a stored record carries Nmap options as text, which the dashboard no longer accepts."""
+    try:
+        if "nmap_flags" in record:
+            _refuse_options(record["nmap_flags"])
+    except ValueError:
+        return True
+    return False
+
+
 def _load_schedules() -> None:
     global _schedules
     if _SCHEDULES_FILE.exists():
@@ -495,6 +539,10 @@ def _load_schedules() -> None:
             if len(valid) != len(data):
                 logging.error("Skipped %d invalid entries of %s. %s", len(data) - len(valid), _SCHEDULES_FILE.name,
                               _set_aside(_SCHEDULES_FILE, move=False))
+            held = [sid for sid, sched in valid.items() if _holds_options(sched)]
+            if held:  # kept as they are: each is disabled when it comes due
+                logging.error("Kept %d schedule(s) of %s that carry Nmap options, which the dashboard no longer accepts. %s",
+                              len(held), _SCHEDULES_FILE.name, _set_aside(_SCHEDULES_FILE, move=False))
             data = valid
             with _schedules_lock:
                 _schedules = data
@@ -1100,9 +1148,9 @@ def _log(job: ScanJob, msg: str, level: str = "info") -> None:
 
 
 def _build_nmap_flags(config: dict) -> str:
-    """Build the full nmap_flags string from both the free-text field and
-    the structured profile fields (scan_technique, ports, version_intensity,
-    os_detection).  This ensures scheduled scans from profiles work correctly."""
+    """Build the Nmap arguments from the structured fields of a config that _profile_config has validated
+    (scan_technique, ports, version_intensity, os_detection). Each is a fixed option name or a value without
+    whitespace that cannot start an option, so the string splits back into exactly these arguments."""
     parts = []
     if config.get("scan_technique"):
         parts.append(config["scan_technique"])
@@ -1113,8 +1161,6 @@ def _build_nmap_flags(config: dict) -> str:
         parts.append(f"--version-intensity {vi}")
     if config.get("os_detection"):
         parts.append("-O")
-    if config.get("nmap_flags"):
-        parts.append(config["nmap_flags"])
     return " ".join(parts)
 
 
@@ -1489,6 +1535,11 @@ def _integer_option(value, field, minimum, maximum=None):
     return number
 
 
+def _refusal(error: ValueError, generic: str) -> str:
+    """Fixed text for a refused configuration; the error's own text is never sent."""
+    return _NMAP_OPTIONS_REFUSED if isinstance(error, _OptionsRefused) else generic
+
+
 def _profile_config(body, existing=None):
     """Apply the same profile rules when creating, editing, or scheduling."""
     defaults = {"mode": "normal", "speed": 3, "scan_type": None,
@@ -1501,6 +1552,7 @@ def _profile_config(body, existing=None):
     config = dict(defaults)
     for source in (existing or {}, body):
         config.update({key: source[key] for key in defaults if key in source})
+    _refuse_options(config["nmap_flags"])
     config["web_options"] = normalize_options(body.get("web_options", {}), (existing or {}).get("web_options", {}))
     if config["vulnerability_source"] not in ("auto", "online", "offline"):
         raise ValueError("'vulnerability_source' must be auto, online, or offline")
@@ -1520,14 +1572,15 @@ def _profile_config(body, existing=None):
         raise ValueError("Select at least one web check")
     if config["scan_web"] and not config["scan_ports"]:
         config.update(scan_vulns=False, skip_discovery=True)
-    for key in ("scan_technique", "ports", "nmap_flags"):
+    config["nmap_flags"] = ""
+    for key in ("scan_technique", "ports"):
         if not isinstance(config[key], str):
             raise ValueError(f"'{key}' must be a string")
+    if config["scan_technique"] not in _SCAN_TECHNIQUES:
+        raise ValueError("'scan_technique' must be one of the techniques the dashboard offers")
+    config["ports"] = _checked_ports(config["ports"])
     intensity = config["version_intensity"]
     config["version_intensity"] = None if intensity is None or intensity == "" else _integer_option(intensity, "version_intensity", 0, 9)
-    flags_error = _validate_nmap_flags(_build_nmap_flags(config))
-    if flags_error:
-        raise ValueError(flags_error)
     return config
 
 
@@ -1535,6 +1588,9 @@ def _schedule_data(body, existing=None):
     """Validate the full merged record before changing a saved schedule."""
     if not isinstance(body, dict):
         raise ValueError("Schedule must be an object")
+    for record in (existing or {}, body):  # a schedule uses its profile's settings and carries no Nmap options of its own
+        if "nmap_flags" in record:
+            _refuse_options(record["nmap_flags"])
     fields = ("name", "target", "profile_id", "enabled", "type", "interval_value",
               "interval_unit", "time_utc", "weekday")
     result = {"name": "", "target": "", "profile_id": None, "enabled": True,
@@ -1717,8 +1773,10 @@ def _disable_invalid_schedule(schedule: dict, error: ValueError) -> None:
             return
         stored["enabled"] = False
     _save_schedules()
-    _log_schedule_disabled(schedule, "a validation failure")
-    _scheduler_note("error", f"[!] Scheduled scan disabled ({schedule.get('name') or schedule['id'][:8]}): {error}. "
+    refused = isinstance(error, _OptionsRefused)
+    _log_schedule_disabled(schedule, "stored Nmap options" if refused else "a validation failure")
+    reason = "the schedule or its profile holds Nmap options, which the dashboard no longer accepts" if refused else error
+    _scheduler_note("error", f"[!] Scheduled scan disabled ({schedule.get('name') or schedule['id'][:8]}): {reason}. "
                     "Edit the schedule or its profile and enable it again.")
 
 
@@ -1881,8 +1939,8 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
 
         try:
             config = _profile_config(body)
-        except ValueError:
-            return jsonify({"error": "Invalid scan configuration"}), 400
+        except ValueError as error:
+            return jsonify({"error": _refusal(error, "Invalid scan configuration")}), 400
         target_err = _validate_job_target(target, config)
         if target_err:
             return jsonify({"error": target_err}), 400
@@ -2232,8 +2290,8 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             return jsonify({"error": "'description' must be a string"}), 400
         try:
             config = _profile_config(body)
-        except ValueError:
-            return jsonify({"error": "Invalid scan configuration"}), 400
+        except ValueError as error:
+            return jsonify({"error": _refusal(error, "Invalid scan configuration")}), 400
         pid = str(uuid.uuid4())
         profile = {
             "id":         pid,
@@ -2264,10 +2322,13 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                 if not isinstance(body["description"], str):
                     return jsonify({"error": "'description' must be a string"}), 400
                 p["description"] = body["description"]
+            stored = p.get("config", {})
+            if isinstance(stored, dict):  # saving replaces what an earlier release stored as Nmap options
+                stored = {key: value for key, value in stored.items() if key != "nmap_flags"}
             try:
-                p["config"] = _profile_config(body, p.get("config", {}))
-            except ValueError:
-                return jsonify({"error": "Invalid scan configuration"}), 400
+                p["config"] = _profile_config(body, stored)
+            except ValueError as error:
+                return jsonify({"error": _refusal(error, "Invalid scan configuration")}), 400
             _profiles[pid] = p
             # A schedule that no longer validates against the edited profile (a CIDR target on a
             # web-only profile, say) would fail every minute; turn it off now, as a delete does.
@@ -2317,8 +2378,8 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         body = request.get_json(force=True, silent=True)
         try:
             schedule = _schedule_data(body)
-        except ValueError:
-            return jsonify({"error": "Invalid schedule configuration"}), 400
+        except ValueError as error:
+            return jsonify({"error": _refusal(error, "Invalid schedule configuration")}), 400
         sid = str(uuid.uuid4())
         schedule.update({
             "id": sid, "name": body.get("name", f"Schedule {sid[:8]}"),
@@ -2343,10 +2404,11 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                 if isinstance(body, dict) and body.keys() == {"enabled"} and body["enabled"] is False:
                     s = dict(_schedules[sid], enabled=False)  # turning a schedule off needs no valid record
                 else:
+                    stored = {key: value for key, value in _schedules[sid].items() if key != "nmap_flags"}
                     try:
-                        s = _schedule_data(body, _schedules[sid])
-                    except ValueError:
-                        return jsonify({"error": "Invalid schedule configuration"}), 400
+                        s = _schedule_data(body, stored)
+                    except ValueError as error:
+                        return jsonify({"error": _refusal(error, "Invalid schedule configuration")}), 400
                     if s["profile_id"] not in _profiles:
                         return jsonify({"error": "Profile not found"}), 400
                 old = _schedules[sid]

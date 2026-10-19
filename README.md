@@ -124,10 +124,11 @@ through, or sign-in is refused as cross-origin); localhost works over plain HTTP
 - **Multiple concurrent scans** - Launch and monitor several scans at the same time
 - **Live terminal output** - Watch nmap commands and results in real time via SSE
 - **Scan progress** - Live Nmap stage percentages, completed CVE lookup counts and target completion counters. The bar follows the current stage; stages without a reported percentage show ongoing activity. Stopped and failed scans retain their last measured progress.
-- **Scan profiles** - Save and reuse scan configurations (technique, speed, timeout, ports, evasion, custom flags)
+- **Scan profiles** - Save and reuse scan configurations (technique, speed, timeout, ports, version intensity, OS detection, evasion)
 - **Web security dashboard** - Select application checks, inspect captured evidence and remediation, download PoCs, and explicitly replay recorded checks
 - **Scheduled scans** - Set up recurring scans on a cron schedule with automatic profile loading
 - **Scan techniques** - Choose between TCP SYN, TCP Connect, UDP, Window, ACK, FIN, Xmas, Null, Maimon and SCTP scans
+- **No free-text Nmap options** - Since v2.7.0 the dashboard builds the Nmap arguments only from its own controls (scan technique list, ports, version intensity, OS detection, speed, timeout and mode). It has no box for Nmap options, so it cannot be made to run NSE scripts or to read or write files through Nmap, and the API refuses a non-empty `nmap_flags`. The ports field takes numbers from 1 to 65535, ranges and comma lists (`22,80,1-1000`). A profile saved by an earlier release with Nmap options is kept but not used: its scheduled scans are disabled until you save it again, which removes them. Custom Nmap flags remain available to the trusted command line (`--nmap-flags`) and the Python API (`nmap_args`)
 - **Evasion mode** - Fragmented packets, spoofed source port and padded data length
 - **Email notifications** - Get notified on scan completion with inline result summaries
 - **Webhook notifications** - Post scan results to any webhook endpoint
@@ -147,7 +148,8 @@ The CLI, Python API and dashboard use the project's `autopwn_suite/nmap_backend.
 to run the system Nmap executable directly and parse its
 [XML output](https://nmap.org/book/output-formats-xml-output.html) with Python's standard library.
 Install Nmap and make sure `nmap` is on `PATH`; no Python Nmap wrapper is required.
-Host discovery, TCP/UDP services, OS/vendor detection, custom Nmap flags and NSE
+Host discovery, TCP/UDP services, OS/vendor detection, custom Nmap flags (command line and
+Python API only; the dashboard builds its arguments from its own controls) and NSE
 results are supported. Dashboard scans retain live progress and cancellation.
 The adapter also exposes complete raw XML, CPE identifiers and nested NSE tables
 for callers that need more detail, and rejects failed or incomplete XML output.
