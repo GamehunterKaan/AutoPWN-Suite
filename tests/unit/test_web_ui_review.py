@@ -168,6 +168,22 @@ def test_missing_saved_profile_does_not_fall_back_to_default_scan(client_review,
     wu_review._launch_scan.assert_not_called()
 
 
+def test_stored_profile_with_a_refused_flag_neither_fires_nor_changes_until_the_flag_is_removed(client_review, wu_review):
+    profile_id = _profile(client_review)
+    schedule_id = _schedule(client_review, profile_id)
+    # As saved by a release that still accepted file options.
+    wu_review._profiles[profile_id]["config"]["nmap_flags"] = "-sV -oN refused.txt"
+    _one_scheduler_tick(wu_review)
+    wu_review._launch_scan.assert_not_called()
+    assert schedule_id not in wu_review._schedule_last_run
+    assert client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed"}).status_code == 400
+    assert wu_review._profiles[profile_id]["name"] == "Offline profile"
+    repaired = client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed", "nmap_flags": "-sV"})
+    assert repaired.status_code == 200
+    _one_scheduler_tick(wu_review)
+    wu_review._launch_scan.assert_called_once()
+
+
 def test_naive_saved_last_run_is_restored_as_utc(client_review, wu_review):
     profile_id = _profile(client_review)
     schedule_id = _schedule(client_review, profile_id)
