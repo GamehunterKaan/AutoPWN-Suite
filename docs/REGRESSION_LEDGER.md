@@ -6,7 +6,7 @@ added for at least 50% of the bugs fixed in the last six months. This ledger cov
 
 ## Method
 
-1. Take every non-merge commit reachable from the 2.7.0 release in the window (**291**).
+1. Take every non-merge commit reachable from the 2.7.0 release in the window (**293**).
 2. Select the commits that fix a defect in product behavior. Read the subject and the change:
    the words `fix`, `bug`, `vulnerability`, `prevent`, `resolve`, `regression`, `correct`, `handle`,
    `avoid`, `harden` and `escape` find some of them, but most fixes of 2.7.0 use other verbs
@@ -32,6 +32,7 @@ this window; the most recent bug report (#67) predates it.
 
 | Commit | Date | Fix | Regression tests changed in the same commit |
 | --- | --- | --- | --- |
+| `ef1dd44` | 2026-10-19 | Write a raw space in a crawled link as %20, correct the limits the re-reviews found, and bound a timing test by size | `tests/unit/test_web_crawler.py` |
 | `ec9ef0f` | 2026-10-19 | Read a URL whole before a line separator turns into a space, and encode URLs alike in the PoC runtime | `tests/unit/test_hostile_text.py`, `tests/unit/test_hostile_urls.py`, `tests/unit/test_web_webvuln.py` |
 | `50a9284` | 2026-10-19 | Keep the OS fingerprint's lines and clean what Nmap and the dashboard log when a scan fails | `tests/unit/test_hostile_nmap_text.py` |
 | `e1352a1` | 2026-10-19 | Store the URLs of a finding as percent-encoding instead of raw control characters | `tests/unit/test_fuzz_inputs.py`, `tests/unit/test_hostile_text.py`, `tests/unit/test_hostile_urls.py` and others |
@@ -185,7 +186,7 @@ this window; the most recent bug report (#67) predates it.
 
 ## Result
 
-**137 of 138** product-defect fixes in the window (99%) added or changed automated tests in the
+**138 of 139** product-defect fixes in the window (99%) added or changed automated tests in the
 same commit, above the 50% requirement. CodeQL alerts #4 and #5 (DOM XSS and attribute
 sanitization) and #1 (workflow permissions) were fixed outside the window (2026-04-15 and
 2025-10-18).
