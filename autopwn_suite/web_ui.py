@@ -438,7 +438,7 @@ def _load_schedules() -> None:
                             if restored.tzinfo is None:
                                 restored = restored.replace(tzinfo=timezone.utc)
                             _schedule_last_run[sid] = restored.astimezone(timezone.utc)
-                        except (ValueError, TypeError):
+                        except (ValueError, TypeError, OverflowError):
                             pass
             return
         except Exception:
@@ -1532,9 +1532,9 @@ def _parse_utc(value):
         return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+    except (ValueError, OverflowError):  # the converted time is outside what datetime can hold
         return None
-    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
 
 
 def _slot_due(schedule: dict, last, slot, now) -> bool:

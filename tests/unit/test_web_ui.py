@@ -297,6 +297,19 @@ class TestSchedules:
         wu._load_schedules()
         assert "s2" not in wu._schedule_last_run
 
+    @pytest.mark.parametrize("stamp", ["0001-01-01T00:00:00+05:00", "9999-12-31T23:59:59-05:00"])
+    def test_time_that_does_not_fit_utc_is_ignored_not_fatal(self, wu, stamp):
+        # Converting these to UTC leaves the range datetime supports (OverflowError, not ValueError).
+        assert wu._parse_utc(stamp) is None
+        wu._SCHEDULES_FILE.write_text(json.dumps({
+            "s1": {"id": "s1", "name": "Kept", "type": "daily", "last_run": stamp, "created_at": stamp}}), encoding="utf-8")
+        wu._load_schedules()
+        assert wu._schedules["s1"]["name"] == "Kept" and "s1" not in wu._schedule_last_run
+        assert not list(wu._SCHEDULES_FILE.parent.glob("*.corrupt-*"))
+        # The scheduler's check treats it as no creation time rather than raising every minute.
+        assert isinstance(wu._should_fire({"id": "s1", "enabled": True, "type": "daily", "time_utc": "02:00",
+                                           "created_at": stamp}), bool)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ScanJob

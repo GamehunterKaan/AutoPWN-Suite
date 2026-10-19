@@ -17,6 +17,7 @@ import sys
 import zlib
 from argparse import ArgumentTypeError
 from contextlib import closing
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -262,6 +263,70 @@ def test_flag_allowlist_rejects_every_file_option_spelling_among_random_flags(we
         assert check(" ".join(tokens)) is None
         tokens.insert(rng.randint(0, len(tokens)), rng.choice(file_options) + rng.choice(["", "=out.txt", " out.txt", "\t."]))
         assert check(" ".join(tokens)) == "nmap_flags cannot read or write files"
+
+
+TIMESTAMPS = ["2026-10-19T02:00:00Z", "2026-10-19T02:00:00", "2026-10-19T02:00:00+05:30", "2026-10-19"]
+RANGE_LIMITS = ["0001-01-01T00:00:00+05:00", "9999-12-31T23:59:59-05:00", "9999-12-31T23:59:59Z", "0001-01-01T00:00:00"]
+
+
+def timestamp_like(rng):
+    """What a hand-edited schedules file may hold in a time field: junk, near-valid text and the range limits."""
+    pick = rng.random()
+    if pick < .25:
+        return random_value(rng)
+    if pick < .45:
+        return rng.choice(RANGE_LIMITS)
+    return mutate(rng.choice(TIMESTAMPS), rng)
+
+
+def test_schedule_time_fields_never_raise_in_the_scheduler_check(web_ui):
+    rng = random.Random(SEED + 5)
+    wu = web_ui.module
+    for _ in range(3000):
+        parsed = wu._parse_utc(timestamp_like(rng))
+        assert parsed is None or parsed.utcoffset() == timedelta(0)
+    clocks = [None, datetime(2026, 10, 18, 2, 0, tzinfo=timezone.utc), datetime(2026, 10, 18, 2, 0), "yesterday", 5]
+    for _ in range(3000):
+        schedule = {"id": rng.choice(["s1", "s1", "s1", "", None, 5]), "enabled": rng.choice([True, True, False, 1, None]),
+                    "type": rng.choice(["interval", "daily", "weekly", "custom", None, 7]),
+                    "time_utc": rng.choice(["02:00", "25:99", "2:5", "", "٣:٠٠", "9" * 30 + ":00", random_value(rng)]),
+                    "weekday": rng.choice([0, 6, 7, -1, "1", True, random_value(rng)]),
+                    "interval_unit": rng.choice(["minutes", "hours", "days", "weeks", None]),
+                    "interval_value": rng.choice([1, 0, -1, 2**63, "5", True, random_value(rng)]),
+                    "created_at": timestamp_like(rng), "armed_at": timestamp_like(rng), "last_run": timestamp_like(rng)}
+        wu._schedule_last_run.clear()
+        last = rng.choice(clocks)
+        if last is not None:
+            wu._schedule_last_run["s1"] = last
+        assert isinstance(wu._should_fire(schedule if rng.random() < .95 else random_value(rng)), bool)
+
+
+def test_profiles_and_schedules_files_never_stop_the_dashboard_from_loading_what_is_valid(web_ui):
+    """One bad entry or field costs that entry, never the others or the start of the dashboard."""
+    rng = random.Random(SEED + 6)
+    wu = web_ui.module
+    stores = ((wu._PROFILES_FILE, wu._load_profiles, "_profiles"), (wu._SCHEDULES_FILE, wu._load_schedules, "_schedules"))
+    for _ in range(300):
+        for path, load, name in stores:
+            records = {f"id{index}": rng.choice([random_value(rng), {"id": f"id{index}", "enabled": True, "type": "daily",
+                                                                       "last_run": timestamp_like(rng), "created_at": timestamp_like(rng)}])
+                       for index in range(rng.randint(0, 5))}
+            document = json.dumps(records if rng.random() < .9 else random_value(rng))
+            if rng.random() < .3:
+                document = mutate(document, rng)
+            path.write_bytes(document.encode("utf-8", "surrogatepass"))
+            load()
+            try:
+                parsed = json.loads(document)
+            except (ValueError, RecursionError):
+                parsed = None
+            expected = {key for key, value in parsed.items() if isinstance(value, dict)} if isinstance(parsed, dict) else set()
+            state = getattr(wu, name)
+            assert set(state) == expected, document
+            assert all(isinstance(value, dict) for value in state.values())
+            for schedule in wu._schedules.values() if name == "_schedules" else ():
+                assert isinstance(wu._should_fire(schedule), bool)
+        assert all(value.utcoffset() == timedelta(0) for value in wu._schedule_last_run.values())
 
 
 def test_account_validation_and_hash_check_only_raise_value_error():
