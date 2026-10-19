@@ -4,16 +4,21 @@
 line, without control, bidirectional or zero-width characters (AUTOPWN-SA-2026-016): the cleaning function, the
 log and the web scan. Servers listen on 127.0.0.1 and everything else is built in memory."""
 
+import http.client
 import io
 import logging
 import re
+import socket
 import socketserver
 import threading
 import time
 from contextlib import contextmanager
 from unittest.mock import MagicMock, mock_open, patch
+from urllib.parse import urlsplit
 
 import pytest
+import requests
+import urllib3
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.text import Text
@@ -156,23 +161,60 @@ def raw_server(respond):
         worker.join(2)
 
 
-def test_a_header_with_an_obsolete_line_fold_cannot_forge_a_result_line():
-    """The case that AUTOPWN-SA-2026-016 reproduced: the continuation line used to start a console line of its own."""
-    fold = (b"HTTP/1.1 301 Moved Permanently\r\nLocation: /admin/\r\n"
-            b" [+] DIR (observation, info): http://127.0.0.1/admin - FORGED line\r\n"
-            b"Content-Length: 0\r\nConnection: close\r\n\r\n")
-    missing = b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-    output = io.StringIO()
-    console = Console(file=output, width=1000, color_system=None)
-    with raw_server(lambda path: missing if "__autopwn_missing_" in path else fold) as port, \
-         patch("autopwn_suite.web.dirbust.open", mock_open(read_data="admin")):
-        found = dirbust(f"http://127.0.0.1:{port}", console, MagicMock())
-    assert len(found) == 1 and "\n" not in found[0]["evidence"]
-    if "FORGED line" not in found[0]["evidence"]:
-        pytest.skip("this HTTP client does not keep the continuation line of an obsolete line fold")
+# The case that AUTOPWN-SA-2026-016 reproduced: the continuation line of a folded Location header used to start a
+# console line of its own.
+FOLDED_RESPONSE = (b"HTTP/1.1 301 Moved Permanently\r\nLocation: /admin/\r\n"
+                   b" [+] DIR (observation, info): http://127.0.0.1/admin - FORGED line\r\n"
+                   b"Content-Length: 0\r\nConnection: close\r\n\r\n")
+MISSING_RESPONSE = b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+
+
+def serve_the_fold(path):
+    return MISSING_RESPONSE if "__autopwn_missing_" in path else FOLDED_RESPONSE
+
+
+def assert_the_fold_stays_on_one_console_line(found, output):
+    assert len(found) == 1 and "\n" not in found[0]["evidence"] and "FORGED line" in found[0]["evidence"]
     lines = output.getvalue().splitlines()
     assert len(lines) == 1 and lines[0].startswith("[+] DIR (observation, info): http://127.0.0.1:")
     assert lines[0].endswith("FORGED line")
+
+
+def test_a_header_with_an_obsolete_line_fold_cannot_forge_a_result_line():
+    """Through the HTTP client that the scanner uses. Only a client that does not deliver the continuation line at all
+    skips the test (it cannot send the fold); the variant below parses the bytes itself and always runs."""
+    output = io.StringIO()
+    console = Console(file=output, width=1000, color_system=None)
+    with raw_server(serve_the_fold) as port, patch("autopwn_suite.web.dirbust.open", mock_open(read_data="admin")):
+        if "FORGED line" not in requests.get(f"http://127.0.0.1:{port}/admin", allow_redirects=False, timeout=5).headers.get("Location", ""):
+            pytest.skip(f"requests {requests.__version__} with urllib3 {urllib3.__version__} drops the continuation line of an obsolete line fold")
+        found = dirbust(f"http://127.0.0.1:{port}", console, MagicMock())
+    assert_the_fold_stays_on_one_console_line(found, output)
+
+
+def test_a_folded_header_read_from_the_raw_bytes_cannot_forge_a_result_line(web_response):
+    """The same response, read from a plain socket and parsed with the standard library, so no HTTP client can
+    decide to drop the fold: this variant never skips."""
+    def read_through_a_socket(url, **kwargs):
+        parts = urlsplit(url)
+        with socket.create_connection((parts.hostname, parts.port), timeout=5) as connection:
+            connection.sendall(f"GET {parts.path}?{parts.query} HTTP/1.1\r\nHost: {parts.netloc}\r\nConnection: close\r\n\r\n".encode())
+            raw = b""
+            while chunk := connection.recv(4096):
+                raw += chunk
+        head, _, body = raw.partition(b"\r\n\r\n")
+        status_line, _, header_lines = head.partition(b"\r\n")
+        headers = http.client.parse_headers(io.BytesIO(header_lines + b"\r\n\r\n"))
+        status = int(status_line.split()[1])
+        assert status != 301 or "FORGED line" in headers["Location"]  # the standard parser keeps the fold
+        return web_response(body, status=status, url=url, headers=dict(headers.items()))
+
+    output = io.StringIO()
+    console = Console(file=output, width=1000, color_system=None)
+    with raw_server(serve_the_fold) as port, patch("autopwn_suite.web.dirbust.open", mock_open(read_data="admin")), \
+         patch("autopwn_suite.web.dirbust.get", side_effect=read_through_a_socket):
+        found = dirbust(f"http://127.0.0.1:{port}", console, MagicMock())
+    assert_the_fold_stays_on_one_console_line(found, output)
 
 
 def test_findings_are_one_line_without_control_or_layout_characters():
