@@ -562,3 +562,73 @@ renderHosts(); renderDetail(hosts.ip);
 assert.doesNotMatch(nodes.get('hosts-grid').children[0].innerHTML,/hc-badge clean/);
 assert.doesNotMatch(nodes.get('det-content').innerHTML,/No vulnerabilities found/);
 """)
+
+
+HOSTILE_SEVERITY_SCRIPT = r"""
+// A copied or poisoned vulnerability mirror controls these two fields.
+const severity='high"><img src=x onerror=alert(1)>', cvss='9.8"><svg onload=alert(2)>';
+const hostile={cve:'CVE-2020-0001',severity,cvss,description:'d',port:80,keyword:'k'};
+const odd=[{cve:'CVE-2020-0002',severity:null,cvss:0,description:'d'},{cve:'CVE-2020-0003',severity:'Critical',cvss:9.8,description:'d'}];
+const markup=/<img src=x|<svg onload/;  // the injected tags, not the page's own logo and icons
+function reportHtml(){let html='';window.open=()=>({document:{write(value){html=value},close(){}},close(){}});return ()=>html}
+"""
+
+
+def test_detail_panel_and_vulnerability_table_never_render_severity_or_cvss_as_markup():
+    run_js(HOSTILE_SEVERITY_SCRIPT + r"""
+renderDetail({ip:'192.0.2.1',ports:[],vulns:[hostile,...odd],scan_status:'completed'});
+const detail=nodes.get('det-content').innerHTML;
+assert.doesNotMatch(detail,markup);
+assert.match(detail,/<div class="vr unknown"><div class="vc"><span class="sev unknown">UNKNOWN<\/span>CVE-2020-0001<span class="cvb unknown">9.8&quot;&gt;&lt;svg onload=alert\(2\)&gt;<\/span>/);
+assert.match(detail,/<div class="vr critical"><div class="vc"><span class="sev critical">CRITICAL<\/span>CVE-2020-0003<span class="cvb critical">9.8<\/span>/);
+hosts={ip:{ip:'192.0.2.1',scan_id:'s',ports:[],vulns:[hostile,...odd]}};
+renderVulnTable();
+const table=nodes.get('vtb').innerHTML;
+assert.doesNotMatch(table,markup);
+assert.match(table,/<span class="sev unknown">UNKNOWN<\/span>/);
+assert.match(table,/<span class="sev critical">CRITICAL<\/span><\/td><td style="font-family:var\(--mono\);color:var\(--red\)">9.8</);
+assert.match(table,/CVE-2020-0002<\/td><td><span class="sev unknown">UNKNOWN<\/span><\/td><td style="font-family:var\(--mono\);color:var\(--text2\)">—</);
+""")
+
+
+def test_severity_filters_match_the_displayed_normalised_severity():
+    run_js(HOSTILE_SEVERITY_SCRIPT + r"""
+hosts={ip:{ip:'192.0.2.1',scan_id:'s',ports:[],vulns:[hostile,...odd]}};
+document.getElementById('vuln-sev').value='unknown';
+renderVulnTable();
+const unknown=nodes.get('vtb').innerHTML;
+assert.equal((unknown.match(/<tr>/g)||[]).length,2);
+assert.doesNotMatch(unknown,/CVE-2020-0003/);
+document.getElementById('vuln-sev').value='critical';
+renderVulnTable();
+assert.match(nodes.get('vtb').innerHTML,/CVE-2020-0003/);
+assert.doesNotMatch(nodes.get('vtb').innerHTML,/CVE-2020-0001|CVE-2020-0002/);
+hosts={ip:{ip:'192.0.2.1',scan_status:'completed',ports:[],vulns:[odd[1]]}};
+renderHosts();
+assert.match(nodes.get('hosts-grid').children[0].innerHTML,/hc-badge vulns/);
+""")
+
+
+@pytest.mark.parametrize("report", ["printHost('192.0.2.1')", "printAllVulns()", "printAllHosts()"])
+def test_exported_reports_never_render_severity_or_cvss_as_markup(report):
+    run_js(HOSTILE_SEVERITY_SCRIPT + f"const report={json.dumps(report)};" + r"""
+hosts={'192.0.2.1':{ip:'192.0.2.1',scan_id:'s',ports:[],vulns:[hostile,...odd]}};
+const html=reportHtml();
+eval(report);
+assert.doesNotMatch(html(),markup);
+assert.match(html(),/<td class="sev-unknown">UNKNOWN<\/td>/);
+assert.match(html(),/<td class="sev-critical">CRITICAL<\/td>/);
+assert.match(html(),/9.8&quot;&gt;&lt;svg onload=alert\(2\)&gt;/);
+""")
+
+
+def test_scan_report_never_renders_severity_or_cvss_as_markup():
+    run_js(HOSTILE_SEVERITY_SCRIPT + r"""
+scans={s:{id:'s',target:'192.0.2.1',status:'completed',host_count:1,started_at:'2026-10-19T00:00:00Z'}};
+const html=reportHtml();
+fetch=async()=>({ok:true,json:async()=>({hosts:[{ip:'192.0.2.1',ports:[],vulns:[hostile,...odd]}]})});
+await printScan('s');
+assert.doesNotMatch(html(),markup);
+assert.match(html(),/<td class="sev-unknown">UNKNOWN<\/td>/);
+assert.match(html(),/<td class="sev-critical">CRITICAL<\/td>/);
+""")

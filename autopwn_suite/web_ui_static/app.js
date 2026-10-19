@@ -93,6 +93,11 @@ function updateProfilePreview() {
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function shortId(id){ return id ? id.slice(0,8) : ''; }
+// Severity comes from the vulnerability database, which a copied mirror can fill with anything: it only
+// ever reaches a class attribute or the page as one of these words, and a CVSS score is escaped as text.
+const SEVERITIES = ['critical','high','medium','low','unknown'];
+function sevClass(s){ const k = String(s ?? '').toLowerCase(); return SEVERITIES.includes(k) ? k : 'unknown'; }
+function cvssText(c){ return c ? esc(c) : '—'; }
 function openReportWindow(){
   const win = window.open('', '_blank');
   if(!win) toast('Allow popups to export a PDF report.', false);
@@ -187,7 +192,8 @@ async function printScan(scanId) {
       if(vulns.length) {
         html += `<h4>Vulnerabilities</h4><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>`;
         vulns.forEach(v => {
-          html += `<tr><td>${esc(v.cve)}</td><td class="sev-${v.severity}">${v.severity.toUpperCase()}</td><td>${v.cvss || '—'}</td><td>${esc(v.description)}</td></tr>`;
+          const sev = sevClass(v.severity);
+          html += `<tr><td>${esc(v.cve)}</td><td class="sev-${sev}">${sev.toUpperCase()}</td><td>${cvssText(v.cvss)}</td><td>${esc(v.description)}</td></tr>`;
         });
         html += `</table>`;
       }
@@ -259,7 +265,8 @@ function printHost(ip) {
   if(vulns.length) {
     html += `<h3>Vulnerabilities (${vulns.length})</h3><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>`;
     vulns.forEach(v => {
-      html += `<tr><td>${esc(v.cve)}</td><td class="sev-${v.severity}">${v.severity.toUpperCase()}</td><td>${v.cvss || '—'}</td><td>${esc(v.description)}</td></tr>`;
+      const sev = sevClass(v.severity);
+      html += `<tr><td>${esc(v.cve)}</td><td class="sev-${sev}">${sev.toUpperCase()}</td><td>${cvssText(v.cvss)}</td><td>${esc(v.description)}</td></tr>`;
     });
     html += `</table>`;
   }
@@ -280,7 +287,7 @@ function printAllVulns() {
   const fScan = document.getElementById('vuln-scanid').value;
   const fSev = document.getElementById('vuln-sev').value;
 
-  const filtered = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || v.severity === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
+  const filtered = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || sevClass(v.severity) === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
   filtered.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
 
   if(!filtered.length) {
@@ -317,10 +324,11 @@ function printAllVulns() {
     <tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Host</th><th>Keyword</th><th>Description</th></tr>
   `;
   filtered.forEach(v => {
+    const sev = sevClass(v.severity);
     html += `<tr>
       <td style="white-space:nowrap;">${esc(v.cve)}</td>
-      <td class="sev-${v.severity}">${v.severity.toUpperCase()}</td>
-      <td>${v.cvss || '—'}</td>
+      <td class="sev-${sev}">${sev.toUpperCase()}</td>
+      <td>${cvssText(v.cvss)}</td>
       <td style="white-space:nowrap;">${esc(v.host)}</td>
       <td>${esc(v.keyword || '')}</td>
       <td>${esc(v.description)}</td>
@@ -378,7 +386,7 @@ function printAllHosts() {
     const vulns = (h.vulns || []);
     if(vulns.length) {
       html += `<h4>Vulnerabilities (${vulns.length})</h4><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>`;
-      vulns.forEach(v => { html += `<tr><td>${esc(v.cve)}</td><td class="sev-${v.severity}">${v.severity.toUpperCase()}</td><td>${v.cvss || '—'}</td><td>${esc(v.description)}</td></tr>`; });
+      vulns.forEach(v => { const sev = sevClass(v.severity); html += `<tr><td>${esc(v.cve)}</td><td class="sev-${sev}">${sev.toUpperCase()}</td><td>${cvssText(v.cvss)}</td><td>${esc(v.description)}</td></tr>`; });
       html += `</table>`;
     }
     html += `<hr style="border:0; border-top:2px dashed #eee; margin:30px 0;">`;
@@ -707,7 +715,7 @@ function renderHosts(){
   grid.innerHTML='';
   list.forEach(h=>{
     const vc=h.vulns?.length||0, scanning=h.scan_status==='scanning';
-    const hasCrit=(h.vulns||[]).some(v=>v.severity==='critical');
+    const hasCrit=(h.vulns||[]).some(v=>sevClass(v.severity)==='critical');
     let bc,bt;
     if(scanning){bc='scanning';bt='scanning…';}
     else if(hostScanLabel(h) !== 'Done'){bc='warn';bt=hostScanLabel(h);}
@@ -746,7 +754,7 @@ function renderDetail(h){
     ?ports.map(p=>`<div class="pr"><span class="pn">${esc(p.protocol||'tcp')}/${esc(p.port)}</span><span class="ps">${esc(p.service||'')}</span><span style="color:var(--text2);font-size:11px">${esc(p.product||'')} ${esc(p.version||'')}</span></div>`).join('')
     :'<div style="color:var(--text3);font-family:var(--mono);font-size:11px;padding:4px 0">No open ports found.</div>';
   const vrs=vulns.length
-    ?vulns.map(v=>`<div class="vr ${v.severity}"><div class="vc"><span class="sev ${v.severity}">${v.severity.toUpperCase()}</span>${esc(v.cve)}${v.cvss?`<span class="cvb ${v.severity}">${v.cvss}</span>`:''}</div><div class="vdesc">${esc(v.description)}</div></div>`).join('')
+    ?vulns.map(v=>{const sev=sevClass(v.severity);return `<div class="vr ${sev}"><div class="vc"><span class="sev ${sev}">${sev.toUpperCase()}</span>${esc(v.cve)}${v.cvss?`<span class="cvb ${sev}">${esc(v.cvss)}</span>`:''}</div><div class="vdesc">${esc(v.description)}</div></div>`;}).join('')
     :h.scan_status==='scanning'
       ?'<div style="color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 0">Scanning in progress…</div>'
       :hostScanLabel(h) !== 'Done'
@@ -797,12 +805,12 @@ function renderVulnTable(){
   const fScan = document.getElementById('vuln-scanid').value;
   const fSev = document.getElementById('vuln-sev').value;
 
-  const filtered = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || v.severity === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
+  const filtered = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || sevClass(v.severity) === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
 
   filtered.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
   const tb=document.getElementById('vtb');
   if(!filtered.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px;font-family:var(--mono);font-size:12px">No vulnerabilities matched.</td></tr>';return;}
-  tb.innerHTML=filtered.map(v=>`<tr><td style="font-family:var(--mono)">${esc(v.cve)}</td><td><span class="sev ${v.severity}">${v.severity.toUpperCase()}</span></td><td style="font-family:var(--mono);color:${cvssColor(v.cvss)}">${v.cvss||'—'}</td><td style="font-family:var(--mono)">${esc(v.host)}</td><td style="font-family:var(--mono);color:var(--text2)">${esc(v.keyword||'')}</td><td style="color:var(--text2)">${esc(v.description)}</td></tr>`).join('');
+  tb.innerHTML=filtered.map(v=>{const sev=sevClass(v.severity);return `<tr><td style="font-family:var(--mono)">${esc(v.cve)}</td><td><span class="sev ${sev}">${sev.toUpperCase()}</span></td><td style="font-family:var(--mono);color:${cvssColor(v.cvss)}">${cvssText(v.cvss)}</td><td style="font-family:var(--mono)">${esc(v.host)}</td><td style="font-family:var(--mono);color:var(--text2)">${esc(v.keyword||'')}</td><td style="color:var(--text2)">${esc(v.description)}</td></tr>`;}).join('');
 }
 
 // ── Badges ────────────────────────────────────────────────────────────────────
