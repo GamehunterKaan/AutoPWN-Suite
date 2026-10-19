@@ -63,6 +63,20 @@ def test_the_cve_listing_prints_the_clean_text_and_never_starts_a_line_of_its_ow
     assert result[0].CVEs == ["CVE-2024-0001 [+] FORGED"]
 
 
+def test_an_unpaired_surrogate_in_provider_text_cannot_abort_the_listing():
+    """A JSON escape such as the one in this description makes a lone surrogate, which a UTF-8 stream cannot write:
+    the console print raised UnicodeEncodeError and ended the scan."""
+    surrogate = json.loads('"bad \\ud800 text"')
+    vulnerability = Vulnerability("keyword", "CVE-2024-0001", "Flaw " + surrogate, "HIGH", 9.8, "https://nvd.test/x", 3.9)
+    stream = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", write_through=True)
+    lookup = SimpleNamespace(search=lambda keyword, log, key: [vulnerability])
+    with patch("autopwn_suite.searchvuln.CheckConnection", return_value=True), \
+         patch("autopwn_suite.searchvuln.get_terminal_width", return_value=100):
+        SearchSploits([["192.0.2.1", 22, "ssh", "OpenSSH", "8.9"]], MagicMock(), Console(file=stream, color_system=None),
+                      Console(file=io.StringIO()), lookup=lookup)
+    assert "Flaw bad  text" in stream.buffer.getvalue().decode("utf-8")
+
+
 def build_database(path, description, updated_at):
     record = {"cve": {"id": "CVE-2025-1234", "descriptions": [{"lang": "en", "value": description}],
                       "metrics": {"cvssMetricV31": [{"type": "Primary", "cvssData": {"baseScore": 7.5, "baseSeverity": "HIGH"},

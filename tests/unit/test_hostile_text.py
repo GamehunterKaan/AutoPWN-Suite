@@ -34,7 +34,8 @@ BIDI = ("\U0000061c\U0000200e\U0000200f\U0000202a\U0000202b\U0000202c\U0000202d\
 ZERO_WIDTH = "\U0000200b\U0000200c\U0000200d\U00002060\U0000feff"
 # Word joiner to the deprecated format characters (U+2060 to U+206F), interlinear annotation and the tag characters.
 OTHER_FORMAT = "".join(map(chr, (*range(0x2060, 0x2070), *range(0xFFF9, 0xFFFC), *range(0xE0000, 0xE0080))))
-FORBIDDEN_TEXT = CONTROLS + SEPARATORS + BIDI + ZERO_WIDTH + OTHER_FORMAT
+SURROGATES = "".join(map(chr, range(0xD800, 0xE000)))  # no UTF-8 stream can write one
+FORBIDDEN_TEXT = CONTROLS + SEPARATORS + BIDI + ZERO_WIDTH + OTHER_FORMAT + SURROGATES
 FORBIDDEN = re.compile("[" + re.escape(FORBIDDEN_TEXT) + "]")
 FORBIDDEN_EXCEPT_NEWLINE = re.compile("[" + re.escape(FORBIDDEN_TEXT.replace("\n", "")) + "]")
 

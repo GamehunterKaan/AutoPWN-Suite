@@ -21,6 +21,7 @@ _REMOVED_RANGES = (
     (0xFEFF, 0xFEFF),  # byte order mark (zero-width no-break space)
     (0xFFF9, 0xFFFB),  # interlinear annotation
     (0xE0000, 0xE007F),  # tag characters
+    (0xD800, 0xDFFF),  # unpaired surrogates, which a UTF-8 stream cannot encode (a JSON escape in provider text makes one)
 )
 _REMOVED = re.compile("[" + "".join(f"{chr(low)}-{chr(high)}" for low, high in _REMOVED_RANGES) + "]")
 
