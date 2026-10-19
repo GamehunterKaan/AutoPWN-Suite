@@ -31,6 +31,25 @@ class RequestCancelled(requests.RequestException):
     pass
 
 
+def _wait(connection, writing):
+    """Wait up to 50 ms until the connection is readable, or (writing) writable or failed.
+
+    select() raises ValueError for a descriptor of 1024 or more on Linux and macOS, which a dashboard with many
+    open sockets reaches, so those fall back to poll().
+    """
+    try:
+        if writing:
+            _, writable, exceptional = select.select([], [connection], [connection], .05)
+            return bool(writable or exceptional)
+        return bool(select.select([connection], [], [], .05)[0])
+    except ValueError:
+        if not hasattr(select, "poll"):
+            raise
+    poller = select.poll()
+    poller.register(connection, select.POLLOUT if writing else select.POLLIN)
+    return bool(poller.poll(50))
+
+
 class _RequestDeadline:
     """Interrupt active socket I/O, including headers, TLS and partial chunks.
 
@@ -100,9 +119,9 @@ class _DeadlineAdapter(HTTPAdapter):
                                 secure.do_handshake()
                                 break
                             except ssl.SSLWantReadError:
-                                select.select([secure], [], [], .05)
+                                _wait(secure, False)
                             except ssl.SSLWantWriteError:
-                                select.select([], [secure], [], .05)
+                                _wait(secure, True)
                         secure.settimeout(timeout)
                     return secure
                 except BaseException:
@@ -136,8 +155,7 @@ class _DeadlineAdapter(HTTPAdapter):
                             raise OSError(result, "Target connection failed")
                         while result in pending:
                             deadline.check()
-                            _, writable, exceptional = select.select([], [connection], [connection], .05)
-                            if writable or exceptional:
+                            if _wait(connection, True):
                                 result = connection.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
                                 if result:
                                     raise OSError(result, "Target connection failed")

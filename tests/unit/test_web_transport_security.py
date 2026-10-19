@@ -3,6 +3,8 @@
 """Real loopback adversaries exercise the HTTP boundary, not mocked reads."""
 
 import errno
+import os
+import select
 import socket
 import socketserver
 import ssl
@@ -215,6 +217,26 @@ def test_host_that_cannot_be_encoded_is_a_connection_failure_not_a_unicode_error
     log = MagicMock()
     assert webvuln(f"http://{host}/", log, MagicMock()) == []
     log.logger.assert_any_call("warning", f"No reachable in-scope web endpoint on http://{host}/.")
+
+
+@pytest.mark.skipif(not hasattr(select, "poll"), reason="Only platforms with poll() have select()'s descriptor limit to work around")
+@pytest.mark.parametrize("tls", [False, True])
+def test_requests_work_when_descriptors_are_above_the_select_limit(diagnostic_server, tls):
+    import resource
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if hard != resource.RLIM_INFINITY and hard < 1400:
+        pytest.skip("The descriptor limit cannot be raised past select()'s 1024")
+    resource.setrlimit(resource.RLIMIT_NOFILE, (max(soft, 1400), hard))
+    held = []
+    try:
+        # Sockets opened now get descriptors of 1100 and more, which select() rejects with ValueError.
+        held = [os.open(os.devnull, os.O_RDONLY) for _ in range(1100)]
+        with diagnostic_server(tls=tls) as (url, _, _):
+            assert read_response(None, "GET", url, timeout=5, verify=False).text == "safe"
+    finally:
+        for descriptor in held:
+            os.close(descriptor)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
 
 
 def test_precancelled_request_never_opens_a_socket():
