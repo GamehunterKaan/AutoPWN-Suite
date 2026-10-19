@@ -1624,6 +1624,18 @@ def _previous_run_active(schedule: dict) -> bool:
     return True
 
 
+def _disable_invalid_schedule(schedule: dict, error: ValueError) -> None:
+    """Validation fails the same way until the schedule or its profile is edited, so stop retrying each minute."""
+    with _schedules_lock:
+        stored = _schedules.get(schedule["id"])
+        if stored != schedule:  # edited since the snapshot; the edit was validated by the API
+            return
+        stored["enabled"] = False
+    _save_schedules()
+    _scheduler_note("error", f"[!] Scheduled scan disabled ({schedule.get('name') or schedule['id'][:8]}): {error}. "
+                    "Edit the schedule or its profile and enable it again.")
+
+
 def _scheduler_loop() -> None:
     """Background thread: checks schedules every 60 seconds."""
     while True:
@@ -1668,6 +1680,8 @@ def _scheduler_loop() -> None:
                     "msg": f"[*] Scheduled scan fired: {schedule.get('name', schedule['id'][:8])} → {config['target']}",
                 })
                 _save_schedules()
+            except ValueError as exc:
+                _disable_invalid_schedule(schedule, exc)
             except Exception as exc:
                 logging.exception("Scheduled scan failed")
                 label = schedule.get("name") or schedule.get("id", "unknown") if isinstance(schedule, dict) else "unknown"
@@ -2162,7 +2176,22 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             except ValueError:
                 return jsonify({"error": "Invalid scan configuration"}), 400
             _profiles[pid] = p
+            # A schedule that no longer validates against the edited profile (a CIDR target on a
+            # web-only profile, say) would fail every minute; turn it off now, as a delete does.
+            disabled = []
+            with _schedules_lock:
+                for schedule in _schedules.values():
+                    if isinstance(schedule, dict) and schedule.get("profile_id") == pid and schedule.get("enabled") is True:
+                        try:
+                            _schedule_data(schedule)
+                        except ValueError:
+                            schedule["enabled"] = False
+                            disabled.append(schedule.get("name") or str(schedule.get("id", ""))[:8])
         _save_profiles()
+        if disabled:
+            _save_schedules()
+            _scheduler_note("warning", f"[*] Disabled after a profile edit: {', '.join(disabled)}. "
+                            "Edit the schedule and enable it again.")
         return jsonify(p)
 
     @app.route("/api/profiles/<pid>", methods=["DELETE"])
@@ -2217,12 +2246,15 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             with _schedules_lock:
                 if sid not in _schedules:
                     return jsonify({"error": "Schedule not found"}), 404
-                try:
-                    s = _schedule_data(body, _schedules[sid])
-                except ValueError:
-                    return jsonify({"error": "Invalid schedule configuration"}), 400
-                if s["profile_id"] not in _profiles:
-                    return jsonify({"error": "Profile not found"}), 400
+                if isinstance(body, dict) and body.keys() == {"enabled"} and body["enabled"] is False:
+                    s = dict(_schedules[sid], enabled=False)  # turning a schedule off needs no valid record
+                else:
+                    try:
+                        s = _schedule_data(body, _schedules[sid])
+                    except ValueError:
+                        return jsonify({"error": "Invalid schedule configuration"}), 400
+                    if s["profile_id"] not in _profiles:
+                        return jsonify({"error": "Profile not found"}), 400
                 _schedules[sid] = s
         _save_schedules()
         return jsonify(s)

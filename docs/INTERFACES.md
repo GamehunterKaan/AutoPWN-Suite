@@ -142,11 +142,11 @@ updates return 202.
 | `POST /api/settings/test_webhook` | Empty object | `{ok,status_code}` after configured test POST, or error. Disabled offline. |
 | `GET /api/profiles` | None | Profile array: `id,name,description,created_at,config`. |
 | `POST /api/profiles` | `name`, optional `description`, scan configuration | 201 created profile; persists it. |
-| `PUT /api/profiles/<pid>` | Partial name/description/configuration | Updated profile; 404 if missing. |
+| `PUT /api/profiles/<pid>` | Partial name/description/configuration | Updated profile; 404 if missing. Disables enabled schedules that no longer validate against the edited profile (a CIDR target on a web-only profile). |
 | `DELETE /api/profiles/<pid>` | None | `{ok}`; disables dependent schedules. |
 | `GET /api/schedules` | None | Saved schedule array. |
 | `POST /api/schedules` | Schedule object | 201 created schedule; referenced profile must exist. |
-| `PUT /api/schedules/<sid>` | Partial schedule object | Updated schedule. |
+| `PUT /api/schedules/<sid>` | Partial schedule object | Updated schedule. The merged record must validate, except that `{"enabled": false}` alone always applies. |
 | `DELETE /api/schedules/<sid>` | None | `{ok}`; removes saved schedule and in-memory last-run state. |
 
 ### Scan and web controls
@@ -199,6 +199,8 @@ missed (a restart, a suspend or a slow check) still runs once when the check
 comes within an hour of that time, and never for a time that passed before the
 schedule was created. A schedule does not start a scan while the scan it started
 last is still running or stopping; it logs one skip and starts when that scan ends.
+A due schedule that fails validation (for example a hand-edited file) is disabled
+and logged once instead of failing every minute; enable it again after fixing it.
 
 ## Files, configuration and integrations
 

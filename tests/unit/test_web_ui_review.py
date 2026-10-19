@@ -252,3 +252,43 @@ def test_schedule_waits_for_its_own_unfinished_scan_and_logs_the_skip_once(clien
     due_again()
     _one_scheduler_tick(wu_review)  # the finished scan no longer blocks the schedule
     assert wu_review._launch_scan.call_count == 2
+
+
+def test_profile_edit_disables_the_schedules_it_no_longer_fits(client_review, wu_review):
+    profile_id = _profile(client_review)
+    cidr = client_review.post("/api/schedules", json={"target": "192.0.2.0/24", "profile_id": profile_id}).get_json()["id"]
+    host = client_review.post("/api/schedules", json={"target": "example.test", "profile_id": profile_id}).get_json()["id"]
+    response = client_review.put(f"/api/profiles/{profile_id}", json={"scan_web": True, "scan_ports": False})
+    assert response.status_code == 200
+    # A CIDR range is not a web target, so that schedule would fail on every check; the other one still fits.
+    assert wu_review._schedules[cidr]["enabled"] is False and wu_review._schedules[host]["enabled"] is True
+    assert json.loads(wu_review._SCHEDULES_FILE.read_text())[cidr]["enabled"] is False
+    assert any("Disabled after a profile edit" in entry["msg"] for entry in wu_review._log_history)
+    _one_scheduler_tick(wu_review)
+    assert [call.args[0]["target"] for call in wu_review._launch_scan.call_args_list] == ["example.test"]
+
+
+def test_schedule_that_fails_validation_is_disabled_instead_of_erroring_every_minute(client_review, wu_review):
+    profile_id = _profile(client_review)
+    schedule_id = _schedule(client_review, profile_id)
+    wu_review._schedules[schedule_id]["target"] = "192.0.2.10;bad"
+    for _ in range(3):
+        _one_scheduler_tick(wu_review)
+    wu_review._launch_scan.assert_not_called()
+    assert wu_review._schedules[schedule_id]["enabled"] is False
+    assert json.loads(wu_review._SCHEDULES_FILE.read_text())[schedule_id]["enabled"] is False
+    errors = [entry["msg"] for entry in wu_review._log_history if entry["level"] == "error"]
+    assert len(errors) == 1 and "disabled" in errors[0]
+
+
+def test_put_can_turn_off_an_invalid_schedule_but_not_turn_it_on(client_review, wu_review):
+    profile_id = _profile(client_review)
+    schedule_id = _schedule(client_review, profile_id)
+    wu_review._schedules[schedule_id]["target"] = "192.0.2.10;bad"
+    assert client_review.put(f"/api/schedules/{schedule_id}", json={"enabled": True}).status_code == 400
+    assert client_review.put(f"/api/schedules/{schedule_id}", json={"enabled": False}).status_code == 200
+    assert wu_review._schedules[schedule_id]["enabled"] is False
+    assert wu_review._schedules[schedule_id]["target"] == "192.0.2.10;bad"  # nothing else was touched
+    assert client_review.put(f"/api/schedules/{schedule_id}", json={"enabled": True}).status_code == 400
+    assert client_review.put(f"/api/schedules/{schedule_id}", json={"enabled": True, "target": "192.0.2.10"}).status_code == 200
+    assert wu_review._schedules[schedule_id]["enabled"] is True
