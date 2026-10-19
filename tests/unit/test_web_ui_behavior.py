@@ -632,3 +632,75 @@ assert.doesNotMatch(html(),markup);
 assert.match(html(),/<td class="sev-unknown">UNKNOWN<\/td>/);
 assert.match(html(),/<td class="sev-critical">CRITICAL<\/td>/);
 """)
+
+
+STARTUP_SCRIPT = r"""
+// A dashboard whose startup requests answer from `routes`; a route set to a status code answers with it.
+const stored={nist_api_key:'nvd-key',email:{enabled:true,smtp_host:'smtp.example.test',password:'••••••••'},
+  webhook:{enabled:true,url:'https://example.invalid/hook'}};
+const routes={'/api/scans':[{id:'0123456789abcdef',target:'192.0.2.1',status:'completed',started_at:'2026-10-19T00:00:00Z'}],
+  '/api/hosts':[{ip:'192.0.2.1',scan_id:'0123456789abcdef',ports:[],vulns:[]}],'/api/log':[],'/api/version':{version:'2.7.0'},
+  '/api/settings':stored,'/api/vulnerability-database':{ready:false,update:{}},
+  '/api/profiles':[{id:'p1',name:'Quick',config:{}}],'/api/schedules':[]};
+const puts=[];
+fetch=async(url,opts)=>{
+  if(opts&&opts.method==='PUT'){puts.push([url,JSON.parse(opts.body)]);return {ok:true,json:async()=>({ok:true})}}
+  const answer=routes[url];
+  if(typeof answer==='number') return {ok:false,status:answer,json:async()=>({error:'Unavailable'})};
+  return {ok:true,status:200,json:async()=>JSON.parse(JSON.stringify(answer))};
+};
+"""
+
+
+def test_failed_settings_request_leaves_saves_disabled_instead_of_blank_forms_that_erase_stored_values():
+    run_js(STARTUP_SCRIPT + r"""
+routes['/api/settings']=500;
+await initDashboard();
+for(const id of ['s-nist-save','s-email-save','s-webhook-save']) assert.equal(nodes.get(id).disabled,true,id);
+assert.equal(nodes.get('settings-unavailable').hidden,false);
+await saveWebhookSettings(); await saveEmailSettings(); await saveNistKey();
+assert.deepEqual(puts,[]);
+// The rest of the page still loaded, and says what did not.
+assert.equal(Object.keys(scans).length,1);
+assert.equal(Object.keys(profiles).length,1);
+assert.equal(nodes.get('app-version').textContent,'v2.7.0');
+assert.ok(nodes.get('term').children.some(line=>line.innerHTML.includes('Some dashboard data could not be loaded. Refresh to retry.')));
+""")
+
+
+def test_successful_settings_load_enables_saves_and_fills_the_forms():
+    run_js(STARTUP_SCRIPT + r"""
+await initDashboard();
+for(const id of ['s-nist-save','s-email-save','s-webhook-save']) assert.equal(nodes.get(id).disabled,false,id);
+assert.equal(nodes.get('settings-unavailable').hidden,true);
+assert.equal(nodes.get('s-webhook-url').value,'https://example.invalid/hook');
+assert.equal(nodes.get('s-nist-key').value,'nvd-key');
+await saveWebhookSettings();
+assert.deepEqual(puts.map(([url,body])=>[url,body.webhook.url]),[['/api/settings','https://example.invalid/hook']]);
+assert.equal(document.getElementById('term').children.length,0);
+""")
+
+
+@pytest.mark.parametrize("route", ["/api/scans", "/api/hosts", "/api/log", "/api/vulnerability-database", "/api/profiles", "/api/schedules"])
+def test_one_failed_startup_request_does_not_stop_settings_or_the_other_sections_loading(route):
+    run_js(f"const failing={json.dumps(route)};" + STARTUP_SCRIPT + r"""
+routes[failing]=503;
+await initDashboard();
+assert.equal(nodes.get('s-webhook-url').value,'https://example.invalid/hook');
+assert.equal(nodes.get('s-webhook-save').disabled,false);
+assert.equal(nodes.get('s-nist-save').disabled,false);
+assert.equal(nodes.get('settings-unavailable').hidden,true);
+assert.equal(Object.keys(profiles).length,failing==='/api/profiles'?0:1);
+assert.equal(Object.keys(scans).length,failing==='/api/scans'?0:1);
+assert.equal(Object.keys(hosts).length,failing==='/api/hosts'?0:1);
+assert.ok(nodes.get('term').children.some(line=>line.innerHTML.includes('Refresh to retry.')));
+""")
+
+
+def test_settings_error_response_is_rejected_without_touching_the_forms():
+    run_js(STARTUP_SCRIPT + r"""
+document.getElementById('s-webhook-url').value='typed by the operator';
+routes['/api/settings']=500;
+await assert.rejects(loadSettingsIntoForm());
+assert.equal(nodes.get('s-webhook-url').value,'typed by the operator');
+""")

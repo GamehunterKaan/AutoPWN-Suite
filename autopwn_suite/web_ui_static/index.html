@@ -237,6 +237,7 @@
   <!-- Settings -->
   <div id="tc-settings" class="tc">
     <div class="settings-body">
+      <div id="settings-unavailable" class="web-notice" role="alert" hidden>Settings could not be loaded, so saving them is disabled. Refresh the page to retry.</div>
       <div class="s-section">
         <div class="s-section-title">Dashboard account</div>
         <form id="account-form" method="post" action="/api/auth/account">
@@ -278,7 +279,7 @@
           <div class="s-row-hint">Without an API key, vulnerability lookups are rate-limited to ~5 requests/30s.</div>
         </div>
         <div class="s-actions">
-          <button class="btn btn-primary btn-sm" onclick="saveNistKey()">Save Key</button>
+          <button class="btn btn-primary btn-sm" id="s-nist-save" onclick="saveNistKey()" disabled>Save Key</button>
         </div>
       </div>
 
@@ -434,7 +435,7 @@
             <div class="chk-row"><input type="checkbox" id="s-email-onvuln" checked/><label for="s-email-onvuln">On vulnerabilities found</label></div>
           </div>
           <div class="s-actions">
-            <button class="btn btn-primary btn-sm" onclick="saveEmailSettings()">Save Email Settings</button>
+            <button class="btn btn-primary btn-sm" id="s-email-save" onclick="saveEmailSettings()" disabled>Save Email Settings</button>
             <button class="btn btn-ghost btn-sm" onclick="testEmail()">Send Test Email</button>
           </div>
         </div>
@@ -458,7 +459,7 @@
           </div>
         </div>
         <div class="s-actions">
-          <button id="s-webhook-save" class="btn btn-primary btn-sm" onclick="saveWebhookSettings()">Save Webhook Settings</button>
+          <button id="s-webhook-save" class="btn btn-primary btn-sm" onclick="saveWebhookSettings()" disabled>Save Webhook Settings</button>
           <button id="s-webhook-test" class="btn btn-ghost btn-sm" onclick="testWebhook()" disabled>Send Test Ping</button>
         </div>
       </div>

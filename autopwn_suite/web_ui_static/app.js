@@ -914,7 +914,22 @@ async function updateVulnerabilityDatabase(){
   }catch(error){ toast(error.message, false); }
   await loadDatabaseStatus().catch(()=>{ button.disabled = false; });
 }
+// Settings forms are only saved after the stored values were read into them: saving a form that is
+// blank because loading failed would replace the stored webhook URL, SMTP password and NVD key.
+let settingsLoaded=false;
+function setSettingsLoaded(loaded){
+  settingsLoaded=loaded;
+  document.getElementById('s-nist-save').disabled=!loaded;
+  document.getElementById('s-email-save').disabled=!loaded;
+  toggleWebhookSection();
+}
+function settingsNotLoaded(){
+  if(settingsLoaded) return false;
+  toast('Settings have not loaded, so they cannot be saved. Refresh the page to retry.',false);
+  return true;
+}
 async function saveNistKey(){
+  if(settingsNotLoaded()) return;
   const key=document.getElementById('s-nist-key').value.trim();
   const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({nist_api_key:key})});
   toast(r.ok?'NIST API key saved.':'Failed to save.',r.ok);
@@ -926,6 +941,7 @@ function toggleEmailSection(){
   document.getElementById('email-section').style.display=on?'flex':'none';
 }
 async function saveEmailSettings(){
+  if(settingsNotLoaded()) return;
   const body={email:{
     enabled:   document.getElementById('s-email-enabled').checked,
     smtp_host: document.getElementById('s-smtp-host').value,
@@ -952,7 +968,7 @@ let webhookPersisting=false, persistedWebhookEnabled=false, webhookRevision=0;
 function toggleWebhookSection(){
   const on=document.getElementById('s-webhook-enabled').checked;
   document.getElementById('webhook-section').style.display=on?'flex':'none';
-  document.getElementById('s-webhook-save').disabled=webhookPersisting;
+  document.getElementById('s-webhook-save').disabled=webhookPersisting||!settingsLoaded;
   document.getElementById('s-webhook-test').disabled=!on||webhookPersisting;
 }
 async function persistWebhookSettings(update,message){
@@ -986,6 +1002,7 @@ async function changeWebhookEnabled(){
   await persistWebhookSettings({enabled},enabled?'Webhook notifications enabled.':'Webhook notifications disabled.');
 }
 async function saveWebhookSettings(){
+  if(settingsNotLoaded()) return;
   const update={
     enabled:     document.getElementById('s-webhook-enabled').checked,
     url:         document.getElementById('s-webhook-url').value,
@@ -1003,7 +1020,7 @@ async function testWebhook(){
 
 // ── Profiles ──────────────────────────────────────────────────────────────────
 async function loadProfilesFromServer(){
-  const r=await fetch('/api/profiles'); const list=await r.json();
+  const list=await fetchJson('/api/profiles');
   profiles={}; list.forEach(p=>{ profiles[p.id]=p; });
   renderProfiles(); refreshProfileSelects();
 }
@@ -1104,7 +1121,7 @@ async function deleteProfile(pid){
 
 // ── Schedules ─────────────────────────────────────────────────────────────────
 async function loadSchedulesFromServer(){
-  const r=await fetch('/api/schedules'); const list=await r.json();
+  const list=await fetchJson('/api/schedules');
   schedules={}; list.forEach(s=>{ schedules[s.id]=s; });
   renderSchedules();
 }
@@ -1186,7 +1203,7 @@ async function deleteSchedule(sid){
 // ── Load settings into form ───────────────────────────────────────────────────
 async function loadSettingsIntoForm(){
   const revision=webhookRevision;
-  const r=await fetch('/api/settings'); const d=await r.json();
+  const d=await fetchJson('/api/settings');
   document.getElementById('s-nist-key').value=d.nist_api_key||'';
   const em=d.email||{};
   document.getElementById('s-email-enabled').checked=!!em.enabled;
@@ -1209,7 +1226,8 @@ async function loadSettingsIntoForm(){
     document.getElementById('s-wh-onerror').checked=wh.on_error!==false;
     document.getElementById('s-wh-onvuln').checked=wh.on_vuln_found!==false;
   }
-  toggleWebhookSection();
+  document.getElementById('settings-unavailable').hidden=true;
+  setSettingsLoaded(true);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -1230,24 +1248,33 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// Every section loads on its own, so one failed request cannot leave the others empty. A failed settings
+// request keeps the settings forms unsaveable (see setSettingsLoaded) instead of blank and saveable.
+async function initDashboard(){
+  let failed=false;
+  const attempt=task=>task.catch(()=>{ failed=true; });
+  let scansR=[], hostsR=[], logR=[], verR={version:''};
+  setSettingsLoaded(false);
+  await Promise.all([
+    attempt(fetchJson('/api/scans').then(r=>{ scansR=r; })),
+    attempt(fetchJson('/api/hosts').then(r=>{ hostsR=r; })),
+    attempt(fetchJson('/api/log').then(r=>{ logR=r; })),
+    fetchJson('/api/version').then(r=>{ verR=r; }, ()=>{}),
+    attempt(loadSettingsIntoForm().catch(e=>{ document.getElementById('settings-unavailable').hidden=false; throw e; })),
+    attempt(loadDatabaseStatus()),
+    attempt(loadProfilesFromServer()),
+    attempt(loadSchedulesFromServer()),
+  ]);
+  if(verR.version) document.getElementById('app-version').textContent = 'v' + verR.version;
+  scansR.forEach(s=>{ scans[s.id]=s; addTermFilterOption(s.id,s.target); });
+  hosts = latestHostObservations(hostsR);
+  logR.filter(e=>!e.level?.startsWith('__')).forEach(e=>addLog(e.scan_id,e.msg,e.level,e.ts));
+  renderScans(); renderHosts(); renderVulnTable(); updateBadges();
+  if(failed) addLog(null,'Some dashboard data could not be loaded. Refresh to retry.','error');
+}
+
 (async()=>{
-  try{
-    const [scansR,hostsR,logR,verR]=await Promise.all([
-      fetch('/api/scans').then(r=>r.json()),
-      fetch('/api/hosts').then(r=>r.json()),
-      fetch('/api/log').then(r=>r.json()),
-      fetch('/api/version').then(r=>r.json()).catch(()=>({version:''})),
-    ]);
-    if(verR.version) document.getElementById('app-version').textContent = 'v' + verR.version;
-    scansR.forEach(s=>{ scans[s.id]=s; scansR.length && addTermFilterOption(s.id,s.target); });
-    hosts = latestHostObservations(hostsR);
-    logR.filter(e=>!e.level?.startsWith('__')).forEach(e=>addLog(e.scan_id,e.msg,e.level,e.ts));
-    renderScans(); renderHosts(); renderVulnTable(); updateBadges();
-    await loadSettingsIntoForm();
-    await loadDatabaseStatus();
-    await loadProfilesFromServer();
-    await loadSchedulesFromServer();
-  }catch(e){ addLog(null,'Cannot connect to server. Refresh to retry.','error'); }
+  await initDashboard();
   connectSSE();
   pollT=setInterval(poll,1500);
   setInterval(()=>loadDatabaseStatus().catch(()=>{}), 5000);
