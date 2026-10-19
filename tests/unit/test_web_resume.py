@@ -368,6 +368,26 @@ def test_resume_network_reuses_nmap_and_only_retries_failed_cve_lookups(dashboar
     assert all(len(host["vulns"]) == 1 for host in job.hosts_list())
 
 
+@pytest.mark.parametrize("lookup_fails", [False, True])
+def test_finished_scan_keeps_nmap_data_only_while_it_can_resume(dashboard, lookup_fails):
+    wu, _ = dashboard
+    nm = MagicMock()
+    nm.all_hosts.return_value = ["192.0.2.1"]
+    nm.__getitem__.return_value = {"addresses": {}, "tcp": {80: {"state": "open", "name": "http", "product": "nginx", "version": "1"}}}
+    config = wu._profile_config({"skip_discovery": True}) | {"target": "192.0.2.1"}
+    job = wu.ScanJob("job", config["target"], config)
+    cve = SimpleNamespace(CVEID="CVE-2026-0001", severity="medium", description="Example", severity_score=5,
+                          data_source="test", database_updated_at="")
+    outcome = RuntimeError("Unavailable") if lookup_fails else [cve]
+    with patch.object(wu.shutil, "which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm), \
+         patch("autopwn_suite.nist_search.searchCVE", side_effect=[outcome]), patch.object(wu, "_notify"):
+        wu._run_scan(job)
+    assert job.status == ("partial" if lookup_fails else "completed")
+    assert (bool(job._network_results), job._targets is not None) == (lookup_fails, lookup_fails)
+    assert bool(job._lookup_results) is False  # a failed lookup is never cached; a successful one is released with the rest
+    assert len(job.hosts_list()[0]["vulns"]) == (0 if lookup_fails else 1)  # the results themselves stay
+
+
 @pytest.mark.parametrize("mixed", [False, True])
 def test_resume_retries_nmap_timeouts_instead_of_caching_empty_success(dashboard, mixed):
     from autopwn_suite.nmap_backend import PortScanner

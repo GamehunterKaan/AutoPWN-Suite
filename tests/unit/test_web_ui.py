@@ -314,6 +314,18 @@ class TestScanJob:
         assert job.status == "completed"
         assert job.finished_at != ""
 
+    @pytest.mark.parametrize("status", ["completed", "partial", "stopped"])
+    def test_only_a_completed_job_releases_its_resume_data(self, wu, status):
+        job = wu.ScanJob("id1", "target", {})
+        job._network_results["192.0.2.1"] = object()
+        job._lookup_results[("192.0.2.1", 80, "tcp", "nginx 1")] = []
+        job._web_checkpoints[("192.0.2.1", "http://192.0.2.1/")] = {"crawl": {}}
+        job._targets = ["192.0.2.1"]
+        job.mark_done(status)
+        remaining = (len(job._network_results), len(job._lookup_results), len(job._web_checkpoints), job._targets)
+        assert remaining == ((0, 0, 0, None) if status == "completed" else (1, 1, 1, ["192.0.2.1"]))
+        assert job.to_dict()["can_resume"] is (status != "completed")
+
     def test_mark_error(self, wu):
         job = wu.ScanJob("id1", "target", {})
         job.mark_error("something failed")

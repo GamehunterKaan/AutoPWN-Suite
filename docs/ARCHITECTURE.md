@@ -68,7 +68,7 @@ flowchart LR
    `_build_app`), and `autopwn_suite/credential_files.py` reads `*_FILE` secrets.
    The sign-in page is `login.html`/`login.js`/`login.css`; `auth.js` attaches the
    CSRF token to dashboard requests. A polling scheduler launches saved profiles and records schedule runs.
-   Resume retains process-memory checkpoints; restarting loses jobs/checkpoints.
+   Resume retains process-memory checkpoints (a completed job releases them, since it cannot resume); restarting loses jobs/checkpoints.
 6. `autopwn_suite/api.py` exposes synchronous Python scanning without starting the web server.
    `autopwn_suite/daemon/daemon_installer.py` generates configuration and a systemd
    service that runs the installed program and removes the service and its configuration again

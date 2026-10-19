@@ -504,6 +504,12 @@ class ScanJob:
                                                        "stopped": "Scan stopped"}.get(status, status))
             if status == "completed":
                 self._progress["percent"] = 100.0
+                # A completed scan cannot be resumed, so its Nmap results and caches only hold memory
+                # (about 15 MB for a /24 with -sV -O), and up to 100 finished jobs are kept.
+                self._network_results.clear()
+                self._lookup_results.clear()
+                self._web_checkpoints.clear()
+                self._targets = None
             self._progress["revision"] += 1
         self._publish_progress()
 
