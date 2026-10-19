@@ -6,7 +6,7 @@ added for at least 50% of the bugs fixed in the last six months. This ledger cov
 
 ## Method
 
-1. Take every non-merge commit reachable from the 2.7.0 release in the window (**261**).
+1. Take every non-merge commit reachable from the 2.7.0 release in the window (**273**).
 2. Select the commits that fix a defect in product behavior. Read the subject and the change:
    the words `fix`, `bug`, `vulnerability`, `prevent`, `resolve`, `regression`, `correct`, `handle`,
    `avoid`, `harden` and `escape` find some of them, but most fixes of 2.7.0 use other verbs
@@ -32,6 +32,15 @@ this window; the most recent bug report (#67) predates it.
 
 | Commit | Date | Fix | Regression tests changed in the same commit |
 | --- | --- | --- | --- |
+| `fed9a3c` | 2026-10-19 | Turn off a profile's schedules when saving it drops stored Nmap options | `tests/unit/test_web_ui_behavior.py`, `tests/unit/test_web_ui_review.py` |
+| `35e79a7` | 2026-10-19 | Refuse Nmap options in the dashboard and check technique and ports against fixed lists | `tests/unit/test_fuzz_inputs.py`, `tests/unit/test_web_ui.py`, `tests/unit/test_web_ui_review.py` |
+| `5a0a416` | 2026-10-19 | Send the scan and profile forms' structured Nmap controls and drop the free-text field | `tests/unit/test_web_ui_behavior.py`, `tests/unit/test_web_ui_static.py` |
+| `4050493` | 2026-10-19 | Say what the umask does to the install directory and to a set-aside copy | `tests/unit/test_daemon_installer.py`, `tests/unit/test_web_ui.py` |
+| `d4ab103` | 2026-10-19 | Restrict dashboard data files that an earlier release left readable | `tests/unit/test_web_ui.py` |
+| `51fff63` | 2026-10-19 | Create the installed daemon configuration owner-only from its first byte | `tests/unit/test_daemon_installer.py` |
+| `90f4ef2` | 2026-10-19 | Wrap the account form's new and confirm password pair by column width | `tests/unit/test_web_account_form_style.py` |
+| `d79a8c0` | 2026-10-19 | Style and space the Settings account form like the other sections | `tests/unit/test_web_account_form_style.py` |
+| `7868742` | 2026-10-19 | Make the sign-in challenge a signed cookie the server does not store | `tests/unit/test_fuzz_inputs.py`, `tests/unit/test_web_auth.py` |
 | `975cdc0` | 2026-10-19 | Bound the Java trace signature, the length of crawled links and what a crawl keeps | `tests/unit/test_web_crawler.py`, `tests/unit/test_web_hostile_bodies.py`, `tests/unit/test_web_poc.py` |
 | `1f25417` | 2026-10-19 | Bound every walk of the crawler's form analysis, including the one inside bs4 | `tests/unit/test_web_hostile_bodies.py` |
 | `aef5436` | 2026-10-19 | Show a schedule the scheduler disabled, and document the set-aside files and the new fuzz targets | `tests/unit/test_web_ui_behavior.py` |
@@ -166,7 +175,7 @@ this window; the most recent bug report (#67) predates it.
 
 ## Result
 
-**118 of 119** product-defect fixes in the window (99%) added or changed automated tests in the
+**127 of 128** product-defect fixes in the window (99%) added or changed automated tests in the
 same commit, above the 50% requirement. CodeQL alerts #4 and #5 (DOM XSS and attribute
 sanitization) and #1 (workflow permissions) were fixed outside the window (2026-04-15 and
 2025-10-18).
