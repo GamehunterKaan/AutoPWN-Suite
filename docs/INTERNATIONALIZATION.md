@@ -74,7 +74,8 @@ earlier, open an issue to discuss starting with step 3.
   UTF-8 and decode with a replacement strategy rather than crashing. Scanned
   text keeps every printable character of every script, but `printable` removes
   its control, bidirectional and zero-width characters, including the zero-width
-  joiner and non-joiner that some scripts use for shaping, so that a target cannot
+  joiner and non-joiner and the Mongolian vowel separator that some scripts use for
+  shaping, so that a target cannot
   forge a line or reorder what the operator reads; the text shown can differ from
   the bytes the host sent in that respect.
 - **Locale-independent behavior.** Do not depend on the system locale for

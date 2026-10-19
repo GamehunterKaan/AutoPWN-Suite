@@ -76,7 +76,7 @@ callers must handle them and protect output paths and sensitive results.
 Text from the scanned host or the vulnerability source (service, product, version, OS and vendor
 names, hostnames, CVE identifiers, descriptions and severities) is one line without control, bidirectional
 or zero-width characters: a tab, a line feed and the Unicode line and paragraph separators become a space and
-every other such character is removed. The output of an NSE script (`script`) keeps its line feeds and nothing else.
+every other such character is removed. The output of an NSE script (`script`, and the text of its elements) and the OS fingerprint (`osfingerprint`) keep their line feeds and nothing else. A URL in a web finding (its `url`, the requests and observations of its reproduction plan, its `target`) keeps those characters as the percent-encoding that the HTTP client sends, for example `%1B` for ESC, so a replay or a PoC sends the request that the scan sent.
 `save_to_file(filename="autopwn.json")` overwrites the selected file with JSON.
 
 The web-check module additionally exposes

@@ -251,7 +251,7 @@ A finding replaces a query value with `REDACTED` when its parameter name looks l
 diagnostic headers, status, response-prefix hash/size, latency and truncation state; response bodies
 and cookie values are omitted. The CLI prints these results through its existing console/export flow.
 
-Text that a scanned host or a data provider controls (response headers, crawled links, Nmap banners and hostnames, NVD, local-database and Exploit-DB descriptions) is printed, saved and returned as a single line: line breaks, escape sequences and other control characters, bidirectional overrides and zero-width characters are removed or replaced by a space, so a hostile target cannot forge a result line or drive your terminal through it. Nmap script output keeps its newlines. The scanned text can still be misleading, so read scan output of an untrusted target with care.
+Text that a scanned host or a data provider controls (response headers, crawled links, Nmap banners and hostnames, certificate names, NVD, local-database and Exploit-DB descriptions) is printed, saved and returned as a single line: line breaks, escape sequences and other control characters, bidirectional overrides and zero-width characters are removed or replaced by a space, so a hostile target cannot forge a result line or drive your terminal through it. A URL keeps such characters as the percent-encoding that the HTTP client sends (a crawled link with an escape sequence is stored as `%1B...`), so the recorded requests, a replay and the generated PoCs send the request that the scan sent. Nmap script output and the OS fingerprint keep their newlines. The scanned text can still be misleading, so read scan output of an untrusted target with care.
 
 ### TLS certificate verification
 

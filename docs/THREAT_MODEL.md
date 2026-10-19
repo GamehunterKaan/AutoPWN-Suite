@@ -48,7 +48,7 @@ whoever holds it controls every scan, profile, schedule and setting.
 | CLI and configuration | `autopwn_suite/cli.py` `StartScanning` and `main`, `autopwn_suite/utils.py` `cli` and `InitArgsConf` |
 | Synchronous library | `autopwn_suite/api.py:100`, `autopwn_suite/api.py:172` |
 | Dashboard, scheduler, browser | `autopwn_suite/web_ui.py` `_scheduler_loop` and `_build_app`, `autopwn_suite/web_auth.py` `install_auth`, `autopwn_suite/web_ui_static/app.js` `initDashboard` and `connectSSE` |
-| Native scanning and XML | `autopwn_suite/nmap_backend.py:155`, `autopwn_suite/nmap_progress.py:97` |
+| Native scanning and XML | `autopwn_suite/nmap_backend.py:159`, `autopwn_suite/nmap_progress.py:98` |
 | Web probes and recorded-evidence replay | `autopwn_suite/web/http.py` `bounded_request`, `autopwn_suite/web/poc_runtime.py` `verify_plan` |
 | Providers and database | `autopwn_suite/nist_search.py:124`, `autopwn_suite/vulnerability_db.py:59` |
 | Notifications, credential files and downloads | `autopwn_suite/report.py:37`, `autopwn_suite/credential_files.py` `read_credential_file`, `autopwn_suite/getexploits.py:130` |
@@ -238,15 +238,21 @@ client-supplied code/plans. Those controls do not extend automatically to core w
 requests, browser rendering, SMTP or host storage.
 
 Text that a scanned host or a data provider controls is untrusted output as well as untrusted input: response
-headers and crawled links, Nmap banners, hostnames and script output, NVD and local-database records, Exploit-DB
-metadata. Since v2.7.0 it becomes one line without control, bidirectional or zero-width characters where it enters
-(`printable` in `autopwn_suite/web/findings.py`: the web finding, the web log line and coverage note, the Nmap XML
-parse, the NVD record and the local database's update time) and again where the CLI prints it (`console_safe` in
-`autopwn_suite/logger.py`, which also escapes Rich markup), so the console, the saved txt, svg and html reports, the
-webhook and email reports, the dashboard job log and the JSON a client reads carry the same text. Nmap script
-output keeps its newlines and nothing else. A target can therefore no longer forge a result line or drive the
-operator's terminal through this text; it can still write misleading words, and what a given terminal does with
-other Unicode characters is not covered.
+headers and crawled links, Nmap banners, hostnames and script output, the names in a target's certificate, NVD and
+local-database records, Exploit-DB metadata. Since v2.7.0 it becomes one line without control, bidirectional or
+zero-width characters where it enters (`printable` in `autopwn_suite/text.py`: the web finding, the web log line and
+coverage note, the Nmap XML parse and Nmap's failure message, the certificate names, the NVD record and the local
+database's update time) and again where the CLI prints it (`console_safe` in `autopwn_suite/logger.py`, which also
+escapes Rich markup), so the console, the saved txt, svg and html reports, the webhook and email reports, the
+dashboard job log and the JSON a client reads carry the same text. A URL cannot lose those characters, because a
+replay and a downloaded PoC must send the request that the scan sent: `wire_url` (`autopwn_suite/text.py`, applied by
+`redact_url` and `finding`) percent-encodes them as the HTTP client does, so the URL of a finding, the recorded
+requests, observations and redirect chain, the target and the generated curl and Python PoCs are plain text that
+names the same request. Nmap script output and the OS fingerprint keep their line feeds and nothing else. A target can
+therefore no longer forge a result line or drive the operator's terminal through this text; it can still write
+misleading words, and what a given terminal does with other Unicode characters is not covered. The response headers
+that a dashboard replay records (`autopwn_suite/web/poc_runtime.py`, also the standalone PoC) are shown JSON-encoded and
+HTML-escaped and are not cleaned.
 
 Security objectives are: preserve data/code separation; prevent unsolicited
 credential disclosure and target-to-host/browser authority gains; restrict
