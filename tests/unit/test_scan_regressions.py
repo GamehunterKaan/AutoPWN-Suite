@@ -212,7 +212,8 @@ def test_noise_scan_stops_and_joins_children_after_unexpected_error():
         with pytest.raises(OSError, match="timer failure"):
             NoiseScan("192.0.2.1", MagicMock(), MagicMock(), ScanType.Ping, 5)
     process.return_value.terminate.assert_called_once()
-    process.return_value.join.assert_called_once_with(timeout=2)
+    process.return_value.join.assert_called_with(timeout=2)
+    assert process.call_args.kwargs["args"][2].is_set()
 
 
 def test_noise_scan_with_no_hosts_exits_before_waiting():

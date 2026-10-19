@@ -3,12 +3,16 @@
 """
 Unit tests for the scanner module.
 """
+import threading
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from autopwn_suite.nmap_progress import ScanCancelled
 from autopwn_suite.scanner import (
+    MAX_NOISE_HOSTS,
     AnalyseScanResults,
+    CreateNoise,
     DiscoverHosts,
     InitHostInfo,
     InitPortInfo,
@@ -348,3 +352,52 @@ class TestNoiseScan:
             NoiseScan("192.168.1.0/24", mock_log, mock_console, scantype=ScanType.Ping, noisetimeout=10)
 
         mock_sleep.assert_called_once_with(10)
+
+    def test_noise_child_ends_its_nmap_when_told_to_stop(self, mock_port_scanner):
+        """Terminating the child process would orphan its Nmap, so the child must watch a stop event."""
+        stop = threading.Event()
+
+        def scan(hosts, arguments, should_stop=None):
+            assert should_stop is not None and not should_stop()
+            stop.set()
+            assert should_stop()
+            raise ScanCancelled("Scan stopped by user")
+
+        mock_port_scanner.scan.side_effect = scan
+
+        CreateNoise("192.0.2.1", False, stop)  # returns instead of raising
+
+        mock_port_scanner.scan.assert_called_once()
+
+    @patch("autopwn_suite.scanner.sleep")
+    @patch("autopwn_suite.scanner.Process")
+    @patch("autopwn_suite.scanner.TestPing", return_value=["192.0.2.1", "192.0.2.2"])
+    def test_noise_scan_asks_children_to_stop_before_joining_them(self, mock_test_ping, mock_process, mock_sleep):
+        """The stop event is set first, and a child that already ended is not terminated."""
+        process = mock_process.return_value
+        process.is_alive.return_value = False
+        set_when_joined = []
+        process.join.side_effect = lambda timeout=None: set_when_joined.append(
+            mock_process.call_args.kwargs["args"][2].is_set())
+
+        with pytest.raises(SystemExit):
+            NoiseScan("192.0.2.0/24", MagicMock(), MagicMock(), scantype=ScanType.Ping, noisetimeout=1)
+
+        assert set_when_joined == [True, True]
+        process.terminate.assert_not_called()
+
+    @patch("autopwn_suite.scanner.sleep")
+    @patch("autopwn_suite.scanner.Process")
+    @patch("autopwn_suite.scanner.TestPing", return_value=[f"192.0.2.{n}" for n in range(1, 41)])
+    def test_noise_scan_samples_a_large_network(self, mock_test_ping, mock_process, mock_sleep):
+        """One process and one `nmap -A` per host must not be started for every host of a large range."""
+        mock_log = MagicMock()
+
+        with pytest.raises(SystemExit):
+            NoiseScan("192.0.2.0/24", mock_log, MagicMock(), scantype=ScanType.Ping, noisetimeout=1)
+
+        assert mock_process.call_count == MAX_NOISE_HOSTS
+        started = [call_.kwargs["args"][0] for call_ in mock_process.call_args_list]
+        assert started == [f"192.0.2.{n}" for n in range(1, MAX_NOISE_HOSTS + 1)]
+        warning = [c.args[1] for c in mock_log.logger.call_args_list if c.args[0] == "warning"]
+        assert warning == [f"Creating noise on the first {MAX_NOISE_HOSTS} of 40 hosts."]

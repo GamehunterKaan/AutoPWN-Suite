@@ -24,7 +24,7 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `-nf/--nmap-flags` | Trusted operator Nmap arguments; pass a single argument such as `-nf="-p 80,443"`. These expose native Nmap capabilities, not a restricted remote job language. |
 | `-s/--speed`, `-ht/--host-timeout` | Nmap speed 0–5 (default 3) and per-host timeout in seconds (default 240). |
 | `-a/--api` | Optional NVD API key. Keep it out of committed files and shell history where possible. When omitted, `AUTOPWN_NIST_API_KEY_FILE` (since v2.6.1) names a one-line key file that is read at use time, before `api.txt`. |
-| `-m/--mode`, `-nt/--noise-timeout` | `normal`, `evade`, or `noise`; optional noise duration. Raw-packet features depend on host privileges. |
+| `-m/--mode`, `-nt/--noise-timeout` | `normal`, `evade`, or `noise`; optional noise duration. Raw-packet features depend on host privileges. Noise mode runs one Nmap per live host for at most 32 hosts, and ends those Nmap processes when the duration passes or the scan is interrupted. |
 | `-sed/--skip-exploit-download` | Suppress optional exploit reference downloads. Downloading does not execute the files. |
 | `--offline`, `--vuln-source`, `--vuln-db` | Force offline integration policy; select `auto`/`online`/`offline` CVE source; choose SQLite database path. Offline mode still sends requested Nmap target traffic. |
 | `--update-vuln-db`, `--vuln-db-status` | Explicitly update the official local NVD mirror or print database readiness/freshness and exit. |

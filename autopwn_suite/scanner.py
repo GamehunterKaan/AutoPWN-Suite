@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 from dataclasses import dataclass
-from multiprocessing import Process
-from time import sleep
+from multiprocessing import Event, Process
+from time import monotonic, sleep
 
 from rich import box
 from rich.table import Table
@@ -142,18 +142,27 @@ def PortScan(
         return nm
 
 
-def CreateNoise(target, offline=False) -> None:
+def CreateNoise(target, offline=False, stop=None) -> None:
     nm = PortScanner()
+    # Terminating this process would not stop its Nmap child, so the parent sets `stop` instead.
+    should_stop = stop.is_set if stop is not None else None
     while True:
         try:
             if is_root():
-                nm.scan(hosts=target, arguments="-A -T 5 -D RND:10" + (" -n" if offline else ""))
+                nm.scan(hosts=target, arguments="-A -T 5 -D RND:10" + (" -n" if offline else ""), should_stop=should_stop)
             else:
-                nm.scan(hosts=target, arguments="-A -T 5" + (" -n" if offline else ""))
+                nm.scan(hosts=target, arguments="-A -T 5" + (" -n" if offline else ""), should_stop=should_stop)
+        except ScanCancelled:
+            return
         except KeyboardInterrupt:
             raise SystemExit("Ctr+C, aborting.") from None
         else:
             break
+
+
+# Every noise host costs a Python process and an `nmap -A -T 5`, so a large network is sampled.
+MAX_NOISE_HOSTS = 32
+NOISE_STOP_GRACE = 5
 
 
 def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *, offline=False) -> None:
@@ -168,12 +177,17 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *,
         log.logger("warning", "No hosts found for noise scan.")
         raise SystemExit(1)
 
+    if len(Uphosts) > MAX_NOISE_HOSTS:
+        log.logger("warning", f"Creating noise on the first {MAX_NOISE_HOSTS} of {len(Uphosts)} hosts.")
+        Uphosts = Uphosts[:MAX_NOISE_HOSTS]
+
+    stop = Event()
     NoisyProcesses = []
     try:
         with console.status("Creating noise ...", spinner="line"):
             for host in Uphosts:
                 log.logger("info", f"Started creating noise on {host}...")
-                P = Process(target=CreateNoise, args=(host, True) if offline else (host,))
+                P = Process(target=CreateNoise, args=(host, offline, stop))
                 P.start()
                 NoisyProcesses.append(P)
 
@@ -189,11 +203,15 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *,
         log.logger("error", "Noise scan interrupted!")
         raise SystemExit from None
     finally:
+        # Terminating a child would leave its Nmap running, so ask the children to end their own Nmap first.
+        stop.set()
+        deadline = monotonic() + NOISE_STOP_GRACE
+        for P in NoisyProcesses:
+            P.join(timeout=max(0.0, deadline - monotonic()))
         for P in NoisyProcesses:
             if P.is_alive():
                 P.terminate()
-        for P in NoisyProcesses:
-            P.join(timeout=2)
+                P.join(timeout=2)
 
 
 def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal, *, offline=False, progress=None, should_stop=None) -> list:
