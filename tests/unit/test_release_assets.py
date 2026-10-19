@@ -342,6 +342,21 @@ def test_current_version_has_matching_release_notes_and_runtime_version():
     assert notes.startswith(f"# AutoPWN Suite v{version}")
 
 
+def test_verification_docs_name_every_signer_identity_the_workflows_can_produce():
+    """The certificate identity is GITHUB_WORKFLOW_REF: the tag for a release event, main for a dispatch."""
+    root = Path(__file__).resolve().parents[2]
+    docker = (root / ".github/workflows/publish-docker.yml").read_text(encoding="utf-8")
+    backfill = (root / ".github/workflows/backfill-release-signatures.yml").read_text(encoding="utf-8")
+    for workflow in (docker, backfill):
+        assert 'identity="https://github.com/$GITHUB_WORKFLOW_REF"' in workflow
+    # A recovery dispatch is accepted from main only, so its identity ends in @refs/heads/main.
+    assert "workflow_dispatch:" in docker and "github.ref == 'refs/heads/main'" in docker
+    docs = (root / "docs/RELEASING.md").read_text(encoding="utf-8")
+    for identity in ("publish-docker.yml@refs/tags/vVERSION", "publish-docker.yml@refs/heads/main",
+                     "backfill-release-signatures.yml@refs/heads/main"):
+        assert identity in docs
+
+
 @pytest.mark.parametrize("workflow", ["publish-docker.yml", "publish-pypi.yml"])
 def test_dispatch_example_tag_has_the_layout_the_policy_scans(workflow):
     """Tags before v2.7.0 lack packaging/requirements-*.txt, so the dispatch input must not suggest one."""

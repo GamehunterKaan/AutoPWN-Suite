@@ -190,11 +190,22 @@ cosign verify-blob --bundle release-manifest.sigstore.json \
   release-manifest.json
 ```
 
-That identity is the one for an automatic published release
-(`publish-docker.yml@refs/tags/vVERSION` under the repository's `.github/workflows/`
-path); it is also the identity of the `SHA256SUMS` signature. A release whose
-signatures were added afterwards, such as v2.6.0, is signed by
-`backfill-release-signatures.yml@refs/heads/main` instead. Confirm the
+That identity is the one for an automatic published release. The signer identity
+is the workflow file plus the ref the run started from (`GITHUB_WORKFLOW_REF`), not
+the release tag, so it depends on how the release was signed; every identity below
+is under `https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/`:
+
+| How the signatures were made | Signer identity |
+| --- | --- |
+| The automatic run for the published release | `publish-docker.yml@refs/tags/vVERSION` |
+| **Publish Docker Image** dispatched by hand from `main` to recover that release (v2.6.1 was recovered this way) | `publish-docker.yml@refs/heads/main` |
+| Signatures added afterwards by the authenticity backfill (v2.6.0 was signed this way) | `backfill-release-signatures.yml@refs/heads/main` |
+
+A validly signed recovered release therefore fails a command written for the tag
+form. Use the row that matches how the release was published (the Actions run
+history shows the trigger) and change nothing else: the manifest's source commit
+must still be the commit of the release tag, and the `SHA256SUMS` signature and the
+provenance attestation use the same identity as the manifest. Confirm the
 expected repository, workflow, ref and source commit against the release record.
 Do not disable identity or issuer checking. Missing signatures are a verification
 failure, not a reason to bypass verification.
@@ -231,7 +242,8 @@ print(manifest["source_commit"], manifest["container"])
 
 To verify a standalone binary, check the signature on `SHA256SUMS` and then the
 binary against it. `sha256sum -c` reports a missing file for each binary you did
-not download, so check only yours:
+not download, so check only yours. The identity below is the tag form; use the
+one from the table above that applies to the release:
 
 ```sh
 cosign verify-blob --bundle SHA256SUMS.sigstore.json \
@@ -248,7 +260,8 @@ SmartScreen warns about an unrecognized app, and macOS may need
 `xattr -d com.apple.quarantine <file>` after you have verified it.
 
 The provenance attests the manifest, which in turn binds every file's hash. It records the
-tag, the source commit, the workflow and the run that produced the release:
+tag, the source commit, the workflow and the run that produced the release (identity as in
+the table above):
 
 ```sh
 cosign verify-blob-attestation --type slsaprovenance1 --bundle autopwn-suite-vVERSION.intoto.jsonl \
