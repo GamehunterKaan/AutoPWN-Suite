@@ -229,3 +229,21 @@ def test_apply_update_dispatches_to_commit(monkeypatch):
     monkeypatch.setattr(uc, "apply_commit_update", lambda *a, **k: "commit-called")
     monkeypatch.setattr(uc, "apply_release_update", lambda *a, **k: pytest.fail("release path used"))
     assert uc.apply_update(channel="commit") == "commit-called"
+
+
+def test_resolve_update_channel_defaults_to_release_when_nothing_saved(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
+    assert uc.resolve_update_channel(None) == "release"
+
+
+def test_resolve_update_channel_remembers_an_explicit_choice(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
+    assert uc.resolve_update_channel("commit") == "commit"
+    assert uc.resolve_update_channel(None) == "commit"
+
+
+def test_resolve_update_channel_explicit_choice_overrides_a_saved_one(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
+    uc.resolve_update_channel("commit")
+    assert uc.resolve_update_channel("release") == "release"
+    assert uc.resolve_update_channel(None) == "release"

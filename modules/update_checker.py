@@ -10,9 +10,39 @@ from pathlib import Path
 
 import requests
 
-DEFAULT_REPO = os.environ.get("AUTOPWN_UPDATE_REPO", "codeyevsky/AutoPWN-Suite")
+DEFAULT_REPO = os.environ.get("AUTOPWN_UPDATE_REPO", "GamehunterKaan/AutoPWN-Suite")
 API_ROOT = "https://api.github.com/repos/{repo}"
 REQUEST_TIMEOUT = 6
+CHANNEL_FILE_NAME = "update_channel.txt"
+
+
+def _channel_file():
+    data_dir = Path(os.environ.get("AUTOPWN_DATA_DIR", str(Path(__file__).resolve().parent)))
+    return data_dir / CHANNEL_FILE_NAME
+
+
+def _load_saved_channel():
+    try:
+        value = _channel_file().read_text().strip()
+    except OSError:
+        return None
+    return value if value in ("release", "commit") else None
+
+
+def _save_channel(channel):
+    try:
+        _channel_file().write_text(channel)
+    except OSError:
+        pass
+
+
+def resolve_update_channel(explicit_channel):
+    """Resolve the effective channel: an explicit CLI choice wins and is remembered;
+    otherwise fall back to the last remembered choice, then "release"."""
+    if explicit_channel is not None:
+        _save_channel(explicit_channel)
+        return explicit_channel
+    return _load_saved_channel() or "release"
 
 
 class UpdateCheckError(RuntimeError):

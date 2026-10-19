@@ -19,6 +19,7 @@ from modules.update_checker import (
     check_for_updates,
     format_result,
     format_status,
+    resolve_update_channel,
 )
 from modules.utils import (
     CheckConnection as CheckConnection,
@@ -131,7 +132,7 @@ def main() -> None:
     elif getattr(args, "apply_update", False) is True:
         try:
             result = apply_update(
-                channel=args.update_channel,
+                channel=resolve_update_channel(args.update_channel),
                 branch=args.update_branch,
                 repo=args.update_repo,
             )
@@ -144,7 +145,7 @@ def main() -> None:
         try:
             status = check_for_updates(
                 __version__,
-                channel=args.update_channel,
+                channel=resolve_update_channel(args.update_channel),
                 branch=args.update_branch,
                 repo=args.update_repo,
             )

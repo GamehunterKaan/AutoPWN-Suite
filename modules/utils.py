@@ -120,10 +120,12 @@ def cli():
                            help="Fast-forward this git checkout to the latest release/commit "
                                 "(see --update-channel), then exit. Requires internet, a git "
                                 "checkout and a clean working tree.")
-    updateargs.add_argument("--update-channel", dest="update_channel", default="release",
+    updateargs.add_argument("--update-channel", dest="update_channel", default=None,
                            choices=["release", "commit"],
                            help="Compare/update against the latest GitHub release tag or the latest "
-                                "commit on --update-branch (default: release).")
+                                "commit on --update-branch. Setting this explicitly remembers it as "
+                                "the default for future runs. (Default: release, or your last "
+                                "explicit choice.)")
     updateargs.add_argument("--update-branch", dest="update_branch", default="main", metavar="BRANCH",
                            help="Branch to compare against in commit mode. (Default: main)")
     updateargs.add_argument("--update-repo", dest="update_repo", default=None, metavar="OWNER/REPO",
