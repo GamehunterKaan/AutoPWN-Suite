@@ -65,7 +65,10 @@ is absent otherwise) and the call logs a warning: its ports and vulnerabilities
 are incomplete. Vulnerability records include description, severity, score,
 reference URL, exploitability, data source and database update time. Severity and
 score come from the newest CVSS version NVD lists; exploitability is the sub-score of
-the newest version that has one (CVSS v4 has none) and is 0.0 when no version does. They are
+the newest version that has one. CVSS v4 has none, so a record scored only with v4 reports 0.0,
+which means that no sub-score is available, not that the CVE is not exploitable. An older
+version's sub-score keeps its own scale (0 to 3.9 for CVSS v3, up to 10.0 for v2), which can
+differ from the scale of the version that supplies the severity. They are
 version-based candidates. Failures may raise scanner/database exceptions;
 callers must handle them and protect output paths and sensitive results.
 `save_to_file(filename="autopwn.json")` overwrites the selected file with JSON.
