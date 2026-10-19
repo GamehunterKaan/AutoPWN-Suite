@@ -358,7 +358,9 @@ requirements. Install Python dependencies and Nmap before disconnecting, or tran
 packages from a connected machine. The dashboard uses local assets and system fonts.
 
 The default `--vuln-source auto` tries online NVD lookups and falls back to a ready local database
-if NVD is unavailable, staying local for the rest of that scan. `--vuln-source online` requires
+if NVD is unavailable, staying local for the rest of that scan. That fallback does not make the scan
+offline: its web checks, reports and email/webhook notifications still run, and only an offline mode
+you chose skips them. `--vuln-source online` requires
 online lookups. Use `--offline` (or `--vuln-source offline`) to avoid trying NVD at all.
 Missing or invalid local data fails explicitly rather than reporting a clean vulnerability scan:
 when NVD fails and no local database is ready, the scan stops with exit status 1 and a message that

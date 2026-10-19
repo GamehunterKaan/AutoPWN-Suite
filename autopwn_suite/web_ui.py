@@ -318,8 +318,11 @@ def _offline_enabled():
 
 
 def _notifications_offline(job):
-    return (_offline_enabled() or job.config.get("vulnerability_source") == "offline"
-            or job.config.get("vulnerability_source_used") == "offline")
+    """Offline mode as the operator chose it (CLI restriction, toggle, or the job's own source).
+
+    An automatic fallback to the local database (vulnerability_source_used) is not offline mode.
+    """
+    return _offline_enabled() or job.config.get("vulnerability_source") == "offline"
 
 
 @contextmanager
@@ -1201,7 +1204,7 @@ def _run_scan(job: ScanJob) -> None:
                     web_rows = [[observed_ip, port["port"], port["service"], port["product"], port["version"], port["protocol"]] for port in host_data["ports"]]
                     scan_data = {"scan": {observed_ip: {"tcp": nm[observed_ip].get("tcp", {})}}}
                     host_failed = _run_host_web(job, observed_ip, web_endpoints(observed_ip, web_rows, scan_data), log, silent,
-                                                offline=lookup is not None and lookup.source == "offline") or host_failed
+                                                offline=source == "offline") or host_failed
                 if host_failed:
                     had_failures = True
                     job.mark_host_done(observed_ip, "partial")

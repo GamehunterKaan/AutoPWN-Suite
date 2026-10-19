@@ -246,6 +246,61 @@ def test_web_offline_job_uses_database_and_skips_notifications(web, local_databa
     export.close()
 
 
+def test_dashboard_nvd_fallback_does_not_make_the_scan_offline(web, local_database, monkeypatch):
+    """Offline mode is the operator's choice. A scan that fell back to the local database after NVD failed
+    still runs its web checks and sends its notifications, like the CLI (see the report test above)."""
+    wu, _ = web
+    monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
+    monkeypatch.setattr(wu.shutil, "which", lambda name: "nmap")
+    scanner = importlib.import_module("autopwn_suite.scanner")
+    monkeypatch.setattr(scanner, "PortScan", MagicMock(return_value=nmap_observation()))
+    monkeypatch.setattr(scanner, "AnalyseScanResults", lambda *a: [["192.168.1.10", 22, "ssh", "OpenSSH", "8.2p1", "tcp"]])
+    unreachable = MagicMock(side_effect=RuntimeError("NVD unreachable"))
+    monkeypatch.setattr("autopwn_suite.nist_search.searchCVE", unreachable)
+    web_checks = MagicMock()
+    monkeypatch.setattr("autopwn_suite.web.webvuln.webvuln", web_checks)
+    notifications = MagicMock()
+    monkeypatch.setattr(wu, "_send_email", notifications)
+    monkeypatch.setattr(wu, "_send_webhook", notifications)
+    monkeypatch.setattr(wu.threading, "Thread", lambda target, args=(), **kwargs: MagicMock(start=lambda: target(*args)))
+    job = wu.ScanJob("fallback", "192.168.1.10", {"target": "192.168.1.10", "skip_discovery": True,
+                                                  "scan_web": True, "vulnerability_source": "auto"})
+    wu._run_scan(job)
+    unreachable.assert_called_once()  # NVD was tried, failed, and the scan went on with the local database.
+    assert job.config["vulnerability_source_used"] == "offline" and job.config["vulnerability_source"] == "auto"
+    assert job.hosts_list()[0]["vulns"][0]["data_source"] == "offline"
+    web_checks.assert_called_once()
+    assert job.hosts_list()[0].get("web_status") != "skipped_offline"
+    assert notifications.call_count == 2  # webhook and email
+
+
+@pytest.mark.parametrize("config, cli_only, toggle, offline", [
+    ({"vulnerability_source": "auto", "vulnerability_source_used": "offline"}, False, False, False),  # fallback only
+    ({"vulnerability_source": "online", "vulnerability_source_used": "offline"}, False, False, False),
+    ({"vulnerability_source": "offline", "vulnerability_source_used": "offline"}, False, False, True),  # chosen per job
+    ({"vulnerability_source": "auto"}, True, False, True),  # --offline
+    ({"vulnerability_source": "auto"}, False, True, True),  # the dashboard toggle
+])
+def test_notifications_follow_the_chosen_offline_mode(web, monkeypatch, config, cli_only, toggle, offline):
+    wu, _ = web
+    monkeypatch.setattr(wu, "_OFFLINE_ONLY", cli_only)
+    wu._settings["offline_mode"] = toggle
+    assert wu._notifications_offline(wu.ScanJob("job", "192.168.1.10", config)) is offline
+
+
+@pytest.mark.parametrize("source, status", [("auto", 202), ("offline", 409)])
+def test_poc_verification_follows_the_chosen_offline_mode_not_the_nvd_fallback(web, monkeypatch, source, status):
+    """Verification replays requests to the scanned target, never to an online service; only a chosen offline mode blocks it."""
+    from tests.unit.test_web_poc import sample
+    wu, client = web
+    job = wu.ScanJob("job", "example.com", {"vulnerability_source": source, "vulnerability_source_used": "offline"})
+    job.mark_done()
+    job.add_web_finding("example.com", "http://example.com/", sample())
+    wu._register_scan(job)
+    monkeypatch.setattr(wu.threading, "Thread", MagicMock())  # accepted requests must not replay anything here
+    assert client.post("/api/web/findings/job/finding/verify", json={}).status_code == status
+
+
 def test_scan_thread_changes_the_job_config_only_under_the_job_lock(web, local_database, monkeypatch):
     """/api/scans copies the config under that lock; an unlocked insert could break its iteration."""
     import threading
