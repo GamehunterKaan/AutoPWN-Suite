@@ -2,6 +2,7 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Own Nmap subprocesses, drain XML output and optionally stream task progress."""
 
+import ipaddress
 import math
 import re
 import shlex
@@ -62,6 +63,13 @@ def _option_name(flag):
     return flag.lstrip("-").split("=", 1)[0] or None
 
 
+def _is_ipv6(target):
+    try:
+        return ipaddress.ip_network(target.split("%", 1)[0], strict=False).version == 6
+    except ValueError:
+        return False
+
+
 def _abbreviates(name, options):
     return len(name) >= 2 and any(option.startswith(name) for option in options)
 
@@ -101,6 +109,8 @@ def scan_with_progress(scanner, hosts, arguments, progress=None, should_stop=Non
     command = [scanner._nmap_path, "-oX", "-"]
     if progress is not None:
         command += ["-v", "--stats-every", "1s"]
+    if targets and "-6" not in flags and all(_is_ipv6(target) for target in targets):
+        command.append("-6")  # Without it Nmap skips IPv6 targets and still exits 0 with no hosts.
     command += targets + flags
     should_stop = should_stop or (lambda: False)
     if should_stop():

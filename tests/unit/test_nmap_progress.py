@@ -175,6 +175,26 @@ def test_ordinary_scan_options_are_not_file_options(flag):
     assert not monitored.uses_files(flag)
 
 
+@pytest.mark.parametrize("hosts", ["2001:db8::10", "2001:db8::/120", "::1", "fe80::1%eth0",
+                                   ["2001:db8::1", "2001:db8::2"], "2001:db8::1 2001:db8::2"])
+def test_ipv6_targets_get_the_option_nmap_needs_to_scan_them(fake_spawn, hosts):
+    """Without -6 Nmap skips an IPv6 target and exits 0 with no hosts, which looks like an offline host."""
+    spawn, _ = fake_spawn
+    monitored.scan_with_progress(scanner(), hosts, "-sn -n", None)
+    assert spawn.call_args.args[0].count("-6") == 1
+
+
+@pytest.mark.parametrize("hosts,flags", [
+    ("192.0.2.1", "-sn"), ("192.0.2.0/24", "-sn"), ("example.test", "-sn"),
+    (["2001:db8::1", "192.0.2.1"], "-sn"),  # one Nmap run cannot scan both families, so neither is forced
+    ("2001:db8::1", "-6 -sn"),
+])
+def test_dash_six_is_not_added_unless_every_target_is_ipv6_and_it_is_not_already_given(fake_spawn, hosts, flags):
+    spawn, _ = fake_spawn
+    monitored.scan_with_progress(scanner(), hosts, flags, None)
+    assert spawn.call_args.args[0].count("-6") == (1 if "-6" in flags else 0)
+
+
 def test_reader_error_still_drains_and_reaps_child(fake_spawn):
     _, process = fake_spawn
     callback = MagicMock(side_effect=RuntimeError("callback failed"))
