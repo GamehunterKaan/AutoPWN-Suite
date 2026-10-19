@@ -14,6 +14,7 @@ import pytest
 from autopwn_suite.web import poc_runtime
 from autopwn_suite.web.content import inspect_content
 from autopwn_suite.web.sqli import SQLIScanner
+from autopwn_suite.web.xss import reflection_context
 
 LIMIT_SECONDS = 2.0
 
@@ -60,3 +61,35 @@ def test_environment_file_keys_are_still_found_on_ordinary_lines(web_response):
     body = "# comment\r\nexport APP_NAME=demo\r\n  DB_PASSWORD = secret\r\nTOKEN=abc\r\n"
     results = inspect_content("http://example.com/.env", web_response(body, headers={"Content-Type": "text/plain"}), MagicMock())
     assert [item["type"] for item in results] == ["EXPOSED_FILE"]
+
+
+# The reflected marker sits after the nesting, so the whole tree has to be read to find it.
+DEEP_PAGES = {"nested": "<html><body>" + "<b>" * 16_000 + "MARK", "unmatched end tags": "<b>" * 16_000 + "</i>" * 16_000 + "MARK"}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("page", DEEP_PAGES.values(), ids=DEEP_PAGES.keys())
+def test_deeply_nested_html_stays_fast_for_reflection_analysis(web_response, page):
+    response = web_response(page, headers={"Content-Type": "text/html"})
+    assert seconds(reflection_context, response, "MARK", "MARK") < LIMIT_SECONDS
+    assert seconds(poc_runtime._Document("MARK").feed, page) < LIMIT_SECONDS
+
+
+INACTIVE_CASES = [
+    ('<template><div><img onerror="MARK"></div></template>', None),
+    ("<noscript><p><script>MARK</script></p></noscript>", None),
+    ('<template><p></p></template><img onerror="MARK">', "HTML event handler"),
+    ('<textarea onclick="MARK"></textarea>', "HTML event handler"),
+    ("<div><script>MARK</script></div>", "script element"),
+    ('<template><b></i></b><img onerror="MARK">', None),
+    ('<template></template></template><img onerror="MARK">', "HTML event handler"),
+]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("page,context", INACTIVE_CASES)
+def test_inactive_elements_are_skipped_in_the_scanner_and_in_the_downloaded_poc(web_response, page, context):
+    assert reflection_context(web_response(page, headers={"Content-Type": "text/html"}), "MARK", "MARK") == context
+    document = poc_runtime._Document("MARK")
+    document.feed(page)
+    assert document.active is (context is not None)

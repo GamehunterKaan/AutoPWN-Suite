@@ -67,16 +67,21 @@ def _public_headers(response):
             for name, value in response.headers.items() if name.lower() in allowed}
 
 
+_INACTIVE_TAGS = ("textarea", "title", "style", "xmp", "noscript", "template")
+
+
 class _Document(HTMLParser):
     def __init__(self, marker=""):
         super().__init__(convert_charrefs=True)
         self.stack, self.links, self.urls, self.heading = [], [], [], []
         self.marker, self.active = marker, False
+        # Counts of the open elements, kept beside the stack: scanning the stack for every tag costs the page's
+        # depth each, which is quadratic on the deeply nested page a target controls.
+        self.open, self.inactive = {}, 0
 
     def handle_starttag(self, tag, attributes):
         attributes = dict(attributes)
-        inactive = any(parent in ("textarea", "title", "style", "xmp", "noscript", "template") for parent, _ in self.stack)
-        if self.marker and not inactive and any(name.startswith("on") and self.marker in (value or "") for name, value in attributes.items()):
+        if self.marker and not self.inactive and any(name.startswith("on") and self.marker in (value or "") for name, value in attributes.items()):
             self.active = True
         if tag == "a" and "href" in attributes:
             self.links.append(attributes["href"])
@@ -84,19 +89,28 @@ class _Document(HTMLParser):
             self.urls.extend(attributes[name] for name in ("href", "src", "action") if attributes.get(name))
         if tag not in ("area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"):
             self.stack.append((tag, attributes))
+            self.open[tag] = self.open.get(tag, 0) + 1
+            if tag in _INACTIVE_TAGS:
+                self.inactive += 1
 
     def handle_endtag(self, tag):
-        for index in range(len(self.stack) - 1, -1, -1):
-            if self.stack[index][0] == tag:
-                del self.stack[index:]
-                break
+        if not self.open.get(tag):
+            return
+        index = len(self.stack) - 1
+        while self.stack[index][0] != tag:
+            index -= 1
+        for name, _ in self.stack[index:]:
+            self.open[name] -= 1
+            if name in _INACTIVE_TAGS:
+                self.inactive -= 1
+        del self.stack[index:]
 
     def handle_data(self, data):
         if self.stack and self.stack[-1][0] in ("title", "h1"):
             self.heading.append(data)
         if self.marker and self.stack and self.stack[-1][0] == "script":
             attributes = self.stack[-1][1]
-            if (not any(parent in ("textarea", "title", "style", "xmp", "noscript", "template") for parent, _ in self.stack[:-1])
+            if (not self.inactive
                     and not attributes.get("src")
                     and attributes.get("type", "").strip().lower() in ("", "module", "text/javascript", "application/javascript")
                     and self.marker in data):

@@ -5,7 +5,7 @@
 from random import choices
 from string import ascii_letters
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from requests import get
 from requests.exceptions import RequestException
 
@@ -19,8 +19,12 @@ def reflection_context(response, payload, marker):
     if not is_html(response) or payload not in response.text:
         return None
     soup = BeautifulSoup(response.text, "html.parser")
-    for node in soup.find_all(True):
-        if any(parent.name in ("textarea", "title", "style", "xmp", "noscript", "template") for parent in node.parents):
+    # Walk the tree once, in document order, and do not enter an inactive element: asking every element for its
+    # ancestors costs the page's depth each, which is quadratic on the deeply nested page a target controls.
+    pending = list(reversed(soup.contents))
+    while pending:
+        node = pending.pop()
+        if not isinstance(node, Tag):
             continue
         if node.name == "script" and not node.has_attr("src"):
             kind = node.get("type", "").lower().strip()
@@ -29,6 +33,8 @@ def reflection_context(response, payload, marker):
         for name, value in node.attrs.items():
             if name.lower().startswith("on") and isinstance(value, str) and marker in value:
                 return "HTML event handler"
+        if node.name not in ("textarea", "title", "style", "xmp", "noscript", "template"):
+            pending.extend(reversed(node.contents))
     return None
 
 
