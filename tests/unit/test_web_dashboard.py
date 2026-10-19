@@ -248,10 +248,8 @@ def test_finding_and_coverage_endpoints_hide_every_value_of_the_target(dashboard
     again.assert_not_called()
 
 
-@pytest.mark.unit
-def test_notifications_carry_the_redacted_target(dashboard, monkeypatch):
-    wu, _ = dashboard
-    job = web_only_job(wu)
+def deliver_notifications(wu, job, monkeypatch):
+    """Send the webhook and the e-mail of a finished scan to stand-ins and return what they received."""
     job.mark_done("completed")
     wu._settings["webhook"] = {"enabled": True, "url": "https://hooks.example.invalid/notify", "on_complete": True}
     wu._settings["email"] = {"enabled": True, "smtp_host": "smtp.example.invalid", "to_addr": "ops@example.invalid",
@@ -266,17 +264,64 @@ def test_notifications_carry_the_redacted_target(dashboard, monkeypatch):
     monkeypatch.setattr(wu, "_smtp_connection", smtp)
     wu._deliver_webhook(job)
     wu._deliver_email(job)
-    assert posted[0]["target"] == SHOWN_TARGET
     message = email.message_from_string(mails[0], policy=email.policy.default)
-    body = message.get_body(("html",)).get_content()
-    assert SHOWN_TARGET in message["Subject"] and html.escape(SHOWN_TARGET) in body
-    assert "hunter2" not in str(posted) + message["Subject"] + body
+    return posted, message["Subject"], message.get_body(("html",)).get_content()
 
 
 @pytest.mark.unit
-def test_the_scheduler_log_line_hides_the_target_it_fired_and_launches_the_one_stored(dashboard):
+def test_notifications_carry_the_redacted_target(dashboard, monkeypatch):
     wu, _ = dashboard
-    schedule = {"id": "sched-0001", "name": "Site", "target": TYPED_TARGET, "profile_id": "profile", "enabled": True}
+    posted, subject, body = deliver_notifications(wu, web_only_job(wu), monkeypatch)
+    assert posted[0]["target"] == SHOWN_TARGET
+    assert SHOWN_TARGET in subject and html.escape(SHOWN_TARGET) in body
+    assert "hunter2" not in str(posted) + subject + body
+
+
+BREAKERS = ["'", '"', "<", ">", "\u00a0", "\u2028", "\u3000"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("breaker", BREAKERS)
+def test_a_breaker_character_in_the_typed_target_leaves_no_later_value_in_a_record_an_answer_or_a_notification(dashboard, monkeypatch, breaker):
+    # The dashboard checks a web-only target against ASCII whitespace only, so these characters reach the job record.
+    wu, client = dashboard
+    typed = f"https://example.com:8443/app?nick=ZQ1{breaker}ZQ2&q=ZQ3#access_token=ZQ4"
+    job = web_only_job(wu, typed)
+    result = {"id": "finding", "type": "CORS", "url": "https://example.com:8443/app", "details": {"title": "CORS"}, "evidence": "repeatable", "severity": "medium"}
+    def scan(endpoint, log, console, **kwargs):
+        kwargs["on_finding"](result)
+        kwargs["on_complete"]({"status": "completed", "requests": 3, "target": endpoint, "issues": []})
+        return [result]
+    with patch("autopwn_suite.web.webvuln.webvuln", side_effect=scan), patch.object(wu, "_notify"):
+        wu._register_scan(job)
+        wu._run_scan(job)
+    assert job.status == "completed" and job.target == job.config["target"] == typed
+    # Job record: status JSON, the list the history is drawn from, the downloaded JSON report; and the finding rows.
+    records = [client.get("/api/scans/job").get_json(), client.get("/api/scans").get_json()[0], json.loads(client.get("/api/scans/job/download").data)]
+    for record in records:
+        assert record["target"] == record["config"]["target"] == SHOWN_TARGET
+        assert [(row["endpoint"], row["target"]) for row in record["web_coverage"]] == [(SHOWN_TARGET, SHOWN_TARGET)]
+    findings = client.get("/api/web/findings")
+    assert findings.get_json()[0]["endpoint"] == SHOWN_TARGET
+    # The answer to starting a scan with this target, and the webhook, the e-mail subject and its report.
+    with patch.object(wu, "_launch_scan", return_value=MagicMock(id="job2")) as launch:
+        response = client.post("/api/scan/start", json={"target": typed, "scan_web": True, "scan_ports": False})
+    assert response.status_code == 200 and launch.call_args.args[0]["target"] == typed
+    assert response.get_json()["message"] == "Scan started for " + SHOWN_TARGET
+    posted, subject, body = deliver_notifications(wu, job, monkeypatch)
+    assert posted[0]["target"] == SHOWN_TARGET and SHOWN_TARGET in subject and html.escape(SHOWN_TARGET) in body
+    assert "ZQ" not in json.dumps(records) + findings.get_data(as_text=True) + response.get_data(as_text=True) + str(posted) + subject + body
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("typed,shown", [
+    (TYPED_TARGET, SHOWN_TARGET),
+    ("https://example.com/app?nick=ZQ1'ZQ2&token=ZQ3", "https://example.com/app?nick=REDACTED&token=REDACTED"),
+    ("https://example.com/app?nick=ZQ1\u3000ZQ2&token=ZQ3", "https://example.com/app?nick=REDACTED&token=REDACTED"),
+])
+def test_the_scheduler_log_line_hides_the_target_it_fired_and_launches_the_one_stored(dashboard, typed, shown):
+    wu, _ = dashboard
+    schedule = {"id": "sched-0001", "name": "Site", "target": typed, "profile_id": "profile", "enabled": True}
     wu._schedules.clear()
     wu._schedules[schedule["id"]] = dict(schedule)
     wu._profiles["profile"] = {"config": {"scan_web": True, "scan_ports": False}}
@@ -288,5 +333,26 @@ def test_the_scheduler_log_line_hides_the_target_it_fired_and_launches_the_one_s
          patch.object(wu, "_launch_scan", return_value=MagicMock(id="job")) as launch, patch.object(wu, "_save_schedules"), \
          patch.object(wu, "_broadcast", side_effect=events.append), pytest.raises(Stop):
         wu._scheduler_loop()
-    assert launch.call_args.args[0]["target"] == TYPED_TARGET
-    assert [event["msg"] for event in events] == ["[*] Scheduled scan fired: Site \u2192 " + SHOWN_TARGET]
+    assert launch.call_args.args[0]["target"] == typed
+    assert [event["msg"] for event in events] == ["[*] Scheduled scan fired: Site → " + shown]
+
+
+@pytest.mark.unit
+def test_a_failed_web_check_or_scan_logs_and_records_the_class_of_the_exception_only(dashboard, caplog):
+    # A request error quotes the URL it sent, query included, and so can the text of any other exception.
+    wu, client = dashboard
+    quoted = "HTTPConnectionPool(host='example.com'): Max retries exceeded with url: /app?token=ZQ1 (Caused by NewConnectionError)"
+    with patch("autopwn_suite.web.webvuln.webvuln", side_effect=RuntimeError(quoted)), caplog.at_level("DEBUG"):
+        failed = wu._run_host_web(web_only_job(wu), "example.com", [TYPED_TARGET], MagicMock(), MagicMock())
+    assert failed and "Web application check failed (RuntimeError)" in caplog.text
+    assert "ZQ1" not in caplog.text and "Traceback" not in caplog.text
+    for index, (error, label) in enumerate([(RuntimeError(quoted), "Unexpected error (RuntimeError)"), (SystemExit(quoted), "Scan aborted (SystemExit)")]):
+        job, events = web_only_job(wu), []
+        job.id = f"failing{index}"
+        wu._register_scan(job)
+        with patch.object(wu, "_run_host_web", side_effect=error), patch.object(wu, "_notify"), patch.object(wu, "_broadcast", side_effect=events.append):
+            wu._run_scan(job)
+        record = client.get(f"/api/scans/failing{index}").get_json()
+        assert record["status"] == "error" and record["error"] == label
+        assert [event["msg"] for event in events if event.get("level") == "error"] == [f"[-] {label}."]
+        assert "ZQ1" not in json.dumps(record) + str(events)

@@ -13,7 +13,7 @@ from rich.logging import RichHandler
 
 from autopwn_suite.web.crawler import link_finder
 from autopwn_suite.web.options import CHECKS
-from autopwn_suite.web.runtime import redact_text
+from autopwn_suite.web.runtime import redact_target, redact_text
 from autopwn_suite.web.webvuln import target_urls, web_endpoints, webvuln
 
 
@@ -218,6 +218,90 @@ def test_redact_text_hides_query_secrets_in_every_url_of_a_message(message, expe
 def test_redact_text_hides_every_query_value_userinfo_and_fragment_of_a_target(message, expected):
     assert redact_text(message) == expected
     assert redact_text(expected) == expected
+
+
+# Characters that can sit inside a URL a target chose (a crawled link is not re-quoted) or a typed target (the dashboard
+# checks a web target against ASCII whitespace only) and that a tokenizer would cut the URL at.
+BREAKERS = ["'", '"', "<", ">", "\u00a0", "\u2028", "\u3000"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("breaker", BREAKERS)
+def test_a_quote_an_angle_bracket_or_a_unicode_space_inside_a_url_does_not_cut_the_redaction_short(breaker):
+    for url, shown in [
+        (f"http://a.test/?q=O{breaker}Brien&token=ZQ1&x=ZQ2", "http://a.test/?q=REDACTED&token=REDACTED&x=REDACTED"),
+        (f"http://us{breaker}er:pa{breaker}ss@a.test/p?x=ZQ3", "http://a.test/p?x=REDACTED"),
+        (f"a.test:80?q=O{breaker}Brien&token=ZQ1", "a.test:80?q=REDACTED&token=REDACTED"),
+        (f"https://a.test/p#ac{breaker}cess_token=ZQ4", "https://a.test/p"),
+        (f"https://a.test/app;jsessionid=AB{breaker}C/p?x=ZQ5", "https://a.test/app;jsessionid=REDACTED/p?x=REDACTED"),
+    ]:
+        # In free text the URL ends at the space after it, and only the sentence punctuation behind it stays out.
+        assert redact_text(f"No reachable endpoint on {url}.") == f"No reachable endpoint on {shown}."
+        assert redact_text(f"Unable to crawl ({url}) now") == f"Unable to crawl ({shown}) now"
+        assert redact_target(url) == shown
+    # A quote or a bracket in front of a URL is closed after it, and the closer stays where it was.
+    for opener, closer in ("''", '""', "()", "<>", "[]", "{}"):
+        assert redact_text(f"on {opener}http://a.test/?q=O{breaker}B&t=ZQ1{closer}.") == f"on {opener}http://a.test/?q=REDACTED&t=REDACTED{closer}."
+        assert redact_text(f"on {opener}a.test:80?t=ZQ1{closer}") == f"on {opener}a.test:80?t=REDACTED{closer}"
+    # A finding keeps the values no credential name guards, and a breaker is no way around the names that do.
+    assert redact_text(f"on http://a.test/?token=ZQ1{breaker}ZQ2&q=1", names_only=True) == "on http://a.test/?token=REDACTED&q=1"
+    assert redact_text(f"on http://a.test/?q=O{breaker}Brien&token=ZQ1", names_only=True) == f"on http://a.test/?q=O{breaker}Brien&token=REDACTED"
+
+
+@pytest.mark.unit
+def test_a_target_is_redacted_as_one_string_with_no_tokenizing():
+    for target, shown in [
+        ("http://a.test/?q=one two&token=ZQ1", "http://a.test/?q=REDACTED&token=REDACTED"),
+        ("http://a.test/?q=one\ttwo&token=ZQ1\nZQ2", "http://a.test/?q=REDACTED&token=REDACTED"),
+        ("a.test:80/p?q=one two&t=ZQ", "a.test:80/p?q=REDACTED&t=REDACTED"),
+        # A part without "=" in a typed target is a bare token (a verification code), not a question.
+        ("a.test/verify?3f9a7c", "a.test/verify?REDACTED"),
+        ("a.test:80?3f9a7c", "a.test:80?REDACTED"),
+        ("http://a.test/verify?3f9a7c&x=1", "http://a.test/verify?REDACTED&x=REDACTED"),
+        ("user:pw@a.test:80/x?q=1#f", "a.test:80/x?q=REDACTED"),
+        ("//user:pw@a.test/x", "//a.test/x"),
+        # Network targets and names come back as typed, and a string with a control character loses it.
+        ("192.0.2.0/24", "192.0.2.0/24"),
+        ("a.test:8080", "a.test:8080"),
+        ("2001:db8::10", "2001:db8::10"),
+        ("a.test/\x1b[2Jx", "a.test/[2Jx"),
+    ]:
+        assert redact_target(target) == shown
+        assert redact_target(shown) == shown
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("breaker", BREAKERS)
+def test_a_breaker_character_in_the_target_leaves_no_later_value_in_the_banner_the_log_and_the_summary(web_response, breaker):
+    url = f"http://example.com/page?id=1&nick=ZQ1{breaker}ZQ2&session=ZQ3"
+    shown = "http://example.com/page?id=REDACTED&nick=REDACTED&session=REDACTED"
+    console, log, summary = Console(file=io.StringIO(), record=True, width=300, color_system=None), MagicMock(), {}
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response(url=url)), patch("autopwn_suite.web.webvuln.crawl", return_value={url}), \
+         patch("autopwn_suite.web.sqli.get", side_effect=ConnectionError("HTTPConnectionPool: Max retries exceeded")):
+        webvuln(url, log, console, controls={"speed": 5, "checks": {name: name == "sqli" for name in CHECKS}}, on_complete=summary.update)
+    # The announcement goes straight to the console, the other lines through the logger and into the coverage issues.
+    announcement = next(line for line in console.export_text().split("\n") if "Testing web application" in line)
+    assert announcement.strip() == f"Testing web application on {shown} ..."
+    expected = f"Connection error raised on: {shown}, skipping"
+    assert expected in summary["issues"]
+    log.logger.assert_any_call("error", expected)
+    assert summary["target"] == shown
+    assert "ZQ" not in console.export_text() + str(log.logger.call_args_list) + str(summary)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("breaker", BREAKERS + [" ", "\t"])
+@pytest.mark.parametrize("template", ["HTTP://127.0.0.1:9/?nick=ZQ1{b}ZQ2&token=ZQ3", "127.0.0.1:9?nick=ZQ1{b}ZQ2&token=ZQ3", "[::1]:9/app?nick=ZQ1{b}ZQ2&token=ZQ3"])
+def test_a_breaker_character_in_the_typed_target_leaves_no_later_value_in_the_unreachable_messages(template, breaker):
+    # The whole typed target is one string: not even a space (a CLI target can hold one) ends it before its query is hidden.
+    target = template.format(b=breaker)
+    for error, word in ((ConnectionError, "No reachable in-scope web endpoint"), (SSLError, "presented a certificate")):
+        log, summary = MagicMock(), {}
+        with patch("autopwn_suite.web.webvuln.get", side_effect=error):
+            webvuln(target, log, MagicMock(), on_complete=summary.update)
+        logged = " ".join(call.args[1] for call in log.logger.call_args_list)
+        assert word in logged and "?nick=REDACTED&token=REDACTED" in logged
+        assert "ZQ" not in logged + str(summary)
 
 
 @pytest.mark.unit

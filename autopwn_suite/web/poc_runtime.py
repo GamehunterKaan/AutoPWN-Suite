@@ -54,9 +54,10 @@ def validate_plan(plan):
 
 # Same as SENSITIVE_PARAMETER and redact_url in runtime.py, which a downloaded PoC does not have.
 _SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?<!by)(?<!com)(?<!sur)(?<!tres)pass(?!age|enger|port|ive|ion|able|over)"
-                                  r"|secret|token|session|sessid|jwt|signature|csrf|xsrf|credential|bearer|pwd|cookie|hmac"
-                                  r"|(?:api|access|private|app|client|consumer|licen[cs]e|encryption|signing|master|service|ssh|developer).?key|^key$"
-                                  r"|(?<![a-z])(?:sig|sid|otp|totp|hotp|cred|creds)(?![a-z])|(?-i:(?<=[a-z0-9])(?:Sig|Sid|Otp)(?![a-zA-Z]))"
+                                  r"|secret|token|session|sessid|jwt|signature|csrf|xsrf|credential|bearer|pwd|cookie|hmac|verifier|samlresponse|relaystate"
+                                  r"|(?:api|access|private|app|client|consumer|licen[cs]e|encryption|signing|master|service|ssh|developer).?key|^key$|^code$"
+                                  r"|(?<![a-z])(?:sig|sid|otp|totp|hotp|cred|creds|pw|ticket|nonce)(?![a-z])"
+                                  r"|(?-i:(?<=[a-z0-9])(?:Sig|Sid|Otp|Pw|Ticket|Nonce)(?![a-zA-Z]))"
                                   r"|(?<![a-z])(?:verif(?:y|ication)|reset|recovery|backup|activation|invite|mfa|2fa|sms|login)[_-]?code", re.I)
 
 

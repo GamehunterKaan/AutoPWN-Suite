@@ -19,7 +19,7 @@ from autopwn_suite.web.lfi import LFIScanner
 from autopwn_suite.web.passive import inspect_response
 from autopwn_suite.web.planning import prioritize_urls, skip_discovered_url
 from autopwn_suite.web.query import query_parts
-from autopwn_suite.web.runtime import ACTIVE, ScanContext, WebBudgetExceeded, allowed, enabled, options, redact_text, run_task, stage, task_done
+from autopwn_suite.web.runtime import ACTIVE, ScanContext, WebBudgetExceeded, allowed, enabled, options, redact_target, redact_text, run_task, stage, task_done
 from autopwn_suite.web.sqli import SQLIScanner
 from autopwn_suite.web.xss import XSSScanner
 
@@ -97,13 +97,13 @@ def _execute_webvuln(target, log, console):
         current.discovery = False
     if response is None:
         if untrusted and options()["verify_tls"]:
-            log.logger("warning", f"{target} presented a certificate that could not be verified, so web checks were skipped. "
+            log.logger("warning", f"{redact_target(target)} presented a certificate that could not be verified, so web checks were skipped. "
                                   "Re-run with --insecure-tls only if you trust this target (for example a lab system with a self-signed certificate).")
         else:
-            log.logger("warning", f"No reachable in-scope web endpoint on {target}.")
+            log.logger("warning", f"No reachable in-scope web endpoint on {redact_target(target)}.")
         return []
     # The banner goes straight to the console, which a CLI scan records into its reports, so it is redacted here.
-    banner(redact_text(f"Testing web application on {target_url} ..."), "purple", console)
+    banner(f"Testing web application on {redact_target(target_url)} ...", "purple", console)
     current = ACTIVE.get()
     if current:
         current.target = target_url
@@ -214,4 +214,4 @@ def webvuln(target, log, console, *, controls=None, should_stop=None, progress=N
             on_complete({"status": "stopped" if context.should_stop() else "partial" if context.issues else "completed", "requests": context.requests,
                          "total_requests": context.state["requests"], "attempts": context.state["attempts"],
                          "completed_tasks": len(context.state["tasks"]),
-                         "issues": context.issues, "target": redact_text(context.target), "controls": context.options})
+                         "issues": context.issues, "target": redact_target(context.target), "controls": context.options})

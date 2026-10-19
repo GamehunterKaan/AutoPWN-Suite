@@ -74,11 +74,14 @@ CREDENTIAL_NAMES = ["password", "passwd", "pass", "user_pass", "userPass", "pass
                     "pwd", "PWD", "newpwd", "otp", "totp", "otp_code", "sig", "x-amz-sig", "sid", "userSid", "key", "KEY", "access_key", "accessKey",
                     "private-key", "app_key", "appKey", "client_key", "license_key", "bearer", "credentials", "x-amz-credential", "cred", "creds",
                     "cookie", "hmac", "xsrf", "sessid", "PHPSESSID", "x-amz-security-token", "verification_code", "reset_code", "recovery_code",
-                    "mfa_code", "%74oken", "to%6Ben"]
+                    "mfa_code", "%74oken", "to%6Ben",
+                    # An OAuth callback holds a credential in code, a single sign-on response in SAMLResponse.
+                    "code", "CODE", "pw", "PW", "userPw", "ticket", "login_ticket", "nonce", "oauth_nonce", "SAMLResponse", "RelayState",
+                    "code_verifier", "verifier"]
 PLAIN_NAMES = ["author", "authors", "author_id", "authorId", "authored", "bypass", "bypassed", "compass", "encompass", "surpass", "trespass",
                "passenger", "passage", "passport", "passive", "passion", "page", "id", "q",
                "sort_key", "primary_key", "cache_key", "monkey", "keyword", "keys", "key_id", "design", "signal", "side", "inside", "credit",
-               "hotpot", "code", "country_code", "zipcode", "nonce", "ticket"]
+               "hotpot", "country_code", "zipcode", "error_code", "status_code", "codec", "encode", "pwned", "tickets", "nonces", "saml", "state"]
 
 
 @pytest.mark.unit

@@ -83,7 +83,7 @@ from autopwn_suite.paths import data_dir
 from autopwn_suite.vulnerability_db import DatabaseInUse, database_path, database_status, update_database
 from autopwn_suite.web.options import CHECKS as WEB_CHECKS
 from autopwn_suite.web.options import normalize_options
-from autopwn_suite.web.runtime import redact_text
+from autopwn_suite.web.runtime import redact_target
 from autopwn_suite.web_auth import ACCOUNT_FILE, COOKIE, AccountStore, install_auth, show_credentials
 
 try:
@@ -605,7 +605,7 @@ class ScanJob:
     def public_target(self) -> str:
         """The target as it is shown and exported: query values, userinfo and fragments of a URL are redacted. The scan
         itself runs, resumes and re-runs with `self.target` and `self.config["target"]`, which stay as typed."""
-        return redact_text(self.target)
+        return redact_target(self.target)
 
     def _publish_progress(self):
         with self._lock:
@@ -699,7 +699,7 @@ class ScanJob:
 
     def add_web_finding(self, ip, endpoint, result):
         result = deepcopy(result)
-        result.update(scan_id=self.id, host=ip, endpoint=redact_text(endpoint))
+        result.update(scan_id=self.id, host=ip, endpoint=redact_target(endpoint))
         with self._lock:
             self._web_findings[result["id"]] = result
             host = self.get_or_create_host(ip)
@@ -730,7 +730,7 @@ class ScanJob:
 
     def add_web_coverage(self, ip, endpoint, summary):
         with self._lock:
-            public_endpoint = redact_text(endpoint)
+            public_endpoint = redact_target(endpoint)
             self._web_coverage = [row for row in self._web_coverage
                                   if (row["host"], row["endpoint"]) != (ip, public_endpoint)]
             self._web_coverage.append({"host": ip, "endpoint": public_endpoint, **deepcopy(summary)})
@@ -749,7 +749,7 @@ class ScanJob:
             # The scan thread adds keys to the config under this lock; iterating it outside would raise.
             config = {k: deepcopy(v) for k, v in self.config.items() if k != "api_key"}
         if isinstance(config.get("target"), str):
-            config["target"] = redact_text(config["target"])
+            config["target"] = redact_target(config["target"])
         return {
             "id":          self.id,
             "target":      self.public_target,
@@ -1374,11 +1374,13 @@ def _run_scan(job: ScanJob) -> None:
     except ScanCancelled:
         job.mark_done("stopped")
     except SystemExit as exc:
-        _log(job, f"[-] Scan aborted: {exc}", "error")
-        job.mark_error(str(exc))
+        # The text of an exception can quote a URL or a command line with the query secrets of the target: the job
+        # log, the record and its notifications carry fixed text and the class of the exception.
+        _log(job, f"[-] Scan aborted ({type(exc).__name__}).", "error")
+        job.mark_error(f"Scan aborted ({type(exc).__name__})")
     except Exception as exc:
-        _log(job, f"[-] Unexpected error: {exc}", "error")
-        job.mark_error(str(exc))
+        _log(job, f"[-] Unexpected error ({type(exc).__name__}).", "error")
+        job.mark_error(f"Unexpected error ({type(exc).__name__})")
 
     finally:
         if lookup is not None:
@@ -1405,7 +1407,7 @@ def _run_host_web(job, ip, endpoints, log, console, *, offline=False):
             raise ScanCancelled("Web scan stopped")
         summary = {}
         with job._lock:
-            if any(row["host"] == ip and row["endpoint"] == redact_text(endpoint) and row["status"] == "completed"
+            if any(row["host"] == ip and row["endpoint"] == redact_target(endpoint) and row["status"] == "completed"
                    for row in job._web_coverage):
                 continue
             checkpoint = job._web_checkpoints.setdefault((ip, endpoint), {})
@@ -1419,11 +1421,12 @@ def _run_host_web(job, ip, endpoints, log, console, *, offline=False):
             if summary:
                 job.add_web_coverage(ip, endpoint, summary)
             raise
-        except Exception:
-            logging.exception("Web application check failed")
-            summary = {"status": "partial", "requests": 0, "issues": ["Web checks failed; see server logs."], "target": redact_text(endpoint)}
+        except Exception as exc:
+            # A request error quotes the URL it sent, query included: the server log carries the class only.
+            logging.error("Web application check failed (%s)", type(exc).__name__)
+            summary = {"status": "partial", "requests": 0, "issues": ["Web checks failed; see server logs."], "target": redact_target(endpoint)}
         summary.setdefault("status", "completed")
-        summary["target"] = redact_text(summary.get("target", endpoint))
+        summary["target"] = redact_target(summary.get("target", endpoint))
         job.add_web_coverage(ip, endpoint, summary)
         failed = failed or summary["status"] != "completed"
         with job._lock:
@@ -1839,7 +1842,7 @@ def _scheduler_loop() -> None:
                 _broadcast({
                     "scan_id": job.id, "level": "info",
                     "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
-                    "msg": f"[*] Scheduled scan fired: {schedule.get('name', schedule['id'][:8])} → {redact_text(config['target'])}",
+                    "msg": f"[*] Scheduled scan fired: {schedule.get('name', schedule['id'][:8])} → {redact_target(config['target'])}",
                 })
                 _save_schedules()
             except Exception as exc:
@@ -1967,7 +1970,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             return jsonify({"error": "Offline database unavailable. Download it in Settings while connected, "
                             "or copy vulnerabilities.sqlite3 from a connected system."}), 409
         job = _launch_scan(config)
-        return jsonify({"ok": True, "scan_id": job.id, "message": f"Scan started for {redact_text(target)}"})
+        return jsonify({"ok": True, "scan_id": job.id, "message": f"Scan started for {redact_target(target)}"})
 
     @app.route("/api/web/catalog")
     def api_web_catalog():
@@ -2043,8 +2046,8 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                 try:
                     verified = verify_plan(plan)
                     job.set_web_verification(finding_id, verified)
-                except Exception:
-                    logging.exception("Web evidence verification failed")
+                except Exception as exc:
+                    logging.error("Web evidence verification failed (%s)", type(exc).__name__)
                     job.set_web_verification(finding_id, {"status": "inconclusive", "summary": "Verification failed; see server logs."})
                 finally:
                     with _mode_lock:

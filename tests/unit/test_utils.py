@@ -135,7 +135,7 @@ class TestSaveOutput:
             ("192.168.*.*", "192.168._._"),
             ("2001:db8::10", "2001_db8__10"),
             ("host.test:8080", "host.test_8080"),
-            ("what?.test", "what_.test"),
+            ("what?.test", "what_REDACTED"),  # what follows a ? is a query part, and the name is printed in the report
             ("10.0.0.0/24", "10.0.0.0_24"),
             ("a\\b\"c<d>e|f", "a_b_c_d_e_f"),
             ("x" * 300, "x" * 100),
@@ -1082,4 +1082,26 @@ def test_param_print_redacts_the_target_it_echoes(mock_width, targetarg, shown, 
 ])
 def test_a_generated_report_name_does_not_carry_the_query_values_of_a_url_target(target, name):
     from autopwn_suite.utils import _report_name
+    assert _report_name(target) == name
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("breaker", ["'", '"', "<", ">", "\u00a0", "\u2028", "\u3000", " ", "\t"])
+@pytest.mark.parametrize("template,shown,name", [
+    ("https://app.test/?nick=ZQ1{b}ZQ2&token=ZQ3", "https://app.test/?nick=REDACTED&token=REDACTED", "https___app.test__nick_REDACTED_token_REDACTED"),
+    ("app.test:8080?nick=ZQ1{b}ZQ2&token=ZQ3", "app.test:8080?nick=REDACTED&token=REDACTED", "app.test_8080_nick_REDACTED_token_REDACTED"),
+    ("https://us{b}er:ZQ1{b}ZQ2@app.test/x?q=ZQ3", "https://app.test/x?q=REDACTED", "https___app.test_x_q_REDACTED"),
+])
+@patch("autopwn_suite.utils.get_terminal_width", return_value=80)
+def test_a_breaker_character_in_a_typed_target_leaves_no_later_value_in_the_summary_and_the_report_name(
+        mock_width, template, shown, name, breaker, mock_console):
+    """The target is echoed as one string: a quote, an angle bracket or any space inside it does not end it early."""
+    from autopwn_suite.utils import _report_name
+    target = template.format(b=breaker)
+    args = argparse.Namespace(output=None, output_folder="outputs", skip_discovery=False, host_file=None, host_timeout=240,
+                              speed=3, nmap_flags="", report=None, yes_please=False)
+    InitAutomation(args)
+    ParamPrint(args, target, ScanType.ARP, ScanMode.Normal, None, mock_console, MagicMock())
+    output = mock_console.print.call_args[0][0]
+    assert f"Target : {shown}\n" in output and "ZQ" not in output
     assert _report_name(target) == name

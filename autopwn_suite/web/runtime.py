@@ -42,19 +42,26 @@ def allowed(kind):
 # a keyword are left alone: "author" (but not "authorization") and "bypass" or "passenger" (but "pass", "userpass",
 # "newPass"). Every other name containing "pass" is redacted, because credential names are not words. The short
 # names (sig, sid, otp, cred) count only as a whole word or as a camelCase part ("x_sig", "userSid" but not "design",
-# "inside"), and "key" alone or after a credential word ("access_key", "appKey" but not "sort_key", "monkey"). A bare
-# "code" is not listed (country_code, zipcode), only the verification kinds. Replays keep working for every other
-# parameter, and a secret in a parameter with any other name is shown as is.
+# "inside"), and "key" or "code" alone or "key" after a credential word ("access_key", "appKey" but not "sort_key",
+# "monkey", "country_code", "zipcode"): an OAuth callback carries a credential in "code". Replays keep working for every
+# other parameter, and a secret in a parameter with any other name is shown as is, as is a credential inside the value
+# of another parameter (`redirect_uri=https%3A%2F%2Fapp%2Fcb%3Fcode%3Dabc`): only the outer name is read.
 SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?<!by)(?<!com)(?<!sur)(?<!tres)pass(?!age|enger|port|ive|ion|able|over)"
-                                 r"|secret|token|session|sessid|jwt|signature|csrf|xsrf|credential|bearer|pwd|cookie|hmac"
-                                 r"|(?:api|access|private|app|client|consumer|licen[cs]e|encryption|signing|master|service|ssh|developer).?key|^key$"
-                                 r"|(?<![a-z])(?:sig|sid|otp|totp|hotp|cred|creds)(?![a-z])|(?-i:(?<=[a-z0-9])(?:Sig|Sid|Otp)(?![a-zA-Z]))"
+                                 r"|secret|token|session|sessid|jwt|signature|csrf|xsrf|credential|bearer|pwd|cookie|hmac|verifier|samlresponse|relaystate"
+                                 r"|(?:api|access|private|app|client|consumer|licen[cs]e|encryption|signing|master|service|ssh|developer).?key|^key$|^code$"
+                                 r"|(?<![a-z])(?:sig|sid|otp|totp|hotp|cred|creds|pw|ticket|nonce)(?![a-z])"
+                                 r"|(?-i:(?<=[a-z0-9])(?:Sig|Sid|Otp|Pw|Ticket|Nonce)(?![a-zA-Z]))"
                                  r"|(?<![a-z])(?:verif(?:y|ication)|reset|recovery|backup|activation|invite|mfa|2fa|sms|login)[_-]?code", re.I)
 _SEPARATOR = re.compile(r"([&;])")
 _SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*")
 _AUTHORITY_END = re.compile(r"[/\\?#]")
 _PATH_PARAMETER = re.compile(r";([^=;/]*)=([^;/]+)")
-_TOKEN = re.compile(r"[^\s<>\"']+")
+# A word of free text ends at ASCII whitespace only. Quotes, angle brackets and Unicode spaces (U+00A0, U+2028, U+3000)
+# can be part of a URL a target chose, so they must not cut one in two: the part after the cut would stay unredacted.
+_WORD = re.compile(r"[^ \t\r\n]+")
+_TRAILING = ".,;:)"  # sentence punctuation after a URL
+_CLOSERS = {"(": ")", "<": ">", "[": "]", "{": "}", "'": "'", '"': '"'}  # what closes a bracket or a quote in front of a URL
+_LEADING = "".join(_CLOSERS)
 
 
 def _rewrite_query(query, rewrite):
@@ -76,12 +83,13 @@ def _hide_values(name, equals, value):
 
 def _hide_every(name, equals, value):
     # A part without "=" is no name: "/verify?3f9a7c" is a bare token as often as a flag, so it goes whole.
+    # Free text keeps such a part in a target without a scheme ("what?"); a whole target never does.
     return _hide_values(name, equals, value) if equals else "REDACTED" if name else ""
 
 
 def redact_url(url):
     """Redact the credential-named query values and the userinfo of a URL, for findings and the requests a PoC
-    replays: a value of any other name stays so that the request can still be sent. Use `redact_text` for diagnostics."""
+    replays: a value of any other name stays so that the request can still be sent. Use `redact_text` or `redact_target` for diagnostics."""
     try:
         parts = urlsplit(url)
         return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1],
@@ -109,7 +117,7 @@ def _redact_target(target, rewrites):
 
 
 def _redact_token(token, rewrites):
-    core = token.rstrip(".,;:)")
+    core = token.rstrip(_TRAILING)
     start = core.find("://")
     if start >= 0:
         # `url=http://h/?a=b` or `(http://h/?a=b`: begin at the scheme, unless what precedes it is itself a URL part.
@@ -118,22 +126,43 @@ def _redact_token(token, rewrites):
         if any(mark in core[:start] for mark in "?#@"):
             start = 0
     elif any(mark in core for mark in "?@") or core.find("#") > 0:
-        start = len(core) - len(core.lstrip("("))
+        start = len(core) - len(core.lstrip(_LEADING))
     else:
         return token
-    return core[:start] + _redact_target(core[start:], rewrites) + token[len(core):]
+    tail = token[len(core):]
+    # A URL inside quotes or brackets: the closer that matches an opener in front of it belongs to the text, not to the last value.
+    for opener in reversed(core[:start]):
+        if opener not in _CLOSERS:
+            break
+        if len(core) > start + 1 and core.endswith(_CLOSERS[opener]):
+            core, tail = core[:-1], _CLOSERS[opener] + tail
+            break
+    return core[:start] + _redact_target(core[start:], rewrites) + tail
+
+
+def redact_target(target):
+    """Redact a string that is known to be one target as typed (a job record, an answer, a report file name): every
+    query value, a query part without `=`, the userinfo, the fragment and `;name=value` path parameters, whatever the
+    parameter is called and whatever the case of the scheme. The whole string is one target, so nothing in it (a quote,
+    an angle bracket, any kind of space) can end the URL early and leave a later part unredacted. Network targets
+    (`192.0.2.0/24`) come back as they were. The control characters a target can carry are dropped (see `printable`)."""
+    return _redact_target(printable(str(target)), (_hide_every, _hide_every))
 
 
 def redact_text(message, *, names_only=False):
-    """Redact the URLs and the targets typed without a scheme in a log line, coverage note or echoed target: every query
-    value (names stay: `?id=REDACTED&x=REDACTED`), the userinfo, the fragment and `;name=value` path parameters, whatever
-    the parameter is called and whatever the case of the scheme. Diagnostics reach the console, exports and saved reports,
-    so unlike findings they cannot keep a value for a replay: `names_only=True` redacts the values of credential names
-    only, as `redact_url` does, for the text of a finding. A query part without `=` goes whole in a URL (`?3f9a7c`) and
-    stays in a target without a scheme (`what?`). The message also loses the control characters a crawled URL can carry
-    (see `printable`). A secret in the path of a URL stays."""
+    """Redact the URLs and the targets typed without a scheme in a log line, coverage note or other free text: every
+    query value (names stay: `?id=REDACTED&x=REDACTED`), the userinfo, the fragment and `;name=value` path parameters,
+    whatever the parameter is called and whatever the case of the scheme. Diagnostics reach the console, exports and
+    saved reports, so unlike findings they cannot keep a value for a replay: `names_only=True` redacts the values of
+    credential names only, as `redact_url` does, for the text of a finding. A word of the message starts a URL at its
+    scheme, or holds a `?`, an `@` or a `#`, and runs to the next space, tab or line break: a quote, an angle bracket or a
+    Unicode space inside it does not end it, and only sentence punctuation at its end (`.`, `,`, `;`, `:`, `)`) and the
+    quote or bracket that closes the one in front of it is left out. A query part without `=` goes whole in a URL (`?3f9a7c`) and stays in a target without a scheme (`what?`);
+    use `redact_target` when the string is a target. The message also loses the control characters a crawled URL can
+    carry (see `printable`). A secret in the path of a URL stays, and so does a URL with a space inside it: its part after
+    the space is another word."""
     rewrites = (_hide_named, _hide_named) if names_only else (_hide_values, _hide_every)
-    return _TOKEN.sub(lambda match: _redact_token(match[0], rewrites), printable(str(message)))
+    return _WORD.sub(lambda match: _redact_token(match[0], rewrites), printable(str(message)))
 
 
 def public_request(method, url, headers=None, role="probe"):
@@ -263,7 +292,7 @@ class ScanContext:
         reproduction["requests"] = [public_request(row.get("method", "GET"), row["url"], row.get("headers"), row.get("role", "probe"))
                                     for row in reproduction.get("requests", [])[:12]]
         # A replay reads only the origin of the target; the requests carry the URLs, so every value can go here.
-        reproduction["target"] = redact_text(reproduction.get("target", self.target))
+        reproduction["target"] = redact_target(reproduction.get("target", self.target))
         reproduction["verify_tls"] = self.options["verify_tls"]
         result["reproduction"] = reproduction
         result["observations"] = []
