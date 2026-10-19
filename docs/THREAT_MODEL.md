@@ -52,7 +52,7 @@ whoever holds it controls every scan, profile, schedule and setting.
 | Web probes and recorded-evidence replay | `autopwn_suite/web/http.py` `bounded_request`, `autopwn_suite/web/poc_runtime.py` `verify_plan` |
 | Providers and database | `autopwn_suite/nist_search.py:80`, `autopwn_suite/vulnerability_db.py:31` |
 | Notifications, credential files and downloads | `autopwn_suite/report.py:37`, `autopwn_suite/credential_files.py` `read_credential_file`, `autopwn_suite/getexploits.py:126` |
-| Installed/service/container startup | `install.sh` (command link step), `autopwn_suite/daemon/daemon_installer.py` (`_root_controlled`, `CopyFiles`), `Dockerfile` (`ENV`/`ENTRYPOINT`), `docker-compose.yml:6` |
+| Installed/service/container startup | `install.sh` (command link step), `autopwn_suite/daemon/daemon_installer.py` (`_root_controlled`, `CopyFiles`, `UninstallDaemon`), `Dockerfile` (`ENV`/`ENTRYPOINT`), `docker-compose.yml:6` |
 | CI and release | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:24`, `scripts/release_assets.py:97` |
 | Existing-release authenticity backfill | `.github/workflows/backfill-release-signatures.yml:27`, `scripts/release_assets.py:23`, `scripts/release_assets.py:60` |
 

@@ -18,7 +18,7 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `-nc/--no-color` | Disable colored terminal output. |
 | `-y/--yes-please` | Answer ordinary scanning confirmations automatically; it is not authorization to test another party's systems. |
 | `-c/--config`, `--create-config` | Read an INI file or interactively create configuration. Present INI values are applied after argument parsing and overwrite matching parsed settings. A created file has mode `0600` (POSIX), because it can hold the SMTP password, NVD key or webhook URL. |
-| `--daemon-install`, `--daemon-uninstall` | Install/remove the Linux root systemd scanner service; privileged filesystem/service side effects. |
+| `--daemon-install`, `--daemon-uninstall` | Install/remove the Linux root systemd scanner service; privileged filesystem/service side effects. Installing asks for the configuration, writes `/opt/autopwn-suite/autopwn-daemon.conf` and the unit, then enables and restarts the service. Removing, as root on Linux, stops and disables the service and deletes the unit and that configuration; the program, `/var/log/autopwn-daemon.log` and other files in `/opt/autopwn-suite` stay. Removing exits with status 1 when it is not run as root on Linux or cannot delete one of those files. |
 | `-t/--target`, `-hf/--host-file` | Target IP/hostname/range/CIDR or newline-separated target file; explicit target takes precedence over the host file. |
 | `-sd/--skip-discovery`, `-st/--scan-type` | Skip discovery, or choose `arp`/`ping` discovery. Privileges limit available techniques. |
 | `-nf/--nmap-flags` | Trusted operator Nmap arguments; pass a single argument such as `-nf="-p 80,443"`. These expose native Nmap capabilities, not a restricted remote job language. |

@@ -550,6 +550,14 @@ installation takes effect. A daemon installed by release 2.6 or earlier keeps ru
 its old copy of the source until you do (`install.sh` warns when it finds
 one).
 
+```console
+sudo autopwn-suite --daemon-uninstall
+```
+
+stops and disables the service and deletes its unit file and `/opt/autopwn-suite/autopwn-daemon.conf`. The program,
+`/var/log/autopwn-daemon.log` and the other files in `/opt/autopwn-suite` stay; remove the program with
+`sudo bash uninstall.sh`, `pipx uninstall autopwn-suite` or by deleting the binary.
+
 ### Web UI
 
 Launch the web dashboard:

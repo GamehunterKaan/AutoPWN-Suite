@@ -16,6 +16,7 @@ from autopwn_suite.subprocess_env import child_environment
 from autopwn_suite.utils import is_root
 
 INSTALL_DIR = "/opt/autopwn-suite"
+SERVICE_FILE = "/etc/systemd/system/autopwn-daemon.service"
 
 
 def _get_menu_choice(console, prompt: str, options: dict, default: str = None) -> str:
@@ -301,7 +302,7 @@ def _check_installable(console, install_path):
 
 def CopyFiles(console):
     DAEMON_INSTALL_PATH = Path(INSTALL_DIR)
-    SERVICE_PATH = Path("/etc/systemd/system/autopwn-daemon.service")
+    SERVICE_PATH = Path(SERVICE_FILE)
     LOG_PATH = Path("/var/log/autopwn-daemon.log")
 
     if not _check_installable(console, DAEMON_INSTALL_PATH):
@@ -401,5 +402,53 @@ def InstallDaemon(console):
     CopyFiles(console)
 
 
+def _systemctl(console, *arguments):
+    """Run systemctl; False (after saying why) when it is missing or reports an error."""
+    try:
+        result = subprocess.run(["systemctl", *arguments], env=child_environment(), stdin=subprocess.DEVNULL, timeout=120)
+    except (OSError, subprocess.SubprocessError):
+        console.print("[yellow]systemctl could not be run.[/yellow]")
+        return False
+    return result.returncode == 0
+
+
 def UninstallDaemon(console):
+    """Remove what InstallDaemon created: the service and its configuration, which can hold secrets. The
+    program (install.sh, pipx, a binary), the log file and the scan outputs in /opt/autopwn-suite stay."""
+    if not is_root() or not system().lower() == "linux":
+        console.print("Daemon can only be removed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!")
+        raise SystemExit(1)
     print_banner(console)
+    service_path = Path(SERVICE_FILE)
+    config_path = Path(INSTALL_DIR) / "autopwn-daemon.conf"
+
+    console.print("Stopping and disabling the service ...")
+    if not _systemctl(console, "disable", "--now", "autopwn-daemon.service"):
+        console.print("[yellow]The service could not be stopped and disabled; it may not be installed. Continuing.[/yellow]")
+
+    try:
+        removed_unit = service_path.exists()
+        service_path.unlink(missing_ok=True)
+    except OSError as e:
+        # Keep the configuration: a unit that is still there would start without it and restart forever.
+        console.print(f"[red]Could not remove {service_path}: {e}[/red]")
+        raise SystemExit(1) from e
+    if removed_unit:
+        console.print(f"[green]Removed {service_path}[/green]")
+        if not _systemctl(console, "daemon-reload"):
+            console.print("[yellow]systemd was not told about the removal; run: sudo systemctl daemon-reload[/yellow]")
+    else:
+        console.print(f"No service file at {service_path}.")
+
+    try:
+        removed_config = config_path.exists()
+        config_path.unlink(missing_ok=True)
+    except OSError as e:
+        console.print(f"[red]Could not remove {config_path}: {e}[/red]")
+        raise SystemExit(1) from e
+    if removed_config:
+        console.print(f"[green]Removed {config_path}[/green]")
+
+    console.print("[green]AutoPWN daemon removed.[/green]")
+    console.print(f"[blue]Left in place: the program, the log file /var/log/autopwn-daemon.log and the files in {INSTALL_DIR}. "
+                  "Remove the program with 'sudo bash uninstall.sh', 'pipx uninstall autopwn-suite' or by deleting the binary.[/blue]")

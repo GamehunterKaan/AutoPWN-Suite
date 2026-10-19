@@ -24,7 +24,7 @@ quarterly, on role changes, and immediately after a suspected compromise.
   `api.txt` are also plaintext. `--create-config` and `--daemon-install` create the
   INI file with mode `0600`, and the daemon installer sets the installed
   `/opt/autopwn-suite/autopwn-daemon.conf` to `0600` too (Windows has no POSIX
-  modes); a configuration file or `api.txt` you write yourself keeps whatever mode
+  modes) and `--daemon-uninstall` deletes that installed copy; a configuration file or `api.txt` you write yourself keeps whatever mode
   you give it. Since v2.6.1, credential files are supported:
   `AUTOPWN_NIST_API_KEY_FILE`, `AUTOPWN_SMTP_PASSWORD_FILE` and
   `AUTOPWN_WEBHOOK_URL_FILE` each name a file holding exactly one non-empty

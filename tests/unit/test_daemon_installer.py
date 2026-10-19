@@ -755,8 +755,104 @@ class TestCheckInstallable:
 
 
 @pytest.mark.unit
-def test_uninstall_daemon(mock_console):
-    """Verify UninstallDaemon runs without error."""
-    # Currently, the function is a placeholder. This test ensures it can be called.
-    UninstallDaemon(mock_console)
-    mock_console.print.assert_called()  # It should at least print the banner
+class TestUninstallDaemon:
+    """--daemon-uninstall removes the service and the configuration that --daemon-install created."""
+
+    @pytest.fixture
+    def layout(self, tmp_path, monkeypatch):
+        service = tmp_path / "systemd" / "autopwn-daemon.service"
+        service.parent.mkdir()
+        service.write_text("[Unit]\n")
+        install = tmp_path / "opt" / "autopwn-suite"
+        install.mkdir(parents=True)
+        (install / "autopwn-daemon.conf").write_text("[AUTOPWN]\n")
+        (install / "keep.txt").write_text("keep\n")
+        monkeypatch.setattr(daemon_installer, "SERVICE_FILE", str(service))
+        monkeypatch.setattr(daemon_installer, "INSTALL_DIR", str(install))
+        monkeypatch.setattr(daemon_installer, "is_root", lambda: True)
+        monkeypatch.setattr(daemon_installer, "system", lambda: "Linux")
+        monkeypatch.setattr(daemon_installer, "print_banner", MagicMock())
+        layout = SimpleNamespace(service=service, install=install, calls=[], returncode=0, environments=[])
+
+        def run(command, **kwargs):
+            # Record whether the unit file still existed when systemctl was asked.
+            layout.calls.append((command[1:], service.exists()))
+            layout.environments.append(kwargs.get("env"))
+            return SimpleNamespace(returncode=layout.returncode)
+
+        monkeypatch.setattr(daemon_installer.subprocess, "run", run)
+        return layout
+
+    def test_removes_the_service_and_the_configuration_and_leaves_the_rest(self, layout, mock_console):
+        UninstallDaemon(mock_console)
+
+        assert not layout.service.exists()
+        assert not (layout.install / "autopwn-daemon.conf").exists()  # it can hold an SMTP password or a webhook URL
+        assert (layout.install / "keep.txt").read_text() == "keep\n"
+        # Stopped while the unit still exists, and systemd told after the file is gone.
+        assert layout.calls == [
+            (["disable", "--now", "autopwn-daemon.service"], True),
+            (["daemon-reload"], False),
+        ]
+        assert "Left in place" in str(mock_console.print.call_args_list)
+
+    def test_nothing_installed_is_not_an_error(self, layout, mock_console):
+        layout.service.unlink()
+        (layout.install / "autopwn-daemon.conf").unlink()
+        layout.returncode = 1  # systemctl: the unit does not exist
+
+        UninstallDaemon(mock_console)
+
+        assert [command for command, _ in layout.calls] == [["disable", "--now", "autopwn-daemon.service"]]
+        assert (layout.install / "keep.txt").exists()
+
+    @pytest.mark.parametrize("root, platform", [(False, "Linux"), (True, "Windows"), (True, "Darwin")])
+    def test_only_root_on_linux_can_remove_it(self, layout, mock_console, monkeypatch, root, platform):
+        monkeypatch.setattr(daemon_installer, "is_root", lambda: root)
+        monkeypatch.setattr(daemon_installer, "system", lambda: platform)
+
+        with pytest.raises(SystemExit) as stopped:
+            UninstallDaemon(mock_console)
+
+        assert stopped.value.code == 1
+        assert layout.calls == [] and layout.service.exists()
+        assert (layout.install / "autopwn-daemon.conf").exists()
+
+    def test_a_unit_that_cannot_be_removed_keeps_the_configuration(self, layout, mock_console):
+        # A unit that stays would start without its configuration and restart every 5 seconds.
+        layout.service.unlink()
+        layout.service.mkdir()  # unlink() of a directory fails
+
+        with pytest.raises(SystemExit) as stopped:
+            UninstallDaemon(mock_console)
+
+        assert stopped.value.code == 1
+        assert (layout.install / "autopwn-daemon.conf").exists()
+        assert "Could not remove" in str(mock_console.print.call_args_list)
+
+    def test_systemctl_errors_do_not_stop_the_removal(self, layout, mock_console):
+        layout.returncode = 1
+
+        UninstallDaemon(mock_console)
+
+        assert not layout.service.exists() and not (layout.install / "autopwn-daemon.conf").exists()
+        assert "sudo systemctl daemon-reload" in str(mock_console.print.call_args_list)
+
+    def test_a_missing_systemctl_does_not_stop_the_removal(self, layout, mock_console, monkeypatch):
+        monkeypatch.setattr(daemon_installer.subprocess, "run", MagicMock(side_effect=FileNotFoundError("systemctl")))
+
+        UninstallDaemon(mock_console)
+
+        assert not layout.service.exists() and not (layout.install / "autopwn-daemon.conf").exists()
+        assert "systemctl could not be run" in str(mock_console.print.call_args_list)
+
+    def test_systemctl_starts_without_the_bundle_of_a_standalone_binary(self, layout, mock_console, monkeypatch):
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.setenv("LD_LIBRARY_PATH", "/tmp/_MEIabc123")
+        monkeypatch.delenv("LD_LIBRARY_PATH_ORIG", raising=False)
+
+        UninstallDaemon(mock_console)
+
+        assert len(layout.environments) == 2
+        assert all("LD_LIBRARY_PATH" not in environment for environment in layout.environments)
