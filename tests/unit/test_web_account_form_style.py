@@ -46,18 +46,6 @@ def stylesheet(name: str) -> dict[str, dict[str, str]]:
     return parse_rules((STATIC / name).read_text(encoding="utf-8"))
 
 
-def narrow_rules() -> dict[str, dict[str, str]]:
-    css = (STATIC / "styles.css").read_text(encoding="utf-8")
-    opening = "@media(max-width:760px){"
-    start = css.index(opening) + len(opening)
-    depth = 1
-    for position in range(start, len(css)):
-        depth += {"{": 1, "}": -1}.get(css[position], 0)
-        if not depth:
-            return parse_rules(css[start:position])
-    raise AssertionError("unterminated narrow-viewport block")
-
-
 def test_every_text_like_control_matches_the_shared_input_rule() -> None:
     """The dashboard styles `input[type=text]` and its siblings, so an input with no type attribute
     falls back to the browser's white box. The account username was one."""
@@ -110,11 +98,30 @@ def test_account_form_uses_the_vertical_rhythm_of_the_settings_sections() -> Non
     assert rules[".s-actions[role=status]"]["align-self"] == "center"
 
 
-def test_account_new_password_pair_stacks_on_a_narrow_viewport_with_the_same_gap() -> None:
-    """Side by side below 760 px the new-password placeholder is cut to "Leave blank to keep"."""
-    stacked = narrow_rules()[".s-form.row2"]
-    assert stacked["grid-template-columns"] == "1fr"
-    assert stacked["row-gap"] == "inherit", "reuse the form's gap instead of repeating the number"
+def test_account_new_password_pair_wraps_before_the_placeholder_is_cut() -> None:
+    """In the three-column layout the Settings column is narrow far above the 760 px breakpoint (about 1300 px
+    wide), and two fields side by side cut the placeholder to "Leave blank to keep curr". The pair wraps into one
+    column as soon as the column cannot hold two fields that fit the placeholder, at any viewport width."""
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+    assert css.count(".s-form .row2{") == 1, "one rule decides the pair's layout: no breakpoint override"
+    rules = stylesheet("styles.css")
+    pair = rules[".s-form.row2"]
+    wrap = re.fullmatch(r"repeat\(auto-fit,minmax\(min\(100%,(\d+)px\),1fr\)\)", pair["grid-template-columns"])
+    assert wrap, "wrap with auto-fit; min(100%, ...) keeps a column narrower than the minimum from overflowing"
+    assert pair["row-gap"] == "inherit", "reuse the form's gap instead of repeating the number"
+    # The minimum holds the placeholder: its characters at the widest common monospace advance (Liberation Mono
+    # and DejaVu Sans Mono: 0.602 em), the field's own padding and its border.
+    shared = next(declarations for selector, declarations in rules.items() if "input[type=text]" in selector)
+    font_size = int(re.fullmatch(r"(\d+)px", shared["font-size"]).group(1))
+    padding = int(re.fullmatch(r"\d+px (\d+)px", shared["padding"]).group(1))
+    assert shared["border"].startswith("1px ")
+    form = page("index.html").select_one("form#account-form")
+    password, confirm = form.select_one("#account-password"), form.select_one("#account-confirm-password")
+    placeholder = password["placeholder"]
+    assert len(placeholder) * 0.61 * font_size + 2 * padding + 2 <= int(wrap.group(1)), placeholder
+    # The pair is one grid, so the rule reaches both fields.
+    grid = password.parent.parent
+    assert "row2" in grid.get("class", []) and confirm in grid.select("input")
 
 
 def test_autofilled_dashboard_fields_keep_the_dark_input_colours() -> None:
