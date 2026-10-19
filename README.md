@@ -338,6 +338,9 @@ feed downloads. Repeat `--update-vuln-db` whenever you want fresh data. Each upd
 year's metadata and downloads only changed yearly feeds, so updates also cover long periods
 without internet. Checksums and record counts are verified before publishing the new database;
 a failed or interrupted update preserves the previous database. Concurrent updates are rejected.
+If NVD has not published the current year's feed yet (early January) and no record of that year was
+ever indexed, the update skips that feed and says so in its last message. The database does not record
+the gap and lacks that year's CVEs until a later update indexes them, so repeat the update after a few days.
 An update may need to be retried after active scans finish if the operating system locks the database file.
 
 Run an airgapped scan with an explicit target:
