@@ -434,3 +434,15 @@ def test_dispatch_example_tag_has_the_layout_the_policy_scans(workflow):
     text = (Path(__file__).resolve().parents[2] / ".github/workflows" / workflow).read_text(encoding="utf-8")
     example = release.re.search(r"for example v(\d+)\.(\d+)\.(\d+)", text)
     assert example and tuple(map(int, example.groups())) >= (2, 7, 0)
+
+
+def test_old_tag_dispatch_doc_says_where_each_workflow_stops():
+    """A release with uploaded assets is refused in the validate job, before the policy scans anything."""
+    root = Path(__file__).resolve().parents[2]
+    workflows = root / ".github/workflows"
+    for name in ("publish-docker.yml", "backfill-release-signatures.yml"):
+        assert "jq '.assets | length'" in (workflows / name).read_text(encoding="utf-8")
+    assert "jq '.assets | length'" not in (workflows / "publish-pypi.yml").read_text(encoding="utf-8")
+    docs = (root / "docs/RELEASING.md").read_text(encoding="utf-8")
+    assert "in the validate job of `publish-docker.yml` and of the backfill" in docs
+    assert "stops in the source\nsecurity job" not in docs.replace("\r\n", "\n")

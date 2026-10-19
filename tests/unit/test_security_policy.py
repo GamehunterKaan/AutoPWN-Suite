@@ -166,7 +166,7 @@ def test_poetry_core_pin_matches_the_release_toolchain():
 
 def test_a_tag_without_the_build_requirement_files_is_refused_with_a_clear_message(tmp_path, monkeypatch):
     """Dispatching publish-docker or the backfill for a tag before v2.7.0 must say why it stops."""
-    with pytest.raises(ValueError, match="before v2.7.0"):
+    with pytest.raises(ValueError, match=r"has no packaging/requirements-build\.txt \(tags before v2.7.0 never had it\)"):
         policy.build_tool_pins(tmp_path)
     repo = tmp_path / "v2.6.1"
     repo.mkdir()

@@ -124,7 +124,7 @@ def build_tool_pins(repo):
     pins = set()
     for name in BUILD_REQUIREMENTS:
         if not (repo / name).is_file():
-            raise ValueError(f"Release source has no {name}: tags before v2.7.0 predate the files the policy scans and cannot be released or backfilled")
+            raise ValueError(f"Release source has no {name} (tags before v2.7.0 never had it)")
         text = (repo / name).read_text(encoding="utf-8")
         pins.update((re.sub(r"[-_.]+", "-", package).lower(), version)
                     for package, version in re.findall(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;\\]+)", text, re.MULTILINE))
