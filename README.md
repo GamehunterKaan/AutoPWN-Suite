@@ -589,7 +589,7 @@ The web UI exposes a full REST API:
 | `POST` | `/api/scan/stop` | Stop a running scan |
 | `GET` | `/api/hosts` | All discovered hosts (merged) |
 | `GET` | `/api/log` | Log history |
-| `GET` | `/api/events` | SSE event stream |
+| `GET` | `/api/events` | SSE event stream; `after=<id>` or `Last-Event-ID` resumes after a log entry |
 | `GET` | `/api/web/catalog` | Web check names, default controls, bounds and offline state |
 | `GET` | `/api/web/findings` | Web finding summaries across current scans |
 | `GET` | `/api/web/findings/<scan_id>/<finding_id>` | Complete finding, evidence and verification history |

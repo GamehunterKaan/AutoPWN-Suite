@@ -642,14 +642,20 @@ _sse_subscribers: list = []
 _sse_subscribers_lock = threading.Lock()
 _log_history: list = []
 _log_history_lock = threading.Lock()
+# Every history entry gets the next id, so a client can resume where it stopped (see api_events). The counter
+# starts from the clock, not from zero: a restarted dashboard then never reuses an id a still-open page has seen.
+_log_seq = time.time_ns() // 1000
 _MAX_LOG_HISTORY = 5000
 _MAX_COMPLETED_SCANS = 100
 _web_verifications_running = 0
 
 
 def _broadcast(event: dict) -> None:
+    global _log_seq
     with _log_history_lock:
         if event.get("level") != "__scan_progress__":
+            _log_seq += 1
+            event = {**event, "id": _log_seq}
             _log_history.append(event)
             if len(_log_history) > _MAX_LOG_HISTORY:
                 del _log_history[:len(_log_history) - _MAX_LOG_HISTORY]
@@ -664,6 +670,20 @@ def _broadcast(event: dict) -> None:
                     except queue.Empty:
                         pass
                     q.put_nowait(event)
+
+
+def _resume_point(*candidates):
+    """The log id an event stream resumes after: the first candidate (`Last-Event-ID` header, then the `after`
+    parameter) that is 1 to 18 ASCII digits. None means no resume point, so only later entries are sent."""
+    for raw in candidates:
+        if isinstance(raw, str) and 0 < len(raw) <= 18 and raw.isascii() and raw.isdigit():
+            return int(raw)
+    return None
+
+
+def _sse_frame(entry: dict) -> str:
+    # Progress events are not retained, so they have no id and cannot be resumed.
+    return (f"id: {entry['id']}\n" if "id" in entry else "") + f"data: {json.dumps(entry)}\n\n"
 
 
 def _register_scan(job: ScanJob) -> None:
@@ -1844,13 +1864,28 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     @app.route("/api/events")
     def api_events():
         session_token = request.cookies.get(COOKIE)
-        client_q = queue.Queue(maxsize=_MAX_LOG_HISTORY)
-        # History is served by /api/log; replaying it here would show every line twice on page load
-        # and again on every reconnect.
-        with _sse_subscribers_lock:
-            _sse_subscribers.append(client_q)
+        # Without a resume point only later entries are sent: the page reads the history from /api/log, and
+        # replaying it here would show every line twice. A page that reconnects (the browser sends
+        # Last-Event-ID) or connects after /api/log (?after=<id of its last entry>) gets what it missed.
+        resume = _resume_point(request.headers.get("Last-Event-ID"), request.args.get("after"))
         def generate():
+            client_q = queue.Queue(maxsize=_MAX_LOG_HISTORY)
+            # _broadcast numbers and queues an entry under this lock, so each entry reaches the stream once:
+            # in the replay if it was logged before this point, in the queue if after. Subscribing here, not
+            # in the view, also means a HEAD request (never iterated) cannot leave a subscriber behind.
+            with _log_history_lock:
+                missed = []
+                if resume is not None:
+                    # An id this process never issued comes from before a restart; send what it holds.
+                    after = 0 if resume > _log_seq else resume
+                    missed = [entry for entry in _log_history if entry["id"] > after]
+                with _sse_subscribers_lock:
+                    _sse_subscribers.append(client_q)
             try:
+                for entry in missed:
+                    if not auth.stream_valid(session_token):
+                        return
+                    yield _sse_frame(entry)
                 while True:
                     if not auth.stream_valid(session_token):
                         return
@@ -1858,7 +1893,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                         entry = client_q.get(timeout=1)
                         if not auth.stream_valid(session_token):
                             return
-                        yield f"data: {json.dumps(entry)}\n\n"
+                        yield _sse_frame(entry)
                     except queue.Empty:
                         if not auth.stream_valid(session_token):
                             return

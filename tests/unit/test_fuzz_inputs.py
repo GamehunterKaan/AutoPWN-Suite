@@ -149,6 +149,27 @@ def test_target_and_flag_allowlists_never_raise_and_reject_shell_syntax(web_ui):
         assert isinstance(web_ui.module._validate_nmap_flags(value), (str, type(None)))
 
 
+def test_event_stream_resume_point_is_the_first_short_ascii_number_and_never_raises(web_ui):
+    rng = random.Random(SEED + 5)
+    accepted = rejected = 0
+    for _ in range(3000):
+        candidates = []
+        for _ in range(rng.randint(0, 3)):
+            kind = rng.random()
+            if kind < .3:
+                candidates.append(random_value(rng))
+            elif kind < .6:
+                candidates.append(str(rng.choice([0, 1, 10**17, 10**18 - 1, 10**18, rng.randint(0, 10**20)])))
+            else:
+                candidates.append(mutate(str(rng.randint(0, 10**9)), rng))
+        result = web_ui.module._resume_point(*candidates)
+        expected = next((int(value) for value in candidates if isinstance(value, str) and re.fullmatch(r"[0-9]{1,18}", value)), None)
+        assert result == expected, candidates
+        accepted += result is not None
+        rejected += result is None
+    assert accepted and rejected  # the corpus exercises both outcomes
+
+
 def test_account_validation_and_hash_check_only_raise_value_error():
     rng = random.Random(SEED + 3)
     for _ in range(1000):

@@ -560,11 +560,27 @@ async function stopScan(scanId){
 }
 
 // ── SSE ────────────────────────────────────────────────────────────────────────
+// Log entries carry an increasing id. The stream is opened after the newest one the page has (the history
+// from /api/log, then every entry received), so a line logged while the page was loading or reconnecting
+// arrives once, from the server's replay, and nothing is shown twice.
+let lastLogId = 0;
+let sseRetryT = null;
+let sseRetryDelay = 1000;
 function connectSSE(){
+  clearTimeout(sseRetryT);
   if(es){ es.close(); es=null; }
-  es = new EventSource('/api/events');
-  es.onmessage = ev => {
+  const source = es = new EventSource('/api/events?after=' + lastLogId);
+  source.onopen = ()=>{ sseRetryDelay = 1000; };
+  source.onerror = ()=>{
+    // The browser reconnects a dropped connection by itself (sending Last-Event-ID) but gives up for good
+    // after an HTTP error, for example a 502 from a proxy that is restarting the dashboard. Open it again.
+    if(es !== source || source.readyState !== EventSource.CLOSED) return;
+    sseRetryT = setTimeout(connectSSE, sseRetryDelay);
+    sseRetryDelay = Math.min(sseRetryDelay * 2, 30000);
+  };
+  source.onmessage = ev => {
     const d = JSON.parse(ev.data);
+    if(typeof d.id === 'number') lastLogId = d.id;
     if(d.level==='__scan_progress__'){
       const job = scans[d.scan_id];
       if(job && (d.progress?.revision ?? 0) > (job.progress?.revision ?? -1)){
@@ -580,7 +596,6 @@ function connectSSE(){
     addLog(d.scan_id, d.msg, d.level, d.ts);
     if(d.msg && d.msg.includes('Scheduled scan fired')) loadSchedulesFromServer();
   };
-  es.onerror = ()=>{};
 }
 
 // ── Poll ───────────────────────────────────────────────────────────────────────
@@ -1269,6 +1284,7 @@ async function initDashboard(){
   scansR.forEach(s=>{ scans[s.id]=s; addTermFilterOption(s.id,s.target); });
   hosts = latestHostObservations(hostsR);
   logR.filter(e=>!e.level?.startsWith('__')).forEach(e=>addLog(e.scan_id,e.msg,e.level,e.ts));
+  if(logR.length) lastLogId = logR[logR.length-1].id;
   renderScans(); renderHosts(); renderVulnTable(); updateBadges();
   if(failed) addLog(null,'Some dashboard data could not be loaded. Refresh to retry.','error');
 }

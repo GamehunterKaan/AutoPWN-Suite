@@ -193,6 +193,29 @@ def test_logout_revokes_cookie_copies_and_stops_open_event_stream(dashboard_logi
     assert not d.wu._sse_subscribers
 
 
+def test_resuming_the_event_stream_needs_sign_in_and_stops_at_logout_even_during_the_replay(dashboard_login):
+    d = dashboard_login
+    client, csrf = logged_in(d)
+    for message in ("replay one", "replay two", "replay three"):
+        d.wu._broadcast({"msg": message})
+    for resume in ({"query_string": {"after": "0"}}, {"headers": {"Last-Event-ID": "0"}}):
+        stranger = d.app.test_client().get("/api/events", **resume)
+        assert stranger.status_code == 401 and b"replay" not in stranger.data
+    stream = client.get("/api/events?after=0", buffered=False)
+    iterator = iter(stream.response)
+    received = b""
+    for _ in range(3):  # a heartbeat can come first; never wait for ever if nothing is replayed
+        received += next(iterator)
+        if b"replay one" in received:
+            break
+    assert b"replay one" in received
+    assert client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf}).status_code == 200
+    with pytest.raises(StopIteration):
+        next(iterator)
+    stream.close()
+    assert b"replay two" not in received and not d.wu._sse_subscribers
+
+
 def test_expired_session_and_forged_cookie_fail_closed(dashboard_login):
     d = dashboard_login
     client, _ = logged_in(d)

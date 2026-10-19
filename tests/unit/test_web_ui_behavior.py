@@ -697,6 +697,76 @@ assert.ok(nodes.get('term').children.some(line=>line.innerHTML.includes('Refresh
 """)
 
 
+EVENT_SOURCE_SCRIPT = r"""
+const urls=[];
+EventSource=function(url){urls.push(url);this.readyState=0;this.close=()=>{this.readyState=2};globalThis.eventSource=this};
+EventSource.CLOSED=2;
+const terminal=()=>document.getElementById('term').children.map(line=>line.innerHTML);
+const message=(id,text,level='info')=>({data:JSON.stringify({id,scan_id:'',level,msg:text,ts:'00:00:00'})});
+"""
+
+
+def test_stream_resumes_after_the_newest_entry_of_the_history_the_page_loaded():
+    run_js(STARTUP_SCRIPT + EVENT_SOURCE_SCRIPT + r"""
+routes['/api/log']=[{id:101,scan_id:'',level:'info',msg:'first',ts:'00:00:01'},
+  {id:102,scan_id:'',level:'__scan_done__',msg:'',ts:''}];
+await initDashboard();
+assert.equal(terminal().length,1);          // the internal event is not a terminal line
+connectSSE();
+assert.deepEqual(urls,['/api/events?after=102']);
+// A line logged between the history request and the stream opening arrives once, through the stream.
+eventSource.onmessage(message(103,'logged in the gap'));
+assert.equal(terminal().length,2);
+assert.match(terminal()[1],/logged in the gap/);
+// The page re-opening the stream itself (after an HTTP error) resumes after the last line it showed.
+connectSSE();
+assert.equal(urls.at(-1),'/api/events?after=103');
+// Progress events have no id and do not move the position.
+eventSource.onmessage({data:JSON.stringify({level:'__scan_progress__',scan_id:'x',status:'running',progress:{revision:1}})});
+connectSSE();
+assert.equal(urls.at(-1),'/api/events?after=103');
+""")
+
+
+def test_stream_replays_everything_retained_when_the_history_could_not_be_loaded():
+    run_js(STARTUP_SCRIPT + EVENT_SOURCE_SCRIPT + r"""
+routes['/api/log']=500;
+await initDashboard();
+connectSSE();
+assert.deepEqual(urls,['/api/events?after=0']);
+eventSource.onmessage(message(7,'replayed from the server'));
+assert.match(terminal().at(-1),/replayed from the server/);
+""")
+
+
+def test_stream_that_the_browser_gave_up_on_is_reopened_with_a_growing_pause():
+    run_js(EVENT_SOURCE_SCRIPT + r"""
+const timers=[];
+setTimeout=(callback,delay)=>{timers.push([callback,delay]);return timers.length};
+connectSSE();
+const first=eventSource;
+first.readyState=0; first.onerror();                      // the browser is retrying by itself
+assert.equal(timers.length,0);
+first.readyState=2; first.onerror();                      // an HTTP error closed it for good
+assert.deepEqual(timers.map(([,delay])=>delay),[1000]);
+timers[0][0]();
+assert.equal(urls.length,2);
+assert.notEqual(eventSource,first);
+eventSource.readyState=2; eventSource.onerror();
+assert.equal(timers.at(-1)[1],2000);
+for(let i=0;i<8;i++){ timers.at(-1)[0](); eventSource.readyState=2; eventSource.onerror(); }
+assert.equal(timers.at(-1)[1],30000);                      // never longer than that
+timers.at(-1)[0]();
+eventSource.onopen();                                      // a working connection resets the pause
+eventSource.readyState=2; eventSource.onerror();
+assert.equal(timers.at(-1)[1],1000);
+// An error from a connection that was already replaced is ignored.
+const replaced=eventSource; connectSSE(); const before=timers.length;
+replaced.readyState=2; replaced.onerror();
+assert.equal(timers.length,before);
+""")
+
+
 def test_settings_error_response_is_rejected_without_touching_the_forms():
     run_js(STARTUP_SCRIPT + r"""
 document.getElementById('s-webhook-url').value='typed by the operator';

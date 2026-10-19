@@ -378,6 +378,45 @@ class TestBroadcast:
         wu._broadcast({"msg": "hello"})
         assert q.get_nowait()["msg"] == "hello"
 
+    def test_history_entries_get_consecutive_ids_and_progress_events_get_none(self, wu):
+        import queue
+        q = queue.Queue()
+        wu._sse_subscribers.append(q)
+        wu._broadcast({"msg": "a"})
+        wu._broadcast({"level": "__scan_progress__", "msg": ""})
+        wu._broadcast({"msg": "b"})
+        first, progress, second = (q.get_nowait() for _ in range(3))
+        assert "id" not in progress and not any(entry.get("level") == "__scan_progress__" for entry in wu._log_history)
+        assert second["id"] == first["id"] + 1
+        assert wu._log_history == [first, second]
+
+    def test_the_caller_keeps_its_own_event_unchanged(self, wu):
+        event = {"scan_id": "s", "level": "info", "msg": "m"}
+        wu._broadcast(event)
+        assert event == {"scan_id": "s", "level": "info", "msg": "m"}
+
+    def test_ids_stay_unique_and_increasing_while_the_history_is_trimmed(self, wu):
+        for number in range(wu._MAX_LOG_HISTORY + 25):
+            wu._broadcast({"msg": str(number)})
+        ids = [entry["id"] for entry in wu._log_history]
+        assert len(ids) == wu._MAX_LOG_HISTORY
+        assert ids == list(range(ids[0], ids[0] + len(ids)))
+
+    def test_ids_of_a_restarted_dashboard_are_higher_than_any_issued_before(self, wu, monkeypatch):
+        import importlib
+
+        def start_at(microseconds):
+            monkeypatch.setattr("time.time_ns", lambda: microseconds * 1000)
+            sys.modules.pop("autopwn_suite.web_ui", None)
+            return importlib.import_module("autopwn_suite.web_ui")
+
+        first = start_at(1_800_000_000_000_000)
+        for _ in range(3):
+            first._broadcast({"msg": "before the restart"})
+        restarted = start_at(1_800_000_060_000_000)
+        restarted._broadcast({"msg": "after the restart"})
+        assert restarted._log_history[-1]["id"] > first._log_history[-1]["id"]
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # WebLogger / NullConsole
@@ -797,8 +836,95 @@ class TestAPILog:
         resp = client.get("/api/log")
         assert len(resp.get_json()) == 1
 
+    def test_log_entries_carry_the_id_a_stream_resumes_after(self, client, wu):
+        for number in range(3):
+            wu._broadcast({"msg": f"entry {number}"})
+        ids = [row["id"] for row in client.get("/api/log").get_json()]
+        assert ids == list(range(ids[0], ids[0] + 3))
+
+
+def _sse_entries(stream, count):
+    """Read `count` numbered entries from an open event stream, skipping heartbeat comments."""
+    chunks = iter(stream.response)
+    entries = []
+    for _ in range(count + 2):  # a stream with nothing to send yields a heartbeat per second; never wait for ever
+        for frame in next(chunks).decode().split("\n\n"):
+            if frame.startswith("id: "):
+                header, data = frame.split("\n", 1)
+                assert data.startswith("data: ")
+                entries.append((int(header[len("id: "):]), json.loads(data[len("data: "):])))
+        if len(entries) >= count:
+            break
+    assert len(entries) == count, entries
+    return entries
+
 
 class TestAPIEvents:
+    def _history(self, wu, count=4):
+        for number in range(count):
+            wu._broadcast({"msg": f"history {number}"})
+        return [row["id"] for row in wu._log_history]
+
+    def test_stream_replays_what_was_logged_after_the_given_id_and_then_goes_live(self, client, wu):
+        ids = self._history(wu)
+        stream = client.get(f"/api/events?after={ids[1]}", buffered=False)
+        try:
+            wu._broadcast({"msg": "live"})
+            received = _sse_entries(stream, 3)
+        finally:
+            stream.close()
+        assert [(entry_id, entry["msg"]) for entry_id, entry in received] == [
+            (ids[2], "history 2"), (ids[3], "history 3"), (ids[3] + 1, "live")]
+        assert all(entry["id"] == entry_id for entry_id, entry in received)
+        assert not wu._sse_subscribers
+
+    def test_reconnect_header_wins_over_the_first_connect_parameter(self, client, wu):
+        ids = self._history(wu)
+        stream = client.get(f"/api/events?after={ids[0]}", headers={"Last-Event-ID": str(ids[2])}, buffered=False)
+        try:
+            assert [entry["msg"] for _, entry in _sse_entries(stream, 1)] == ["history 3"]
+        finally:
+            stream.close()
+
+    def test_an_entry_logged_while_the_replay_is_being_read_arrives_once_and_in_order(self, client, wu):
+        ids = self._history(wu)
+        stream = client.get("/api/events?after=0", buffered=False)
+        try:
+            wu._broadcast({"msg": "during the replay"})
+            received = _sse_entries(stream, len(ids) + 1)
+        finally:
+            stream.close()
+        assert [entry_id for entry_id, _ in received] == ids + [ids[-1] + 1]
+        assert received[-1][1]["msg"] == "during the replay"
+
+    def test_an_id_this_process_never_issued_replays_the_retained_history(self, client, wu):
+        ids = self._history(wu, 2)
+        stream = client.get(f"/api/events?after={ids[-1] + 10**9}", buffered=False)
+        try:
+            assert [entry_id for entry_id, _ in _sse_entries(stream, 2)] == ids
+        finally:
+            stream.close()
+
+    def test_a_malformed_resume_point_means_live_only(self, client, wu):
+        self._history(wu, 2)
+        stream = client.get("/api/events?after=nonsense", headers={"Last-Event-ID": "-1"}, buffered=False)
+        try:
+            wu._broadcast({"msg": "live"})
+            assert [entry["msg"] for _, entry in _sse_entries(stream, 1)] == ["live"]
+        finally:
+            stream.close()
+
+    def test_resume_point_accepts_only_short_ascii_digits(self, wu):
+        assert wu._resume_point(None, "42") == 42
+        assert wu._resume_point("7", "42") == 7
+        assert wu._resume_point("junk", "42") == 42
+        for value in (None, "", " 1", "1 ", "+1", "-1", "1.5", "1e3", "0x10", "١٢٣", "²", "9" * 19, "1\n2"):
+            assert wu._resume_point(value) is None, value
+
+    def test_a_head_request_does_not_leave_a_subscriber_behind(self, client, wu):
+        assert client.head("/api/events").status_code == 200
+        assert not wu._sse_subscribers
+
     def test_stream_sends_only_new_entries_because_the_page_loads_history_from_api_log(self, client, wu):
         for number in range(3):
             wu._broadcast({"msg": f"history {number}"})
