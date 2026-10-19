@@ -92,7 +92,9 @@ if [ -f "$SERVICE_FILE" ]; then
     fi
     run_for "$SERVICE_FILE" rm -f "$SERVICE_FILE"
     if [ -z "$DESTDIR" ]; then
-        run_for "$SERVICE_FILE" systemctl daemon-reload
+        # Without a running systemd (a container, a chroot) this fails; the files below still have to go.
+        run_for "$SERVICE_FILE" systemctl daemon-reload ||
+            echo "Warning: systemctl daemon-reload failed; run it yourself once systemd is available." >&2
     fi
     echo "Service $SERVICE_NAME removed."
 else

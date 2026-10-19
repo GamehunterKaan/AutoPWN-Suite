@@ -404,6 +404,27 @@ def test_uninstall_destdir_removes_only_staged_files(source_tree, tmp_path):
 
 
 @posix_only
+def test_uninstall_goes_on_when_systemctl_cannot_reload(source_tree, tmp_path):
+    # In a container or chroot there is no running systemd, so every systemctl call fails.
+    app, bindir, env = working_install(tmp_path)
+    systemd = tmp_path / "systemd"
+    systemd.mkdir()
+    (systemd / "autopwn-daemon.service").write_text("[Unit]\n")
+    tools = tmp_path / "fake-tools"
+    tools.mkdir()
+    (tools / "systemctl").write_text("#!/usr/bin/env bash\nexit 1\n")
+    (tools / "systemctl").chmod(0o755)
+
+    result = run_script(source_tree, "uninstall.sh", {
+        "APPDIR": str(app), "BINDIR": str(bindir), "SYSTEMDDIR": str(systemd),
+        "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}"})
+
+    assert "daemon-reload failed" in result.stderr
+    assert not (systemd / "autopwn-daemon.service").exists()
+    assert not app.exists() and not os.path.lexists(bindir / "autopwn-suite")
+
+
+@posix_only
 @pytest.mark.parametrize("script", ["install.sh", "uninstall.sh"])
 def test_unsafe_or_relative_paths_are_rejected(source_tree, tmp_path, script):
     run_script(source_tree, script, {"APPDIR": "/", "DESTDIR": str(tmp_path / "s")}, expect=2)

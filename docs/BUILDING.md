@@ -190,7 +190,9 @@ final path (for example `/usr/lib/autopwn-suite/.venv/bin/autopwn-suite`), never
 dependencies and install the staged source. A `DESTDIR` inside the checkout (the
 `$PWD/pkgroot` example above, or `debian/tmp`) is left out of the staged copy of the source.
 `uninstall.sh` must be given the same `PREFIX`/`BINDIR`/`APPDIR` (and optional
-`SYSTEMDDIR`, default `/etc/systemd/system`) that were used to install.
+`SYSTEMDDIR`, default `/etc/systemd/system`) that were used to install. A failing
+`systemctl daemon-reload` (no running systemd, as in a container) only prints a warning, so the
+application directory and the command are still removed.
 
 ## Repeatable builds
 
