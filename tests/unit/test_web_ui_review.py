@@ -4,7 +4,7 @@
 
 import importlib.util
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -225,3 +225,30 @@ def test_disable_after_scheduler_snapshot_prevents_stale_launch(client_review, w
     with patch.object(wu_review, "_should_fire", side_effect=disable_after_due_check):
         _one_scheduler_tick(wu_review)
     wu_review._launch_scan.assert_not_called()
+
+
+@pytest.mark.parametrize("state", ["running", "stopping"])
+def test_schedule_waits_for_its_own_unfinished_scan_and_logs_the_skip_once(client_review, wu_review, state):
+    profile_id = _profile(client_review)
+    schedule_id = _schedule(client_review, profile_id)
+    job = wu_review.ScanJob("first-run", "192.0.2.10", {})
+    wu_review._register_scan(job)
+    wu_review._launch_scan.return_value = SimpleNamespace(id="first-run")
+
+    def due_again():
+        wu_review._schedule_last_run[schedule_id] = datetime.now(timezone.utc) - timedelta(hours=2)
+
+    _one_scheduler_tick(wu_review)
+    assert wu_review._launch_scan.call_count == 1
+    if state == "stopping":
+        job.request_stop()
+    for _ in range(3):  # three due ticks while the first scan is still unfinished
+        due_again()
+        _one_scheduler_tick(wu_review)
+    assert wu_review._launch_scan.call_count == 1
+    skips = [entry["msg"] for entry in wu_review._log_history if "previous scan is still running" in entry["msg"]]
+    assert len(skips) == 1
+    job.mark_done("stopped")
+    due_again()
+    _one_scheduler_tick(wu_review)  # the finished scan no longer blocks the schedule
+    assert wu_review._launch_scan.call_count == 2

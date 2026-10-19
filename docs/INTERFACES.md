@@ -197,7 +197,8 @@ Schedules use the selected profile when firing and must satisfy offline policy.
 The scheduler checks once a minute. A daily or weekly schedule whose time was
 missed (a restart, a suspend or a slow check) still runs once when the check
 comes within an hour of that time, and never for a time that passed before the
-schedule was created.
+schedule was created. A schedule does not start a scan while the scan it started
+last is still running or stopping; it logs one skip and starts when that scan ends.
 
 ## Files, configuration and integrations
 

@@ -406,6 +406,10 @@ _schedules_lock  = threading.Lock()
 # Track last-run time per schedule so we don't double-fire
 _schedule_last_run: dict = {}
 _schedule_last_run_lock = threading.Lock()
+# The scan each schedule started last, so a schedule never overlaps its own previous run. Only the
+# scheduler thread uses these two.
+_schedule_jobs: dict = {}
+_schedule_overlap_logged: set = set()
 
 
 def _load_schedules() -> None:
@@ -1602,6 +1606,24 @@ def _should_fire(schedule: dict) -> bool:
     return False
 
 
+def _scheduler_note(level: str, message: str) -> None:
+    _broadcast({"scan_id": "", "level": level, "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"), "msg": message})
+
+
+def _previous_run_active(schedule: dict) -> bool:
+    """Whether this schedule's last scan is still running or stopping; the skip is logged once per overlap."""
+    sid = schedule["id"]
+    previous = _get_scan(_schedule_jobs.get(sid, ""))
+    if previous is None or previous.status not in ("running", "stopping"):
+        _schedule_overlap_logged.discard(sid)
+        return False
+    if sid not in _schedule_overlap_logged:
+        _schedule_overlap_logged.add(sid)
+        _scheduler_note("warning", f"[*] Scheduled scan skipped ({schedule.get('name') or sid[:8]}): "
+                        "its previous scan is still running; it starts when that one ends.")
+    return True
+
+
 def _scheduler_loop() -> None:
     """Background thread: checks schedules every 60 seconds."""
     while True:
@@ -1618,6 +1640,8 @@ def _scheduler_loop() -> None:
             try:
                 if not _should_fire(schedule):
                     continue
+                if _previous_run_active(schedule):
+                    continue
                 checked = _schedule_data(schedule)
                 # Keep the profile and schedule stable until launch. Deleting,
                 # disabling, or editing either cannot start the stale snapshot.
@@ -1632,6 +1656,7 @@ def _scheduler_loop() -> None:
                         if _schedules.get(schedule["id"]) != schedule:
                             continue
                         job = _launch_scan(config)
+                        _schedule_jobs[schedule["id"]] = job.id
                         now = datetime.now(timezone.utc)
                         with _schedule_last_run_lock:
                             _schedule_last_run[schedule["id"]] = now
