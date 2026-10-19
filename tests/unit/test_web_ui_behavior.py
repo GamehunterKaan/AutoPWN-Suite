@@ -32,8 +32,11 @@ const context = vm.createContext({assert, nodes, document, window:{location:{ori
   setTimeout(){}, clearTimeout(){}, Blob, URL, console});
 const source = fs.readFileSync(process.argv[1], 'utf8');
 vm.runInContext(source.slice(0, source.lastIndexOf('\n(async()=>{')), context);
+let finished = false;
+process.on('exit', () => { if (!finished && !process.exitCode) { console.error('The test script never finished.'); process.exitCode = 1; } });
 (async()=>{
   await vm.runInContext('(async()=>{' + process.argv[2] + '})()', context);
+  finished = true;
 })().catch(error=>{console.error(error);process.exitCode=1});
 """
     result = subprocess.run([NODE, "-e", harness, str(APP_JS), script], text=True, capture_output=True, timeout=10)
@@ -239,6 +242,31 @@ assert.equal(document.getElementById('toast-el').textContent,message);
 assert.equal(document.getElementById('toast-el').className,'toast err');
 assert.ok(nodes.get('term').children[0].innerHTML.includes(message));
 assert.equal(nodes.get('f-target').value,'192.0.2.1');
+""")
+
+
+def test_double_click_on_start_scan_sends_one_request_and_the_button_recovers():
+    run_js("""
+document.getElementById('f-target').value='192.0.2.1';
+let requests=0, answer;
+fetch=()=>{requests++;return new Promise(resolve=>{answer=resolve})};
+const button=document.getElementById('start-scan');
+const first=startScan();
+const second=startScan();
+assert.equal(requests,1);
+assert.equal(button.disabled,true);
+answer({ok:true,json:async()=>({scan_id:'0123456789abcdef'})});
+await Promise.all([first,second]);
+assert.equal(requests,1);
+assert.equal(button.disabled,false);
+// A rejected or unreachable start leaves the form usable for the next attempt.
+document.getElementById('f-target').value='192.0.2.2';
+fetch=async()=>{requests++;return {ok:false,status:400,json:async()=>({error:'Invalid target'})}};
+await startScan();
+fetch=async()=>{requests++;throw new Error('offline')};
+await startScan();
+assert.equal(requests,3);
+assert.equal(button.disabled,false);
 """)
 
 

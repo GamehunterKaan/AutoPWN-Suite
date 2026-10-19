@@ -505,7 +505,9 @@ function refreshProfileSelects(){
 function reportScanError(message){ addLog(null,message,'error'); toast(message,false); }
 function reportUnreachable(e){ reportScanError(`Cannot reach server: ${e.message}`); }
 
+let startingScan = false;
 async function startScan(){
+  if(startingScan) return;  // the form is only cleared once the server answers, so a second click would start a second scan
   const target = document.getElementById('f-target').value.trim();
   if(!target){ reportScanError('Please enter a target.'); return; }
   const webError = window.webSecurity?.validateControls('f');
@@ -523,6 +525,8 @@ async function startScan(){
     skip_discovery: document.getElementById('f-skipd').checked,
     ...(window.webSecurity?.readControls('f') || {}),
   };
+  startingScan = true;
+  document.getElementById('start-scan').disabled = true;
   try{
     const r = await fetch('/api/scan/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     // A proxy or crash can answer with an HTML page; that is a server answer, not an unreachable server.
@@ -533,6 +537,7 @@ async function startScan(){
     if(body.scan_web && body.scan_ports === false) switchTab('web', document.getElementById('web-tab-button'));
     else switchTab('scans', document.querySelector('.tab'));
   }catch(e){ reportUnreachable(e); }
+  finally{ startingScan = false; document.getElementById('start-scan').disabled = false; }
 }
 
 async function stopScan(scanId){
