@@ -13,6 +13,18 @@ import shutil
 from xml.etree import ElementTree
 
 from autopwn_suite.nmap_progress import scan_with_progress
+from autopwn_suite.web.findings import printable
+
+
+def _clean(root):
+    """Every attribute and text below `root` comes from the scanned hosts or their DNS (banners, product and version
+    strings, hostnames, script output), so none keeps a line break or a control or layout character (`printable`).
+    NSE output (the `output` attribute of a script and the text of its elements) is several lines by nature and
+    keeps its newlines."""
+    for element in root.iter():
+        for name, value in list(element.attrib.items()):
+            element.attrib[name] = printable(value, multiline=element.tag == "script" and name == "output")
+        element.text = printable(element.text, multiline=True)
 
 
 def _script_elements(parent):
@@ -106,6 +118,8 @@ def parse_nmap_xml(xml, stderr=""):
         raise RuntimeError("Invalid or incomplete Nmap XML output") from exc
     if root.tag != "nmaprun":
         raise RuntimeError("Expected nmaprun XML output")
+    _clean(root)
+    stderr = printable(stderr, multiline=True)
     finished = root.find("runstats/finished")
     hosts = root.find("runstats/hosts")
     if finished is None or hosts is None:
