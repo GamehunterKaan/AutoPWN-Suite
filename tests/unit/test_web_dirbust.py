@@ -1,12 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
+import io
+import re
 from unittest.mock import MagicMock, mock_open, patch
 from urllib.parse import urlsplit
 
 import pytest
 from requests.exceptions import ConnectionError
+from rich.console import Console
 
 from autopwn_suite.web.dirbust import dirbust
+from autopwn_suite.web.findings import finding
 
 
 @pytest.mark.unit
@@ -84,3 +88,30 @@ def test_discovery_is_relative_to_the_directory_of_a_file_path(web_response, tar
     with patch("autopwn_suite.web.dirbust.open", mock_open(read_data="admin")), patch("autopwn_suite.web.dirbust.get", side_effect=respond):
         found = dirbust(target, MagicMock(), MagicMock())
     assert [item["url"] for item in found] == [expected]
+
+
+HOSTILE_LOCATION = "/admin/\x1b[2J\x1b]0;pwned\x07\r\x1b[31m[+] No findings\x9b2J"
+
+
+@pytest.mark.unit
+def test_terminal_control_characters_in_a_redirect_never_reach_the_console(web_response):
+    def respond(url, **kwargs):
+        if "__autopwn_missing_" in url:
+            return web_response("not found", status=404, url=url)
+        return web_response("admin panel", status=301, url=url, headers={"Location": HOSTILE_LOCATION})
+
+    output = io.StringIO()
+    console = Console(file=output, force_terminal=True, color_system=None, width=300)
+    with patch("autopwn_suite.web.dirbust.open", mock_open(read_data="admin")), patch("autopwn_suite.web.dirbust.get", side_effect=respond):
+        found = dirbust("http://example.com", console, MagicMock())
+    assert "redirect to /admin/[2J]0;pwned[31m[+] No findings" in found[0]["evidence"]
+    assert not re.search(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]", output.getvalue() + str(found))
+    assert "[+] DIR" in output.getvalue()
+
+
+@pytest.mark.unit
+def test_findings_keep_newlines_and_tabs_and_drop_other_control_characters():
+    result = finding("X", "http://example.com/a\x1bb", "one\ntwo\tthree\r\x07\x7f\x85", parameter="q\x1b")
+    assert result["url"] == "http://example.com/ab" and result["parameter"] == "q"
+    assert result["evidence"] == "one\ntwo\tthree"
+    assert finding("X", "http://example.com/", "plain", parameter=None)["parameter"] is None
