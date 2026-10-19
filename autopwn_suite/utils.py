@@ -30,6 +30,7 @@ from autopwn_suite.credential_files import (
     credential_from_environment,
 )
 from autopwn_suite.report import ReportMail, ReportType
+from autopwn_suite.subprocess_env import child_environment
 
 
 class ScanMode(Enum):
@@ -403,7 +404,7 @@ def DetectIPRange() -> str:
         )
         net_range = f"{ip}/{net_dict[mask]}"
     else:
-        proc = Popen(["ip", "-o", "-f", "inet", "addr", "show"], stdout=PIPE)
+        proc = Popen(["ip", "-o", "-f", "inet", "addr", "show"], stdout=PIPE, env=child_environment())
         regex = rf"\b{ip}/\b([0-9]|[12][0-9]|3[0-2])\b"
         cmd_output = proc.stdout.read().decode()
         net_range = search(regex, cmd_output).group()
@@ -921,7 +922,7 @@ def install_nmap_mac(log) -> None:
 
 def check_nmap(log, *, offline=False) -> None:
     try:
-        check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
+        check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL, env=child_environment())
     except (CalledProcessError, FileNotFoundError):
         log.logger("warning", "Nmap is not installed.")
         if offline:

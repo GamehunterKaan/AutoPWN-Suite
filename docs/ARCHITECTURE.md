@@ -50,7 +50,9 @@ flowchart LR
 2. `autopwn_suite/scanner.py` builds discovery/port scans and normalizes observations.
    `autopwn_suite/nmap_backend.py` parses Nmap XML; `autopwn_suite/nmap_progress.py` starts
    the native executable using an argument list, streams progress and handles
-   cancellation/timeouts and process cleanup. It does not invoke a shell.
+   cancellation/timeouts and process cleanup. It does not invoke a shell. The standalone
+   Linux binary starts Nmap, `ip` and `systemctl` with the library path it was launched with,
+   not the one that points into its unpacked bundle (`autopwn_suite/subprocess_env.py`).
 3. `autopwn_suite/nist_search.py` and `autopwn_suite/searchvuln.py` map service/version
    observations to candidate CVEs. `autopwn_suite/vulnerability_db.py` reads a local
    mirror or explicitly updates it using validated official annual feeds.

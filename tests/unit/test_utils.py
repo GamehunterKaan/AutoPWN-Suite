@@ -516,7 +516,7 @@ class TestNmapInstallation:
         mock_check_call.return_value = 0  # Simulate nmap -h succeeding
         mock_log = MagicMock()
         check_nmap(mock_log)
-        mock_check_call.assert_called_once_with(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
+        mock_check_call.assert_called_once_with(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL, env=None)
 
     @patch("autopwn_suite.utils.install_nmap_linux")
     @patch("autopwn_suite.utils.system", return_value="linux")

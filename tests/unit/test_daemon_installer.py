@@ -467,9 +467,9 @@ class TestCopyFiles:
         mock_shutil.copytree.assert_not_called()
         mock_subprocess.check_call.assert_has_calls(
             [
-                call(["systemctl", "daemon-reload"]),
-                call(["systemctl", "enable", "autopwn-daemon.service"]),
-                call(["systemctl", "restart", "autopwn-daemon.service"]),
+                call(["systemctl", "daemon-reload"], env=None),
+                call(["systemctl", "enable", "autopwn-daemon.service"], env=None),
+                call(["systemctl", "restart", "autopwn-daemon.service"], env=None),
             ]
         )
         # `enable --now` would leave a daemon that is already running on the old program and configuration.
@@ -510,7 +510,28 @@ class TestCopyFiles:
         CopyFiles(mock_console)
 
         mock_shutil.copy2.assert_not_called()
-        mock_subprocess.check_call.assert_any_call(["systemctl", "daemon-reload"])
+        mock_subprocess.check_call.assert_any_call(["systemctl", "daemon-reload"], env=None)
+
+    @patch("autopwn_suite.daemon.daemon_installer.subprocess")
+    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer.Path")
+    @patch("autopwn_suite.daemon.daemon_installer.open")
+    def test_copy_files_starts_systemctl_without_the_bundle_of_a_standalone_binary(
+        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console, monkeypatch
+    ):
+        # The binary's bootloader puts its unpacked libraries first in LD_LIBRARY_PATH; systemctl must not load them.
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.setenv("LD_LIBRARY_PATH", "/tmp/_MEIabc123")
+        monkeypatch.delenv("LD_LIBRARY_PATH_ORIG", raising=False)
+        self._paths(mock_path)
+
+        CopyFiles(mock_console)
+
+        assert mock_subprocess.check_call.call_count == 3
+        for systemctl in mock_subprocess.check_call.call_args_list:
+            assert systemctl.args[0][0] == "systemctl"
+            assert "LD_LIBRARY_PATH" not in systemctl.kwargs["env"]
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
     @patch("autopwn_suite.daemon.daemon_installer.shutil")

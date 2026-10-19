@@ -12,6 +12,7 @@ from pathlib import Path
 from platform import system
 
 from autopwn_suite.banners import print_banner
+from autopwn_suite.subprocess_env import child_environment
 from autopwn_suite.utils import is_root
 
 INSTALL_DIR = "/opt/autopwn-suite"
@@ -371,10 +372,10 @@ WantedBy=multi-user.target
     # again would keep the old program and configuration running; restart starts a stopped one as well.
     try:
         console.print("Reloading systemd daemon ...")
-        subprocess.check_call(["systemctl", "daemon-reload"])
+        subprocess.check_call(["systemctl", "daemon-reload"], env=child_environment())
         console.print("Enabling and starting service ...")
-        subprocess.check_call(["systemctl", "enable", "autopwn-daemon.service"])
-        subprocess.check_call(["systemctl", "restart", "autopwn-daemon.service"])
+        subprocess.check_call(["systemctl", "enable", "autopwn-daemon.service"], env=child_environment())
+        subprocess.check_call(["systemctl", "restart", "autopwn-daemon.service"], env=child_environment())
         console.print("[green]Service enabled and started successfully.[/green]")
         console.print("[blue]Check status with: sudo systemctl status autopwn-daemon.service[/blue]")
     except subprocess.CalledProcessError as e:

@@ -11,6 +11,8 @@ import threading
 import time
 from xml.etree import ElementTree
 
+from autopwn_suite.subprocess_env import child_environment
+
 
 class ScanCancelled(RuntimeError):
     pass
@@ -70,7 +72,7 @@ def scan_with_progress(scanner, hosts, arguments, progress=None, should_stop=Non
     errors = []
     with tempfile.SpooledTemporaryFile(max_size=1024 * 1024) as output, tempfile.SpooledTemporaryFile(max_size=1024 * 1024) as error_output:
         process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, bufsize=65536,
+                                   stderr=subprocess.PIPE, bufsize=65536, env=child_environment(),
                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), shell=False)
 
         def drain(stream, destination, report=False):
