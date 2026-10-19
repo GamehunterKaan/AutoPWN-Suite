@@ -97,8 +97,10 @@ def test_cli_report_follows_the_offline_choice_not_the_nvd_fallback(local_databa
         autopwn.InitializeReport.assert_not_called()
 
 
-def test_cli_keeps_the_recorded_output_when_the_lookup_aborts_the_scan(tmp_path, monkeypatch):
-    """NVD fails and no local database exists: the scan stops with exit status 1 but its output is saved."""
+@pytest.mark.parametrize("save_failure", [None, OSError("disk full")], ids=["saved", "disk-full"])
+def test_cli_keeps_the_recorded_output_when_the_lookup_aborts_the_scan(tmp_path, monkeypatch, save_failure):
+    """NVD fails and no local database exists: the scan stops with exit status 1 but its output is saved,
+    and a failure to save it does not hide why the scan stopped."""
     from rich.console import Console
 
     import autopwn_suite.cli as autopwn
@@ -113,18 +115,22 @@ def test_cli_keeps_the_recorded_output_when_the_lookup_aborts_the_scan(tmp_path,
     monkeypatch.setattr(autopwn, "PortScan", MagicMock(return_value=nmap_observation()))
     monkeypatch.setattr(autopwn, "AnalyseScanResults", lambda *a: [["192.0.2.10", 22, "ssh", "OpenSSH", "8.2p1"]])
     monkeypatch.setattr(autopwn, "WebScan", lambda: False)
-    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock())
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock(side_effect=save_failure))
     monkeypatch.setattr(autopwn, "InitializeReport", MagicMock())
     monkeypatch.setattr("autopwn_suite.nist_search.searchCVE", MagicMock(side_effect=RuntimeError("HTTP 429")))
 
     with pytest.raises(SystemExit) as stopped:
         autopwn.main()
 
-    assert stopped.value.code == 1
+    # A text exit code is printed to stderr and the process exits with status 1, as before the output was saved.
+    assert isinstance(stopped.value.code, str)
+    assert "NVD lookup failed" in stopped.value.code and "local vulnerability database" in stopped.value.code
     autopwn.SaveOutput.assert_called_once()
     autopwn.InitializeReport.assert_not_called()
-    errors = [str(call.args[1]) for call in logger.logger.call_args_list if call.args[0] == "error"]
-    assert any("NVD lookup failed" in text and "local vulnerability database" in text for text in errors)
+    logged = [(call.args[0], str(call.args[1])) for call in logger.logger.call_args_list]
+    assert sum(text == stopped.value.code for _, text in logged) == 1  # Logged once, by the lookup, not again here.
+    assert any(level == "warning" and "did not finish" in text for level, text in logged)
+    assert any(level == "error" and text == "The recorded output could not be saved." for level, text in logged) == bool(save_failure)
 
 
 def test_database_management_commands_do_not_start_a_scan(local_database, monkeypatch):
