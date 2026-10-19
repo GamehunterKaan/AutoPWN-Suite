@@ -69,8 +69,9 @@ because Python removes assertions under `python -O`. Untrusted input is checked 
 explicit conditions that raise a documented exception (for example `ValueError`), and
 invariants are verified by the test suite, including the seeded fuzz tests in
 `tests/unit/test_fuzz_inputs.py`, which feed mutated input to the Nmap XML parser, the
-options schema, the target and flag allowlists, account validation and the login
-endpoints and require that only documented errors occur.
+options schema, the target and flag allowlists, account validation, the login
+endpoints and the stored records of a copied vulnerability database, and require
+that only documented errors occur.
 
 ## Tests
 

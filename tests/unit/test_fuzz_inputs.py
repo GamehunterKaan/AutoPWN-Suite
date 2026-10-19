@@ -8,10 +8,14 @@ something it must reject. Seeds are fixed so a failure is reproducible.
 """
 
 import importlib
+import json
 import random
 import re
+import sqlite3
 import string
 import sys
+import zlib
+from contextlib import closing
 from types import SimpleNamespace
 
 import pytest
@@ -19,6 +23,7 @@ from rich.text import Text
 
 from autopwn_suite.logger import markup_safe
 from autopwn_suite.nmap_backend import parse_nmap_xml
+from autopwn_suite.vulnerability_db import SCHEMA_VERSION, DatabaseUnavailable, OfflineDatabase
 from autopwn_suite.web.options import normalize_options
 from autopwn_suite.web_auth import ACCOUNT_FILE, password_matches, validate_account
 
@@ -120,6 +125,53 @@ def test_web_option_schema_only_raises_value_error():
             continue
         assert isinstance(result["verify_tls"], bool)
         assert all(isinstance(result[name], int) and not isinstance(result[name], bool) for name in result if name not in ("checks", "verify_tls"))
+
+
+def test_copied_mirror_records_only_raise_database_unavailable(tmp_path):
+    """A mirror is copied between machines, so its stored records are untrusted input to the lookup."""
+    path = tmp_path / "vulnerabilities.sqlite3"
+    description = "OpenSSH 8.2p1 has a possible vulnerability"
+    base = {"cve": {"id": "CVE-2025-1234", "descriptions": [{"lang": "en", "value": description}],
+                    "metrics": {"cvssMetricV31": [{"type": "Primary", "cvssData": {
+                        "baseScore": 7.5, "baseSeverity": "HIGH"}, "exploitabilityScore": 3.9}]},
+                    "configurations": [{"nodes": []}], "references": [{"url": "https://example.com/advisory"}]}}
+    with closing(sqlite3.connect(path)) as connection:
+        connection.executescript(f"""
+            CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE cves (id TEXT PRIMARY KEY, year INTEGER NOT NULL, description TEXT NOT NULL, record BLOB NOT NULL);
+            INSERT INTO metadata VALUES ('ready', 'true'), ('count', '1'), ('updated_at', '2026-01-01');
+            PRAGMA user_version = {SCHEMA_VERSION};
+        """)
+        connection.execute("INSERT INTO cves VALUES ('CVE-2025-1234', 2025, ?, x'00')", (description.casefold(),))
+        connection.commit()
+    rng = random.Random(SEED + 50)
+    junk = [None, True, 0, -1, 2**70, 1.5, float("nan"), "", "x", [], ["x"], {}, {"a": 1}, [[[]]],
+            {"lang": "en", "value": 5}, {"cvssData": []}]
+
+    def corrupt(node):
+        if rng.random() < .15:
+            return rng.choice(junk)
+        if isinstance(node, dict):
+            return {key: corrupt(value) for key, value in node.items()}
+        if isinstance(node, list):
+            return [corrupt(value) for value in node]
+        return node
+
+    accepted = rejected = 0
+    for _ in range(400):
+        with closing(sqlite3.connect(path)) as connection:
+            connection.execute("UPDATE cves SET record = ?", (zlib.compress(json.dumps(corrupt(base)).encode()),))
+            connection.commit()
+        with closing(OfflineDatabase(path)) as local:
+            try:
+                findings = local.search("OpenSSH 8.2p1")
+            except DatabaseUnavailable:
+                rejected += 1
+                continue
+        accepted += 1
+        assert all(isinstance(value, str) for finding in findings
+                   for value in (finding.CVEID, finding.description, finding.severity))
+    assert accepted and rejected  # the corpus exercises both outcomes
 
 
 @pytest.fixture
