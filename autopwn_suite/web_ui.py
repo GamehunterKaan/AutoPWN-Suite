@@ -80,6 +80,7 @@ from autopwn_suite.credential_files import (
 from autopwn_suite.nist_search import VulnerabilityLookup
 from autopwn_suite.nmap_progress import ScanCancelled
 from autopwn_suite.paths import data_dir
+from autopwn_suite.text import printable
 from autopwn_suite.vulnerability_db import DatabaseInUse, database_path, database_status, update_database
 from autopwn_suite.web.options import CHECKS as WEB_CHECKS
 from autopwn_suite.web.options import normalize_options
@@ -900,7 +901,7 @@ class WebLogger:
             "scan_id": self.scan_id,
             "ts":      datetime.now(timezone.utc).strftime("%H:%M:%S"),
             "level":   level,
-            "msg":     str(message),
+            "msg":     printable(str(message), multiline=True),
         })
 
 
@@ -1152,7 +1153,7 @@ def _log(job: ScanJob, msg: str, level: str = "info") -> None:
         "scan_id": job.id,
         "ts":      datetime.now(timezone.utc).strftime("%H:%M:%S"),
         "level":   level,
-        "msg":     msg,
+        "msg":     printable(msg, multiline=True),
     })
 
 

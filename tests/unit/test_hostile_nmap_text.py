@@ -5,14 +5,16 @@
 
 import io
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from rich.console import Console
 
+from autopwn_suite import nmap_progress as monitored
 from autopwn_suite.nmap_backend import PortScanner
-from autopwn_suite.scanner import AnalyseScanResults
+from autopwn_suite.scanner import AnalyseScanResults, PortScan
 from tests.unit.test_hostile_text import FORBIDDEN_EXCEPT_NEWLINE, HOSTILE, assert_clean
+from tests.unit.test_nmap_progress import FakeProcess
 
 # Written as character references because XML has no way to carry ESC or BEL: NEL, LS, PS, LF, right-to-left override,
 # zero-width space, left-to-right mark, the 8-bit CSI and a left-to-right isolate.
@@ -95,3 +97,40 @@ def test_the_dashboard_keeps_and_logs_only_clean_host_text():
     assert_clean(job.to_full_dict(), "scan result")
     assert_clean(list(wu._log_history), "job log")
     assert any(BANNER_CLEAN in entry.get("msg", "") for entry in wu._log_history)
+
+
+def test_the_os_fingerprint_keeps_its_lines_and_a_cpe_is_one_line():
+    xml = """<nmaprun><host><status state="up"/><address addr="192.0.2.1" addrtype="ipv4"/>
+<ports><port protocol="tcp" portid="22"><state state="open"/>
+<service name="ssh"><cpe>cpe:/a:x:y&#10;[+] FORGED&#8238;&#9;end</cpe></service></port></ports>
+<os><osmatch name="Linux" accuracy="98"/><osfingerprint fingerprint="OS:SCAN(V=7.99%E=4)&#10;SEQ(SP=100&#8238;&#155;)&#9;x&#133;&#10;OPS(O1=M5B4)"/></os></host>
+<runstats><finished exit="success"/><hosts up="1" down="0" total="1"/></runstats></nmaprun>"""
+    scan = PortScanner(nmap_path="unused")
+    host = scan.load_xml(xml)["scan"]["192.0.2.1"]
+    # One probe result per line, as Nmap writes it; nothing else that drives a terminal.
+    assert host["osfingerprint"]["fingerprint"] == "OS:SCAN(V=7.99%E=4)\nSEQ(SP=100) x\nOPS(O1=M5B4)"
+    assert host["tcp"][22]["cpe"] == "cpe:/a:x:y [+] FORGED end" and host["tcp"][22]["cpes"] == ["cpe:/a:x:y [+] FORGED end"]
+    assert not FORBIDDEN_EXCEPT_NEWLINE.search(host["osfingerprint"]["fingerprint"])
+
+
+def test_the_error_nmap_prints_when_a_scan_fails_is_cleaned(monkeypatch):
+    stderr = 'Failed to resolve "host\x1b[2J\u202e\u2028x".\nQUITTING!\n\x85'.encode()
+    monkeypatch.setattr(monitored.subprocess, "Popen", MagicMock(return_value=FakeProcess(stderr=stderr, exit_code=1)))
+    with pytest.raises(RuntimeError) as failed:
+        monitored.scan_with_progress(MagicMock(_nmap_path="nmap"), "192.0.2.1", "-sV", MagicMock())
+    assert str(failed.value) == 'Failed to resolve "host[2J x".\nQUITTING!'
+
+
+def test_the_message_that_ends_a_scan_and_the_job_log_are_cleaned():
+    with patch("autopwn_suite.scanner.PortScanner") as port_scanner, patch("autopwn_suite.scanner.is_root", return_value=False):
+        port_scanner.return_value.scan.side_effect = RuntimeError("Failed\x1b[2J \u202eto\nresolve\u2028x")
+        with pytest.raises(SystemExit) as stopped:
+            PortScan("192.0.2.1", MagicMock())
+    assert str(stopped.value) == "Error: Failed[2J to\nresolve x"
+    pytest.importorskip("flask")
+    import autopwn_suite.web_ui as wu
+    wu._log_history.clear()
+    job = wu.ScanJob("hostile-log-job", "192.0.2.1", {"target": "192.0.2.1"})
+    wu._log(job, "[-] Port scan failed: bad\x1b[2J\u202e\u2028[+] FORGED\nsecond line", "error")
+    wu.WebLogger(job.id).logger("error", ValueError("bad\x07\x85\u2029x"))
+    assert [entry["msg"] for entry in wu._log_history] == ["[-] Port scan failed: bad[2J [+] FORGED\nsecond line", "bad x"]

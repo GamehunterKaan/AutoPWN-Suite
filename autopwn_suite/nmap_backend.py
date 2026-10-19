@@ -15,16 +15,20 @@ from xml.etree import ElementTree
 from autopwn_suite.nmap_progress import scan_with_progress
 from autopwn_suite.text import printable
 
+# The fields that are several lines by nature and keep their line feeds: NSE output (the attribute of a script and the
+# text of the elements inside it) and the fingerprint that OS detection writes one line per probe.
+_MULTILINE_ATTRIBUTES = {("script", "output"), ("osfingerprint", "fingerprint")}
+
 
 def _clean(root):
     """Every attribute and text below `root` comes from the scanned hosts or their DNS (banners, product and version
     strings, hostnames, script output), so none keeps a line break or a control or layout character (`printable`).
-    NSE output (the `output` attribute of a script and the text of its elements) is several lines by nature and
-    keeps its newlines."""
+    The fields in `_MULTILINE_ATTRIBUTES` and the text of the elements inside a script keep their line feeds."""
+    in_script = {id(element) for script in root.iter("script") for element in script.iter()}
     for element in root.iter():
         for name, value in list(element.attrib.items()):
-            element.attrib[name] = printable(value, multiline=element.tag == "script" and name == "output")
-        element.text = printable(element.text, multiline=True)
+            element.attrib[name] = printable(value, multiline=(element.tag, name) in _MULTILINE_ATTRIBUTES)
+        element.text = printable(element.text, multiline=id(element) in in_script)
 
 
 def _script_elements(parent):

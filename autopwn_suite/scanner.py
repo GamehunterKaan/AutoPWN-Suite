@@ -10,6 +10,7 @@ from rich.table import Table
 from autopwn_suite.logger import banner, console_safe
 from autopwn_suite.nmap_backend import PortScanner
 from autopwn_suite.nmap_progress import ScanCancelled, scan_with_progress
+from autopwn_suite.text import printable
 from autopwn_suite.utils import GetIpAdress, ScanMode, ScanType, is_root
 
 
@@ -137,7 +138,7 @@ def PortScan(
     except ScanCancelled:
         raise
     except Exception as e:
-        raise SystemExit(f"Error: {e}") from e
+        raise SystemExit(f"Error: {printable(str(e), multiline=True)}") from e
     else:
         return nm
 

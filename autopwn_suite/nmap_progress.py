@@ -13,6 +13,7 @@ import time
 from xml.etree import ElementTree
 
 from autopwn_suite.subprocess_env import child_environment
+from autopwn_suite.text import printable
 
 
 class ScanCancelled(RuntimeError):
@@ -192,5 +193,6 @@ def scan_with_progress(scanner, hosts, arguments, progress=None, should_stop=Non
         xml = output.read()
         stderr = error_output.read().decode("utf-8", errors="replace")
         if process.returncode:
-            raise RuntimeError(stderr.strip() or "Nmap scan failed")
+            # Nmap quotes names it resolved, so the message is cleaned like every other text a scanned host can influence.
+            raise RuntimeError(printable(stderr, multiline=True).strip() or "Nmap scan failed")
         return scanner.load_xml(xml, stderr=stderr)
