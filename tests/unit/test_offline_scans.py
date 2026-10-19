@@ -293,6 +293,7 @@ def test_poc_verification_follows_the_chosen_offline_mode_not_the_nvd_fallback(w
     """Verification replays requests to the scanned target, never to an online service; only a chosen offline mode blocks it."""
     from tests.unit.test_web_poc import sample
     wu, client = web
+    monkeypatch.setattr(wu, "_web_verifications_running", 0)  # the mocked Thread never runs its decrement; monkeypatch restores the counter
     job = wu.ScanJob("job", "example.com", {"vulnerability_source": source, "vulnerability_source_used": "offline"})
     job.mark_done()
     job.add_web_finding("example.com", "http://example.com/", sample())

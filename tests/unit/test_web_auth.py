@@ -320,12 +320,21 @@ def test_reset_succeeds_when_a_reader_releases_the_account_file_shortly_after(tm
     store.reset()
     reader = store.path.open(encoding="utf-8")
     timer = threading.Timer(.3, reader.close)
-    timer.start()
+    real_replace, attempts = os.replace, []
+
+    def replace_with_the_reader_still_open(source, destination):
+        attempts.append(source)
+        if len(attempts) == 1:
+            timer.start()  # the reader is open for the first attempt, however long the password hash took
+        return real_replace(source, destination)
+
     try:
-        username, password = store.reset()
+        with patch("autopwn_suite.web_auth.os.replace", side_effect=replace_with_the_reader_still_open):
+            username, password = store.reset()
     finally:
         timer.join()
         reader.close()
+    assert len(attempts) > 1
     assert username == "admin" and password_matches(password, store.load()["password_hash"])
 
 
@@ -333,7 +342,8 @@ def test_account_replacement_gives_up_after_the_retries_and_keeps_the_original(t
     store = AccountStore(tmp_path / ACCOUNT_FILE)
     store.reset()
     original = store.path.read_bytes()
-    with patch("autopwn_suite.web_auth.os.replace", side_effect=PermissionError(13, "Access is denied")) as replace,             patch("autopwn_suite.web_auth.time.sleep"):
+    with patch("autopwn_suite.web_auth.os.replace", side_effect=PermissionError(13, "Access is denied")) as replace, \
+            patch("autopwn_suite.web_auth.time.sleep"):
         with pytest.raises(PermissionError):
             store.reset()
     assert replace.call_count == 20
