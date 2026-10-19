@@ -46,7 +46,7 @@ whoever holds it controls every scan, profile, schedule and setting.
 | Component | Entry point or consumer |
 | --- | --- |
 | CLI and configuration | `autopwn_suite/cli.py` `StartScanning` and `main`, `autopwn_suite/utils.py` `cli` and `InitArgsConf` |
-| Synchronous library | `autopwn_suite/api.py:98`, `autopwn_suite/api.py:170` |
+| Synchronous library | `autopwn_suite/api.py:100`, `autopwn_suite/api.py:172` |
 | Dashboard, scheduler, browser | `autopwn_suite/web_ui.py` `_scheduler_loop` and `_build_app`, `autopwn_suite/web_auth.py` `install_auth`, `autopwn_suite/web_ui_static/app.js` `initDashboard` and `connectSSE` |
 | Native scanning and XML | `autopwn_suite/nmap_backend.py:139`, `autopwn_suite/nmap_progress.py:93` |
 | Web probes and recorded-evidence replay | `autopwn_suite/web/http.py` `bounded_request`, `autopwn_suite/web/poc_runtime.py` `verify_plan` |
@@ -135,7 +135,7 @@ absolute path: dashboard resolution does not expand a leading tilde
 | Supplied Compose | CVE mirror | Explicit path > `AUTOPWN_DATA_DIR=/data` | `/data/vulnerabilities.sqlite3` | Scanner/updater/API, volume readers | Volume permissions + DB controls; `docker-compose.yml:6`, `autopwn_suite/vulnerability_db.py:58` |
 | Explicit DB updates | Lock/staging/feed files | Derived from resolved DB parent | `<database>.update-lock`, sibling `.nvd-*.sqlite3`, temporary feed files | Updater and authorized file readers | Exclusive update transaction, hash/size validation, fsync/replace/cleanup (the next update also removes the staging files and their SQLite journals, named after a digest of the database file name, that a killed update left behind); `autopwn_suite/vulnerability_db.py:324` (lock), `autopwn_suite/vulnerability_db.py:280` (feed download and verification), `autopwn_suite/vulnerability_db.py:402` (replace) |
 | Source/native CLI | NVD key | INI > CLI key > `AUTOPWN_NIST_API_KEY_FILE` file > CWD `api.txt`; offline skips | Credential reference only, optional key file, optional `CWD/api.txt` | Scanner/NVD API header | Host permissions + provider HTTPS; `InitArgsAPI` in `autopwn_suite/utils.py`, `autopwn_suite/credential_files.py`, `autopwn_suite/nist_search.py:164` |
-| Library | Key and export | Explicit caller arguments | In-memory key; default `CWD/autopwn.json` | Calling app, NVD, file readers | Caller authority; no dashboard settings load; `autopwn_suite/api.py:98`, `autopwn_suite/api.py:170` |
+| Library | Key and export | Explicit caller arguments | In-memory key; default `CWD/autopwn.json` | Calling app, NVD, file readers | Caller authority; no dashboard settings load; `autopwn_suite/api.py:100`, `autopwn_suite/api.py:172` |
 | Dashboard | NVD key | Per-job key > `AUTOPWN_NIST_API_KEY_FILE` file > persisted NVD key | Secret reference in deployment-specific settings, or the key file | NVD; signed-in administrative settings API (stored values only; file values are not returned) | Sign-in/ACL; job serialization removes key; `ScanJob.to_dict`, `_run_scan` and `api_settings_get` in `autopwn_suite/web_ui.py` |
 | CLI through source/installed command | Reports | Explicit output > output folder > CWD default | `CWD/outputs/YYYY-MM-DD_<target>.<format>` | Operator/file readers | Account permissions, filename sanitization; `SaveOutput` in `autopwn_suite/utils.py` |
 | Docker CLI | Reports | Same CWD rules | `/app/outputs/...` by default, outside Compose data volume | Operator/container-storage readers | Runtime permissions; `Dockerfile` (`WORKDIR /app`), `SaveOutput` in `autopwn_suite/utils.py` |
