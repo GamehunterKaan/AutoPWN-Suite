@@ -13,7 +13,7 @@ import shutil
 from xml.etree import ElementTree
 
 from autopwn_suite.nmap_progress import scan_with_progress
-from autopwn_suite.web.findings import printable
+from autopwn_suite.text import printable
 
 
 def _clean(root):

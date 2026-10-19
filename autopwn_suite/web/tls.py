@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 
+from autopwn_suite.text import printable
 from autopwn_suite.web.findings import emit, finding
 from autopwn_suite.web.runtime import ACTIVE
 
@@ -69,7 +70,8 @@ def inspect_certificate(url, der, *, now=None):
     hostname = urlsplit(url).hostname
     now = now or datetime.now(timezone.utc)
     results = []
-    certificate_data = {"subject": certificate.subject.rfc4514_string(), "issuer": certificate.issuer.rfc4514_string(),
+    # The names are the target's own text, and rfc4514_string() escapes only its special characters.
+    certificate_data = {"subject": printable(certificate.subject.rfc4514_string()), "issuer": printable(certificate.issuer.rfc4514_string()),
                         "not_before": certificate.not_valid_before_utc.isoformat(), "not_after": certificate.not_valid_after_utc.isoformat(),
                         "fingerprint_sha256": certificate.fingerprint(hashes.SHA256()).hex(), "serial_number": str(certificate.serial_number)}
     reproduction = {"strategy": "tls", "target": url, "requests": [], "certificate": certificate_data}

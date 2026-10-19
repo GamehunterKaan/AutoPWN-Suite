@@ -643,8 +643,9 @@ def test_random_unicode_never_leaves_a_line_break_a_control_or_a_layout_characte
     the characters listed in test_hostile_text, and cleaning it a second time changes nothing."""
     from autopwn_suite.logger import console_safe
     from autopwn_suite.nist_search import Vulnerability
+    from autopwn_suite.text import wire_url
     from autopwn_suite.web.findings import finding, printable
-    from autopwn_suite.web.runtime import redact_text
+    from autopwn_suite.web.runtime import redact_text, redact_url
     from tests.unit.test_hostile_text import FORBIDDEN, FORBIDDEN_EXCEPT_NEWLINE, FORBIDDEN_TEXT
     rng = random.Random(SEED + 7)
     pieces = [*FORBIDDEN_TEXT, "\r\n", "\x1b[2J", "\x1b]0;t\x07", "[/red]", "[bold]", "http://a.test/?token=1", " ", "a", "é", "日本"]
@@ -674,6 +675,9 @@ def test_random_unicode_never_leaves_a_line_break_a_control_or_a_layout_characte
         assert single == multi.replace("\n", " ") and len(single.splitlines()) <= 1
         assert Text.from_markup(console_safe(text), emoji=False).plain == single
         assert not FORBIDDEN.search(redact_text(text))
+        # A URL keeps the characters as percent-encoding, which is plain, stable and what a replay sends.
+        encoded = wire_url("http://a.test/" + text)
+        assert not FORBIDDEN.search(encoded) and wire_url(encoded) == encoded and not FORBIDDEN.search(redact_url("http://a.test/" + text))
         result = finding("X", "http://a.test/" + text, text, parameter=text)
         assert not any(FORBIDDEN.search(result[key]) for key in ("url", "parameter", "evidence"))
         vulnerability = Vulnerability(text, text, text, text, 1.0, text, 1.0)

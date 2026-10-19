@@ -11,6 +11,7 @@ from requests.exceptions import RequestException, SSLError
 from autopwn_suite.logger import banner
 from autopwn_suite.nmap_progress import ScanCancelled
 from autopwn_suite.random_user_agent import random_user_agent
+from autopwn_suite.text import wire_url
 from autopwn_suite.web.additional import additional_checks, critical_checks
 from autopwn_suite.web.crawler import crawl
 from autopwn_suite.web.dirbust import dirbust, discovery_base
@@ -106,7 +107,8 @@ def _execute_webvuln(target, log, console):
     banner(f"Testing web application on {redact_target(target_url)} ...", "purple", console)
     current = ACTIVE.get()
     if current:
-        current.target = target_url
+        # Recorded in results and the summary: a redirect can have put control characters in it.
+        current.target = wire_url(target_url)
     results = []
     controls = options()
     selected = set()

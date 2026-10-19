@@ -6,8 +6,8 @@ from rich.logging import RichHandler
 from rich.markup import escape
 from rich.text import Text
 
+from autopwn_suite.text import printable
 from autopwn_suite.utils import get_terminal_width
-from autopwn_suite.web.findings import printable
 
 
 def banner(msg, color, console) -> None:

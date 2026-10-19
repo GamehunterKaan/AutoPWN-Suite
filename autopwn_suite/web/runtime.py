@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from urllib.parse import unquote_plus, urlsplit, urlunsplit
 
 from autopwn_suite.nmap_progress import ScanCancelled
-from autopwn_suite.web.findings import printable
+from autopwn_suite.text import printable, wire_url
 from autopwn_suite.web.options import CHECKS as CHECKS
 from autopwn_suite.web.options import TYPE_CHECK, normalize_options
 
@@ -89,9 +89,12 @@ def _hide_every(name, equals, value):
 
 def redact_url(url):
     """Redact the credential-named query values and the userinfo of a URL, for findings and the requests a PoC
-    replays: a value of any other name stays so that the request can still be sent. Use `redact_text` or `redact_target` for diagnostics."""
+    replays: a value of any other name stays so that the request can still be sent. A control or layout character
+    that a host put in the URL (a crawled link, a redirect) is percent-encoded as the HTTP client sends it (see
+    `wire_url`), so the stored URL is plain text and names the request that was sent; `urlsplit` would otherwise drop a
+    CR, LF or tab. Use `redact_text` or `redact_target` for diagnostics."""
     try:
-        parts = urlsplit(url)
+        parts = urlsplit(wire_url(url))
         return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1],
                                          query=_rewrite_query(parts.query, _hide_named), fragment=""))
     except ValueError:

@@ -6,7 +6,7 @@ from time import monotonic, sleep
 
 from requests import get
 
-from autopwn_suite.web.findings import printable
+from autopwn_suite.text import printable
 
 # Dashboard and scheduled scans are long-lived and run concurrently. A successful NVD answer is
 # reused for CACHE_LIFETIME seconds, so CVEs published later are seen; the lock guards both
