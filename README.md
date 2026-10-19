@@ -362,8 +362,10 @@ if NVD is unavailable, staying local for the rest of that scan. `--vuln-source o
 online lookups. Use `--offline` (or `--vuln-source offline`) to avoid trying NVD at all.
 Missing or invalid local data fails explicitly rather than reporting a clean vulnerability scan:
 when NVD fails and no local database is ready, the scan stops with exit status 1 and a message that
-names both failures, and the output recorded so far is still saved. A scan that stops on any other
-runtime error, such as a failed host discovery, saves its output the same way and ends with that error's text.
+names both failures, and the output recorded so far is still saved. A scan whose host discovery fails
+saves its output the same way and ends with that error's text; a failed Nmap port scan ends the scan with
+its error text and saves nothing. A saved partial report goes to the usual output file, so it replaces an
+earlier report with the same name.
 Stored data remains usable without an expiry; its update time is shown in scan logs and dashboard
 results. Offline matching uses description keyword prefixes, with all query terms required,
 and keeps versions such as `10.1.18` distinct from a query for `1.1`. As with online keyword scans,
