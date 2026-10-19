@@ -200,7 +200,8 @@ offline mode a due schedule whose profile has web checks is skipped with one log
 line (a manual start answers 409) and is tried again at its next interval or time.
 The scheduler checks once a minute. A daily or weekly schedule whose time was
 missed (a restart, a suspend or a slow check) still runs once when the check
-comes within an hour of that time, and never for a time that passed before the
+comes within an hour of that time (a later check skips that day or week, without
+a log line), and never for a time that passed before the
 schedule was created, enabled again or retimed. A schedule does not start a scan
 while the scan it started last is still running or stopping; it logs one skip and
 starts when that scan ends.
@@ -228,7 +229,8 @@ log as a fixed-text warning with the schedule ID (no exception text).
   API. A profiles or schedules file that cannot be parsed is logged and renamed to
   `<name>.corrupt-<UTC timestamp>` before the dashboard starts without it, and a
   file with some non-object entries loads the valid ones, logs the count and keeps
-  a copy of the original the same way, so the next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
+  a copy of the original the same way (once: a restart with an identical copy
+  already kept does not add another), so the next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
   versions; never edit an active database directly.
 - Nmap receives argv and returns XML/progress. Online NVD receives service
   keywords and optional API key over HTTPS; Exploit-DB supplies references and

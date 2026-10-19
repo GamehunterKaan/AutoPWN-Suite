@@ -365,6 +365,13 @@ def _set_aside(path: Path, *, move: bool) -> str:
         if move:
             os.replace(path, kept)
         else:
+            current = path.read_bytes()
+            for earlier in path.parent.glob(path.name + ".corrupt-*"):
+                try:
+                    if earlier.read_bytes() == current:  # a start after a crash must not pile up copies
+                        return f"The original of {path.name} is already kept as {earlier.name}."
+                except OSError:
+                    continue
             shutil.copy2(path, kept)
     except OSError:
         return f"Could not keep a copy of {path.name}; the next save replaces it."

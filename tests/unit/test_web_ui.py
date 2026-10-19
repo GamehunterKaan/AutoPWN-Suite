@@ -2236,6 +2236,22 @@ class TestSettingsLoadError:
         assert sorted(json.loads(path.read_text(encoding="utf-8"))) == ["a", "c"]
         assert kept[0].read_text(encoding="utf-8") == original
 
+    @pytest.mark.parametrize("kind", ["profiles", "schedules"])
+    def test_restarts_do_not_pile_up_copies_of_the_same_partial_file(self, wu, caplog, kind):
+        path = getattr(wu, f"_{kind.upper()}_FILE")
+        original = json.dumps({"a": {"id": "a"}, "b": "not an object"})
+        path.write_text(original, encoding="utf-8")
+        earlier = path.with_name(path.name + ".corrupt-20200101T000000Z")
+        earlier.write_text(original, encoding="utf-8")  # kept by a previous start
+        getattr(wu, f"_load_{kind}")()
+        assert sorted(getattr(wu, f"_{kind}")) == ["a"]
+        assert list(path.parent.glob(path.name + ".corrupt-*")) == [earlier]
+        assert f"already kept as {earlier.name}" in caplog.text
+        # A different file, though, is copied: nothing a person edited is ever left unkept.
+        path.write_text(json.dumps({"a": {"id": "a"}, "c": 3}), encoding="utf-8")
+        getattr(wu, f"_load_{kind}")()
+        assert len(list(path.parent.glob(path.name + ".corrupt-*"))) == 2
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Email with duplicate -O flag dedup
