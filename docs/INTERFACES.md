@@ -193,7 +193,9 @@ Schedule keys are `name,target,profile_id,enabled,type,interval_value,
 interval_unit,time_utc,weekday`. Types are `interval`, `daily`, `weekly`;
 interval units are minutes/hours/days, with a positive value; time is `HH:MM`
 UTC and weekday is 0–6 (Monday–Sunday). Saved records add `id,created_at,last_run`.
-Schedules use the selected profile when firing and must satisfy offline policy.
+Schedules use the selected profile when firing and must satisfy offline policy: in
+offline mode a due schedule whose profile has web checks is skipped with one log
+line (a manual start answers 409) and is tried again at its next interval or time.
 The scheduler checks once a minute. A daily or weekly schedule whose time was
 missed (a restart, a suspend or a slow check) still runs once when the check
 comes within an hour of that time, and never for a time that passed before the

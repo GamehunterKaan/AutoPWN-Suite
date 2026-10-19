@@ -292,3 +292,26 @@ def test_put_can_turn_off_an_invalid_schedule_but_not_turn_it_on(client_review, 
     assert client_review.put(f"/api/schedules/{schedule_id}", json={"enabled": True}).status_code == 400
     assert client_review.put(f"/api/schedules/{schedule_id}", json={"enabled": True, "target": "192.0.2.10"}).status_code == 200
     assert wu_review._schedules[schedule_id]["enabled"] is True
+
+
+@pytest.mark.parametrize("how", ["dashboard toggle", "profile source"])
+def test_scheduled_web_scan_is_skipped_in_offline_mode_instead_of_completing_empty(client_review, wu_review, how):
+    body = {"name": "Site", "scan_ports": False, "scan_web": True}
+    if how == "profile source":
+        body["vulnerability_source"] = "offline"
+    else:
+        wu_review._settings["offline_mode"] = True
+    profile_id = client_review.post("/api/profiles", json=body).get_json()["id"]
+    schedule_id = client_review.post("/api/schedules", json={"target": "example.test", "profile_id": profile_id}).get_json()["id"]
+    _one_scheduler_tick(wu_review)
+    _one_scheduler_tick(wu_review)  # not due again until the next interval, so no second log line
+    wu_review._launch_scan.assert_not_called()
+    skips = [entry["msg"] for entry in wu_review._log_history if "web checks are disabled in offline mode" in entry["msg"]]
+    assert len(skips) == 1
+    assert wu_review._schedules[schedule_id]["enabled"] is True and wu_review._schedules[schedule_id]["last_run"] == ""
+    wu_review._settings["offline_mode"] = False
+    if how == "profile source":
+        client_review.put(f"/api/profiles/{profile_id}", json={"vulnerability_source": "online"})
+    wu_review._schedule_last_run.pop(schedule_id)
+    _one_scheduler_tick(wu_review)  # once online, the same schedule runs
+    wu_review._launch_scan.assert_called_once()

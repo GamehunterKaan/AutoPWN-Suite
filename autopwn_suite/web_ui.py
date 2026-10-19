@@ -1624,6 +1624,13 @@ def _previous_run_active(schedule: dict) -> bool:
     return True
 
 
+def _skip_scheduled_run(schedule: dict, reason: str) -> None:
+    """Skip a due run and wait for the next interval or slot, so the skip is logged once rather than every minute."""
+    with _schedule_last_run_lock:
+        _schedule_last_run[schedule["id"]] = datetime.now(timezone.utc)
+    _scheduler_note("warning", f"[*] Scheduled scan skipped ({schedule.get('name') or schedule['id'][:8]}): {reason}")
+
+
 def _disable_invalid_schedule(schedule: dict, error: ValueError) -> None:
     """Validation fails the same way until the schedule or its profile is edited, so stop retrying each minute."""
     with _schedules_lock:
@@ -1664,6 +1671,11 @@ def _scheduler_loop() -> None:
                     config = _profile_config({}, profile.get("config", {}))
                     config["target"] = checked["target"]
                     config["nmap_flags"] = _build_nmap_flags(config)
+                    if config["scan_web"] and (_offline_enabled() or config["vulnerability_source"] == "offline"):
+                        # A manual start is refused with 409 here; a scheduled one must not become a
+                        # "completed" scan that skipped all of its work.
+                        _skip_scheduled_run(schedule, "web checks are disabled in offline mode.")
+                        continue
                     with _schedules_lock:
                         if _schedules.get(schedule["id"]) != schedule:
                             continue
