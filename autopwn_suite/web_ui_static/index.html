@@ -240,19 +240,21 @@
       <div id="settings-unavailable" class="web-notice" role="alert" hidden>Settings could not be loaded, so saving them is disabled. Refresh the page to retry.</div>
       <div class="s-section">
         <div class="s-section-title">Dashboard account</div>
-        <form id="account-form" method="post" action="/api/auth/account">
-          <div class="fl"><label for="account-username">Username</label></div>
-          <input id="account-username" autocomplete="username" maxlength="64" required>
-          <div class="fl"><label for="account-current-password">Current password</label></div>
-          <input id="account-current-password" type="password" autocomplete="current-password" maxlength="128" required>
+        <form id="account-form" class="s-form" method="post" action="/api/auth/account">
+          <div><div class="fl"><label for="account-username">Username</label></div>
+            <input type="text" id="account-username" autocomplete="username" maxlength="64" required></div>
+          <div><div class="fl"><label for="account-current-password">Current password</label></div>
+            <input id="account-current-password" type="password" autocomplete="current-password" maxlength="128" required></div>
           <div class="row2">
             <div><div class="fl"><label for="account-password">New password</label></div>
               <input id="account-password" type="password" autocomplete="new-password" minlength="15" maxlength="128" placeholder="Leave blank to keep current password"></div>
             <div><div class="fl"><label for="account-confirm-password">Confirm new password</label></div>
               <input id="account-confirm-password" type="password" autocomplete="new-password" minlength="15" maxlength="128"></div>
           </div>
-          <p id="account-message" role="status" aria-live="polite"></p>
-          <button class="btn btn-primary btn-sm" id="account-save" type="submit">Update account</button>
+          <div class="s-actions">
+            <button class="btn btn-primary btn-sm" id="account-save" type="submit">Update account</button>
+            <p id="account-message" role="status" aria-live="polite"></p>
+          </div>
         </form>
       </div>
 

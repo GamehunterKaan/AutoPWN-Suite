@@ -39,6 +39,12 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
   color:var(--text);font-family:var(--mono);font-size:13px;padding:7px 10px;outline:none;
   transition:border-color .2s;resize:vertical}
 input:focus,select:focus,textarea:focus{border-color:var(--accent2)}
+/* Browsers repaint autofilled fields with their own light background and dark text. Cover that with the
+   field's own background and keep the text and caret colours. :-webkit-autofill is Chromium and Safari,
+   :autofill the standard name (Firefox); :is() ignores the one a browser does not know. */
+:is(input,select,textarea):is(:-webkit-autofill,:autofill){
+  -webkit-text-fill-color:var(--text);caret-color:var(--text);background-color:var(--bg3);filter:none;
+  box-shadow:inset 0 0 0 100vmax var(--bg3)}
 select option{background:var(--bg3)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
@@ -178,12 +184,13 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
 /* ── Settings tab ── */
 #tc-settings{overflow-y:auto}
 .settings-body{padding:24px;display:flex;flex-direction:column;gap:32px;max-width:900px}
-.s-section{display:flex;flex-direction:column;gap:14px}
+.s-section,.s-form{display:flex;flex-direction:column;gap:14px}
 .s-section-title{font-family:var(--mono);font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .s-row{display:flex;flex-direction:column;gap:4px}
 .s-row-label{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3)}
 .s-row-hint{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px}
 .s-actions{display:flex;gap:8px;flex-wrap:wrap}
+.s-actions [role=status]{align-self:center}
 
 /* Profile / Schedule cards */
 .item-card{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px 14px;display:flex;align-items:center;gap:12px}
@@ -328,4 +335,4 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
 .web-verification-card p{color:var(--text2);font-size:12px;line-height:1.6}.web-verification-card .btn{font-size:11px}
 .web-verification-result{font-size:12px;line-height:1.6;color:var(--text2);margin-top:12px}.web-verification-result.reproduced{color:#49d992}
 @media(max-width:1100px){#app{grid-template-columns:270px minmax(0,1fr) 270px}#app.web-focus{grid-template-columns:270px minmax(0,1fr) 0}.web-page{padding:23px 20px}.web-summary{gap:8px}.web-stat{padding:13px}.web-finding-side .web-pill:first-child{display:none}}
-@media(max-width:760px){html,body{overflow:auto;height:auto}#app,#app.web-focus{height:auto;min-height:100vh;grid-template-columns:1fr;grid-template-rows:52px auto minmax(500px,1fr) auto}#hdr{grid-column:1}#left{border-right:0;border-bottom:1px solid var(--border)}#scan-form{max-height:440px}#main{min-height:540px}#right{border-left:0;border-top:1px solid var(--border);min-height:260px}#tabs{padding:0 8px}.tab{padding:12px 10px;font-size:10px}.web-page{padding:20px 15px}.web-summary{grid-template-columns:repeat(2,1fr)}.web-stat strong{font-size:24px}.web-page-heading h1{font-size:23px}.web-page-heading>.btn{font-size:9px}.web-finding-row{padding:13px;gap:10px}.web-finding-side{gap:5px}.web-finding-side .web-pill{display:none}.web-list-heading span:last-child{display:none}.web-dialog{width:calc(100vw - 20px);max-height:calc(100vh - 20px)}.web-dialog-header{padding:20px 18px 12px}.web-dialog-header h2{font-size:20px}.web-detail-url,.web-detail-tabs{padding-left:18px;padding-right:18px}.web-dialog-body{padding:18px;max-height:calc(100vh - 205px)}.web-detail-grid{grid-template-columns:1fr}.web-verification-card{flex-direction:column;align-items:stretch}.web-code{max-height:360px}.web-filter-bar label{flex:1 1 130px}.web-filter-bar .web-search{flex-basis:100%}}
+@media(max-width:760px){html,body{overflow:auto;height:auto}#app,#app.web-focus{height:auto;min-height:100vh;grid-template-columns:1fr;grid-template-rows:52px auto minmax(500px,1fr) auto}#hdr{grid-column:1}#left{border-right:0;border-bottom:1px solid var(--border)}#scan-form{max-height:440px}#main{min-height:540px}#right{border-left:0;border-top:1px solid var(--border);min-height:260px}#tabs{padding:0 8px}.tab{padding:12px 10px;font-size:10px}.web-page{padding:20px 15px}.web-summary{grid-template-columns:repeat(2,1fr)}.web-stat strong{font-size:24px}.web-page-heading h1{font-size:23px}.web-page-heading>.btn{font-size:9px}.web-finding-row{padding:13px;gap:10px}.web-finding-side{gap:5px}.web-finding-side .web-pill{display:none}.web-list-heading span:last-child{display:none}.web-dialog{width:calc(100vw - 20px);max-height:calc(100vh - 20px)}.web-dialog-header{padding:20px 18px 12px}.web-dialog-header h2{font-size:20px}.web-detail-url,.web-detail-tabs{padding-left:18px;padding-right:18px}.web-dialog-body{padding:18px;max-height:calc(100vh - 205px)}.web-detail-grid{grid-template-columns:1fr}.web-verification-card{flex-direction:column;align-items:stretch}.web-code{max-height:360px}.web-filter-bar label{flex:1 1 130px}.web-filter-bar .web-search{flex-basis:100%}.s-form .row2{grid-template-columns:1fr;row-gap:inherit}}
