@@ -76,10 +76,12 @@ existing release summaries; they do not retroactively claim artifact signing.
   discovery to `/app/`.
 - The dashboard shows an invalid or rejected scan target, a failed Start Scan request and a failed
   Stop in a toast as well as in the Terminal tab.
-- The dashboard no longer shows every log line twice on page load and again after each reconnect:
-  `GET /api/events` sends only entries added after the connection opens (history is on
-  `GET /api/log`) and the terminal keeps the newest 2000 lines. Lines logged while the stream is
-  disconnected are not replayed; reload the page to see them.
+- The dashboard shows every log line exactly once, also across a page load and a reconnect. Log
+  entries carry an increasing id; `GET /api/events` resumes after the id in `Last-Event-ID` (a browser
+  reconnect) or in the `after` query parameter (the first connection, after `GET /api/log`), and without
+  a resume point it still sends only entries added after the connection opens. The terminal keeps the
+  newest 2000 lines. The page reopens the stream, with a pause that grows from 1 to 30 seconds, after the
+  browser gave up on it following an HTTP error such as a proxy restart.
 - `install.sh` checks that `PYTHON` is 3.10 or newer and can create virtual environments before it
   changes anything, sets the existing environment aside while the new one is built, and restores it
   if the build fails or the script is interrupted, so a failed upgrade (no network, no matching
@@ -90,6 +92,150 @@ existing release summaries; they do not retroactively claim artifact signing.
   dashboard from the bridge gateway, not from loopback, so signing in over plain HTTP needs
   `--network host` with `AUTOPWN_WEB_HOST=127.0.0.1` (as `docker-compose.yml` does) or a TLS
   reverse proxy that keeps `Host` with `AUTOPWN_WEB_SECURE_COOKIE=1`.
+- IPv6 targets are scanned: Nmap's `-6` is added when every target is an IPv6 address or prefix, instead
+  of reporting an up host as offline or finding no hosts. One Nmap run cannot scan both address families,
+  so a mixed list must be split, and as root an evade-mode scan (`-f`) of IPv6 targets stops with Nmap's
+  own error.
+- Generated report file names contain only letters, digits, `.`, `_` and `-` (other characters of the
+  target become `_`, at most 100 characters), so scans of `192.168.*.*`, IPv6 addresses or `host:port`
+  targets can save their report on Windows.
+- Noise mode ends each host's Nmap process when the noise duration passes or the scan is interrupted (it
+  used to leave `nmap -A -T 5` running) and samples at most 32 live hosts, with a log warning on a larger
+  network.
+- A missing or unreadable `-c` config file, a declined Nmap install and a failed `winget` install exit with
+  status 1 instead of 0. The Nmap install offer runs `brew install nmap` without `sudo` on macOS, reports a
+  missing `sudo` instead of a traceback, never prompts under `-y` and stops with status 1 when the
+  installation fails. `--version` and `--help` no longer crash when the per-user data directory cannot be
+  created, and `--web-port` and `AUTOPWN_WEB_PORT` are validated (1 to 65535) with a usage error instead of
+  a traceback.
+- `api.txt` and the `AUTOPWN_*_FILE` credential files ignore a leading UTF-8 byte order mark (written by
+  Windows PowerShell), and `api.txt` ignores spaces around the key. In the Python API an `AutoScanner`
+  `nmap_args` list keeps every item as one Nmap argument, so values with spaces or Windows paths are not
+  split.
+- The dashboard rejects Nmap options that name an output, input or data file (`-oN`, `-oG`, `-oS`, `-oM`,
+  `-oX`, `-oA`, `-o`, `-m`, `-iL`, `-i`, `--excludefile`, `--datadir`, `--servicedb`, `--versiondb`,
+  `--stylesheet`, `--resume` and `--append-output`) with HTTP 400 in any spelling, abbreviation or
+  short-option cluster. Single-dash spellings of long options that start with `o`, `i` or `m`, such as
+  `-max-retries`, are refused too: write long options with `--`. A profile or schedule stored with such an
+  option has to be edited before it can be changed or run again; until then `PUT /api/profiles/<id>`
+  answers 400 and its scheduled scans are skipped.
+- When NVD lookups fail and no local vulnerability database is ready, the scan stops with exit status 1 and
+  a message that names both failures. A scan that stops on a runtime error during lookup or host discovery
+  (for example a failed Nmap host discovery) saves the output recorded so far instead of discarding it,
+  and the reason is still the exit message on stderr; a failed Nmap port scan still ends the scan without
+  saving. A saved partial report goes to the usual output file, so it replaces an earlier report with the
+  same name.
+- Vulnerability database updates retry each feed request up to three times on network errors, 429 and 5xx
+  answers instead of discarding the whole download, and skip a newest-year feed that NVD has not published
+  yet (404) when that year was never indexed: the last message names the year, and the database lacks that
+  year's CVEs until a later update indexes them. An update removes the staging file and SQLite journal that
+  an earlier, hard-killed update of the same database left behind (staging files of earlier releases have a
+  different name and have to be deleted by hand), including for a database whose file name is not valid
+  UTF-8 on POSIX.
+- On Windows, an update that cannot replace the mirror because a running scan or another program has it
+  open stops before downloading when a scan is already running, keeps the previous database and asks you to
+  close running scans (the dashboard no longer blames the connection). A scan that opens the database during
+  the download blocks the final replace, which is retried for a few seconds before the download is
+  discarded. A read-only database file is reported the same way and the message asks you to make it
+  writable. `--vuln-db` and the dashboard also accept a database on a UNC (network share) path.
+- A CVE that NVD scores with CVSS v4 reports the exploitability sub-score of the newest older CVSS version
+  that has one instead of 0.0 (each keeps its own scale: up to 3.9 for v3, up to 10.0 for v2); 0.0 now
+  means that no sub-score is available.
+- A vulnerability database copied from another machine with malformed or oversized records makes the lookup
+  fail with "database coverage is incomplete" instead of crashing the scan.
+- A daemon whose host discovery finds nothing waits for its next scan interval (and sends no empty report
+  and writes no empty output file) instead of exiting, which made systemd restart it and repeat the
+  discovery every five seconds.
+- `--daemon-install` and `--create-config` ask again for a scan speed outside 0-5, a negative scan interval
+  or host timeout, an email port outside 1-65535, an output type other than html, txt or svg (in any letter
+  case) and an empty webhook URL, instead of writing a configuration that makes the daemon exit and restart
+  every five seconds. `--daemon-install` checks that the installation is usable before it asks its
+  questions (a source checkout started with `python autopwn.py` and pipx environments are refused; the
+  README no longer recommends pipx for the daemon) and restarts the service when it runs again, so a new
+  configuration, or a release 2.6 daemon, moves onto the installed program.
+- `--daemon-uninstall` stops and disables the service and removes its unit file and
+  `/opt/autopwn-suite/autopwn-daemon.conf` (as root on Linux; it exits 1 otherwise or when a file cannot be
+  removed); before it only printed the banner. The program, the log file and other files in
+  `/opt/autopwn-suite` stay. `uninstall.sh` no longer stops at a failing `systemctl daemon-reload` (no
+  running systemd, as in a container).
+- `install.sh` run as root hands the application directory to root (also when an earlier run as a normal
+  user created it), so `--daemon-install` accepts it; run as a normal user it says that the installation
+  belongs to that user. A second run as a normal user no longer fails at the command link when `BINDIR`
+  belongs to root.
+- The standalone Linux binary starts Nmap, `ip`, `systemctl` and the package manager that installs Nmap
+  with the library path it was launched with, not the one that points into its unpacked bundle, so they load
+  the system's libraries. The container exits on SIGTERM, so `docker stop` and `docker compose down` return
+  at once instead of after Docker's ten second kill timeout.
+- A completed dashboard scan releases its Nmap results and lookup caches (a /24 scanned with `-sV -O` held
+  about 15 MB per job, up to 100 finished jobs); stopped, partial and failed scans keep them for Resume.
+  `GET /api/scans` no longer answers HTTP 500 when a scan thread updates the job configuration at the same
+  moment, and `HEAD /api/events` no longer leaves an event-stream subscriber behind.
+- A dashboard scan that falls back to the local database because NVD is unreachable still runs its web
+  checks, sends its email and webhook notifications and allows Verify evidence; only an offline mode you
+  chose (CLI `--offline`, the Settings toggle or the scan's own offline source) skips them.
+- Schedules: a schedule does not start a new scan while the one it started last is still running or
+  stopping (it logs one skip). Editing a profile disables the schedules that no longer fit it, and a due
+  schedule that fails validation is disabled and logged once, in the dashboard log and as a one-line
+  server-log warning with the schedule id, instead of failing every minute; `PUT /api/schedules/<id>` with
+  `{"enabled": false}` switches any schedule off. A daily or weekly schedule whose time was missed by a
+  restart, suspend or slow check still runs once when the check comes within an hour of that time, but not
+  for a time that passed before the schedule was created, enabled again or retimed. In offline mode a
+  scheduled scan with web checks is skipped with one log line (as a manual start is refused with 409)
+  instead of finishing as an empty "completed" scan. A hand-edited schedule time that cannot be converted to
+  UTC is ignored.
+- A profiles or schedules file the dashboard cannot load is logged and kept as `<name>.corrupt-<timestamp>`
+  (one copy of an identical file) instead of being overwritten by the next save, and one invalid entry no
+  longer discards the valid ones. On Windows `--web-reset-account` and account changes retry for about a
+  second when the running dashboard has the account file open instead of failing with `PermissionError`.
+  The README says that a TLS reverse proxy must pass the `Host` header through, or sign-in is refused as
+  cross-origin.
+- Sign-in: a lone-surrogate username is rejected with 401 like any wrong username instead of failing with
+  HTTP 500, and a request body of deeply nested JSON is handled as malformed JSON by every dashboard route
+  instead of failing with HTTP 500.
+- Web checks no longer stall on hostile targets: the reflected-XSS check and the downloadable PoC's HTML
+  parser read deeply nested pages in time proportional to their size, directory-listing detection reads
+  only the start of the first few headings, response-body comparisons (boolean SQL injection, directory
+  discovery, the PoC) compare a shorter prefix of a hostile body of many different characters (ordinary
+  pages are compared exactly as before), and recording findings no longer copies all the earlier ones for
+  each new one. The crawler's resume checkpoint keeps at most 10,001 links per crawled page, in crawl order
+  and without links it would never follow.
+- Web scan log lines and coverage notes show query secrets in URLs as `REDACTED`, like findings do, and the
+  crawler logs a fixed message instead of the request exception. Web findings drop terminal control
+  characters (ESC, CR and the C1 codes; newlines and tabs stay) from target-controlled text. Query
+  parameters that only contain "auth" or "pass" inside another word, such as `author`, `bypass` and
+  `passenger`, are no longer redacted, so findings on them can be replayed as PoCs; credential names such as
+  `auth`, `password`, `passwd`, `userpass`, `token` and `session` still are.
+- A target host that cannot be IDNA-encoded (an empty or over-63-character label such as `example..test`)
+  is reported as an unreachable web endpoint instead of aborting the scan, and web requests no longer fail
+  with "filedescriptor out of range in select()" on Linux and macOS when more than 1,024 descriptors are
+  open.
+- The dashboard shows a vulnerability's severity as one of critical, high, medium, low or unknown (anything
+  else is shown as unknown; the host badge and the severity filters follow the same mapping), and a missing
+  severity no longer blanks the vulnerability table. A failed request while the dashboard loads no longer
+  blanks the Settings forms: each section loads on its own, and the Save buttons for the NVD key, email and
+  webhook stay disabled, with a notice, until the stored settings were read, so a later Save cannot replace
+  the stored webhook URL, SMTP password or NVD key with empty values.
+- Dashboard interaction: a double click on Start Scan starts one scan and the button keeps keyboard focus
+  afterwards; live scan updates no longer rebuild the scan cards, so focus on Stop, Resume or Export
+  survives and clicks on Stop are not lost; a faded toast no longer blocks clicks in the bottom-right
+  corner; toasts are announced to screen readers through a polite live region; a start request answered
+  with something other than JSON (for example an HTML 500 from a proxy) reports `Failed to start scan
+  (HTTP <status>)` instead of "Cannot reach server". On windows narrower than 760 px the host detail panel
+  is shown under the main area and selecting a host scrolls it into view. The Terminal tab keeps the
+  reader's place when they scroll up, and its scan filter lists every scan, including scheduled ones. The
+  dashboard polls scans and hosts every 1.5 s only while a scan is running, every 10 s otherwise and not at
+  all in a hidden tab, and at once when the tab is shown again, a scan is started or a scheduled scan
+  fires.
+- Releasing: dispatching `publish-docker.yml`, `publish-pypi.yml` or the signature backfill by hand for a
+  tag before v2.7.0 stops before anything is signed or published, with a message that names the missing
+  build requirements file (only v2.7.0 and later can be dispatched). The PyPI workflow expects the PEP 440
+  file names for a prerelease tag (`v2.8.0-rc.1` builds `2.8.0rc1`), and re-running the failed jobs of a
+  release's `publish-pypi.yml` run skips files already on PyPI, so a partial upload can be completed (a run
+  dispatched from `main` runs the gates and the build but cannot publish: the `pypi` environment admits
+  only `v*` tags). `docs/RELEASING.md` lists the three signer identities (release run, recovery from
+  `main`, authenticity backfill), `docs/SECURITY_TESTING.md` has a table of every workflow and describes
+  the OWASP ZAP baseline scan and how to refresh its pinned image, and `GOVERNANCE.md` and `docs/SECRETS.md`
+  record the identity and token handling of the Scorecard workflow.
 
 ### Security changes
 
