@@ -76,8 +76,8 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
 def link_finder(target_url, log) -> set[str]:
     try:
         response = scoped_get(get, target_url, headers={"User-Agent": next(random_user_agent(log))})
-    except RequestException as exc:
-        log.logger("error", f"Unable to crawl {target_url}: {exc}")
+    except RequestException:
+        log.logger("error", f"Unable to crawl {target_url}; coverage is incomplete.")
         return set()
     page_url = response.url if isinstance(response.url, str) else target_url
     if isinstance(response.status_code, int) and response.status_code >= 400:

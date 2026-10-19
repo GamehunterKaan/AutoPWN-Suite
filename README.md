@@ -242,7 +242,7 @@ findings = webvuln("https://example.com:8443/app/", log, console)
 
 Each returned finding contains `type`, `url`, `parameter`, `severity`, `confidence`, `evidence`,
 an ID, timestamp, detection/impact/remediation context, captured exchanges and a reproduction plan.
-Sensitive query values and URL credentials are redacted. Captured exchanges include request roles,
+Sensitive query values and URL credentials are redacted, in the web scan's log lines and coverage notes as well. Captured exchanges include request roles,
 diagnostic headers, status, response-prefix hash/size, latency and truncation state; response bodies
 and cookie values are omitted. The CLI prints these results through its existing console/export flow.
 

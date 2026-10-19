@@ -19,7 +19,7 @@ from autopwn_suite.web.lfi import LFIScanner
 from autopwn_suite.web.passive import inspect_response
 from autopwn_suite.web.planning import prioritize_urls, skip_discovered_url
 from autopwn_suite.web.query import query_parts
-from autopwn_suite.web.runtime import ACTIVE, ScanContext, WebBudgetExceeded, allowed, enabled, options, run_task, stage, task_done
+from autopwn_suite.web.runtime import ACTIVE, ScanContext, WebBudgetExceeded, allowed, enabled, options, redact_text, run_task, stage, task_done
 from autopwn_suite.web.sqli import SQLIScanner
 from autopwn_suite.web.xss import XSSScanner
 
@@ -182,6 +182,7 @@ def webvuln(target, log, console, *, controls=None, should_stop=None, progress=N
     context = ScanContext(target, log, controls=controls, should_stop=should_stop, progress=progress, on_finding=on_finding, checkpoint=checkpoint)
     class ScanLog:
         def logger(self, level, message):
+            message = redact_text(message)
             coverage_words = ("limited", "incomplete", "budget", "failed", "unable", "unavailable", "not checked", "no reachable", "connection error")
             if level in ("warning", "error") and any(word in str(message).lower() for word in coverage_words):
                 context.problem_revision += 1

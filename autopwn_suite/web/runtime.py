@@ -47,6 +47,14 @@ def redact_url(url):
         return "Invalid URL"
 
 
+def redact_text(message):
+    """Redact every URL in a log line or coverage issue, which reach the console, exports and saved reports."""
+    def redact(match):
+        url = match[0].rstrip(".,;:)")
+        return redact_url(url) + match[0][len(url):]
+    return re.sub(r"https?://[^\s<>\"']+", redact, str(message))
+
+
 def public_request(method, url, headers=None, role="probe"):
     safe_headers = {name: str(value)[:512] for name, value in (headers or {}).items()
                     if name.lower() in ("user-agent", "origin", "host", "x-forwarded-host", "x-autopwn-trace", "cache-control")}
@@ -118,6 +126,7 @@ class ScanContext:
         return time.monotonic()
 
     def issue(self, message):
+        message = redact_text(message)
         self.problem_revision += 1
         if message not in self.issues:
             self.issues.append(message)

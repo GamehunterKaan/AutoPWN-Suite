@@ -6,6 +6,9 @@ from urllib.parse import urlsplit
 import pytest
 from requests.exceptions import ConnectionError
 
+from autopwn_suite.web.crawler import link_finder
+from autopwn_suite.web.options import CHECKS
+from autopwn_suite.web.runtime import redact_text
 from autopwn_suite.web.webvuln import target_urls, web_endpoints, webvuln
 
 
@@ -139,3 +142,36 @@ def test_directory_discovery_stays_under_a_deliberate_sub_path(web_response):
         webvuln("http://example.test/app/", MagicMock(), MagicMock(), controls={"speed": 5})
     assert "http://example.test/app/admin" in requested
     assert all(urlsplit(url).path.startswith("/app/") for url in requested)
+
+
+@pytest.mark.unit
+def test_probe_log_lines_and_coverage_issues_do_not_carry_query_secrets(web_response):
+    url = "http://example.com/page?id=1&session=abcdef"
+    log, summary = MagicMock(), {}
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response(url=url)), patch("autopwn_suite.web.webvuln.crawl", return_value={url}), \
+         patch("autopwn_suite.web.sqli.get", side_effect=ConnectionError("HTTPConnectionPool: Max retries exceeded with url: /page?id=1&session=abcdef")):
+        webvuln(url, log, MagicMock(), controls={"speed": 5, "checks": {name: name == "sqli" for name in CHECKS}}, on_complete=summary.update)
+    expected = "Connection error raised on: http://example.com/page?id=1&session=REDACTED, skipping"
+    assert expected in summary["issues"]
+    log.logger.assert_any_call("error", expected)
+    assert "abcdef" not in str(log.logger.call_args_list) + str(summary["issues"])
+
+
+@pytest.mark.unit
+def test_crawl_failures_are_logged_with_fixed_text_not_the_exception():
+    log = MagicMock()
+    with patch("autopwn_suite.web.crawler.get", side_effect=ConnectionError("Max retries exceeded with url: /app?session=abcdef")):
+        assert link_finder("http://example.com/app", log) == set()
+    log.logger.assert_called_once_with("error", "Unable to crawl http://example.com/app; coverage is incomplete.")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("message,expected", [
+    ("Connection error raised on: http://127.0.0.1:8080/?id=1&token=abc, skipping", "Connection error raised on: http://127.0.0.1:8080/?id=1&token=REDACTED, skipping"),
+    ("Unable to crawl https://app.test/a?api_key=XYZ.", "Unable to crawl https://app.test/a?api_key=REDACTED."),
+    ("Unable to crawl http://user:pw@app.test/x: HTTP 500; coverage is incomplete.", "Unable to crawl http://app.test/x: HTTP 500; coverage is incomplete."),
+    ("Two urls (http://a.test/?jwt=1) and http://b.test/?q=2", "Two urls (http://a.test/?jwt=REDACTED) and http://b.test/?q=2"),
+    ("No reachable in-scope web endpoint on 127.0.0.1.", "No reachable in-scope web endpoint on 127.0.0.1."),
+])
+def test_redact_text_hides_query_secrets_in_every_url_of_a_message(message, expected):
+    assert redact_text(message) == expected
