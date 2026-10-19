@@ -1056,7 +1056,7 @@ function editProfile(pid){
 async function saveProfile(){
   const pid=document.getElementById('pf-id').value;
   const name=document.getElementById('pf-name').value.trim();
-  if(!name){ toast('Profile name is required','',false); return; }
+  if(!name){ toast('Profile name is required',false); return; }
   const webError = window.webSecurity?.validateControls('pf');
   if(webError){ toast(webError, false); return; }
   const body={

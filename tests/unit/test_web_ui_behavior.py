@@ -280,6 +280,19 @@ assert.match(term.children[MAX_TERM_LINES-1].innerHTML,new RegExp('line '+(MAX_T
 """)
 
 
+def test_missing_profile_name_is_reported_as_an_error_toast_without_saving():
+    run_js("""
+const shown=[];
+toast=(...args)=>{shown.push(args)};
+let requests=0;
+fetch=async()=>{requests++;return {ok:true,json:async()=>({})}};
+document.getElementById('pf-name').value='   ';
+await saveProfile();
+assert.deepEqual(shown,[['Profile name is required',false]]);
+assert.equal(requests,0);
+""")
+
+
 def test_profile_source_is_loaded_and_new_profile_resets_it():
     run_js("""
 profiles={airgap:{id:'airgap',name:'Airgap',config:{vulnerability_source:'offline'}}};
