@@ -225,7 +225,7 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   downloads; running one is a separate operator action.
 - CLI webhook delivery sends its report payload to the configured URL only (a redirect
   response is a failed delivery and is not followed); dashboard webhook delivery
-  sends JSON scan/test events. SMTP delivers MIME scan reports/test messages to
+  sends JSON scan/test events and treats a redirect the same way. SMTP delivers MIME scan reports/test messages to
   configured recipients. Inspect `autopwn_suite/report.py` and dashboard notification
   functions for payload details; only send to destinations you control/trust.
 - Distribution interfaces are GitHub releases (source archives and standalone binaries),

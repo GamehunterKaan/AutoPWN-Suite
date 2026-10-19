@@ -3,7 +3,10 @@
 """Tests for the web UI module."""
 import json
 import sys
+import threading
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -1424,6 +1427,89 @@ class TestWebhookEdgeCases:
             wu._send_webhook(job)  # Should return early, not raise
         finally:
             wu.REQUESTS_AVAILABLE = orig
+
+
+@contextmanager
+def _answering_webhook(status):
+    """A 127.0.0.1 webhook that answers every POST with ``status`` and points at a second 127.0.0.1 sink.
+
+    Yields the webhook URL, the bodies the webhook received and the bodies the sink received.
+    """
+    hook_bodies, sink_bodies = [], []
+
+    class Sink(BaseHTTPRequestHandler):
+        bodies = sink_bodies
+
+        def do_POST(self):
+            self.bodies.append(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    sink = ThreadingHTTPServer(("127.0.0.1", 0), Sink)
+
+    class Hook(Sink):
+        bodies = hook_bodies
+
+        def do_POST(self):
+            self.bodies.append(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+            self.send_response(status)
+            self.send_header("Location", f"http://127.0.0.1:{sink.server_port}/collect")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    hook = ThreadingHTTPServer(("127.0.0.1", 0), Hook)
+    servers = [sink, hook]
+    for server in servers:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        yield f"http://127.0.0.1:{hook.server_port}/hook", hook_bodies, sink_bodies
+    finally:
+        for server in servers:
+            server.shutdown()
+            server.server_close()
+
+
+class TestWebhookRedirects:
+    """A 307/308 would make requests POST the event again to whatever host the Location names."""
+
+    @pytest.fixture(autouse=True)
+    def _loopback_without_proxy(self, monkeypatch):
+        monkeypatch.setenv("NO_PROXY", "127.0.0.1")
+        monkeypatch.setenv("no_proxy", "127.0.0.1")
+
+    @pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+    def test_a_redirect_is_a_failed_delivery_and_is_not_followed(self, wu, status):
+        wu._load_settings()
+        job = wu.ScanJob("id1", "target", {})
+        job.mark_done()
+        with _answering_webhook(status) as (url, hook_bodies, sink_bodies):
+            wu._settings["webhook"] = {"enabled": True, "url": url, "on_complete": True, "on_error": False, "on_vuln_found": False}
+            wu._send_webhook(job)
+        assert len(hook_bodies) == 1
+        assert sink_bodies == [], "the redirect target must never receive the event"
+        assert any(f"Webhook delivery failed: HTTPError (HTTP {status})" in e.get("msg", "") for e in wu._log_history)
+
+    @pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+    def test_the_test_webhook_route_reports_a_redirect_as_a_failure(self, client, wu, status):
+        with _answering_webhook(status) as (url, hook_bodies, sink_bodies):
+            wu._settings["webhook"] = {"enabled": True, "url": url}
+            response = client.post("/api/settings/test_webhook")
+        assert response.status_code == 500
+        assert len(hook_bodies) == 1
+        assert sink_bodies == [], "the redirect target must never receive the event"
+
+    @pytest.mark.parametrize("status", [200, 204])
+    def test_a_2xx_answer_is_still_a_delivery(self, client, wu, status):
+        with _answering_webhook(status) as (url, hook_bodies, sink_bodies):
+            wu._settings["webhook"] = {"enabled": True, "url": url}
+            response = client.post("/api/settings/test_webhook")
+        assert response.status_code == 200
+        assert response.get_json() == {"ok": True, "status_code": status}
+        assert len(hook_bodies) == 1 and sink_bodies == []
 
 
 class TestAPIWebhookNoRequests:

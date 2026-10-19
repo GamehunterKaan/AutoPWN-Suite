@@ -753,6 +753,15 @@ class NullConsole:
 
 # ── Notifications ─────────────────────────────────────────────────────────────
 
+def _post_webhook(url, payload):
+    """POST a JSON event; a redirect is a failed delivery, since a 307/308 would re-send it to whatever host the Location names."""
+    response = _requests.post(url, json=payload, timeout=10, allow_redirects=False)
+    response.raise_for_status()
+    if response.status_code // 100 == 3:
+        raise _requests.HTTPError(response=response)
+    return response
+
+
 def _send_webhook(job: ScanJob) -> None:
     with _notification_operation(job) as allowed:
         if allowed:
@@ -792,8 +801,7 @@ def _deliver_webhook(job: ScanJob) -> None:
         "timestamp":  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     try:
-        response = _requests.post(cfg["url"], json=payload, timeout=10)
-        response.raise_for_status()
+        _post_webhook(cfg["url"], payload)
     except Exception as e:
         _broadcast({
             "scan_id": job.id, "level": "warning",
@@ -1994,11 +2002,10 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         if not REQUESTS_AVAILABLE:
             return jsonify({"error": "requests library not installed"}), 500
         try:
-            r = _requests.post(cfg["url"], json={
+            r = _post_webhook(cfg["url"], {
                 "event": "test", "message": "AutoPWN Suite webhook test",
                 "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            }, timeout=10)
-            r.raise_for_status()
+            })
             return jsonify({"ok": True, "status_code": r.status_code})
         except Exception as error:
             logging.error("Failed to send test webhook: %s", delivery_error_summary(error))
