@@ -3,6 +3,7 @@
 """Offline regressions for configuration, actual Nmap results and NVD failures."""
 import io
 from argparse import Namespace
+from contextlib import nullcontext
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
@@ -86,6 +87,16 @@ def test_invalid_config_fails_before_scanning(tmp_path, option):
 def test_missing_config_is_not_silently_ignored(tmp_path):
     with pytest.raises(SystemExit):
         InitArgsConf(Namespace(config=str(tmp_path / "missing.ini")), MagicMock())
+
+
+@pytest.mark.parametrize("failure", ["missing", "directory", "unreadable"])
+def test_a_config_that_cannot_be_read_exits_with_a_failure_status(tmp_path, failure):
+    """cron and CI treat exit status 0 as success, so a typo in -c must not look like one."""
+    path = tmp_path / "missing.ini" if failure == "missing" else tmp_path
+    reading = patch("autopwn_suite.utils.ConfigParser.read", side_effect=PermissionError) if failure == "unreadable" else nullcontext()
+    with reading, pytest.raises(SystemExit) as exit_:
+        InitArgsConf(Namespace(config=str(path)), MagicMock())
+    assert exit_.value.code == 1
 
 
 def test_config_can_select_web_mode_before_scan_initialization(tmp_path):

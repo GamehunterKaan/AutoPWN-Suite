@@ -7,6 +7,7 @@ import argparse
 import os
 import sys
 from datetime import datetime
+from subprocess import CalledProcessError
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -582,9 +583,10 @@ class TestNmapInstallation:
     ):
         """Any spelling of "no" must refuse the sudo install instead of running it."""
         monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
-        with patch("builtins.input", return_value=answer), pytest.raises(SystemExit):
+        with patch("builtins.input", return_value=answer), pytest.raises(SystemExit) as exit_:
             check_nmap(MagicMock())
         mock_install_linux.assert_not_called()
+        assert exit_.value.code == 1, "a scan that cannot start must not report success to cron or CI"
 
     @patch("autopwn_suite.utils.install_nmap_linux")
     @patch("autopwn_suite.utils.system", return_value="Linux")
@@ -661,6 +663,13 @@ class TestNmapInstallation:
         mock_check_call.assert_called_once_with(
             ["C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "winget", "install", "nmap", "--silent"], stderr=DEVNULL
         )
+
+    @patch("autopwn_suite.utils.check_call", side_effect=CalledProcessError(1, "winget"))
+    def test_install_nmap_windows_failure_exits_with_a_failure_status(self, mock_check_call):
+        from autopwn_suite.utils import install_nmap_windows
+        with pytest.raises(SystemExit) as exit_:
+            install_nmap_windows(MagicMock())
+        assert exit_.value.code == 1
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS specific test")
     @patch("autopwn_suite.utils.check_call")

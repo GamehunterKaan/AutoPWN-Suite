@@ -823,10 +823,10 @@ def InitArgsConf(args, log) -> None:
 
     except FileNotFoundError:
         log.logger("error", "Config file not found!")
-        raise SystemExit from None
+        raise SystemExit(1) from None
     except PermissionError:
         log.logger("error", "Permission denied while trying to read config file!")
-        raise SystemExit from None
+        raise SystemExit(1) from None
     except (ConfigError, ValueError) as error:
         log.logger("error", f"Invalid config file: {error}")
         raise SystemExit(1) from error
@@ -917,7 +917,7 @@ def install_nmap_windows(log) -> None:
         raise SystemExit
     except CalledProcessError:
         log.logger("error", "Couldn't install nmap! (Windows)")
-        raise SystemExit from None
+        raise SystemExit(1) from None
 
 
 def install_nmap_mac(log) -> None:
@@ -946,7 +946,7 @@ def check_nmap(log, *, offline=False) -> None:
                 raise SystemExit("Unknown OS! Auto installation not supported!") from None
         else:
             log.logger("error", "Denied permission to install Nmap.")
-            raise SystemExit from None
+            raise SystemExit(1) from None
 
 
 def ParamPrint(
