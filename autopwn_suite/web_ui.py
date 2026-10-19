@@ -45,6 +45,7 @@ API:
 
 from __future__ import annotations
 
+import errno
 import html as _html
 import io
 import json
@@ -55,6 +56,7 @@ import queue
 import shutil
 import smtplib
 import ssl
+import stat
 import threading
 import time
 import uuid
@@ -263,6 +265,65 @@ def _write_json(path: Path, data: dict) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _owner_only(path: Path, discard_after: Optional[float] = None) -> bool:
+    """Restrict an existing regular file that group or others can access to its owner (mode 0600), or delete it
+    when `discard_after` seconds have passed since it was written. True when that ended an exposure to group or
+    others. The file is opened without following symlinks, so the mode never changes on what a link points to."""
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+    except FileNotFoundError:
+        return False
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            return False  # a symlink: its target is not ours to change
+        raise
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            return False
+        exposed = bool(info.st_mode & 0o077)
+        if discard_after is not None and time.time() - info.st_mtime > discard_after:
+            os.unlink(path)
+            return exposed
+        if not exposed:
+            return False
+        os.fchmod(descriptor, 0o600)
+        return True
+    finally:
+        os.close(descriptor)
+
+
+# A temporary file younger than this may belong to a save that is still running in another process.
+_STALE_TEMPORARY_SECONDS = 60
+
+
+def _tighten_data_files() -> None:
+    """Make the dashboard files that can hold credentials or scan targets owner-only. Releases before 2.7.0 wrote
+    them with the process umask (usually mode 0644), and a file keeps its mode until it is saved again, which for
+    the settings is only when settings change. This also deals with the temporary file of a save that an earlier
+    release left behind. It never stops the dashboard from starting. POSIX only: Windows has no POSIX modes."""
+    if os.name == "nt":
+        return
+    changed = failed = False
+    try:
+        leftovers = [(leftover, _STALE_TEMPORARY_SECONDS) for leftover in _DATA_DIR.glob(".web_ui_*.json.*.tmp")]
+    except OSError:
+        leftovers, failed = [], True
+    files = [(file, None) for file in (_SETTINGS_FILE, _PROFILES_FILE, _SCHEDULES_FILE, _DATA_DIR / ACCOUNT_FILE)]
+    for file, discard_after in files + leftovers:
+        try:
+            changed |= _owner_only(file, discard_after)
+        except OSError:
+            failed = True
+    # Fixed text: neither a path nor the reason (it can name a file or an account) goes to the log.
+    if changed:
+        logging.warning("Restricted dashboard data files that other local users could read to their owner (mode 0600). "
+                        "Rotate credentials that were saved while other accounts could read them.")
+    if failed:
+        logging.warning("Could not restrict every dashboard data file to its owner (mode 0600). "
+                        "Check who owns and can read the files in the data directory.")
+
+
 def _save_settings() -> None:
     with _settings_lock:
         _write_json(_SETTINGS_FILE, _settings)
@@ -372,7 +433,10 @@ def _set_aside(path: Path, *, move: bool) -> str:
                         return f"The original of {path.name} is already kept as {earlier.name}."
                 except OSError:
                     continue
-            shutil.copy2(path, kept)
+            # Owner-only from creation like the original, which can hold scan targets.
+            descriptor = os.open(kept, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(descriptor, "wb") as copy:
+                copy.write(current)
     except OSError:
         return f"Could not keep a copy of {path.name}; the next save replaces it."
     return f"The original of {path.name} is kept as {kept.name}."
@@ -2345,7 +2409,8 @@ def start_server(host: str = "127.0.0.1", port: int = 8080, version: str = "Unko
             "Make sure autopwn_suite/web_ui_static/index.html exists."
         )
 
-    # Load persisted data
+    # Load persisted data, after restricting the files that an earlier release wrote with the process umask
+    _tighten_data_files()
     _load_settings()
     _load_profiles()
     _load_schedules()

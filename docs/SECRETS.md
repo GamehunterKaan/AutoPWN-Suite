@@ -43,8 +43,8 @@ quarterly, on role changes, and immediately after a suspected compromise.
   dedicated scanner account, an absolute `AUTOPWN_DATA_DIR` outside the checkout,
   directory mode `0700` and file mode `0600` (or equivalent owner-only Windows
   ACLs). The dashboard writes its settings, profiles, schedules and account files
-  with mode `0600` on POSIX (a file written by an earlier release keeps its mode
-  until it is next saved) and creates a missing data directory with mode `0700`,
+  with mode `0600` on POSIX (it restricts a file that an earlier release left readable
+  by others when it starts, and logs one line when it does) and creates a missing data directory with mode `0700`,
   but it does not change the mode of an existing directory or of any other file,
   and it does not encrypt these files.
   Use host/disk encryption and encrypted, access-controlled backups. Protect

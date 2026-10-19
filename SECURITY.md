@@ -105,7 +105,8 @@ Remote access requires HTTPS. Regardless of version, restrict access to trusted
 operators, bind to loopback when possible, and use authenticated ingress/firewall
 controls for remote access. Protect the data directory and backups: settings contain
 integration credentials in plaintext JSON (since v2.7.0 the dashboard writes them
-owner-only, mode 0600, on POSIX; earlier releases used the process umask, see
+owner-only, mode 0600, on POSIX and restricts files an earlier release left readable when it starts; earlier
+releases used the process umask, see
 AUTOPWN-SA-2026-007). Use a dedicated scanner account and do not
 expose the dashboard to the public internet. Do not rely on the login as the only
 control for an internet-facing deployment.

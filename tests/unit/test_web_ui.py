@@ -1,9 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 """Tests for the web UI module."""
+import errno
 import json
+import logging
+import os
+import stat
 import sys
 import threading
+import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -246,6 +251,289 @@ class TestSettings:
         if wu.os.name != "nt":
             for path in (wu._SETTINGS_FILE, wu._PROFILES_FILE, wu._SCHEDULES_FILE):
                 assert path.stat().st_mode & 0o777 == 0o600
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Files an earlier release wrote with the process umask (AUTOPWN-SA-2026-007)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+POSIX_ONLY = pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX file modes")
+
+
+def _mode(path):
+    return stat.S_IMODE(os.lstat(path).st_mode)
+
+
+def _warnings(caplog):
+    return [record.getMessage() for record in caplog.records if record.levelno == logging.WARNING]
+
+
+class TestExistingDataFilesAreRestricted:
+    """Before 2.7.0 the settings, profiles, schedules and account files were created with the process umask (usually
+    0644) and kept that mode until the next save, which for the settings is only when settings change."""
+
+    @staticmethod
+    def _plant(wu, mode):
+        paths = [wu._SETTINGS_FILE, wu._PROFILES_FILE, wu._SCHEDULES_FILE, wu._DATA_DIR / wu.ACCOUNT_FILE]
+        for path in paths:
+            path.write_text('{"synthetic": "content"}', encoding="utf-8")
+            path.chmod(mode)
+        return paths
+
+    @staticmethod
+    def _age(path, seconds):
+        stamp = time.time() - seconds
+        os.utime(path, (stamp, stamp))
+
+    @POSIX_ONLY
+    @pytest.mark.parametrize("mode", [0o644, 0o640, 0o604, 0o666, 0o660, 0o664, 0o755])
+    def test_a_file_that_group_or_others_can_access_becomes_owner_only(self, wu, caplog, mode):
+        paths = self._plant(wu, mode)
+
+        wu._tighten_data_files()
+
+        for path in paths:
+            assert _mode(path) == 0o600
+            assert path.read_text(encoding="utf-8") == '{"synthetic": "content"}'
+        message, = _warnings(caplog)  # one line for all four files, fixed text
+        assert "0600" in message and str(wu._DATA_DIR) not in message and wu._SETTINGS_FILE.name not in message
+
+    @POSIX_ONLY
+    @pytest.mark.parametrize("mode", [0o600, 0o400, 0o700])
+    def test_an_owner_only_file_is_not_touched_or_reported(self, wu, caplog, mode):
+        paths = self._plant(wu, mode)
+
+        with patch.object(wu.os, "fchmod", wraps=wu.os.fchmod) as fchmod:
+            wu._tighten_data_files()
+
+        fchmod.assert_not_called()
+        assert [_mode(path) for path in paths] == [mode] * 4
+        assert _warnings(caplog) == []
+
+    @POSIX_ONLY
+    def test_a_missing_file_or_data_directory_is_not_an_error(self, wu, caplog, tmp_path):
+        wu._tighten_data_files()
+        wu._DATA_DIR = tmp_path / "does-not-exist"
+        wu._tighten_data_files()
+        assert _warnings(caplog) == []
+
+    @POSIX_ONLY
+    def test_files_that_hold_neither_secrets_nor_targets_are_left_alone(self, wu):
+        other = wu._DATA_DIR / "vulnerability_database.sqlite"
+        notes = wu._DATA_DIR / ".web_ui_notes.txt"
+        for path in (other, notes):
+            path.write_text("x", encoding="utf-8")
+            path.chmod(0o644)
+
+        wu._tighten_data_files()
+
+        assert [_mode(other), _mode(notes)] == [0o644, 0o644]
+
+    @POSIX_ONLY
+    def test_the_leftover_of_an_interrupted_save_is_removed_when_it_is_old_and_restricted_when_it_may_be_running(self, wu, caplog):
+        old_settings = wu._DATA_DIR / f".{wu._SETTINGS_FILE.name}.{'a' * 32}.tmp"
+        old_account = wu._DATA_DIR / f".{wu.ACCOUNT_FILE}.{'b' * 32}.tmp"
+        running = wu._DATA_DIR / f".{wu._PROFILES_FILE.name}.{'c' * 32}.tmp"
+        unrelated = wu._DATA_DIR / f".other.json.{'d' * 32}.tmp"
+        for path, mode in ((old_settings, 0o644), (old_account, 0o600), (running, 0o644), (unrelated, 0o644)):
+            path.write_text("{}", encoding="utf-8")
+            path.chmod(mode)
+        for path in (old_settings, old_account, unrelated):
+            self._age(path, 3600)
+
+        wu._tighten_data_files()
+
+        assert not old_settings.exists() and not old_account.exists()  # nothing is writing to them any more
+        assert _mode(running) == 0o600  # a save in another process may still be about to rename it
+        assert _mode(unrelated) == 0o644
+        assert len(_warnings(caplog)) == 1
+
+    @POSIX_ONLY
+    def test_removing_an_old_owner_only_leftover_is_not_reported_as_a_fix(self, wu, caplog):
+        leftover = wu._DATA_DIR / f".{wu._SETTINGS_FILE.name}.{'a' * 32}.tmp"
+        leftover.write_text("{}", encoding="utf-8")
+        leftover.chmod(0o600)
+        self._age(leftover, 3600)
+
+        wu._tighten_data_files()
+
+        assert not leftover.exists() and _warnings(caplog) == []
+
+    @POSIX_ONLY
+    def test_a_chmod_that_fails_never_stops_startup_and_is_logged_once_with_fixed_text(self, wu, caplog):
+        paths = self._plant(wu, 0o644)
+
+        with patch.object(wu.os, "fchmod", side_effect=PermissionError(f"secret detail about {wu._DATA_DIR}")):
+            wu._tighten_data_files()  # read-only file system, or a file that another account owns
+
+        assert [_mode(path) for path in paths] == [0o644] * 4
+        message, = _warnings(caplog)
+        assert "Could not restrict" in message and "secret detail" not in message and str(wu._DATA_DIR) not in message
+        assert "secret detail" not in caplog.text
+
+    @POSIX_ONLY
+    def test_one_file_that_cannot_be_restricted_does_not_leave_the_others_exposed(self, wu, caplog):
+        paths = self._plant(wu, 0o644)
+        real_fchmod = os.fchmod
+        calls = []
+
+        def fails_first(descriptor, mode):
+            calls.append(mode)
+            if len(calls) == 1:
+                raise OSError("read-only file system")
+            return real_fchmod(descriptor, mode)
+
+        with patch.object(wu.os, "fchmod", fails_first):
+            wu._tighten_data_files()
+
+        assert sorted(_mode(path) for path in paths) == [0o600] * 3 + [0o644]
+        assert len(_warnings(caplog)) == 2  # what was restricted, and that something could not be
+
+    @POSIX_ONLY
+    def test_a_symlink_is_not_followed(self, wu, caplog, tmp_path):
+        outside = tmp_path / "outside" / "shared.json"
+        outside.parent.mkdir()
+        outside.write_text("{}", encoding="utf-8")
+        outside.chmod(0o644)
+        wu._SETTINGS_FILE.symlink_to(outside)
+
+        wu._tighten_data_files()
+
+        assert _mode(outside) == 0o644  # the target is not the dashboard's to change
+        assert _warnings(caplog) == []
+
+    @POSIX_ONLY
+    @pytest.mark.parametrize("kind", ["directory", "fifo"])
+    def test_what_is_not_a_regular_file_is_skipped(self, wu, caplog, kind):
+        if kind == "directory":
+            wu._SETTINGS_FILE.mkdir(mode=0o755)
+            wu._SETTINGS_FILE.chmod(0o755)
+        else:
+            os.mkfifo(wu._SETTINGS_FILE, 0o644)  # opening it must not block
+
+        wu._tighten_data_files()
+
+        assert _mode(wu._SETTINGS_FILE) == (0o755 if kind == "directory" else 0o644)
+        assert _warnings(caplog) == []
+
+    @pytest.mark.skipif(os.name != "nt", reason="the Windows no-op")
+    def test_windows_has_no_posix_modes_so_nothing_is_touched(self, wu, caplog):
+        self._plant(wu, 0o644)
+        with patch.object(wu.os, "open", side_effect=AssertionError("must not open anything")):
+            wu._tighten_data_files()
+        assert _warnings(caplog) == []
+
+    def test_the_file_is_restricted_through_its_descriptor_without_following_symlinks(self, wu):
+        from types import SimpleNamespace
+        info = SimpleNamespace(st_mode=stat.S_IFREG | 0o644, st_mtime=time.time())
+        with patch.object(wu.os, "open", return_value=7) as opened, patch.object(wu.os, "fstat", return_value=info), \
+                patch.object(wu.os, "fchmod", create=True) as fchmod, patch.object(wu.os, "close") as close:
+            assert wu._owner_only(Path("settings.json")) is True
+
+        (path, flags), _ = opened.call_args
+        assert path == Path("settings.json") and flags & os.O_RDONLY == os.O_RDONLY
+        assert flags & getattr(os, "O_NOFOLLOW", 0) == getattr(os, "O_NOFOLLOW", 0)
+        fchmod.assert_called_once_with(7, 0o600)
+        close.assert_called_once_with(7)
+
+    @pytest.mark.parametrize("mode, kind", [(0o600, stat.S_IFREG), (0o400, stat.S_IFREG), (0o755, stat.S_IFDIR), (0o644, stat.S_IFIFO)])
+    def test_an_owner_only_file_or_one_that_is_not_a_regular_file_is_left_alone(self, wu, mode, kind):
+        from types import SimpleNamespace
+        info = SimpleNamespace(st_mode=kind | mode, st_mtime=time.time())
+        with patch.object(wu.os, "open", return_value=7), patch.object(wu.os, "fstat", return_value=info), \
+                patch.object(wu.os, "fchmod", create=True) as fchmod, patch.object(wu.os, "close") as close:
+            assert wu._owner_only(Path("settings.json")) is False
+
+        fchmod.assert_not_called()
+        close.assert_called_once_with(7)
+
+    def test_a_missing_file_and_a_symlink_are_skipped_and_any_other_failure_is_raised(self, wu):
+        for error, skipped in ((FileNotFoundError(), True), (OSError(errno.ELOOP, "too many levels of symbolic links"), True),
+                               (PermissionError(errno.EACCES, "denied"), False)):
+            with patch.object(wu.os, "open", side_effect=error):
+                if skipped:
+                    assert wu._owner_only(Path("settings.json")) is False
+                else:
+                    with pytest.raises(OSError):
+                        wu._owner_only(Path("settings.json"))
+
+    def test_an_old_temporary_file_is_deleted_a_young_one_is_not(self, wu):
+        from types import SimpleNamespace
+        for age, deleted in ((3600, True), (1, False)):
+            info = SimpleNamespace(st_mode=stat.S_IFREG | 0o644, st_mtime=time.time() - age)
+            with patch.object(wu.os, "open", return_value=7), patch.object(wu.os, "fstat", return_value=info), \
+                    patch.object(wu.os, "fchmod", create=True) as fchmod, patch.object(wu.os, "unlink") as unlink, \
+                    patch.object(wu.os, "close"):
+                assert wu._owner_only(Path(".x.json.tmp"), discard_after=60) is True
+            assert unlink.called is deleted and fchmod.called is not deleted
+
+    def test_start_server_restricts_the_files_before_it_loads_them(self, wu, monkeypatch):
+        order = []
+        for name in ("_tighten_data_files", "_load_settings", "_load_profiles", "_load_schedules"):
+            monkeypatch.setattr(wu, name, lambda name=name: order.append(name))
+
+        class Stop(Exception):
+            pass
+
+        def stop(*args, **kwargs):
+            raise Stop
+
+        monkeypatch.setattr(wu, "_build_app", stop)
+        with pytest.raises(Stop):
+            wu.start_server(port=0)
+
+        assert order == ["_tighten_data_files", "_load_settings", "_load_profiles", "_load_schedules"]
+
+    @POSIX_ONLY
+    @pytest.mark.parametrize("failing_chmod", [False, True])
+    def test_the_dashboard_starts_with_old_files_restricted_and_also_when_that_fails(self, wu, monkeypatch, failing_chmod):
+        from types import SimpleNamespace
+        paths = [wu._SETTINGS_FILE, wu._PROFILES_FILE, wu._SCHEDULES_FILE]
+        for path, content in zip(paths, ({"nist_api_key": "synthetic-key"}, {}, {}), strict=True):
+            path.write_text(json.dumps(content), encoding="utf-8")
+            path.chmod(0o644)
+        served = {}
+
+        def make_server(host, port, application, *args, **kwargs):
+            served["application"] = application
+            return SimpleNamespace(socket=SimpleNamespace(set_inheritable=lambda value: None), fileno=lambda: 0,
+                                   log_startup=lambda: None, serve_forever=lambda: None)
+
+        monkeypatch.setenv("WERKZEUG_SERVER_FD", "0")  # run_simple exports it; the monkeypatch restores it
+        monkeypatch.setattr("werkzeug.serving.make_server", make_server)
+        monkeypatch.setattr(wu, "_scheduler_loop", lambda: None)
+        if failing_chmod:
+            monkeypatch.setattr(wu.os, "fchmod", MagicMock(side_effect=PermissionError("not the owner")))
+
+        wu.start_server(port=0)
+
+        assert "application" in served
+        assert wu._settings["nist_api_key"] == "synthetic-key"  # the file was still loaded
+        assert {_mode(path) for path in paths} == ({0o644} if failing_chmod else {0o600})
+
+    def test_a_copy_kept_of_an_unreadable_file_is_created_owner_only(self, wu, monkeypatch):
+        """The profiles and schedules hold scan targets; the kept copy used to be created with the process umask."""
+        original = json.dumps({"a": {"id": "a"}, "b": "not an object"})
+        wu._PROFILES_FILE.write_text(original, encoding="utf-8")
+        wu._PROFILES_FILE.chmod(0o644)
+        real_open, modes = wu.os.open, []
+
+        def recording_open(path, flags, mode=0o777, **kwargs):
+            if ".corrupt-" in str(path):
+                modes.append(mode)
+            return real_open(path, flags, mode, **kwargs)
+
+        monkeypatch.setattr(wu.os, "open", recording_open)
+        previous = wu.os.umask(0o022)
+        try:
+            wu._load_profiles()
+        finally:
+            wu.os.umask(previous)
+
+        kept, = wu._PROFILES_FILE.parent.glob(wu._PROFILES_FILE.name + ".corrupt-*")
+        assert modes == [0o600] and kept.read_text(encoding="utf-8") == original
+        if os.name != "nt":
+            assert _mode(kept) == 0o600
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

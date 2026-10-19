@@ -57,7 +57,7 @@ below before starting large work.
   regression tests.
 - Reduce the plaintext-secret exposure documented in [SECRETS.md](SECRETS.md): the dashboard
   now creates its files with mode `0600` on POSIX, so evaluate tightening what that leaves
-  (an existing data directory and files from earlier releases keep their modes) and an option to supply
+  (an existing data directory keeps its mode; files from earlier releases are restricted when the dashboard starts) and an option to supply
   integration secrets through environment variables or a file outside the data
   directory instead of the JSON settings.
 - Address the high-impact items in the [accessibility plan](ACCESSIBILITY.md): keyboard-operable
