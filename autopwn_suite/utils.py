@@ -31,6 +31,7 @@ from autopwn_suite.credential_files import (
 )
 from autopwn_suite.report import ReportMail, ReportType
 from autopwn_suite.subprocess_env import child_environment
+from autopwn_suite.web.runtime import redact_text
 
 
 class ScanMode(Enum):
@@ -994,7 +995,7 @@ def ParamPrint(
         + "├"
         + "─" * (term_width - 1)
         + "\n"
-        + f"│\tTarget : {targetarg}\n"
+        + f"│\tTarget : {redact_text(targetarg)}\n"
         + f"│\t{'Output file' if args.output else 'Output folder'} : [yellow]{args.output if args.output else args.output_folder}[/yellow]\n"
         + f"│\tAPI Key : {type(apiKey) is str}\n"
         + f"│\tAutomatic : {DontAskForConfirmation}\n"
@@ -1048,8 +1049,9 @@ def CheckConnection(log) -> bool:
 
 
 def _report_name(target) -> str:
-    """The target as a file name every platform accepts; Windows refuses `*`, `?` and `:` (a colon names a data stream)."""
-    return "multihost" if isinstance(target, list) else sub(r"[^A-Za-z0-9._-]", "_", str(target))[:100]
+    """The target as a file name every platform accepts; Windows refuses `*`, `?` and `:` (a colon names a data stream).
+    The query values of a URL are redacted first: the name is printed in the report and stays on disk."""
+    return "multihost" if isinstance(target, list) else sub(r"[^A-Za-z0-9._-]", "_", redact_text(target))[:100]
 
 
 def SaveOutput(console, out_type, output_file, output_folder, target) -> None:

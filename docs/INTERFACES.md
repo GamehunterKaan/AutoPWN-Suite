@@ -19,7 +19,7 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `-y/--yes-please` | Answer ordinary scanning confirmations automatically; it is not authorization to test another party's systems. |
 | `-c/--config`, `--create-config` | Read an INI file or interactively create configuration. Present INI values are applied after argument parsing and overwrite matching parsed settings. A created file has mode `0600` from its first byte (POSIX), because it can hold the SMTP password, NVD key or webhook URL: it is written to a new temporary file beside it that replaces the final name in one step, so an existing file is replaced, never written into. |
 | `--daemon-install`, `--daemon-uninstall` | Install/remove the Linux root systemd scanner service; privileged filesystem/service side effects. Installing asks for the configuration, writes `/opt/autopwn-suite/autopwn-daemon.conf` (created owner-only the same way, so no other user can read it while it is installed, and a copy that was readable is replaced) and the unit, then enables and restarts the service. Removing, as root on Linux, stops and disables the service and deletes the unit and that configuration; the program, `/var/log/autopwn-daemon.log` and other files in `/opt/autopwn-suite` stay. Removing exits with status 1 when it is not run as root on Linux or cannot delete one of those files. |
-| `-t/--target`, `-hf/--host-file` | Target IP/hostname/range/CIDR or newline-separated target file; explicit target takes precedence over the host file. When every target is an IPv6 literal or prefix, Nmap's `-6` is added; one Nmap run cannot scan both address families, so a mixed list must be split. Nmap does not support fragmentation (`-f`) with IPv6, so as root an evade-mode scan of IPv6 targets stops with Nmap's error. |
+| `-t/--target`, `-hf/--host-file` | Target IP/hostname/range/CIDR or newline-separated target file; explicit target takes precedence over the host file. The parameter summary the scan prints (`Target : ...`) shows a URL target with every query value replaced by `REDACTED` and its userinfo and fragment dropped; the scan itself uses the target as typed. When every target is an IPv6 literal or prefix, Nmap's `-6` is added; one Nmap run cannot scan both address families, so a mixed list must be split. Nmap does not support fragmentation (`-f`) with IPv6, so as root an evade-mode scan of IPv6 targets stops with Nmap's error. |
 | `-sd/--skip-discovery`, `-st/--scan-type` | Skip discovery, or choose `arp`/`ping` discovery. Privileges limit available techniques. |
 | `-nf/--nmap-flags` | Trusted operator Nmap arguments; pass a single argument such as `-nf="-p 80,443"`. These expose native Nmap capabilities, not a restricted remote job language. The scanner owns the XML output, so `-oX`, `-oA`, `--resume` and `--append-output` are refused whatever their spelling (`--oX`, an abbreviation such as `--appe`). |
 | `-s/--speed`, `-ht/--host-timeout` | Nmap speed 0–5 (default 3) and per-host timeout in seconds (default 240). |
@@ -28,7 +28,7 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `-sed/--skip-exploit-download` | Suppress optional exploit reference downloads. Downloading does not execute the files. |
 | `--offline`, `--vuln-source`, `--vuln-db` | Force offline integration policy; select `auto`/`online`/`offline` CVE source; choose SQLite database path. Offline mode still sends requested Nmap target traffic. |
 | `--update-vuln-db`, `--vuln-db-status` | Explicitly update the official local NVD mirror or print database readiness/freshness and exit. |
-| `-o/--output`, `-of/--output-folder`, `-ot/--output-type` | Explicit output path or generated file under an output directory; `html`, `txt`, or `svg`. Output defaults to `outputs/` relative to the working directory. A generated name is the date and the target with every character other than letters, digits, `.`, `_` and `-` replaced by `_` (at most 100 characters), so `192.168.*.*` or an IPv6 address also saves on Windows. |
+| `-o/--output`, `-of/--output-folder`, `-ot/--output-type` | Explicit output path or generated file under an output directory; `html`, `txt`, or `svg`. Output defaults to `outputs/` relative to the working directory. A generated name is the date and the target with every character other than letters, digits, `.`, `_` and `-` replaced by `_` (at most 100 characters), so `192.168.*.*` or an IPv6 address also saves on Windows. The query values of a URL target are redacted first. |
 | `-rp/--report`, `-rpw/--report-webhook` | Select `email`/`webhook` notification and webhook destination. When no destination is given, `AUTOPWN_WEBHOOK_URL_FILE` (since v2.6.1) names a one-line file holding it, before the interactive prompt. |
 | `-rpe/--report-email`, `-rpep/--report-email-password` | SMTP username and password. When no password is given, `AUTOPWN_SMTP_PASSWORD_FILE` (since v2.6.1) names a one-line password file, before the interactive prompt. |
 | `-rpet/--report-email-to`, `-rpef/--report-email-from` | Report recipient and From address. |
@@ -79,7 +79,7 @@ The web-check module additionally exposes
 `autopwn_suite.web.webvuln.webvuln(target, log, console)`, returning structured finding
 dictionaries. Targets may be hostname, host:port, IPv6 or an HTTP(S) URL. Findings
 include type, URL, parameter, severity/confidence, evidence, reproduction plan,
-timestamps and remediation/impact context. See the README for check semantics.
+timestamps and remediation/impact context. See the README for check semantics. The log lines, the coverage `issues` and the `target` of the `on_complete` summary, and the announcement line printed to `console`, redact every query value, userinfo and fragment of a URL (`redact_text` in `autopwn_suite/web/runtime.py`); a finding redacts only the values of credential-named parameters (see Redaction under Scan and web controls).
 Other implementation helpers are internal and are not a compatibility promise.
 
 ## HTTP API
@@ -119,10 +119,10 @@ updates return 202.
 | `GET /api/auth/session` | None | Since v2.6.1. `{username,csrf_token}` for the current session. |
 | `POST /api/auth/logout` | None | Since v2.6.1. `{ok}`; revokes the session. |
 | `PUT /api/auth/account` | `{username,current_password,new_password}` (new password optional, 15-128 characters) | Since v2.6.1. Changes the username/password after verifying the current password; returns a fresh session and signs out others; 403 for a wrong current password. |
-| `GET /api/scans` | None | Array of job summaries including config, status, timestamps, counts, hosts, progress, web findings/coverage. |
-| `GET /api/scans/<scan_id>` | Job ID | One job summary; 404 if absent. |
-| `GET /api/scans/<scan_id>/download` | Job ID | JSON attachment with complete serializable job/results. Private resume checkpoints are excluded. |
-| `POST /api/scan/start` | `target`, scan configuration, optional `api_key` | `{ok,scan_id,message}`; launches background work. 400 for a non-empty `nmap_flags` or a technique or ports outside the structured fields (see Scan and web controls). |
+| `GET /api/scans` | None | Array of job summaries including config, status, timestamps, counts, hosts, progress, web findings/coverage. The `target` and `config.target` of a URL target show every query value as `REDACTED` and no userinfo or fragment (see Redaction under Scan and web controls); the target the scan runs and resumes with is stored as typed. |
+| `GET /api/scans/<scan_id>` | Job ID | One job summary, with the target redacted as above; 404 if absent. |
+| `GET /api/scans/<scan_id>/download` | Job ID | JSON attachment with complete serializable job/results, with the target redacted as above. Private resume checkpoints are excluded. |
+| `POST /api/scan/start` | `target`, scan configuration, optional `api_key` | `{ok,scan_id,message}`; launches background work. 400 for a non-empty `nmap_flags` or a technique or ports outside the structured fields (see Scan and web controls). The message shows the target redacted as above. |
 | `POST /api/scan/stop` | `{scan_id}` | `{ok}`; requests cancellation of a running/stopping job. |
 | `POST /api/scans/<scan_id>/resume` | Optional `{web_options:{...}}` | `{ok,scan_id,resume_count}`; only incomplete/stopped/error jobs, retaining target and selected checks. |
 | `GET /api/web/catalog` | None | Check descriptions, normalized default controls, numeric bounds, effective offline state. |
@@ -191,6 +191,8 @@ coverage limitations; HTTP timeout bounds active network I/O through headers and
 body, and Stop interrupts active reads. OS DNS resolution is outside this bound.
 Diagnostic probes/replay do not import `.netrc`, environment proxies or ambient
 credentials. Each response is isolated from cookies set by previous responses.
+
+Redaction: a web scan shows a URL in two ways. In a finding (`url`, `evidence`, the recorded requests and `Location` headers) a query value is replaced by `REDACTED` when its parameter name looks like a credential: a name containing `auth`, `pass` (not `passage`, `passport` and similar words), `secret`, `token`, `session`, `jwt`, `signature`, `csrf`, `credential`, `bearer`, `pwd`, `cookie` or `hmac`, an `api`, `access` or `private` key, the whole words `key`, `sig`, `sid`, `otp` and `cred`, and the verification codes (`reset_code`, `mfa_code`). The other values stay, because a replay needs them, so a secret in a parameter with any other name (`code`, `ref`, `s`) or in the URL path is shown there; userinfo and fragment are dropped. Everywhere else, namely the console announcement, log lines and the log history, the `issues` and `target` of the web coverage, the `target` and `config.target` of a job, a finding's `endpoint` and the target of its reproduction plan (a replay reads only its origin), and the webhook, email and report text, every query value is replaced by `REDACTED` whatever the parameter is called, the parameter names stay (`?id=REDACTED&x=REDACTED`), and userinfo, fragments and `;name=value` path parameter values are dropped or replaced. This holds for any case of the scheme and for a target typed without one (`host:80?x=y`, `[::1]:80/?x=y`). Only a secret in the URL path stays visible. Redaction changes what is shown and exported, never what the scan uses: the dashboard keeps the target as typed to run, resume and re-run the scan.
 
 ### Settings and schedules
 
@@ -265,7 +267,7 @@ log as a fixed-text warning with the schedule ID (no exception text).
   downloads; running one is a separate operator action.
 - CLI webhook delivery sends its report payload to the configured URL only (a redirect
   response is a failed delivery and is not followed); dashboard webhook delivery
-  sends JSON scan/test events and treats a redirect the same way. SMTP delivers MIME scan reports/test messages to
+  sends JSON scan/test events and treats a redirect the same way; its event and the email subject and report show a URL target redacted as above. SMTP delivers MIME scan reports/test messages to
   configured recipients. Inspect `autopwn_suite/report.py` and dashboard notification
   functions for payload details; only send to destinations you control/trust.
 - Distribution interfaces are GitHub releases (source archives and standalone binaries),

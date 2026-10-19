@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
+import email
+import email.policy
+import html
 import importlib
+import json
 import sys
+from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -164,3 +169,124 @@ def test_scan_evidence_removes_url_credentials_from_redirect_headers(web_respons
     response.autopwn_truncated = False
     record = context.capture(response, "GET", "http://example.com/", {}, context.before())
     assert record["response"]["headers"]["Location"] == "https://example.com/?token=REDACTED"
+
+
+TYPED_TARGET = "https://example.com:8443/app?nick=hunter2&q=1#access_token=abc"
+SHOWN_TARGET = "https://example.com:8443/app?nick=REDACTED&q=REDACTED"
+
+
+def web_only_job(wu, target=TYPED_TARGET):
+    config = wu._profile_config({"scan_web": True, "scan_ports": False}) | {"target": target}
+    return wu.ScanJob("job", target, config)
+
+
+@pytest.mark.unit
+def test_scan_record_exports_show_a_redacted_target_and_the_scan_keeps_the_one_typed(dashboard):
+    wu, client = dashboard
+    job, scanned = web_only_job(wu), []
+    def scan(endpoint, log, console, **kwargs):
+        scanned.append(endpoint)
+        kwargs["on_complete"]({"status": "partial", "requests": 1, "target": endpoint, "issues": []})
+        return []
+    with patch("autopwn_suite.web.webvuln.webvuln", side_effect=scan), patch.object(wu, "_notify"):
+        wu._register_scan(job)
+        wu._run_scan(job)
+    assert scanned == [TYPED_TARGET] and job.status == "partial"
+    # Status JSON (the list the history is drawn from, and one scan) and the downloaded JSON report; the printable report is drawn from the first.
+    listed, single, download = (client.get("/api/scans").get_json()[0], client.get("/api/scans/job").get_json(),
+                                json.loads(client.get("/api/scans/job/download").data))
+    for record in (listed, single, download):
+        assert record["target"] == record["config"]["target"] == SHOWN_TARGET
+        assert [row["endpoint"] for row in record["web_coverage"]] == [SHOWN_TARGET]
+        assert record["web_coverage"][0]["target"] == SHOWN_TARGET
+    assert "hunter2" not in client.get("/api/scans").get_data(as_text=True) + client.get("/api/scans/job/download").get_data(as_text=True)
+    # The record the scan runs from is untouched, and so is what a second run reaches after Resume.
+    assert job.target == job.config["target"] == TYPED_TARGET
+    with patch.object(wu.threading, "Thread") as thread:
+        assert client.post("/api/scans/job/resume", json={}).status_code == 200
+    with patch("autopwn_suite.web.webvuln.webvuln", side_effect=scan), patch.object(wu, "_notify"):
+        thread.call_args.kwargs["target"](*thread.call_args.kwargs["args"])
+    assert scanned == [TYPED_TARGET, TYPED_TARGET]
+    assert job.target == job.config["target"] == TYPED_TARGET
+
+
+@pytest.mark.unit
+def test_network_scan_targets_are_shown_as_typed(dashboard):
+    wu, client = dashboard
+    job = wu.ScanJob("job", "192.0.2.0/24", wu._profile_config({}) | {"target": "192.0.2.0/24"})
+    wu._register_scan(job)
+    record = client.get("/api/scans/job").get_json()
+    assert record["target"] == record["config"]["target"] == "192.0.2.0/24"
+
+
+@pytest.mark.unit
+def test_starting_a_web_scan_answers_with_a_redacted_target_and_launches_the_one_typed(dashboard):
+    wu, client = dashboard
+    with patch.object(wu, "_launch_scan", return_value=MagicMock(id="job")) as launch:
+        response = client.post("/api/scan/start", json={"target": TYPED_TARGET, "scan_web": True, "scan_ports": False})
+    assert response.status_code == 200 and launch.call_args.args[0]["target"] == TYPED_TARGET
+    assert response.get_json()["message"] == "Scan started for " + SHOWN_TARGET
+
+
+@pytest.mark.unit
+def test_finding_and_coverage_endpoints_hide_every_value_of_the_target(dashboard):
+    wu, client = dashboard
+    job = web_only_job(wu)
+    result = {"id": "finding", "type": "CORS", "url": "https://example.com:8443/app", "details": {"title": "CORS"}, "evidence": "repeatable", "severity": "medium"}
+    def scan(endpoint, log, console, **kwargs):
+        kwargs["on_finding"](result)
+        kwargs["on_complete"]({"status": "completed", "requests": 3, "target": endpoint, "issues": []})
+        return [result]
+    with patch("autopwn_suite.web.webvuln.webvuln", side_effect=scan), patch.object(wu, "_notify"):
+        wu._register_scan(job)
+        wu._run_scan(job)
+    assert client.get("/api/web/findings").get_json()[0]["endpoint"] == SHOWN_TARGET
+    assert client.get("/api/web/findings/job/finding").get_json()["endpoint"] == SHOWN_TARGET
+    # A completed endpoint is recognized again by the same redacted form, so a resumed scan does not repeat it.
+    with patch("autopwn_suite.web.webvuln.webvuln") as again:
+        wu._run_host_web(job, "example.com", [TYPED_TARGET], MagicMock(), MagicMock())
+    again.assert_not_called()
+
+
+@pytest.mark.unit
+def test_notifications_carry_the_redacted_target(dashboard, monkeypatch):
+    wu, _ = dashboard
+    job = web_only_job(wu)
+    job.mark_done("completed")
+    wu._settings["webhook"] = {"enabled": True, "url": "https://hooks.example.invalid/notify", "on_complete": True}
+    wu._settings["email"] = {"enabled": True, "smtp_host": "smtp.example.invalid", "to_addr": "ops@example.invalid",
+                             "from_addr": "autopwn@example.invalid", "on_complete": True}
+    posted, mails = [], []
+    monkeypatch.setattr(wu._requests, "post", lambda url, **kwargs: posted.append(kwargs["json"]) or MagicMock(status_code=200))
+    @contextmanager
+    def smtp(cfg):
+        server = MagicMock()
+        server.sendmail.side_effect = lambda *args: mails.append(args[2])
+        yield server
+    monkeypatch.setattr(wu, "_smtp_connection", smtp)
+    wu._deliver_webhook(job)
+    wu._deliver_email(job)
+    assert posted[0]["target"] == SHOWN_TARGET
+    message = email.message_from_string(mails[0], policy=email.policy.default)
+    body = message.get_body(("html",)).get_content()
+    assert SHOWN_TARGET in message["Subject"] and html.escape(SHOWN_TARGET) in body
+    assert "hunter2" not in str(posted) + message["Subject"] + body
+
+
+@pytest.mark.unit
+def test_the_scheduler_log_line_hides_the_target_it_fired_and_launches_the_one_stored(dashboard):
+    wu, _ = dashboard
+    schedule = {"id": "sched-0001", "name": "Site", "target": TYPED_TARGET, "profile_id": "profile", "enabled": True}
+    wu._schedules.clear()
+    wu._schedules[schedule["id"]] = dict(schedule)
+    wu._profiles["profile"] = {"config": {"scan_web": True, "scan_ports": False}}
+    class Stop(Exception):
+        pass
+    events = []
+    with patch.object(wu.time, "sleep", side_effect=[None, Stop]), patch.object(wu, "_should_fire", return_value=True), \
+         patch.object(wu, "_previous_run_active", return_value=False), patch.object(wu, "_schedule_data", return_value=schedule), \
+         patch.object(wu, "_launch_scan", return_value=MagicMock(id="job")) as launch, patch.object(wu, "_save_schedules"), \
+         patch.object(wu, "_broadcast", side_effect=events.append), pytest.raises(Stop):
+        wu._scheduler_loop()
+    assert launch.call_args.args[0]["target"] == TYPED_TARGET
+    assert [event["msg"] for event in events] == ["[*] Scheduled scan fired: Site \u2192 " + SHOWN_TARGET]

@@ -1051,3 +1051,35 @@ class TestConfirmation:
         mock_input.side_effect = [unrecognized, final]
         assert Confirmation("Test message") is expected_result
         assert mock_input.call_count == 2
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("targetarg,shown", [
+    ("https://app.test/?nick=hunter2&session=abc", "https://app.test/?nick=REDACTED&session=REDACTED"),
+    ("HTTP://user:pw@app.test:8080/x?nick=hunter2#token=abc", "HTTP://app.test:8080/x?nick=REDACTED"),
+    ("app.test:8080?nick=hunter2", "app.test:8080?nick=REDACTED"),
+    (["192.0.2.1", "app.test/?nick=hunter2"], "['192.0.2.1', 'app.test/?nick=REDACTED']"),
+    ("192.0.2.0/24", "192.0.2.0/24"),
+])
+@patch("autopwn_suite.utils.get_terminal_width", return_value=80)
+def test_param_print_redacts_the_target_it_echoes(mock_width, targetarg, shown, mock_console):
+    """The summary goes to the recorded console, so the saved and emailed reports would carry a URL query secret."""
+    args = argparse.Namespace(output=None, output_folder="outputs", skip_discovery=False, host_file=None, host_timeout=240,
+                              speed=3, nmap_flags="", report=None, yes_please=False)
+    InitAutomation(args)
+    ParamPrint(args, targetarg, ScanType.ARP, ScanMode.Normal, None, mock_console, MagicMock())
+    output = mock_console.print.call_args[0][0]
+    assert f"Target : {shown}\n" in output
+    assert "hunter2" not in output
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("target,name", [
+    ("https://app.test/?nick=hunter2&session=abc", "https___app.test__nick_REDACTED_session_REDACTED"),
+    ("app.test:8080?nick=hunter2", "app.test_8080_nick_REDACTED"),
+    ("192.0.2.0/24", "192.0.2.0_24"),
+    ("192.168.*.*", "192.168._._"),
+])
+def test_a_generated_report_name_does_not_carry_the_query_values_of_a_url_target(target, name):
+    from autopwn_suite.utils import _report_name
+    assert _report_name(target) == name

@@ -83,7 +83,7 @@ from autopwn_suite.paths import data_dir
 from autopwn_suite.vulnerability_db import DatabaseInUse, database_path, database_status, update_database
 from autopwn_suite.web.options import CHECKS as WEB_CHECKS
 from autopwn_suite.web.options import normalize_options
-from autopwn_suite.web.runtime import redact_url
+from autopwn_suite.web.runtime import redact_text
 from autopwn_suite.web_auth import ACCOUNT_FILE, COOKIE, AccountStore, install_auth, show_credentials
 
 try:
@@ -601,6 +601,12 @@ class ScanJob:
                           "target_index": 0, "targets_completed": 0, "targets_total": None,
                           "revision": 0}
 
+    @property
+    def public_target(self) -> str:
+        """The target as it is shown and exported: query values, userinfo and fragments of a URL are redacted. The scan
+        itself runs, resumes and re-runs with `self.target` and `self.config["target"]`, which stay as typed."""
+        return redact_text(self.target)
+
     def _publish_progress(self):
         with self._lock:
             event = {"scan_id": self.id, "level": "__scan_progress__", "msg": "", "ts": "",
@@ -693,7 +699,7 @@ class ScanJob:
 
     def add_web_finding(self, ip, endpoint, result):
         result = deepcopy(result)
-        result.update(scan_id=self.id, host=ip, endpoint=redact_url(endpoint))
+        result.update(scan_id=self.id, host=ip, endpoint=redact_text(endpoint))
         with self._lock:
             self._web_findings[result["id"]] = result
             host = self.get_or_create_host(ip)
@@ -724,7 +730,7 @@ class ScanJob:
 
     def add_web_coverage(self, ip, endpoint, summary):
         with self._lock:
-            public_endpoint = redact_url(endpoint)
+            public_endpoint = redact_text(endpoint)
             self._web_coverage = [row for row in self._web_coverage
                                   if (row["host"], row["endpoint"]) != (ip, public_endpoint)]
             self._web_coverage.append({"host": ip, "endpoint": public_endpoint, **deepcopy(summary)})
@@ -742,9 +748,11 @@ class ScanJob:
             web_coverage = deepcopy(self._web_coverage)
             # The scan thread adds keys to the config under this lock; iterating it outside would raise.
             config = {k: deepcopy(v) for k, v in self.config.items() if k != "api_key"}
+        if isinstance(config.get("target"), str):
+            config["target"] = redact_text(config["target"])
         return {
             "id":          self.id,
-            "target":      self.target,
+            "target":      self.public_target,
             "config":      config,
             "status":      status,
             "started_at":  self.started_at,
@@ -952,7 +960,7 @@ def _deliver_webhook(job: ScanJob) -> None:
     payload = {
         "event":      "scan_" + job.status,
         "scan_id":    job.id,
-        "target":     job.target,
+        "target":     job.public_target,
         "host_count": len(hosts),
         "vuln_count": vuln_count,
         "started_at": job.started_at,
@@ -1014,13 +1022,14 @@ def _deliver_email(job: ScanJob) -> None:
         return
 
     _e = _html.escape
-    subject = f"[AutoPWN] Scan {job.status.upper()} — {job.target}"
+    target = job.public_target
+    subject = f"[AutoPWN] Scan {job.status.upper()} — {target}"
 
     c = job.config or {}
     if c.get("mode") == "evade":
-        cmd_base = f"nmap {job.target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10"
+        cmd_base = f"nmap {target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10"
     else:
-        cmd_base = f"nmap {job.target} -sS -sV --host-timeout {c.get('host_timeout', 240)} -Pn -O -T {c.get('speed', 3)}"
+        cmd_base = f"nmap {target} -sS -sV --host-timeout {c.get('host_timeout', 240)} -Pn -O -T {c.get('speed', 3)}"
     flags = c.get("nmap_flags", "")
     if flags:
         if "-O" in cmd_base and "-O" in flags:
@@ -1038,7 +1047,7 @@ def _deliver_email(job: ScanJob) -> None:
         except Exception:
             pass
 
-    html = f"""<!DOCTYPE html><html><head><title>Scan Report - {_e(job.target)}</title>
+    html = f"""<!DOCTYPE html><html><head><title>Scan Report - {_e(target)}</title>
     <style>
       body{{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}}
       h1, h2, h3, h4{{color: #111; margin-bottom: 8px;}}
@@ -1065,7 +1074,7 @@ def _deliver_email(job: ScanJob) -> None:
       </tr>
     </table>
     <div class="meta">
-      <p><strong>Target:</strong> {_e(job.target)}</p>
+      <p><strong>Target:</strong> {_e(target)}</p>
       <p><strong>Scan ID:</strong> {_e(job.id)}</p>
       <p><strong>Status:</strong> {_e(job.status)}</p>
       <p><strong>Command:</strong> {_e(cmd_base.strip())}</p>
@@ -1396,7 +1405,7 @@ def _run_host_web(job, ip, endpoints, log, console, *, offline=False):
             raise ScanCancelled("Web scan stopped")
         summary = {}
         with job._lock:
-            if any(row["host"] == ip and row["endpoint"] == redact_url(endpoint) and row["status"] == "completed"
+            if any(row["host"] == ip and row["endpoint"] == redact_text(endpoint) and row["status"] == "completed"
                    for row in job._web_coverage):
                 continue
             checkpoint = job._web_checkpoints.setdefault((ip, endpoint), {})
@@ -1412,9 +1421,9 @@ def _run_host_web(job, ip, endpoints, log, console, *, offline=False):
             raise
         except Exception:
             logging.exception("Web application check failed")
-            summary = {"status": "partial", "requests": 0, "issues": ["Web checks failed; see server logs."], "target": redact_url(endpoint)}
+            summary = {"status": "partial", "requests": 0, "issues": ["Web checks failed; see server logs."], "target": redact_text(endpoint)}
         summary.setdefault("status", "completed")
-        summary["target"] = redact_url(summary.get("target", endpoint))
+        summary["target"] = redact_text(summary.get("target", endpoint))
         job.add_web_coverage(ip, endpoint, summary)
         failed = failed or summary["status"] != "completed"
         with job._lock:
@@ -1830,7 +1839,7 @@ def _scheduler_loop() -> None:
                 _broadcast({
                     "scan_id": job.id, "level": "info",
                     "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
-                    "msg": f"[*] Scheduled scan fired: {schedule.get('name', schedule['id'][:8])} → {config['target']}",
+                    "msg": f"[*] Scheduled scan fired: {schedule.get('name', schedule['id'][:8])} → {redact_text(config['target'])}",
                 })
                 _save_schedules()
             except Exception as exc:
@@ -1958,7 +1967,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             return jsonify({"error": "Offline database unavailable. Download it in Settings while connected, "
                             "or copy vulnerabilities.sqlite3 from a connected system."}), 409
         job = _launch_scan(config)
-        return jsonify({"ok": True, "scan_id": job.id, "message": f"Scan started for {target}"})
+        return jsonify({"ok": True, "scan_id": job.id, "message": f"Scan started for {redact_text(target)}"})
 
     @app.route("/api/web/catalog")
     def api_web_catalog():
