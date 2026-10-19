@@ -104,6 +104,32 @@ suppression reasons. Resolve expired exceptions and reassess when source,
 configuration, dependencies or deployment assumptions change. Do not use broad
 rule/path exclusions or change severity merely to pass a check.
 
+## Dynamic analysis (OWASP ZAP baseline)
+
+`dynamic-analysis.yml` starts the dashboard from the source under test on loopback
+with a throwaway data directory and runs the ZAP baseline scan against it twice:
+once without a session (the sign-in surface) and once with the session cookie of the
+generated account (the dashboard, its scripts and the read-only API routes). The scan
+is passive: it spiders and inspects responses and sends no attacks or state-changing
+requests, so it complements the tests and SAST and does not replace them. Pull
+requests and pushes to `main` run it, and `publish-docker.yml` and `publish-pypi.yml`
+call it on the release commit, so nothing is pushed or published unless it passed.
+
+Every ZAP alert must be triaged in `.github/zap/rules.tsv`: findings are `FAIL`,
+harmless ones are `IGNORE` with a written reason, and an alert with no entry is a
+`WARN` that fails the job like any other.
+
+The ZAP image is pinned by digest (`ZAP_IMAGE` in the workflow: the multi-architecture
+index digest that `ghcr.io/zaproxy/zaproxy:stable` resolved to), so the same source
+gets the same verdict and a new ZAP release cannot change it unreviewed. A pin that
+ages can start to raise ZAP's own "ZAP is Out of Date" alert. It has no entry in
+`rules.tsv`, so it fails the scan; refresh the pin rather than adding an `IGNORE`
+entry, which would let the scanner age unnoticed. To refresh it, resolve the current
+index digest with `docker buildx imagetools inspect ghcr.io/zaproxy/zaproxy:stable`,
+replace the digest in `ZAP_IMAGE`, run the workflow on the branch and triage any new
+alerts in `rules.tsv` before merging. Check the pin before cutting a release after a
+long gap, so that the release run is not the first to find a stale scanner.
+
 ## VEX feed and local execution
 
 See [VEX policy](../.security/vex/README.md). Non-exploitability is an evidence
@@ -144,7 +170,7 @@ CodeQL's default setup; the workflows behind them have no `paths:` filter.
 | `install-smoke.yml` | Pull request and push to `main` and `dev` | None | Installs the built wheel into a clean environment and starts it (Ubuntu, macOS and Windows, Python 3.10 and 3.14); archives the commit the way a release does and builds the standalone binaries from that archive through `build-binary.yml`. |
 | `build-binary.yml` | Reusable: called by `install-smoke.yml` and `publish-docker.yml` | None | Builds each standalone binary twice on its own runner (Linux amd64 and arm64, Windows amd64, macOS arm64) from the pinned interpreter and hash-pinned requirements, fails unless both builds are identical, smoke-tests it and writes its SBOM. |
 | `security.yml` | Pull request and push to `main`; reusable with a release commit | None | Check `Security policy`: `scripts/security_policy.py` (OSV-Scanner SCA of the lockfile and the pinned release build tools, Bandit SAST). The release workflows run it on the exact release commit. |
-| `dynamic-analysis.yml` | Pull request and push to `main`, manually; reusable with a release commit | None | OWASP ZAP baseline scan of the running dashboard, unauthenticated and signed in. The release workflows need it before they push or publish anything. |
+| `dynamic-analysis.yml` | Pull request and push to `main`, manually; reusable with a release commit | None | OWASP ZAP baseline scan of the running dashboard, unauthenticated and signed in (see [Dynamic analysis](#dynamic-analysis-owasp-zap-baseline)). The release workflows need it before they push or publish anything. |
 | `cflite_pr.yml` | Pull requests that change `autopwn_suite/`, `fuzz/`, `.clusterfuzzlite/`, `requirements-locked.txt` or the workflow itself (a path filter; not a required check) | None (the job token is read-only) | ClusterFuzzLite builds the Atheris harnesses in `fuzz/` and fuzzes the changed code for 180 seconds. |
 | `scorecard.yml` | Weekly, on push to `main` and on branch-protection changes | `security-events: write` and `id-token: write` in its one job | OpenSSF Scorecard analysis; uploads the SARIF results to code scanning and publishes them to the OpenSSF API for the badge. It gates nothing and stores no secret. |
 | `human-review.yml` | Pull request | `pull-requests: read` | Check `Independent human approval`: a human other than the author must approve the current revision. |

@@ -191,6 +191,17 @@ def test_security_testing_doc_lists_every_workflow_and_only_existing_ones():
     assert set(re.findall(r"`([A-Za-z0-9_-]+\.yml)`", document)) <= workflows
 
 
+def test_zap_image_is_pinned_by_digest_and_its_refresh_is_documented():
+    """A digest pin ages: the document says how to refresh it instead of ignoring ZAP's own age alert."""
+    project = Path(__file__).resolve().parents[2]
+    workflow = (project / ".github/workflows/dynamic-analysis.yml").read_text(encoding="utf-8")
+    assert re.search(r"^\s+ZAP_IMAGE: ghcr\.io/zaproxy/zaproxy@sha256:[0-9a-f]{64}$", workflow, re.MULTILINE)
+    document = (project / "docs/SECURITY_TESTING.md").read_text(encoding="utf-8")
+    for text in ("`ZAP_IMAGE`", "ZAP is Out of Date", "docker buildx imagetools inspect ghcr.io/zaproxy/zaproxy:stable"):
+        assert text in document
+    assert "ZAP is Out of Date" not in (project / ".github/zap/rules.tsv").read_text(encoding="utf-8")
+
+
 def test_vex_exemption_binds_product_component_and_version(root):
     write_vex(root)
     assert not policy.evaluate_sca(report(["CVE-TEST-1"]), "2.6.0", root)[0]
