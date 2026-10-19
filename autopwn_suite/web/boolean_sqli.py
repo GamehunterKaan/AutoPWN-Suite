@@ -2,7 +2,6 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Conservative boolean comparisons without timing probes or data extraction."""
 
-from difflib import SequenceMatcher
 from html import escape
 from secrets import randbelow
 from urllib.parse import parse_qsl, quote, urlsplit
@@ -12,6 +11,7 @@ from requests.exceptions import RequestException
 from autopwn_suite.web.findings import emit, finding
 from autopwn_suite.web.query import parameter_indexes, probe_url, query_parts
 from autopwn_suite.web.runtime import begin_parameter, finish_parameter, parameter_done
+from autopwn_suite.web.similarity import similarity as _similar
 from autopwn_suite.web.sqli import SQLIScanner
 
 
@@ -25,10 +25,6 @@ def _shape(response, url, payload=""):
         if len(value) > 4:
             text = text.replace(value, "{probe}")
     return text
-
-
-def _similar(left, right):
-    return SequenceMatcher(None, left, right).ratio()
 
 
 def _kind(response):

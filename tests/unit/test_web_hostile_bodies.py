@@ -6,13 +6,18 @@ Python's `re` holds the GIL while it matches, so a body that makes a pattern bac
 its Stop button and every other dashboard thread until the match ends (minutes for the bodies below
 with the unbounded patterns they replaced).
 """
+import random
 import time
+from difflib import SequenceMatcher
 from unittest.mock import MagicMock
 
 import pytest
 
 from autopwn_suite.web import poc_runtime
+from autopwn_suite.web.boolean_sqli import _similar
 from autopwn_suite.web.content import inspect_content
+from autopwn_suite.web.dirbust import _catch_all
+from autopwn_suite.web.similarity import similarity
 from autopwn_suite.web.sqli import SQLIScanner
 from autopwn_suite.web.xss import reflection_context
 
@@ -102,3 +107,46 @@ def test_inactive_elements_are_skipped_in_the_scanner_and_in_the_downloaded_poc(
     document = poc_runtime._Document("MARK")
     document.feed(page)
     assert document.active is (context is not None)
+
+
+def unicode_noise(seed, size):
+    """100 different characters at about 1% each: difflib finds nothing to ignore, and compares them all."""
+    generator = random.Random(seed)
+    alphabet = [chr(0x4E00 + index) for index in range(100)]
+    return "".join(generator.choice(alphabet) for _ in range(size))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("compare", [similarity, _similar, poc_runtime._similarity], ids=["similarity", "boolean_sqli", "poc_runtime"])
+def test_similarity_stays_fast_on_hostile_bodies_and_stays_meaningful(compare):
+    one, other = unicode_noise(1, 100_000), unicode_noise(2, 100_000)
+    assert seconds(compare, one, other) < LIMIT_SECONDS
+    assert compare(one, one) == 1.0
+    assert compare(one, other) < .5
+
+
+@pytest.mark.unit
+def test_directory_catch_all_check_uses_the_bounded_comparison(web_response, monkeypatch):
+    url = "http://example.com/admin/"
+    response = web_response("<html>Not found</html>", url=url)
+    seen = []
+
+    def spy(left, right):
+        seen.append((left, right))
+        return similarity(left, right)
+
+    monkeypatch.setattr("autopwn_suite.web.dirbust.similarity", spy)
+    assert _catch_all(response, url, [("http://example.com/missing", web_response("<html>Not found</html>"))])
+    assert seen == [("<html>Not found</html>", "<html>Not found</html>")]
+    other = web_response(unicode_noise(1, 20_000))
+    assert not _catch_all(web_response(unicode_noise(2, 20_000), url=url), url, [("http://example.com/missing", other)])
+    assert len(seen) == 2
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("compare", [similarity, poc_runtime._similarity], ids=["similarity", "poc_runtime"])
+def test_ordinary_pages_are_compared_exactly_as_difflib_does(compare):
+    page = "<html><head><title>Store</title></head><body>" + "".join(f"<li class='item'>Item {number} costs {number * 3} dollars</li>" for number in range(400))
+    changed = page.replace("Item 7 ", "Item seven ").replace("</body>", "<p>You have an error</p></body>")
+    for left, right in ((page, page), (page, changed), (page, page[:5000]), (page[:3000], "<html>Not found</html>"), ("", page), (page, "")):
+        assert compare(left, right) == SequenceMatcher(None, left, right).ratio()

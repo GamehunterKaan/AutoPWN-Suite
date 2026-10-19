@@ -2,7 +2,6 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Directory discovery with randomized controls for catch-all responses."""
 
-from difflib import SequenceMatcher
 from os.path import dirname
 from secrets import token_hex
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
@@ -15,6 +14,7 @@ from autopwn_suite.web.content import inspect_content
 from autopwn_suite.web.findings import emit, finding
 from autopwn_suite.web.http import bounded_request, resolve_url, same_origin
 from autopwn_suite.web.runtime import enabled, run_task, task_done
+from autopwn_suite.web.similarity import similarity
 
 
 def _normalized(value, url):
@@ -33,7 +33,7 @@ def _catch_all(response, url, controls):
         if response.status_code in (301, 302, 303, 307, 308):
             if location and location == _normalized(resolve_url(control_url, control.headers.get("Location", "")) or "", control_url):
                 return True
-        elif SequenceMatcher(None, text, _normalized(control.text, control_url)[:20_000]).ratio() >= .98:
+        elif similarity(text, _normalized(control.text, control_url)[:20_000]) >= .98:
             return True
     return False
 

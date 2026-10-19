@@ -8,6 +8,7 @@ import re
 import socket
 import ssl
 import warnings
+from collections import Counter
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from html import escape
@@ -134,6 +135,18 @@ def _files(text):
     return {name for name, matched in (("Unix passwd", unix), ("Windows win.ini", windows)) if matched}
 
 
+def _similarity(left, right):
+    # Same as similarity() in similarity.py, which a downloaded PoC does not have: difflib's ratio, on shorter
+    # prefixes when a hostile body of many different characters would make it take minutes.
+    counts = Counter(right)
+    popular = len(right) // 100 + 1 if len(right) >= 200 else len(right)
+    work = sum(counts[char] for char in left if counts[char] <= popular)
+    if work > 500_000:
+        keep = max(1000, int(len(left) * (500_000 / work) ** .5))
+        left, right = left[:keep], right[:keep]
+    return SequenceMatcher(None, left, right).ratio()
+
+
 def _normalized(response, row, plan):
     text = response.text[:100000]
     values = [row["url"], urlsplit(row["url"]).query]
@@ -243,8 +256,7 @@ def _check_http(plan, responses):
         if len(responses) != 6 or not 200 <= responses[0].status_code < 300 or len({(row.status_code, row.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()) for row in responses}) != 1:
             return False
         texts = [_normalized(response, row, plan) for response, row in zip(responses, rows, strict=False)]
-        def similar(a, b):
-            return SequenceMatcher(None, a, b).ratio()
+        similar = _similarity
         return (similar(texts[0], texts[1]) >= .98 and all(similar(texts[0], texts[index]) >= .98 for index in (2, 4))
                 and all(similar(texts[0], texts[index]) <= .85 for index in (3, 5)) and similar(texts[3], texts[5]) >= .98
                 and not any(_sql_errors(response.text) for response in responses))
@@ -290,7 +302,7 @@ def _check_http(plan, responses):
             if probe.status_code in (301, 302, 303, 307, 308):
                 if normalize(probe.headers.get("Location", ""), rows[2]["url"]) == normalize(response.headers.get("Location", ""), row["url"]):
                     return False
-            elif SequenceMatcher(None, normalize(probe.text[:20000], rows[2]["url"]), normalize(response.text[:20000], row["url"])).ratio() >= .98:
+            elif _similarity(normalize(probe.text[:20000], rows[2]["url"]), normalize(response.text[:20000], row["url"])) >= .98:
                 return False
         return True
     return _response_condition(plan, responses[0]) if responses else None
