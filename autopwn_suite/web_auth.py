@@ -338,7 +338,9 @@ def install_auth(app, static_dir, account_path):
                 return jsonify({"error": "Too many sign-in attempts. Try again in a minute."}), 429, {"Retry-After": "60"}
             try:
                 password_ok = password_matches(body["password"], data["password_hash"])
-                username_ok = isinstance(body["username"], str) and secrets.compare_digest(body["username"].encode(), data["username"].encode())
+                # surrogatepass: a lone surrogate in the JSON must be a failed sign-in, not an encoding error.
+                username_ok = isinstance(body["username"], str) and secrets.compare_digest(
+                    body["username"].encode("utf-8", "surrogatepass"), data["username"].encode())
             finally:
                 auth.hash_slots.release()
             if not username_ok or not password_ok:

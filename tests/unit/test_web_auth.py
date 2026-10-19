@@ -308,6 +308,15 @@ def test_login_input_is_bounded_and_malformed_values_are_safe(dashboard_login):
     assert response.status_code == 413
 
 
+def test_lone_surrogate_username_is_a_throttled_failed_sign_in_not_a_server_error(dashboard_login):
+    d = dashboard_login
+    client = d.app.test_client()
+    for _ in range(5):
+        assert sign_in(client, d.password, username="\ud800").status_code == 401
+    assert d.auth.failures["127.0.0.1"][0] == 5
+    assert sign_in(client, d.password).status_code == 429
+
+
 def test_https_cookie_is_secure_and_no_auth_configuration_is_downloadable(dashboard_login):
     d = dashboard_login
     client = d.app.test_client()
