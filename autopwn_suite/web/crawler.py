@@ -7,7 +7,7 @@ from itertools import islice
 from urllib.parse import urldefrag, urlencode, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag
+from bs4.element import CData, NavigableString, Tag
 from requests import get
 from requests.exceptions import RequestException
 
@@ -19,21 +19,45 @@ from autopwn_suite.web.runtime import ACTIVE
 
 # html.parser nests unclosed <form>, <select> and <textarea> tags, so looking through the whole subtree of each
 # one is quadratic on a hostile page (tens of seconds for 48 KB). Every walk below is cut to a fixed number of
-# elements, far above what an ordinary page has, and the page is reported as only partly analysed when one was.
+# elements, and all the walks of one page together to MAX_PAGE_NODES; both are far above what an ordinary page
+# has, and the page is reported as only partly analysed when one was reached.
 MAX_FORMS = 100
 MAX_FORM_ELEMENTS = 5_000
 MAX_CONTROLS = 2_000
 MAX_OPTION_ELEMENTS = 200
+MAX_PAGE_NODES = 200_000
 
 
-def _below(tag, limit):
-    """(the first `limit` nodes below `tag`, whether there were more)."""
-    nodes = list(islice(tag.descendants, limit + 1))
-    return nodes[:limit], len(nodes) > limit
+class _Walk:
+    """The tree walks of the form analysis of one page."""
 
+    def __init__(self):
+        self.left = MAX_PAGE_NODES
+        self.cut = False  # a walk stopped before the end of its subtree
 
-def _text(tag):
-    return "".join(islice(tag.strings, 50))  # tag.get_text() would read a whole nested subtree
+    def below(self, tag, limit):
+        """The first `limit` nodes below `tag` in document order, fewer once the page's nodes are used up.
+
+        tag.descendants first walks to the last descendant of the tag, which for a nested page is the whole rest of
+        it, so even a few nodes cost time in proportion to the page. This walk visits only what it returns."""
+        allowed = min(limit, self.left)
+        nodes, pending = [], [iter(tag.contents)]
+        while pending and len(nodes) <= allowed:
+            for node in pending[-1]:
+                nodes.append(node)
+                if isinstance(node, Tag):
+                    pending.append(iter(node.contents))
+                break
+            else:
+                pending.pop()
+        self.cut = self.cut or len(nodes) > allowed
+        nodes = nodes[:allowed]
+        self.left -= len(nodes)
+        return nodes
+
+    def text(self, tag):
+        # tag.get_text() would read a whole nested subtree
+        return "".join(islice((node for node in self.below(tag, 200) if type(node) in (NavigableString, CData)), 50))
 
 
 def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS["max_urls"][0], max_depth=LIMITS["max_depth"][0], on_discovered=None) -> set[str]:
@@ -131,13 +155,12 @@ def link_finder(target_url, log) -> set[str]:
     # Build URLs only for GET forms. Do not submit POST, passwords or uploads.
     forms = soup.find_all("form", limit=MAX_FORMS + 1)
     limited = len(forms) > MAX_FORMS
+    walk = _Walk()
     controls_left = MAX_CONTROLS
     for form in forms[:MAX_FORMS]:
         if form.get("method", "get").lower() != "get":
             continue
-        nodes, more = _below(form, MAX_FORM_ELEMENTS)
-        limited = limited or more
-        tags = [node for node in nodes if isinstance(node, Tag)]
+        tags = [node for node in walk.below(form, MAX_FORM_ELEMENTS) if isinstance(node, Tag)]
         if any(tag.name == "input" and (tag.get("type") or "").lower() in ("password", "file") for tag in tags):
             continue
         action = resolve_url(base_url, form.get("action") or page_url)
@@ -158,19 +181,17 @@ def link_finder(target_url, log) -> set[str]:
             if kind in ("checkbox", "radio") and not control.has_attr("checked"):
                 continue
             if control.name == "select":
-                below, more = _below(control, MAX_OPTION_ELEMENTS)
-                limited = limited or more
-                options = [node for node in below if isinstance(node, Tag) and node.name == "option" and not node.has_attr("disabled")]
+                options = [node for node in walk.below(control, MAX_OPTION_ELEMENTS) if isinstance(node, Tag) and node.name == "option" and not node.has_attr("disabled")]
                 selected = [option for option in options if option.has_attr("selected")]
                 for option in selected or options[:1]:
-                    params.append((name, option["value"] if option.has_attr("value") else _text(option)))
+                    params.append((name, option["value"] if option.has_attr("value") else walk.text(option)))
             else:
-                value = _text(control) if control.name == "textarea" else control.get("value", "on" if kind in ("checkbox", "radio") else "")
+                value = walk.text(control) if control.name == "textarea" else control.get("value", "on" if kind in ("checkbox", "radio") else "")
                 params.append((name, value))
         if params:
             # Browsers replace an action's query when submitting a GET form.
             urls.add(urlunsplit(urlsplit(action)._replace(query=urlencode(params))))
-    if limited:
+    if limited or walk.cut:
         message = f"Only part of the forms of {page_url} were analysed; coverage is incomplete."
         current = ACTIVE.get()
         if current:

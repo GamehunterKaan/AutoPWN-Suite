@@ -12,12 +12,13 @@ from difflib import SequenceMatcher
 from unittest.mock import MagicMock, patch
 
 import pytest
+from bs4 import BeautifulSoup
 
-from autopwn_suite.web import poc_runtime
+from autopwn_suite.web import crawler, poc_runtime
 from autopwn_suite.web import similarity as similarity_module
 from autopwn_suite.web.boolean_sqli import _similar
 from autopwn_suite.web.content import inspect_content
-from autopwn_suite.web.crawler import MAX_FORMS, link_finder
+from autopwn_suite.web.crawler import MAX_FORMS, _Walk, link_finder
 from autopwn_suite.web.dirbust import _catch_all
 from autopwn_suite.web.similarity import similarity
 from autopwn_suite.web.sqli import SQLIScanner
@@ -251,6 +252,7 @@ NESTED_FORM_PAGES = {
     "textareas": "<form>" + "<textarea name=t>" * 16_000 + "x",
     "options": "<form><select name=s>" + "<option>" * 16_000 + "x",
     "forms_with_controls": "<form><input name=a>" * 16_000,
+    "selected_options": "<form>" + "<select name=s><option selected>x" * 8_000,  # the texts of the options are read for each select
 }
 
 
@@ -266,6 +268,28 @@ def test_deeply_nested_forms_and_controls_stay_fast_for_the_crawler(web_response
     assert time.perf_counter() - started < LIMIT_SECONDS
     if "textarea" not in page:  # newer html.parser versions read the inside of a textarea as text, older ones nest it
         assert any("coverage is incomplete" in call.args[1] for call in log.logger.call_args_list)
+
+
+@pytest.mark.unit
+def test_the_bounded_walk_visits_nodes_in_the_order_of_descendants():
+    form = BeautifulSoup("<form><div><p>a<b>b</b>c</p><!--x--><select name=s><option>1<option>2</select></div><input name=i>tail</form>", "html.parser").form
+    everything = list(form.descendants)
+    for limit in (0, 1, 4, len(everything), len(everything) + 5):
+        walk = _Walk()
+        assert walk.below(form, limit) == everything[:limit]
+        assert walk.cut is (limit < len(everything))
+    assert _Walk().text(form) == "".join(node for node in form.strings)
+
+
+@pytest.mark.unit
+def test_all_the_walks_of_one_page_share_a_budget(web_response, monkeypatch):
+    monkeypatch.setattr(crawler, "MAX_PAGE_NODES", 20)  # one node for each form below
+    page = "".join(f'<form action="/search{number}"><input name="q"></form>' for number in range(40))
+    log = MagicMock()
+    with patch("autopwn_suite.web.crawler.get", return_value=web_response(page)), patch("autopwn_suite.web.crawler.random_user_agent", return_value=iter(["UA"])):
+        urls = link_finder("http://example.com/", log)
+    assert len(urls) == 20  # forms after the budget is used up are not analysed, and none is submitted unchecked
+    assert any("Only part of the forms" in call.args[1] for call in log.logger.call_args_list)
 
 
 @pytest.mark.unit
