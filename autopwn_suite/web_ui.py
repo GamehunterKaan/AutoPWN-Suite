@@ -76,7 +76,7 @@ from autopwn_suite.credential_files import (
     delivery_error_summary,
 )
 from autopwn_suite.nist_search import VulnerabilityLookup
-from autopwn_suite.nmap_progress import ScanCancelled
+from autopwn_suite.nmap_progress import ScanCancelled, uses_files
 from autopwn_suite.paths import data_dir
 from autopwn_suite.vulnerability_db import DatabaseInUse, database_path, database_status, update_database
 from autopwn_suite.web.options import CHECKS as WEB_CHECKS
@@ -132,7 +132,6 @@ def _validate_nmap_flags(flags: str) -> Optional[str]:
         return "nmap_flags contains invalid characters"
     if not _NMAP_FLAG_RE.match(flags):
         return "nmap_flags contains invalid characters"
-    from autopwn_suite.nmap_progress import uses_files
     if any(uses_files(token) for token in flags.split()):
         return "nmap_flags cannot read or write files"
     return None
