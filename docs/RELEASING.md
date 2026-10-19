@@ -77,6 +77,20 @@ immutable, so nothing is published unless every earlier job succeeded. The actio
 also uploads PEP 740 attestations binding each file to this repository and
 workflow. This workflow does not touch GitHub release assets or notes.
 
+If the upload stops after one of the two files (PyPI keeps what it received and
+cannot replace it), dispatch the workflow from `main` for the same tag:
+
+```sh
+gh workflow run publish-pypi.yml --ref main -f tag=vVERSION
+```
+
+That run repeats the validation, the security gates and the build, and uploads with
+`skip-existing`, so a file already on PyPI is left alone and only the missing one is
+added. Only a dispatched run skips existing files: re-running the failed jobs of the
+original release run fails again with "File already exists", and the automatic run
+never skips. A skipped file is not compared with the new build, so afterwards check
+that the hashes on the PyPI release page equal those of the run's `pypi-dist` artifact.
+
 The build/publish workflow validates tag syntax, source package version and
 ancestry in `origin/main`. It refuses existing uploaded assets and never silently
 overwrites them. Resolve partial uploads manually after inspecting the failed

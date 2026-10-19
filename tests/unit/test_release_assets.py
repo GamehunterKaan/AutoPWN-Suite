@@ -385,6 +385,18 @@ def test_the_pypi_workflow_checks_file_names_with_the_normalising_helper(tmp_pat
     assert shown.stdout.split() == release.pypi_files("v2.8.0-rc.1")
 
 
+def test_pypi_upload_skips_existing_files_only_for_a_dispatched_recovery_run():
+    """A partial upload is completed by dispatching the workflow; the automatic run keeps uploading strictly."""
+    root = Path(__file__).resolve().parents[2]
+    publish = (root / ".github/workflows/publish-pypi.yml").read_text(encoding="utf-8").split("\n  publish:\n", 1)[1]
+    assert "skip-existing: ${{ github.event_name == 'workflow_dispatch' }}" in publish
+    assert "attestations: true" in publish
+    # Nothing is uploaded unless every earlier gate passed, whichever way the run was started.
+    assert "needs: [validate, source-security, dynamic-analysis, build]" in publish
+    docs = (root / "docs/RELEASING.md").read_text(encoding="utf-8")
+    assert "gh workflow run publish-pypi.yml --ref main -f tag=vVERSION" in docs
+
+
 def test_verification_docs_name_every_signer_identity_the_workflows_can_produce():
     """The certificate identity is GITHUB_WORKFLOW_REF: the tag for a release event, main for a dispatch."""
     root = Path(__file__).resolve().parents[2]
