@@ -430,31 +430,32 @@ def InitAutomation(args) -> None:
 
 
 def read_file_any_encoding(filepath: str) -> str:
-    # Try UTF-8 first
+    # Try UTF-8 first; "utf-8-sig" drops the byte order mark that Windows editors and PowerShell write,
+    # which would otherwise end up inside the key.
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return f.readline().strip("\n")
+        with open(filepath, "r", encoding="utf-8-sig") as f:
+            return f.readline().strip()
     except UnicodeError:
         pass
     # Try UTF-16 variations
     try:
         with open(filepath, "r", encoding="utf-16") as f:
-            return f.readline().strip("\n")
+            return f.readline().strip()
     except UnicodeError:
         try:
             with open(filepath, "r", encoding="utf-16-le") as f:
-                return f.readline().strip("\n")
+                return f.readline().strip()
         except UnicodeError:
             pass
     # Try latin-1 (very permissive)
     try:
         with open(filepath, "r", encoding="latin-1") as f:
-            return f.readline().strip("\n")
+            return f.readline().strip()
     except Exception:
         pass
     # As a last resort, replace undecodable characters
     with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-        return f.readline().strip("\n")
+        return f.readline().strip()
 
 
 def _credential_file(variable, log):

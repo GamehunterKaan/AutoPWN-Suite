@@ -31,7 +31,8 @@ quarterly, on role changes, and immediately after a suspected compromise.
   you give it. Since v2.6.1, credential files are supported:
   `AUTOPWN_NIST_API_KEY_FILE`, `AUTOPWN_SMTP_PASSWORD_FILE` and
   `AUTOPWN_WEBHOOK_URL_FILE` each name a file holding exactly one non-empty
-  UTF-8 line of at most 4096 bytes. The CLI and dashboard read them at use time,
+  UTF-8 line of at most 4096 bytes (a leading byte order mark and the line ending
+  are not part of the secret). The CLI and dashboard read them at use time,
   so a rotated secret takes effect without a restart. The dashboard overlays them
   on the stored settings and never writes them into `web_ui_settings.json`, but a
   value an operator also typed into settings stays stored in plaintext. Keep each

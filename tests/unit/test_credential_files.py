@@ -42,6 +42,21 @@ def test_credential_file_strips_only_the_line_ending(tmp_path):
     assert read_credential_file(path) == " key with spaces "
 
 
+@pytest.mark.parametrize("content", [b"\xef\xbb\xbfsecret\r\n", b"\xef\xbb\xbfsecret\n", b"\xef\xbb\xbfsecret", b"secret\r\n"])
+def test_credential_file_ignores_a_utf8_byte_order_mark(tmp_path, content):
+    """Windows PowerShell 5.1 `Out-File -Encoding utf8` writes a BOM; it must not end up in the secret."""
+    path = tmp_path / "secret"
+    path.write_bytes(content)
+    assert read_credential_file(path) == "secret"
+
+
+def test_a_file_holding_only_a_byte_order_mark_is_empty(tmp_path):
+    path = tmp_path / "secret"
+    path.write_bytes(b"\xef\xbb\xbf\r\n")
+    with pytest.raises(CredentialFileError):
+        read_credential_file(path)
+
+
 @pytest.mark.parametrize("content", [b"", b"\n", b"LEAKMARK\nSECOND\n", b"\xffLEAKMARK", b"LEAKMARK" * 600])
 def test_invalid_credential_files_are_rejected_without_echoing_content(tmp_path, content):
     path = tmp_path / "secret"

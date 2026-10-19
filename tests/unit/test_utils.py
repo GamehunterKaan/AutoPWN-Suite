@@ -899,6 +899,13 @@ class TestReadFileAnyEncoding:
         result = read_file_any_encoding(str(file_path))
         assert result == content
 
+    @pytest.mark.parametrize("content", [b"\xef\xbb\xbfkey\r\n", b"\xef\xbb\xbfkey\n", b"\xef\xbb\xbf  key  \r\n", b"  key \t\r\n"])
+    def test_a_byte_order_mark_and_surrounding_whitespace_are_not_part_of_the_key(self, temp_dir, content):
+        """A BOM breaks the apiKey header (latin-1 encode error) and silently disables online NVD lookups."""
+        file_path = temp_dir / "api.txt"
+        file_path.write_bytes(content)
+        assert read_file_any_encoding(str(file_path)) == "key"
+
     def test_read_utf16_file(self, temp_dir):
         """Verify it falls back to and correctly reads a UTF-16 file."""
         content = "hello world"

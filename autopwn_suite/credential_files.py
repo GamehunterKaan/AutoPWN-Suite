@@ -34,8 +34,9 @@ def read_credential_file(path):
     if len(raw) > MAX_CREDENTIAL_BYTES:
         raise CredentialFileError(f"Credential file {path} is larger than {MAX_CREDENTIAL_BYTES} bytes.")
     try:
-        # A trailing newline is an editor artifact, never part of the secret.
-        value = raw.decode("utf-8").rstrip("\r\n")
+        # A trailing newline and a leading byte order mark (Windows PowerShell writes one) are editor
+        # artifacts, never part of the secret.
+        value = raw.decode("utf-8-sig").rstrip("\r\n")
     except UnicodeError:
         raise CredentialFileError(f"Credential file {path} is not valid UTF-8.") from None
     if not value or "\n" in value or "\r" in value:
