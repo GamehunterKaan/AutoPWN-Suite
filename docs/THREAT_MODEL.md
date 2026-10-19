@@ -212,8 +212,9 @@ External provider data enters NVD parsing, local DB updates and exploit-referenc
 storage. Database readers use read-only snapshots and parameterized operations;
 updates validate/stage/replace. A mirror copied from another system is not
 validated again as a whole, so each stored record is inflated with a size limit
-and type-checked when read, and a malformed one fails the lookup as incomplete
-instead of crashing the scan. Advertised feed hashes and feed bytes share the
+(16 MiB, and 256 MiB for all the records one search reads, so that many matching
+records cannot add up to gigabytes of results) and type-checked when read, and a
+malformed or oversized one fails the lookup as incomplete instead of crashing the scan. Advertised feed hashes and feed bytes share the
 same provider HTTPS boundary, not an independent signature
 (`autopwn_suite/vulnerability_db.py:265`). Downloads save bytes without executing them.
 Replay validates a generated recorded-evidence plan; it does not accept arbitrary
