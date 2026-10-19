@@ -358,18 +358,36 @@ _profiles: dict = {}   # id -> profile dict
 _profiles_lock  = threading.Lock()
 
 
+def _set_aside(path: Path, *, move: bool) -> str:
+    """Keep what the dashboard could not load (the next save rewrites the file) and log where it went."""
+    kept = path.with_name(f"{path.name}.corrupt-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}")
+    try:
+        if move:
+            os.replace(path, kept)
+        else:
+            shutil.copy2(path, kept)
+    except OSError:
+        return f"Could not keep a copy of {path.name}; the next save replaces it."
+    return f"The original of {path.name} is kept as {kept.name}."
+
+
 def _load_profiles() -> None:
     global _profiles
     if _PROFILES_FILE.exists():
         try:
             data = json.loads(_PROFILES_FILE.read_text(encoding="utf-8"))
-            if not isinstance(data, dict) or any(not isinstance(p, dict) for p in data.values()):
+            if not isinstance(data, dict):
                 raise ValueError("Profiles must be an object of profile objects")
+            valid = {pid: profile for pid, profile in data.items() if isinstance(profile, dict)}
+            if len(valid) != len(data):
+                logging.error("Skipped %d invalid entries of %s. %s", len(data) - len(valid), _PROFILES_FILE.name,
+                              _set_aside(_PROFILES_FILE, move=False))
             with _profiles_lock:
-                _profiles = data
+                _profiles = valid
             return
         except Exception:
-            pass
+            logging.error("Could not load %s; starting without profiles. %s", _PROFILES_FILE.name,
+                          _set_aside(_PROFILES_FILE, move=True))
     with _profiles_lock:
         _profiles = {}
 
@@ -397,8 +415,12 @@ def _load_schedules() -> None:
             data = json.loads(_SCHEDULES_FILE.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 raise ValueError("Schedules must be an object")
-            data = {sid: sched for sid, sched in data.items()
-                    if isinstance(sid, str) and isinstance(sched, dict)}
+            valid = {sid: sched for sid, sched in data.items()
+                     if isinstance(sid, str) and isinstance(sched, dict)}
+            if len(valid) != len(data):
+                logging.error("Skipped %d invalid entries of %s. %s", len(data) - len(valid), _SCHEDULES_FILE.name,
+                              _set_aside(_SCHEDULES_FILE, move=False))
+            data = valid
             with _schedules_lock:
                 _schedules = data
             # Restore last_run times so schedules don't fire immediately on restart
@@ -416,7 +438,8 @@ def _load_schedules() -> None:
                             pass
             return
         except Exception:
-            pass
+            logging.error("Could not load %s; starting without schedules. %s", _SCHEDULES_FILE.name,
+                          _set_aside(_SCHEDULES_FILE, move=True))
     with _schedules_lock:
         _schedules = {}
     with _schedule_last_run_lock:

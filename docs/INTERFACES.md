@@ -211,7 +211,10 @@ Schedules use the selected profile when firing and must satisfy offline policy.
   by their IDs. Since v2.6.1 the dashboard also keeps `web_ui_auth.json` (plaintext
   username, scrypt password hash and a revision) beside them; do not edit it by
   hand, use the account settings or `--web-reset-account`. They are implementation-managed state, not a stable migration
-  API. SQLite schema/readiness is versioned internally. Export before moving
+  API. A profiles or schedules file that cannot be parsed is logged and renamed to
+  `<name>.corrupt-<UTC timestamp>` before the dashboard starts without it, and a
+  file with some non-object entries loads the valid ones, logs the count and keeps
+  a copy of the original the same way, so the next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
   versions; never edit an active database directly.
 - Nmap receives argv and returns XML/progress. Online NVD receives service
   keywords and optional API key over HTTPS; Exploit-DB supplies references and

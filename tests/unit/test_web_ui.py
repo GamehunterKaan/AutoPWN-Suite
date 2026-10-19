@@ -2066,6 +2066,32 @@ class TestSettingsLoadError:
         wu._load_schedules()
         assert wu._schedules == {}
 
+    @pytest.mark.parametrize("kind", ["profiles", "schedules"])
+    def test_unreadable_file_is_kept_and_logged_before_the_next_save(self, wu, caplog, kind):
+        path = getattr(wu, f"_{kind.upper()}_FILE")
+        path.write_text("{truncated", encoding="utf-8")
+        getattr(wu, f"_load_{kind}")()
+        assert getattr(wu, f"_{kind}") == {}
+        kept = list(path.parent.glob(path.name + ".corrupt-*"))
+        assert len(kept) == 1 and kept[0].read_text(encoding="utf-8") == "{truncated"
+        assert path.name in caplog.text and kept[0].name in caplog.text
+        getattr(wu, f"_save_{kind}")()  # the first save used to destroy the only copy
+        assert kept[0].read_text(encoding="utf-8") == "{truncated"
+
+    @pytest.mark.parametrize("kind", ["profiles", "schedules"])
+    def test_one_invalid_entry_does_not_drop_the_others(self, wu, caplog, kind):
+        path = getattr(wu, f"_{kind.upper()}_FILE")
+        original = json.dumps({"a": {"id": "a"}, "b": "not an object", "c": {"id": "c"}})
+        path.write_text(original, encoding="utf-8")
+        getattr(wu, f"_load_{kind}")()
+        assert sorted(getattr(wu, f"_{kind}")) == ["a", "c"]
+        kept = list(path.parent.glob(path.name + ".corrupt-*"))
+        assert len(kept) == 1 and kept[0].read_text(encoding="utf-8") == original
+        assert "Skipped 1 invalid entries" in caplog.text and kept[0].name in caplog.text
+        getattr(wu, f"_save_{kind}")()
+        assert sorted(json.loads(path.read_text(encoding="utf-8"))) == ["a", "c"]
+        assert kept[0].read_text(encoding="utf-8") == original
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Email with duplicate -O flag dedup
