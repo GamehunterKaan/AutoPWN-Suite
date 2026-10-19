@@ -7,6 +7,7 @@ import importlib.util
 import json
 import shutil
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -340,6 +341,48 @@ def test_current_version_has_matching_release_notes_and_runtime_version():
     # Needs a '## [<version>]' section with non-empty Functional and Security notes, as the release workflow does.
     notes = release.release_notes((root / "CHANGELOG.md").read_text(encoding="utf-8"), f"v{version}")
     assert notes.startswith(f"# AutoPWN Suite v{version}")
+
+
+@pytest.mark.parametrize("tag,version", [
+    ("v2.7.0", "2.7.0"), ("v2.8.0-rc.1", "2.8.0rc1"), ("v2.8.0-beta.2", "2.8.0b2"), ("v2.8.0-alpha.10", "2.8.0a10"),
+])
+def test_pypi_file_names_carry_the_pep_440_version_of_the_tag(tag, version):
+    """poetry-core builds autopwn_suite-2.8.0rc1-* for the tag v2.8.0-rc.1; the PyPI workflow must expect that."""
+    assert release.pypi_files(tag) == [f"autopwn_suite-{version}-py3-none-any.whl", f"autopwn_suite-{version}.tar.gz"]
+
+
+@pytest.mark.parametrize("tag", ["v2.8.0-notaversion", "2.7.0", "v2.7.0;id"])
+def test_a_tag_pypi_cannot_name_or_that_is_not_a_tag_is_rejected(tag):
+    with pytest.raises(ValueError):
+        release.pypi_files(tag)
+
+
+def test_the_build_directory_must_hold_exactly_the_wheel_and_the_sdist(tmp_path):
+    for name in release.pypi_files("v2.8.0-rc.1"):
+        (tmp_path / name).write_bytes(b"distribution")
+    assert release.check_pypi_dist("v2.8.0-rc.1", tmp_path) == release.pypi_files("v2.8.0-rc.1")
+    # Another version, a missing sdist or an extra file all stop the release.
+    with pytest.raises(ValueError, match="PyPI distribution"):
+        release.check_pypi_dist("v2.8.1-rc.1", tmp_path)
+    (tmp_path / "autopwn_suite-2.8.0rc1.tar.gz").unlink()
+    with pytest.raises(ValueError, match="PyPI distribution"):
+        release.check_pypi_dist("v2.8.0-rc.1", tmp_path)
+    (tmp_path / "autopwn_suite-2.8.0rc1.tar.gz").write_bytes(b"distribution")
+    (tmp_path / "extra.txt").write_bytes(b"unexpected")
+    with pytest.raises(ValueError, match="PyPI distribution"):
+        release.check_pypi_dist("v2.8.0-rc.1", tmp_path)
+
+
+def test_the_pypi_workflow_checks_file_names_with_the_normalising_helper(tmp_path):
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github/workflows/publish-pypi.yml").read_text(encoding="utf-8")
+    assert 'python scripts/release_assets.py pypi-dist --tag "$RELEASE_TAG" --output dist' in workflow
+    assert "py3-none-any.whl\\nautopwn_suite-%s.tar.gz" not in workflow
+    for name in release.pypi_files("v2.8.0-rc.1"):
+        (tmp_path / name).write_bytes(b"distribution")
+    shown = subprocess.run([sys.executable, str(root / "scripts/release_assets.py"), "pypi-dist", "--tag", "v2.8.0-rc.1",
+                            "--output", str(tmp_path)], capture_output=True, text=True, check=True)
+    assert shown.stdout.split() == release.pypi_files("v2.8.0-rc.1")
 
 
 def test_verification_docs_name_every_signer_identity_the_workflows_can_produce():

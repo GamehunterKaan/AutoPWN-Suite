@@ -99,8 +99,8 @@ jobs:
           (cd dist && sha256sum -- * | sort -k2) > "$RUNNER_TEMP/first.sha256"
           (cd "$RUNNER_TEMP/rebuild" && sha256sum -- * | sort -k2) > "$RUNNER_TEMP/second.sha256"
           diff "$RUNNER_TEMP/first.sha256" "$RUNNER_TEMP/second.sha256"
-          version="${RELEASE_TAG#v}"
-          test "$(ls dist | sort)" = "$(printf 'autopwn_suite-%s-py3-none-any.whl\nautopwn_suite-%s.tar.gz\n' "$version" "$version" | sort)"
+          # Exactly the wheel and the sdist; their names carry the PEP 440 form of the version (v2.8.0-rc.1 builds 2.8.0rc1).
+          python scripts/release_assets.py pypi-dist --tag "$RELEASE_TAG" --output dist
       - name: Install the wheel into a clean environment and start it
         run: |
           set -euo pipefail

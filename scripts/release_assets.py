@@ -281,9 +281,27 @@ def bundle_supporting(output, tag, assets, standalone=()):
     return published, {"name": name, "files": supporting}
 
 
+def pypi_files(tag):
+    """File names `python -m build` writes for a tag: they carry the PEP 440 form of the version (v2.8.0-rc.1 builds 2.8.0rc1)."""
+    if not TAG.fullmatch(tag):
+        raise ValueError("Expected a version tag")
+    # Only the PyPI build job has `packaging`; release validation runs on the runner's bare interpreter.
+    from packaging.version import Version
+    version = Version(tag[1:])
+    return [f"autopwn_suite-{version}-py3-none-any.whl", f"autopwn_suite-{version}.tar.gz"]
+
+
+def check_pypi_dist(tag, output):
+    """The build directory holds exactly the wheel and the source distribution of this release."""
+    expected = pypi_files(tag)
+    if sorted(path.name for path in output.iterdir()) != sorted(expected):
+        raise ValueError("Unexpected or missing PyPI distribution files")
+    return expected
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("prepare", "manifest", "image-index", "platform-digest", "backfill-record"))
+    parser.add_argument("mode", choices=("prepare", "manifest", "image-index", "platform-digest", "backfill-record", "pypi-dist"))
     parser.add_argument("--tag", required=True)
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--output", type=Path, required=True)
@@ -309,6 +327,8 @@ def main():
         if not args.arch or not args.image_config:
             parser.error("backfill-record requires --arch and --image-config")
         backfill_record(args.repo, args.tag, args.output, args.arch, args.image_config)
+    elif args.mode == "pypi-dist":
+        print("\n".join(check_pypi_dist(args.tag, args.output)))
     else:
         if not args.image or not args.digest:
             parser.error("manifest requires --image and --digest")
