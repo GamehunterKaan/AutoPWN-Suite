@@ -208,6 +208,13 @@ existing release summaries; they do not retroactively claim artifact signing.
   length of every link. The Java stack-trace signature reads at most 1,000 characters before a frame and
   100 characters of a frame's file name; with an unbounded frame a 100 KB error page stalled a scan for
   over a minute.
+- The dashboard's scan and profile forms no longer have an "Extra Nmap Flags" field; the scan technique and the ports
+  are checked against fixed lists (see the Security notes), and the README no longer lists SCTP among the dashboard's
+  scan techniques, which are the nine the forms offer.
+- The Settings account form in the dashboard looks like the other forms: the username field is a dark input instead of a
+  white box, the fields and the Update account button are spaced like the other Settings sections, the new and confirm
+  password fields stack whenever the column is too narrow for both, and fields filled in by the browser keep the dark
+  theme on the dashboard and on the sign-in page.
 - Web scan log lines and coverage notes show query secrets in URLs as `REDACTED`, like findings do, and the
   crawler logs a fixed message instead of the request exception. Web findings drop terminal control
   characters (ESC, CR and the C1 codes; newlines and tabs stay) from target-controlled text. Query
@@ -314,8 +321,10 @@ existing release summaries; they do not retroactively claim artifact signing.
   loopback for sign-in.
 - AUTOPWN-SA-2026-007: The dashboard writes its settings, profiles and schedules files owner-only (mode 0600
   on POSIX) instead of with the process umask, which exposed the SMTP password, NVD key and webhook URL in
-  the settings file to other local users (affects v2.6.0 and v2.6.1). A file saved by an earlier release
-  keeps its mode until it is next saved, so run `chmod 600` on the existing ones after upgrading.
+  the settings file to other local users (affects v2.6.0 and v2.6.1). When it starts it also restricts such
+  a file that an earlier release left readable, removes the leftover temporary file of an interrupted save
+  and logs one fixed line, so an upgraded installation needs no chmod; the copy it keeps of a profiles or
+  schedules file it cannot load is created owner-only too.
 - AUTOPWN-SA-2026-008: A failed test email or scan-notification email writes only the exception class, not
   the SMTP server's reply with its host and account names, to the dashboard process's log output and the
   dashboard log (affects v2.6.0 and v2.6.1).
@@ -334,14 +343,25 @@ existing release summaries; they do not retroactively claim artifact signing.
 - AUTOPWN-SA-2026-012: The dashboard now shows a vulnerability's severity only as critical, high, medium,
   low or unknown and escapes its CVSS score, because an attacker-chosen severity from a poisoned NVD answer
   or a copied vulnerability database could run script in the dashboard origin (affects v2.6.0 and v2.6.1).
-- AUTOPWN-SA-2026-013: The daemon configuration written by --create-config and --daemon-install (SMTP
-  password, NVD key, webhook URL) is now created and installed with mode 0600 instead of 0644 so other local
-  users cannot read it at rest, but the installed copy is still created with the process umask and tightened
-  a moment later, so a short race during the first --daemon-install remains.
-- AUTOPWN-SA-2026-014: Dashboard Nmap options that write, read or resume files (`-oN`, `-oG`, `-6o`, `--oX`,
-  `-iL`, `--excludefile` and their abbreviations) are now refused with HTTP 400, closing a way for a
-  signed-in user of a root dashboard to create, overwrite or read files (affects v2.6.0 and v2.6.1), while
-  NSE script options are still accepted and still reach files, so the issue is only partly fixed.
+- AUTOPWN-SA-2026-013: The daemon installer creates the configuration that the wizard writes
+  (--create-config and --daemon-install) and its installed copy owner-only from their first byte, through a
+  temporary 0600 file that replaces the final name in one step, so a local user polling the directory during
+  a first --daemon-install can no longer read the SMTP password, NVD key or webhook URL (affects v2.6.0 and
+  v2.6.1). An older readable copy is replaced instead of being written into, a symlink planted at the file
+  name is not written through, and the install directory is created with mode 0755 (never wider; an umask of
+  000 used to give 0777).
+- AUTOPWN-SA-2026-014: The web dashboard no longer accepts Nmap options at all. The "Extra Nmap Flags" boxes
+  are gone from the scan and profile forms, a scan, profile or schedule request with a non-empty nmap_flags
+  is refused with HTTP 400, scan_technique must be one of the techniques the forms offer, and ports must be
+  port numbers from 1 to 65535, ranges and comma lists, so the Nmap file options and the NSE options
+  (--script, --script-args, --script-args-file) can no longer reach Nmap from the dashboard, and a target
+  that starts with a dash is refused as well (affects v2.6.0 and v2.6.1). A profile or schedule that an
+  earlier release saved with Nmap options is kept but never used: a copy of the file is set aside at
+  startup, and a schedule that uses the profile is disabled with a log line that names the reason, either
+  when it next comes due or when the profile is saved again. Saving the profile removes the options (even
+  when the request does not mention nmap_flags) and turns off the enabled schedules that use it, because
+  they would otherwise run without those options; enable each schedule again by hand. The command line
+  (--nmap-flags) and the Python API (nmap_args) keep their trusted Nmap options.
 - AUTOPWN-SA-2026-015: Do not follow redirects when posting the CLI webhook report or the dashboard webhook
   events: a 307 or 308 re-sent the report or event to the origin named in Location, and any redirect answer
   is now a failed delivery.
@@ -362,12 +382,11 @@ existing release summaries; they do not retroactively claim artifact signing.
 - AUTOPWN-SA-2026-020: The interactive confirmations and the Nmap install offer declined only on a bare "n",
   so "no", "nope" or a padded "n" still ran the refused step, including the exploit download and the sudo
   Nmap install; an unrecognized answer is now asked again instead of being taken as yes.
-- AUTOPWN-SA-2026-021: Partially mitigated in 2.7.0: one client address now keeps at most 16 of the 128
-  pending sign-in challenges, so cookie-less GET /api/auth/login requests from one address no longer evict
-  another address's pending sign-in (affects v2.6.1), but clients behind one proxy or Docker bridge address
-  share the cap and a flood from 8 or more addresses still evicts, so rate-limit that route at the reverse
-  proxy.
-
+- AUTOPWN-SA-2026-021: The dashboard sign-in challenge is now a signed cookie that the server does not
+  store, so a flood of requests to the sign-in page, from one address or many, can no longer evict the
+  operator's pending sign-in or use memory (affects v2.6.1); the per-address cap of 16 and the limit of 128
+  pending challenges are gone, and a restart of the dashboard or a change of the account ends the sign-in
+  challenges that are open, so the page asks for a new one.
 ## [2.6.1] - 2026-10-16
 
 ### Functional changes

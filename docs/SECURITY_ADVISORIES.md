@@ -156,10 +156,9 @@ release that contains it.
 ## AUTOPWN-SA-2026-007 — Dashboard settings file readable by other local users
 
 - Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
-- Status: **fixed in v2.7.0** (2026-10-19) for the files the dashboard creates or
-  saves. A file written by an earlier release keeps its mode until the dashboard
-  next saves it, so an upgraded installation stays exposed until the operator
-  tightens it (see Mitigation). Fixed released version: **2.7.0**.
+- Status: **fixed in v2.7.0** (2026-10-19), completely. The dashboard creates and saves its settings, profiles and schedules files owner-only, and when it starts it also restricts such a file that an earlier release left readable (POSIX), so an upgraded installation no longer waits for the next save. Fixed released version: **2.7.0**.
+
+(Mitigation: keep the data directory owner-only (mode 0700), supply credentials through `*_FILE` files from 2.6.1 on, and rotate a credential that was stored while another local account could read it. For a host that still runs 2.6.x or earlier, keep the existing instruction to run `chmod 600` on the existing `web_ui_settings.json`, `web_ui_profiles.json` and `web_ui_schedules.json` and on any leftover `.web_ui_*.json.*.tmp` file. Delete the sentence that says the files keep their old mode until saved again after upgrading, and instead say that starting the dashboard on 2.7.0 does this itself.)
 - CWE-732; low, requiring a local account on the same host, credentials that an
   operator saved in the dashboard settings, and a data directory that account can
   enter.
@@ -178,23 +177,10 @@ release that contains it.
   owner-only in 2.6.1 and is not affected. In 2.6.0 the unauthenticated dashboard
   (AUTOPWN-SA-2026-001) also returned the NVD key and webhook URL from
   `GET /api/settings` to any client that could reach it.
-- Mitigation: keep the data directory owner-only (mode 0700). After upgrading, run
-  `chmod 600` on the existing `web_ui_settings.json`, `web_ui_profiles.json` and
-  `web_ui_schedules.json` and on any leftover `.web_ui_*.json.*.tmp` file from an
-  interrupted save; they keep their old mode until saved again, and the settings
-  file is saved only when settings change. From 2.6.1 on, supply credentials through
-  `*_FILE` files, and rotate a credential that was stored while another local
-  account could read it.
+- Mitigation: keep the data directory owner-only (mode 0700), supply credentials through `*_FILE` files from 2.6.1 on, and rotate a credential that was stored while another local account could read it. On a host that still runs 2.6.x or earlier, run `chmod 600` on the existing `web_ui_settings.json`, `web_ui_profiles.json` and `web_ui_schedules.json` and on any leftover `.web_ui_*.json.*.tmp` file; v2.7.0 restricts them itself when the dashboard starts.
 - Source: `_write_json` in `autopwn_suite/web_ui.py` (`modules/web_ui.py` in 2.6.1
   and 2.6.0), which the settings, profiles and schedules saves use.
-- Fix in v2.7.0: the temporary file is created with `os.open`, `O_EXCL` and mode 0600,
-  like the account file, so the saved file is owner-only on POSIX whatever the umask
-  (Windows has no POSIX modes, so nothing changes there). A file written by an
-  earlier release is replaced with that mode on its next save, not before. The
-  dashboard now also creates a missing data directory with mode 0700; an existing
-  data directory keeps its own mode. Regression: `tests/unit/test_web_ui.py`
-  (`test_persisted_files_are_created_owner_only`, which saves all three files under
-  umask 022), which fails on the previous code.
+- Fix in v2.7.0: the temporary file is created with `os.open`, `O_EXCL` and mode 0600, like the account file, so the saved file is owner-only on POSIX whatever the umask (Windows has no POSIX modes, so nothing changes there). The dashboard creates a missing data directory with mode 0700; an existing data directory keeps its own mode. In addition, `start_server` now calls `_tighten_data_files` before it loads anything. On POSIX it makes `web_ui_settings.json`, `web_ui_profiles.json`, `web_ui_schedules.json` and the account file `web_ui_auth.json` owner-only (mode 0600) when group or others have any permission on them, and removes a leftover `.web_ui_*.json.*.tmp` file of an interrupted save once it is more than 60 seconds old (a younger one may belong to a save that is still running in another process, so it is only restricted). Each file is opened with `O_NOFOLLOW` and its mode is changed through the open descriptor, so a symlink is never followed and what it points to is never changed, and anything that is not a regular file is skipped. It never stops the dashboard from starting: a file that cannot be changed (a read-only file system, a file that another account owns) is left as it was and reported once, and the other files are still processed. When it changed something it logs one fixed warning line, and when it could not change something one more fixed line; neither names a path or carries exception text. The CVE database and the data directory's own mode are not touched. The copy that the dashboard keeps of a profiles or schedules file it cannot load (`<name>.corrupt-<UTC timestamp>`, new in 2.7.0) is created owner-only as well; it was created with `shutil.copy2`, which briefly has the process umask's mode. A file that cannot be parsed at all is moved aside by a rename instead of being copied, and keeps the mode it had, which the start-up restriction has already made 0600 unless it could not change that file. What the fix cannot undo: a credential that another local account read while the file was readable stays exposed, so rotate it. Regressions fail on the previous code: `tests/unit/test_web_ui.py` `TestExistingDataFilesAreRestricted` (`test_a_file_that_group_or_others_can_access_becomes_owner_only`, `test_an_owner_only_file_is_not_touched_or_reported`, `test_the_leftover_of_an_interrupted_save_is_removed_when_it_is_old_and_restricted_when_it_may_be_running`, `test_a_chmod_that_fails_never_stops_startup_and_is_logged_once_with_fixed_text`, `test_one_file_that_cannot_be_restricted_does_not_leave_the_others_exposed`, `test_a_symlink_is_not_followed`, `test_the_dashboard_starts_with_old_files_restricted_and_also_when_that_fails`, `test_start_server_restricts_the_files_before_it_loads_them`, `test_a_copy_kept_of_an_unreadable_file_is_created_owner_only`, `test_a_file_moved_aside_keeps_the_mode_it_had` (POSIX only; its restricted-first case fails on the previous code, which has no start-up restriction)) together with the existing `test_persisted_files_are_created_owner_only`. Most of these cases are POSIX only; the ones that mock `os.open`, `os.fstat` and `os.fchmod` also run on Windows.
 - Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
 
 ## AUTOPWN-SA-2026-008 — SMTP server's reply written to logs when an email fails
@@ -480,11 +466,9 @@ release that contains it.
 ## AUTOPWN-SA-2026-013 — Daemon configuration file readable by other local users
 
 - Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
-- Status: **partly fixed in v2.7.0** (2026-10-19). The persistent exposure is fixed in
-  **2.7.0**: the file the wizard writes and the installed copy are owner-only once
-  the installer has run. A short race remains while `--daemon-install` creates the
-  installed copy for the first time (see the residual below), so this entry is not
-  closed. Fixed released version: **2.7.0** (persistent exposure only).
+- Status: **fixed in v2.7.0** (2026-10-19), completely. The file the wizard writes and the installed copy are owner-only from their first byte, including on a first installation, and the installer never writes into a file that already exists. Fixed released version: **2.7.0**.
+
+(Replace the "Fix in v2.7.0" paragraph and the "Residual after the v2.7.0 fix" paragraph with the following. The Mitigation paragraph stays for hosts that still run v2.6.x; on v2.7.0, running `--daemon-install` again replaces an installed copy that an earlier release left readable with an owner-only one.)
 - CWE-732; low, requiring a local account on the same host, a process umask that
   leaves the other-read bit (the usual 022) and a directory that account can enter.
 - Prerequisite: `--daemon-install` (or `--create-config`) was run on a multi-user
@@ -506,40 +490,16 @@ release that contains it.
   accounts. On an affected version, running `--daemon-install` again and answering
   yes to overwriting the working-directory file recreates that file and copies it
   over the installed one, so both are mode 0644 again under 022 (answering no stops
-  before any copy).
+  before any copy). On v2.7.0, running `--daemon-install` again replaces an installed copy that an earlier release left readable with an owner-only one.
 - Source: `CreateConfig` and `CopyFiles` in `autopwn_suite/daemon/daemon_installer.py`
   (`modules/daemon/daemon_installer.py` in 2.6.1 and 2.6.0).
-- Fix in v2.7.0: `_write_config` creates the file through `os.open` with mode 0600,
-  so the file it creates is never readable by others, not even briefly, whatever
-  the umask, and `CopyFiles` sets the installed copy to 0600 after copying it, so
-  running `--daemon-install` again also tightens a copy installed by an earlier
-  release. A configuration file written by an earlier release otherwise keeps its
-  mode until the wizard replaces it. On Windows, where `--create-config` also runs,
-  there are no POSIX modes; `--daemon-install` runs only on Linux. Regressions in
-  `tests/unit/test_daemon_installer.py`,
-  `test_create_config_creates_the_file_for_its_owner_only`,
-  `test_create_config_file_mode_is_0600_also_when_replacing_a_0644_file` (POSIX
-  only) and `test_copy_files_leaves_the_installed_config_readable_by_its_owner_only`,
-  fail on the previous code.
-- Residual after the v2.7.0 fix: on a first installation `CopyFiles` calls
-  `shutil.copy2`, which creates `/opt/autopwn-suite/autopwn-daemon.conf` with the
-  process umask (mode 0644 under 022), writes the content, and only then does the
-  `chmod` to 0600 run. In that interval a local account that polls the directory
-  (mode 0755 under 022) can open the file and read the secrets, and keeps reading
-  through the descriptor after the mode change. An unprivileged user id polling
-  during repeated first installs read the synthetic content in about every one of
-  them. The window is a few milliseconds and exists only while `--daemon-install`
-  runs, but v2.7.0 does not close it. Running `--daemon-install` from a root shell
-  with `umask 077` creates the copy owner-only from the start.
+- Fix in v2.7.0: `_private_file` in `autopwn_suite/daemon/daemon_installer.py` creates a new temporary file beside the target with `os.open`, `O_EXCL` and mode 0600, writes and syncs it, and renames it over the final name with `os.replace`. `_write_config` (the wizard's file for `--create-config` and `--daemon-install`) and `_install_config` (the copy to `/opt/autopwn-suite/autopwn-daemon.conf`, which no longer uses `shutil.copy2` and no longer relies on a `chmod` after the copy) both use it. The final name is therefore only ever the old file or the complete mode-0600 file: no file that group or others can open exists at any moment, so there is nothing to poll, and a reader that already holds an older copy open sees only that copy's old content, because an existing copy, including a 0644 one that an earlier release installed, is replaced by a new file and never written into. A failure removes the temporary file and leaves the old file in place. The wizard also no longer follows a symlink planted at its file name (it used to open the name with `O_TRUNC` and so created the link's target as root); the link is replaced instead. `/opt/autopwn-suite` is now created with mode 0755 (never wider, because the umask can only remove bits, so an umask of 077 gives 0700; before, the default 0777 under an umask of 000 gave a directory that anyone could write, which `_root_controlled` then refused); it has to stay enterable for the users who run the installed program, the configuration inside it is 0600, and the existing root-ownership check (`_root_controlled`) still refuses a directory that others can write. An existing directory keeps its mode. The systemd unit holds no secret (its only `Environment=` is `PYTHONUNBUFFERED=1`), `install.sh` and `uninstall.sh` never read or write the configuration, and `--daemon-uninstall` still deletes the installed copy. Measured on Linux with an unprivileged user id that opened and read every entry of the install directory in a loop during 40 first installations of a 1.2 MB synthetic configuration: 538 reads on the code before the fix, none on the fixed code, which left a single mode-0600 file and no temporary file. `--daemon-install` runs only on Linux; on Windows, where `--create-config` also runs, there are no POSIX modes. Not part of this issue and unchanged: the wizard's own file `autopwn-daemon.conf` stays in the working directory (mode 0600) after the installation. Regressions in `tests/unit/test_daemon_installer.py` fail on the previous code: `TestOwnerOnlyConfigInstall` (`test_the_installed_config_is_never_copied_onto_its_final_name`, `test_the_installed_config_is_created_exclusively_with_mode_0600_and_replaces_the_final_name`, `test_nothing_in_the_install_directory_is_readable_by_others_when_the_file_is_put_in_place` and `test_a_local_user_polling_the_directory_never_sees_a_readable_file` (POSIX only), `test_an_existing_0644_installed_config_is_replaced_not_written_into` (POSIX only), `test_a_failed_installation_leaves_the_old_config_and_no_temporary_file`, `test_a_write_that_fails_halfway_leaves_no_temporary_file`, `test_a_new_install_directory_is_0755_less_what_the_umask_removes` (POSIX only; it runs under umasks 000, 022, 027 and 077, and only the umask-000 case fails on the previous code, which created a 0777 directory)) and `TestCreateConfig` (`test_create_config_creates_the_file_for_its_owner_only`, `test_create_config_does_not_write_through_a_dangling_symlink` (POSIX only), `test_create_config_leaves_no_file_behind_when_it_cannot_finish`).
 - Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
 
 ## AUTOPWN-SA-2026-014 — Dashboard accepts Nmap options that make a root dashboard write or read files
 
 - Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
-- Status: **partially fixed in v2.7.0** (2026-10-19): the Nmap options that name an
-  input, output or data file are refused; NSE script options are still accepted and
-  still reach files (see Remaining exposure). Released version with the partial fix:
-  **2.7.0**.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**. The dashboard no longer accepts Nmap options as text at all, so neither the file options nor the NSE options (`--script`, `--script-args`, `--script-args-file`) can reach Nmap from it. **v2.6.0** and **v2.6.1** remain affected; upgrading either closes the exposure. Not changed: the trusted command line (`--nmap-flags`, the daemon configuration) and the Python API (`nmap_args`) still hand operator-chosen Nmap options, NSE included, to Nmap, because they are trusted operator input in `docs/THREAT_MODEL.md` and not a capability of a signed-in dashboard user.
 - CWE-88; low, requiring the dashboard's administrator sign-in (which
   AUTOPWN-SA-2026-001 documents as administrative) and a dashboard process that can
   reach files its users should not.
@@ -572,54 +532,12 @@ release that contains it.
   unprivileged user on Windows and were not repeated as root or with POSIX paths.
   Through the Nmap options named here, reading was confirmed to reach the dashboard
   only for `--excludefile`.
-- Remaining exposure in v2.7.0: `--script`, `--script-args` and `--script-args-file`
-  are still accepted, because NSE scripts and their arguments are trusted
-  administrator functionality in `docs/THREAT_MODEL.md`. Checked on the 2.7.0 code
-  through a signed-in dashboard (Windows build of Nmap 7.99, web servers on
-  loopback): `--script http-fetch` with `--script-args
-  http-fetch.destination=<dir>,http-fetch.url=<path>` saved what the scanned web
-  server returned as a file under the named directory, and `--script http-put` with
-  `--script-args http-put.url=<path>,http-put.file=<file>` sent the content of a
-  local file to the scanned web server. `--script-args-file` makes Nmap read a file;
-  its content did not reach the dashboard in the one scan checked. So a signed-in
-  user of a root dashboard can still use stock NSE scripts to write files and to send
-  files to a web server; no other NSE script was assessed.
-- Mitigation: run the dashboard as an unprivileged account, or in a container started
-  with a non-root user (its data directory must then be writable by that user),
-  where the reduced scan features are acceptable; limit who holds the dashboard
-  sign-in; and check the saved profiles (`web_ui_profiles.json`, which schedules use)
-  for the options above. Upgrading to v2.7.0 closes the Nmap file options only: the
-  first two measures are what limit the NSE route.
+- Remaining exposure in v2.7.0: none through the dashboard's request, profile or schedule fields. A profile that v2.6.x saved with options keeps that text in `web_ui_profiles.json`, in the copy of the file set aside at startup and in the `GET /api/profiles` answer until it is saved again or deleted; the dashboard never applies it. Checked on the 2.7.0 code with the checks that the Impact paragraph describes: the same requests (`-oN`, `-oG`, `-6o`, `-m`, `--oX`, `--excludefile`, `--script http-fetch`, `--script http-put`, `--script-args-file`) sent as `nmap_flags`, `scan_technique` or `ports` of a scan or profile are answered with HTTP 400 and do not start a job; no value outside the nine fixed technique names (`-sS`, `-sT`, `-sA`, `-sW`, `-sM`, `-sU`, `-sN`, `-sF`, `-sX`) starts an option, and no field accepted whitespace inside a value, in the seeded fuzz tests.
+- Mitigation: upgrade to v2.7.0. On v2.6.0 or v2.6.1, until then: run the dashboard as an unprivileged account, or in a container started with a non-root user (its data directory must then be writable by that user), where the reduced scan features are acceptable; limit who holds the dashboard sign-in; and check the saved profiles (`web_ui_profiles.json`, which schedules use) for Nmap options. After upgrading, a schedule whose profile held options is disabled, with one log line that names the reason, either when it next comes due or when the profile is saved again. Saving the profile replaces the stored options with the structured fields, even when the request does not mention `nmap_flags`, and turns off every enabled schedule that uses it (the log line reads `Scheduled scan disabled after a profile edit that removed its stored Nmap options`), because those schedules would otherwise start running without the options they had. Open the profile, check its technique, ports and detection settings, save it, and enable each schedule again by hand. The copy `web_ui_profiles.json.corrupt-<UTC timestamp>` shows what the old profile held.
 - Source: `_validate_nmap_flags` in `autopwn_suite/web_ui.py` (allowed characters
   only) and `scan_with_progress` in `autopwn_suite/nmap_progress.py` (exact-prefix
-  refusal of four spellings); in v2.6.1 and v2.6.0 both are under `modules/`.
-- Fix in v2.7.0: options are matched by name, the way Nmap reads them
-  (`replaces_xml_output` and `uses_files` in `autopwn_suite/nmap_progress.py`).
-  `_validate_nmap_flags` now returns an error, which the scan and profile routes
-  answer with HTTP 400, for any option that writes an output file (`-oN`, `-oG`,
-  `-oS`, `-oM`, `-oX`, `-oA`, `-o`, `-m`), reads an input list (`-iL`, `-i`,
-  `--excludefile`), names a data or stylesheet file (`--datadir`, `--servicedb`,
-  `--versiondb`, `--stylesheet`) or resumes or appends to an output file (`--resume`,
-  `--append-output`), however it is abbreviated or clustered (`-6o`); the three
-  structured fields `scan_technique`, `ports` and `nmap_flags` are all checked. The
-  library guard also matches `-oX`, `-oA`, `--resume` and `--append-output` by name, so
-  no spelling (`--oX`, `--resu`, `--appe`) can replace the scanner's XML. A
-  single-dash spelling of a long option that starts with `o`, `i` or `m`
-  (`-max-retries`) is refused as well; write long options with `--`. A profile saved
-  earlier with a refused option is refused on edit, and a schedule that uses it is
-  disabled when it next comes due and stays disabled until the option is removed and
-  the schedule is enabled again. The trusted CLI keeps `-oN` and the other options
-  that leave the managed XML alone. Regressions that fail on the previous code:
-  `tests/unit/test_web_ui.py`
-  (`TestValidateNmapFlags::test_flags_that_read_or_write_files_are_rejected`,
-  `TestValidateNmapFlags::test_a_profile_cannot_smuggle_file_options_through_the_structured_fields`,
-  `TestAPIScans::test_start_scan_rejects_flags_that_read_or_write_files`),
-  `tests/unit/test_nmap_progress.py::test_every_spelling_of_the_managed_output_options_is_refused`
-  (the nine cases that are not an exact `-oX`, `-oA`, `--resume` or `--append-output`
-  prefix) and
-  `tests/unit/test_web_ui_review.py::test_stored_profile_with_a_refused_flag_disables_its_schedule_until_the_flag_is_removed_and_it_is_enabled_again`.
-  `tests/unit/test_fuzz_inputs.py` adds a seeded fuzz test of the same spellings. NSE
-  options are not covered by any of these.
+  refusal of four spellings); in v2.6.1 and v2.6.0 both are under `modules/`. In v2.7.0 `scan_with_progress` is the only option check left (for the library and the command line); the dashboard builds its arguments from structured fields.
+- Fix in v2.7.0: the free-text "Extra Nmap Flags" field is removed from the scan and profile forms, and the dashboard builds the Nmap arguments only from structured fields (`_profile_config` and `_build_nmap_flags` in `autopwn_suite/web_ui.py`). A scan, profile or schedule request whose `nmap_flags` is not empty is refused with HTTP 400 and one fixed message, whatever the option; an absent or empty value is stored as `""`. `scan_technique` must be `""` or one of the nine techniques the forms offer (`-sS`, `-sT`, `-sA`, `-sW`, `-sM`, `-sU`, `-sN`, `-sF`, `-sX`); `ports` must be a comma list of port numbers 1-65535 and ranges whose first number is at most the last, at most 2048 characters, with no whitespace inside, no `T:`/`U:` prefix and no `-` shorthand; `version_intensity` is an integer from 0 to 9, `speed` an integer from 0 to 5, `host_timeout` an integer of at least 1 (it has no upper bound) and the toggles are JSON booleans. So the only values that start with a dash are the nine fixed technique names, and no field can add an argument. A target with a part that starts with a dash is also refused with HTTP 400 (before, the library guard in `scan_with_progress` failed the job when it started). The arguments are still built as a list and run with `shell=False`. A profile or schedule saved by an earlier release with Nmap options, or with a technique or ports outside those lists, is kept as it was and is not used: at startup a copy of the file is set aside as `<name>.corrupt-<UTC timestamp>` (one copy of an identical file), the scheduler's validation refuses it and disables the schedule that uses it once, with a log line (`Scheduled scan disabled after stored Nmap options`) and a dashboard note. Saving the profile again (a `PUT /api/profiles/<pid>` that does not send `nmap_flags`) replaces the stored options and, because the schedules that use the profile would then run without them, disables every enabled schedule that uses it at that moment, with the log line `Scheduled scan disabled after a profile edit that removed its stored Nmap options` and a dashboard note; each schedule is enabled again by hand. A request that still sends non-empty `nmap_flags` is refused with HTTP 400 and changes nothing. A schedule record that carries an `nmap_flags` key is treated the same way. `replaces_xml_output` and `uses_files` in `autopwn_suite/nmap_progress.py` are unchanged for the Python API and the trusted command line. Regressions that fail on the previous code: `tests/unit/test_web_ui.py` (`TestStructuredNmapSettings::test_any_nmap_flags_text_is_refused_with_the_fixed_message`, `TestStructuredNmapSettings::test_anything_else_in_the_ports_field_is_refused`, `TestStructuredNmapSettings::test_a_technique_the_forms_do_not_offer_is_refused`, `TestStructuredNmapSettings::test_a_target_that_starts_an_nmap_option_is_refused`, `TestAPIScans::test_start_scan_refuses_any_nmap_flags_text`, `TestAPIScans::test_start_scan_refuses_structured_values_that_would_carry_an_option`), `tests/unit/test_web_ui_review.py` (`test_stored_profile_with_nmap_options_disables_its_schedule_once_and_saving_it_again_removes_them`, `test_saving_a_profile_that_held_options_disables_the_schedules_that_would_run_without_them`, `test_loading_profiles_saved_with_nmap_options_keeps_them_and_a_copy_of_the_file`, `test_profile_routes_refuse_any_nmap_flags_text_with_the_fixed_message`, `test_schedule_routes_refuse_nmap_flags_text_too`, `test_stored_schedule_that_carries_options_is_disabled_when_due_and_an_edit_removes_them`), `tests/unit/test_fuzz_inputs.py` (`test_dashboard_refuses_every_nmap_flags_text_whatever_the_option`, `test_structured_scan_fields_can_only_produce_the_fixed_nmap_arguments`), `tests/unit/test_web_ui_behavior.py` (`test_scan_form_sends_the_structured_nmap_controls_and_no_free_text_options`, `test_profile_form_sends_the_structured_nmap_controls_and_no_free_text_options`, `test_a_profile_saved_with_nmap_options_shows_a_notice_and_never_applies_or_resends_them`) and `tests/unit/test_web_ui_static.py::test_the_dashboard_has_no_free_text_nmap_options_field`. They replace `TestValidateNmapFlags`, `test_stored_profile_with_a_refused_flag_disables_its_schedule_until_the_flag_is_removed_and_it_is_enabled_again`, `test_start_scan_rejects_flags_that_read_or_write_files` and `test_flag_allowlist_rejects_every_file_option_spelling_among_random_flags`, which tested the file-option allowlist that no longer exists in `web_ui.py`; `tests/unit/test_nmap_progress.py::test_every_spelling_of_the_managed_output_options_is_refused` still covers the library guard.
 - Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
 
 ## AUTOPWN-SA-2026-015 — Webhook posts follow HTTP redirects
@@ -945,56 +863,79 @@ release that contains it.
 
 - Assessed affected version: **2.6.1**, which introduced the sign-in; **2.6.0** has no
   sign-in and so no challenges, and does not have this defect. Earlier versions not assessed.
-- Status: **partially mitigated in v2.7.0** (2026-10-19). Fixed released version: none;
-  the per-address cap ships in **2.7.0**, and the two limits under Impact remain (behind
-  one shared peer address the eviction now takes 16 requests, where 2.6.1 needed 128).
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**. What
+  remains is listed under Impact: a flood still costs the dashboard work, but it can no
+  longer cause a failed sign-in or use memory.
 - CWE-410; low and availability only: a flood delays a sign-in, it discloses and grants
   nothing, and signed-in sessions are kept in a separate pool.
 - Prerequisite: the attacker's requests reach `GET /api/auth/login` (public, no
   credentials) and pass the HTTPS rule, which means a loopback peer, or any peer when
   `AUTOPWN_WEB_SECURE_COOKIE=1` is set (a non-loopback peer on plain HTTP is answered
   403 and creates no challenge). The operator must be starting a sign-in during the flood.
-- Impact: every `GET /api/auth/login` without a valid challenge cookie creates a
-  server-side challenge, and the server keeps 128 of them, dropping the oldest. In
-  2.6.1 a client that sent 128 such requests after the operator opened the sign-in page
-  removed the operator's challenge, and the operator's sign-in then answered HTTP 403
-  "Sign-in expired. Refresh the page and retry." A flood that places 128 newer
-  challenges (16 on a shared address in 2.7.0) between the operator's page load and
-  submit keeps the operator from signing in for as long as it lasts; a flood too slow
-  to do that does not stop a sign-in. It signs nobody in, is not counted by the
-  failed-sign-in throttle (which counts failed `POST` requests), and does not evict
-  signed-in sessions (a session survived 1000 challenge requests).
-  v2.7.0 does not remove this in two cases:
-  - Clients that reach the dashboard from the same peer address share the cap. The
-    dashboard uses the TCP peer address and ignores `X-Forwarded-For`; it serves plain
-    HTTP itself, so in practice a remote client arrives through a TLS-terminating proxy
-    with `AUTOPWN_WEB_SECURE_COOKIE=1`, which presents its own address, as do a Docker
-    bridge gateway (README.md) and local clients over loopback. For them the cap
-    isolates nobody: a flood evicts the operator's pending challenge after 16 requests,
-    where 2.6.1 needed 128.
-  - The limit of 128 in all remains. Floods from 8 or more addresses (16 each, so 128
-    in all) still evict the oldest challenge of any client; 7 addresses (112) did not
-    when only the operator's challenge was otherwise pending, and fewer addresses
-    suffice when other challenges are pending.
-- Mitigation: rate-limit `GET /api/auth/login` at the reverse proxy, restrict who can
-  reach the dashboard (default loopback bind, firewall or VPN), and reload the sign-in
-  page when it answers "Sign-in expired" while no flood is running. Upgrading adds the
-  per-address cap for clients that arrive from distinct addresses.
+- Impact: every `GET /api/auth/login` without a valid challenge cookie created a
+  server-side challenge, and the server kept 128 of them, dropping the oldest. In 2.6.1
+  a client that sent 128 such requests after the operator opened the sign-in page removed
+  the operator's challenge, and the operator's sign-in then answered HTTP 403 "Sign-in
+  expired. Refresh the page and retry." A flood that placed 128 newer challenges between
+  the operator's page load and submit kept the operator from signing in for as long as it
+  lasted; a flood too slow to do that did not stop a sign-in. It signed nobody in, was not
+  counted by the failed-sign-in throttle (which counts failed `POST` requests), and did
+  not evict signed-in sessions (a session survived 1000 challenge requests). The
+  dashboard uses the TCP peer address and ignores `X-Forwarded-For`, so clients behind one
+  TLS-terminating proxy, a Docker bridge gateway (README.md) or loopback share one peer
+  address; any limit per address isolated none of them.
+  Not removed by the fix in v2.7.0:
+  - A flood of `GET /api/auth/login` still costs the dashboard one read of the account
+    file and one HMAC per request. It stores nothing and cannot make a sign-in fail.
+  - The failed-sign-in throttle (5 failures per peer address and 30 in all within a
+    minute, answered 429) is unchanged. A client that can reach `POST /api/auth/login`
+    and fail sign-ins on purpose can still delay the operator's sign-in for a minute,
+    because any client can obtain a valid challenge. That is the throttle's design, not
+    this defect.
+  - A challenge is not single-use. It carries no authority, since any client can fetch
+    one, so a captured cookie and token pair can only be replayed to attempt a sign-in
+    within its 5 minutes, which the throttle counts; a successful sign-in still issues a
+    new random session. Recording used challenges would need server-side state and add
+    no protection.
+  - A restart of the dashboard, `--web-reset-account` or an account change ends the
+    challenges that are open; the operator sees "Sign-in expired" once and the page
+    fetches a new challenge.
+- Mitigation: none is needed for the eviction once v2.7.0 is installed. To limit the
+  remaining cost of floods and deliberate failed sign-ins, rate-limit `/api/auth/login` at
+  the reverse proxy and restrict who can reach the dashboard (default loopback bind,
+  firewall or VPN). On 2.6.1, rate-limit `GET /api/auth/login` and reload the sign-in
+  page when it answers "Sign-in expired" while no flood is running.
 - Source: `DashboardAuth.new_session` and the `GET` branch of `dashboard_login` in
   `autopwn_suite/web_auth.py` (`modules/web_auth.py` in v2.6.1).
-- Fix in v2.7.0: a challenge records the peer address it was issued to
-  (`LoginSession.address`), and an address keeps at most 16 pending challenges
-  (`PENDING_CHALLENGES_PER_ADDRESS`): its 17th request drops its own oldest one, so one
-  address can no longer evict another's challenge while fewer than 128 are pending.
-  The limit of 128 in all stays as the memory bound. Regression:
-  `tests/unit/test_web_auth.py::test_cookieless_challenge_flood_cannot_evict_another_clients_pending_sign_in`
-  keeps an operator's challenge pending, sends 200 challenge requests from another
-  address, expects that address to hold exactly 16 and the operator's sign-in to answer
-  200. It passes on 2.7.0. On the previous code the test file cannot be imported,
-  because it imports `PENDING_CHALLENGES_PER_ADDRESS` (and the test also reads
-  `LoginSession.address`), so that failure is not evidence of the defect; with those two
-  uses removed, the operator's sign-in answers 403 there. No test covers the two limits
-  above.
+- Fix in v2.7.0: the sign-in challenge is stateless. `GET /api/auth/login` returns a
+  random CSRF token in the body and sets the `autopwn_login` cookie to an expiry (5
+  minutes) and an HMAC-SHA256 signature over the expiry, the CSRF token and the account
+  revision, made with a random key that `DashboardAuth` creates when the process starts
+  (`DashboardAuth.new_challenge`). The sign-in `POST` recomputes the signature from the
+  cookie, the `X-CSRF-Token` header and the current account revision, compares it in
+  constant time and checks the expiry (`DashboardAuth.challenge_valid`); a missing,
+  expired, altered, foreign or non-matching challenge answers 403 "Sign-in expired.
+  Refresh the page and retry." before the credentials are read. The server keeps no
+  challenge, so there is nothing to evict and no memory to exhaust; the per-address cap
+  (`PENDING_CHALLENGES_PER_ADDRESS`), the limit of 128 and `LoginSession.address` are
+  removed. Signed-in sessions, the throttle, the hashing slots, the HTTPS rule and the
+  cookie attributes are unchanged. Regression:
+  `tests/unit/test_web_auth.py::test_a_flood_of_challenge_requests_never_invalidates_another_clients_pending_sign_in`
+  (1,000 challenge requests from one shared address and from a thousand addresses; the
+  operator's sign-in and the oldest flooded challenge both answer 200; on the previous
+  code the operator's sign-in answers 403 in both cases),
+  `test_issuing_challenges_keeps_no_server_side_state`,
+  `test_tampered_forged_foreign_and_restarted_challenges_answer_403`,
+  `test_a_restart_ends_open_challenges_and_a_fresh_one_works`,
+  `test_a_challenge_lasts_five_minutes`,
+  `test_challenge_cookie_alone_is_not_enough_the_csrf_token_must_match`,
+  `test_changing_the_account_ends_the_pending_challenges`,
+  `test_a_replayed_challenge_only_permits_a_throttled_sign_in_attempt_and_never_reuses_a_session`
+  and `test_challenge_is_valid_only_for_the_process_token_and_account_it_was_issued_for`,
+  with seeded fuzz coverage in
+  `tests/unit/test_fuzz_inputs.py::test_sign_in_challenge_check_never_raises_and_only_accepts_the_issued_cookie_and_token`.
+  The first two tests fail on the previous code; the others exercise the new challenge
+  format and are not evidence of the defect.
 - Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
 
 ## Local fix validation — 2026-10-16
