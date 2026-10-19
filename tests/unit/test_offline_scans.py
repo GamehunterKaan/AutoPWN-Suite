@@ -97,6 +97,36 @@ def test_cli_report_follows_the_offline_choice_not_the_nvd_fallback(local_databa
         autopwn.InitializeReport.assert_not_called()
 
 
+def test_cli_keeps_the_recorded_output_when_the_lookup_aborts_the_scan(tmp_path, monkeypatch):
+    """NVD fails and no local database exists: the scan stops with exit status 1 but its output is saved."""
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)  # -y sets it; restored afterwards.
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--vuln-source", "auto", "--vuln-db", str(tmp_path / "missing.sqlite3"),
+                                    "-t", "192.0.2.10", "-y", "--skip-discovery", "--skip-exploit-download",
+                                    "--api", "unused"])
+    logger = MagicMock()
+    monkeypatch.setattr(autopwn, "Logger", lambda console: logger)
+    monkeypatch.setattr(autopwn, "check_nmap", MagicMock())
+    monkeypatch.setattr(autopwn, "PortScan", MagicMock(return_value=nmap_observation()))
+    monkeypatch.setattr(autopwn, "AnalyseScanResults", lambda *a: [["192.0.2.10", 22, "ssh", "OpenSSH", "8.2p1"]])
+    monkeypatch.setattr(autopwn, "WebScan", lambda: False)
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock())
+    monkeypatch.setattr(autopwn, "InitializeReport", MagicMock())
+    monkeypatch.setattr("autopwn_suite.nist_search.searchCVE", MagicMock(side_effect=RuntimeError("HTTP 429")))
+
+    with pytest.raises(SystemExit) as stopped:
+        autopwn.main()
+
+    assert stopped.value.code == 1
+    autopwn.SaveOutput.assert_called_once()
+    autopwn.InitializeReport.assert_not_called()
+    errors = [str(call.args[1]) for call in logger.logger.call_args_list if call.args[0] == "error"]
+    assert any("NVD lookup failed" in text and "local vulnerability database" in text for text in errors)
+
+
 def test_database_management_commands_do_not_start_a_scan(local_database, monkeypatch):
     from rich.console import Console
 

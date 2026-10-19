@@ -137,7 +137,15 @@ class VulnerabilityLookup:
         except Exception:
             if self.source != "auto":
                 raise
-            self._open_local()
+            from autopwn_suite.vulnerability_db import DatabaseUnavailable
+            try:
+                self._open_local()
+            except DatabaseUnavailable as unavailable:
+                raise DatabaseUnavailable(
+                    "NVD lookup failed and no local vulnerability database is available. Retry later, "
+                    "use an NVD API key to avoid rate limits, or download the database with "
+                    "--update-vuln-db while connected."
+                ) from unavailable
             log.logger("warning", "NVD unavailable; using the local vulnerability database "
                        f"updated {self.local.metadata['updated_at']} for this scan.")
             return self.local.search(keyword)

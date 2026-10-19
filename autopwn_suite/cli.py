@@ -210,7 +210,11 @@ def main() -> None:
             raise
         no_hosts = exc
     except RuntimeError as exc:
-        raise SystemExit(str(exc)) from exc
+        # A lookup or Nmap failure late in a long scan must not discard the output recorded so far.
+        log.logger("error", str(exc))
+        log.logger("warning", "The scan did not finish; saving the output recorded so far.")
+        SaveOutput(console, args.output_type, args.output, args.output_folder, targetarg)
+        raise SystemExit(1) from exc
     finally:
         lookup.close()
 

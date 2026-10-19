@@ -357,7 +357,9 @@ packages from a connected machine. The dashboard uses local assets and system fo
 The default `--vuln-source auto` tries online NVD lookups and falls back to a ready local database
 if NVD is unavailable, staying local for the rest of that scan. `--vuln-source online` requires
 online lookups. Use `--offline` (or `--vuln-source offline`) to avoid trying NVD at all.
-Missing or invalid local data fails explicitly rather than reporting a clean vulnerability scan.
+Missing or invalid local data fails explicitly rather than reporting a clean vulnerability scan:
+when NVD fails and no local database is ready, the scan stops with exit status 1 and a message that
+names both failures, and the output recorded so far is still saved.
 Stored data remains usable without an expiry; its update time is shown in scan logs and dashboard
 results. Offline matching uses description keyword prefixes, with all query terms required,
 and keeps versions such as `10.1.18` distinct from a query for `1.1`. As with online keyword scans,
