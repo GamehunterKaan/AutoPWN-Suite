@@ -40,16 +40,22 @@ def _get_menu_choice(console, prompt: str, options: dict, default: str = None) -
             return choice
         console.print(f"[red]Invalid choice. Please enter one of {list(options.keys())}.[/red]")
 
-def _get_validated_int(console, prompt: str, default: int = None) -> int:
-    """Gets and validates an integer input from the user."""
+def _get_validated_int(console, prompt: str, default: int = None, minimum: int = None, maximum: int = None) -> int:
+    """Gets and validates an integer input from the user. The bounds are the ones InitArgsConf enforces
+    when the daemon reads the file back: a value it rejects would make the service exit and restart forever."""
     while True:
         user_input = console.input(prompt)
         if user_input == "" and default is not None:
             return default
         try:
-            return int(user_input)
+            value = int(user_input)
         except ValueError:
             console.print("[red]Invalid input. Please enter a whole number.[/red]")
+            continue
+        if (minimum is None or value >= minimum) and (maximum is None or value <= maximum):
+            return value
+        limits = ([f"at least {minimum}"] if minimum is not None else []) + ([f"at most {maximum}"] if maximum is not None else [])
+        console.print(f"[red]Out of range. Please enter a whole number that is {' and '.join(limits)}.[/red]")
 
 def _get_validated_email(console, prompt: str, allow_empty: bool = False) -> str:
     """Gets and validates an email address from the user."""
@@ -82,7 +88,7 @@ def _write_config(config, config_file):
 def CreateConfig(console, config_filename=""):
     console.print("Welcome to AutoPWN Suite Config Creator!")
 
-    scan_interval = _get_validated_int(console, "Enter the scan interval in [cyan]seconds[/cyan] (Set to 0 for no interval - if not using as daemon): ")
+    scan_interval = _get_validated_int(console, "Enter the scan interval in [cyan]seconds[/cyan] (Set to 0 for no interval - if not using as daemon): ", minimum=0)
 
     report_choice = _get_menu_choice(
         console,
@@ -97,11 +103,11 @@ def CreateConfig(console, config_filename=""):
         report_email_to = _get_validated_email(console, "Enter the email address to [cyan]send the report to[/cyan]: ")
         report_email_from = _get_validated_email(console, "Enter the email address to [cyan]send from[/cyan] (leave empty to use login email): ", allow_empty=True)
         report_email_server = _get_non_empty_input(console, "Enter the [cyan]email server[/cyan] to send the report from: ")
-        report_email_server_port = _get_validated_int(console, "Enter the [cyan]email port[/cyan] to send the report from: ")
+        report_email_server_port = _get_validated_int(console, "Enter the [cyan]email port[/cyan] to send the report from: ", minimum=1, maximum=65535)
         console.print("[green]Email notifications enabled.[/green]")
     elif report_choice == "2":
         report_method = 'webhook'
-        report_webhook = console.input("Enter your [cyan]webhook URL[/cyan]: ")
+        report_webhook = _get_non_empty_input(console, "Enter your [cyan]webhook URL[/cyan]: ")
         console.print("[green]Webhook notifications enabled.[/green]")
     else: # choice == "3"
         report_method = 'none'
@@ -118,7 +124,7 @@ def CreateConfig(console, config_filename=""):
 
     api_key = console.input("Enter [cyan]API key[/cyan] (Leave empty for none): ")
     nmap_flags = console.input("Enter [cyan]nmap flags[/cyan] (Leave empty for none): ")
-    speed = _get_validated_int(console, "Enter [cyan]speed[/cyan] (0-5, Leave empty for default): ", default=3)
+    speed = _get_validated_int(console, "Enter [cyan]speed[/cyan] (0-5, Leave empty for default): ", default=3, minimum=0, maximum=5)
 
 
     scan_type_choice = _get_menu_choice(
@@ -129,7 +135,7 @@ def CreateConfig(console, config_filename=""):
     )
     scan_type = "arp" if scan_type_choice == "1" else "ping"
 
-    host_timeout = _get_validated_int(console, "Enter [cyan]host timeout[/cyan] (Leave empty for default): ", default=240)
+    host_timeout = _get_validated_int(console, "Enter [cyan]host timeout[/cyan] (Leave empty for default): ", default=240, minimum=0)
 
     scan_method_choice = _get_menu_choice(
         console,
@@ -142,9 +148,12 @@ def CreateConfig(console, config_filename=""):
     output_folder = console.input("Enter [cyan]output folder[/cyan] (Leave empty for default): ")
     if output_folder == "":
         output_folder = "outputs"
-    output_type = console.input("Enter [cyan]output type[/cyan] (Leave empty for html): ")
-    if output_type == "":
-        output_type = "html"
+    output_type = _get_menu_choice(
+        console,
+        "Enter [cyan]output type[/cyan] (Leave empty for html): ",
+        {"html": "HTML report", "txt": "Plain text", "svg": "SVG image"},
+        default="html"
+    )
 
     console.print("Creating config file...")
     # InitArgsConf reads with interpolation disabled, so a '%' in a secret or URL must be written the same way.

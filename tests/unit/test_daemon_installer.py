@@ -8,6 +8,7 @@ import re
 import shlex
 import stat
 import sys
+from configparser import ConfigParser
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
@@ -80,6 +81,23 @@ class TestDaemonHelpers:
         mock_console.print.assert_called_with(
             "[red]Invalid input. Please enter a whole number.[/red]"
         )
+
+    @pytest.mark.parametrize("minimum, maximum, rejected, accepted", [
+        (0, 5, ["-1", "6", "99"], "0"),
+        (0, 5, ["6"], "5"),
+        (1, 65535, ["0", "65536", "-1"], "1"),
+        (1, 65535, ["65536"], "65535"),
+        (0, None, ["-1", "-3600"], "0"),
+    ])
+    def test_get_validated_int_re_prompts_outside_its_bounds(self, mock_console, minimum, maximum, rejected, accepted):
+        mock_console.input.side_effect = [*rejected, accepted]
+        assert _get_validated_int(mock_console, "Prompt", minimum=minimum, maximum=maximum) == int(accepted)
+        assert mock_console.input.call_count == len(rejected) + 1
+        assert any("Out of range" in str(c) for c in mock_console.print.call_args_list)
+
+    def test_get_validated_int_default_is_returned_without_a_range_check(self, mock_console):
+        mock_console.input.return_value = ""
+        assert _get_validated_int(mock_console, "Prompt", default=3, minimum=0, maximum=5) == 3
 
     def test_get_validated_email_valid(self, mock_console):
         """Verify a valid email is returned."""
@@ -263,6 +281,43 @@ class TestCreateConfig:
     def _webhook_answers():
         """Answers for a webhook configuration with every optional prompt left empty."""
         return ["0", "2", "https://hooks.example.test/h", "", "", "", "", "", "1", "", "1", "", ""]
+
+    @staticmethod
+    def _email_answers():
+        """Answers for an email configuration with every optional prompt left empty."""
+        return ["0", "1", "user@example.test", "p4ss", "to@example.test", "", "smtp.example.test", "587",
+                "", "", "", "", "", "1", "", "1", "", ""]
+
+    @pytest.mark.parametrize("flow, position, rejected, setting", [
+        ("webhook", 0, "-1", ("AUTOPWN", "scan_interval", "0")),
+        ("webhook", 2, "", ("REPORT", "webhook", "https://hooks.example.test/h")),
+        ("webhook", 2, "   ", ("REPORT", "webhook", "https://hooks.example.test/h")),
+        ("webhook", 7, "6", ("AUTOPWN", "speed", "3")),
+        ("webhook", 7, "-1", ("AUTOPWN", "speed", "3")),
+        ("webhook", 9, "-5", ("AUTOPWN", "host_timeout", "240")),
+        ("webhook", 12, "pdf", ("AUTOPWN", "output_type", "html")),
+        ("email", 7, "0", ("REPORT", "email_port", "587")),
+        ("email", 7, "65536", ("REPORT", "email_port", "587")),
+    ])
+    def test_create_config_asks_again_for_a_value_the_loader_would_reject(
+        self, mock_console, tmp_path, flow, position, rejected, setting
+    ):
+        """The daemon exits on a value InitArgsConf rejects and systemd restarts it every 5 seconds, so the
+        wizard must refuse it while the operator is still answering."""
+        answers = self._webhook_answers() if flow == "webhook" else self._email_answers()
+        answers.insert(position, rejected)  # the wizard must read the same question again
+        mock_console.input.side_effect = answers
+        config_path = tmp_path / "autopwn-daemon.conf"
+
+        assert CreateConfig(mock_console, str(config_path)) is True
+
+        assert mock_console.input.call_count == len(answers)
+        section, option, expected = setting
+        args = SimpleNamespace(config=str(config_path))
+        InitArgsConf(args, MagicMock())  # the loader accepts what was written
+        parser = ConfigParser(interpolation=None)
+        parser.read(config_path, encoding="utf-8")
+        assert parser[section][option] == expected
 
     def test_create_config_creates_the_file_for_its_owner_only(self, mock_console, tmp_path):
         """The file holds the SMTP password, NVD key or webhook URL, so it is never created group/world readable."""
