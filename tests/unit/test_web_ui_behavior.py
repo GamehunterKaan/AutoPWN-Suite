@@ -427,6 +427,31 @@ for (const value of bad) assert.match(portsError(value),/Ports must be port numb
 """)
 
 
+def test_the_browser_ports_check_agrees_with_the_server_on_random_and_edge_values():
+    import random
+
+    from autopwn_suite.web_ui import _checked_ports
+
+    rng = random.Random(20261019)
+    alphabet = "0123456789012345678901234567890123456789-,- ,:TU;pxo"
+    corpus = ["", "80", "0", "65535", "65536", "1-65535", "1-65536", "80-22", "80-80", "22,80", "22, 80", "-", "80-", "-80",
+              "0080", "99999", "100000", "1,2,3", ",", "1-2-3", "1--2", "T:80", "9" * 40, ",".join(["80"] * 50)]
+    corpus += ["".join(rng.choice(alphabet) for _ in range(rng.randint(0, 14))) for _ in range(700)]
+    expected = []
+    for value in corpus:
+        try:
+            _checked_ports(value.strip())
+            expected.append(True)
+        except ValueError:
+            expected.append(False)
+    assert any(expected) and not all(expected)
+    run_js(f"const corpus={json.dumps(corpus)}, expected={json.dumps(expected)};" + """
+const actual=corpus.map(value=>portsError(value.trim())==='');
+const different=corpus.filter((value,i)=>actual[i]!==expected[i]);
+assert.deepEqual(different,[]);
+""")
+
+
 @pytest.mark.parametrize("ports", ["22, 80", "0", "65536", "80-22", "T:80", "--script=banner", "80 -oN x"])
 def test_scan_and_profile_forms_report_a_ports_value_the_server_would_refuse_without_sending_it(ports):
     run_js(f"const ports={json.dumps(ports)};" + """
