@@ -117,8 +117,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   `--stylesheet`, `--resume` and `--append-output`) with HTTP 400 in any spelling, abbreviation or
   short-option cluster. Single-dash spellings of long options that start with `o`, `i` or `m`, such as
   `-max-retries`, are refused too: write long options with `--`. A profile or schedule stored with such an
-  option has to be edited before it can be changed or run again; until then `PUT /api/profiles/<id>`
-  answers 400 and its scheduled scans are skipped.
+  option has to be edited before it can be changed: until then `PUT /api/profiles/<id>` answers 400, and a
+  schedule that uses it is disabled when it next comes due (enable it again after the edit).
 - When NVD lookups fail and no local vulnerability database is ready, the scan stops with exit status 1 and
   a message that names both failures. A scan that stops on a runtime error during lookup or host discovery
   (for example a failed Nmap host discovery) saves the output recorded so far instead of discarding it,

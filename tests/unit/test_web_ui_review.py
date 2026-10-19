@@ -168,7 +168,7 @@ def test_missing_saved_profile_does_not_fall_back_to_default_scan(client_review,
     wu_review._launch_scan.assert_not_called()
 
 
-def test_stored_profile_with_a_refused_flag_neither_fires_nor_changes_until_the_flag_is_removed(client_review, wu_review):
+def test_stored_profile_with_a_refused_flag_disables_its_schedule_until_the_flag_is_removed_and_it_is_enabled_again(client_review, wu_review):
     profile_id = _profile(client_review)
     schedule_id = _schedule(client_review, profile_id)
     # As saved by a release that still accepted file options.
@@ -176,10 +176,14 @@ def test_stored_profile_with_a_refused_flag_neither_fires_nor_changes_until_the_
     _one_scheduler_tick(wu_review)
     wu_review._launch_scan.assert_not_called()
     assert schedule_id not in wu_review._schedule_last_run
+    assert wu_review._schedules[schedule_id]["enabled"] is False  # disabled once, not retried every minute
     assert client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed"}).status_code == 400
     assert wu_review._profiles[profile_id]["name"] == "Offline profile"
     repaired = client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed", "nmap_flags": "-sV"})
     assert repaired.status_code == 200
+    _one_scheduler_tick(wu_review)
+    wu_review._launch_scan.assert_not_called()  # repairing the profile does not switch the schedule back on
+    assert client_review.put(f"/api/schedules/{schedule_id}", json={"enabled": True}).status_code == 200
     _one_scheduler_tick(wu_review)
     wu_review._launch_scan.assert_called_once()
 

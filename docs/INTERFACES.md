@@ -159,7 +159,7 @@ Configuration fields are `mode` (normal/evade/noise), `speed` (0–5), `scan_typ
 when they name a file: output options (`-oN`, `-oG`, `-oS`, `-oM`, `-oX`, `-oA`, `-o`, `-m`, however
 spelled or clustered, as in `-6o`), `-iL`, `--excludefile`, `--datadir`, `--servicedb`, `--versiondb`,
 `--stylesheet`, `--resume` and `--append-output`. A single-dash spelling of a long option that starts with
-`o`, `i` or `m` (`-max-retries`) is refused as well; write long options with `--`. A profile saved earlier with such an option is held to the same rule: `PUT /api/profiles/<pid>` answers 400 for any change, and its scheduled scans are skipped, until `nmap_flags` is edited to drop the option. Boolean fields require JSON booleans. Web-only mode sets
+`o`, `i` or `m` (`-max-retries`) is refused as well; write long options with `--`. A profile saved earlier with such an option is held to the same rule: `PUT /api/profiles/<pid>` answers 400 for any change until `nmap_flags` is edited to drop the option, and a schedule that uses it is disabled when it next comes due (enable it again after the edit). Boolean fields require JSON booleans. Web-only mode sets
 `scan_ports:false,scan_web:true` and disables discovery/CVE lookup. Noise mode
 falls back to normal in the dashboard. Job statuses are `running`, `stopping`,
 `completed`, `partial`, `stopped` or `error`; progress can have a null percentage.
