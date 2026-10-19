@@ -75,6 +75,15 @@ def test_deeply_nested_html_stays_fast_for_reflection_analysis(web_response, pag
     assert seconds(poc_runtime._Document("MARK").feed, page) < LIMIT_SECONDS
 
 
+@pytest.mark.unit
+def test_nested_headings_stay_fast_and_ordinary_listing_headings_are_still_read(web_response):
+    nested = web_response("<html><body>" + "<h1>" * 16_000, headers={"Content-Type": "text/html"})
+    assert seconds(inspect_content, "http://example.com/", nested, MagicMock()) < LIMIT_SECONDS
+    listing = '<html><title>Welcome</title><h1>Files</h1><h1>Index of /files/</h1><a href="one">One</a><a href="two">Two</a></html>'
+    result = inspect_content("http://example.com/files/", web_response(listing, headers={"Content-Type": "text/html"}), MagicMock())
+    assert [item["type"] for item in result] == ["DIR_LISTING"]
+
+
 INACTIVE_CASES = [
     ('<template><div><img onerror="MARK"></div></template>', None),
     ("<noscript><p><script>MARK</script></p></noscript>", None),

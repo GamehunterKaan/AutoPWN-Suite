@@ -51,7 +51,9 @@ def inspect_content(url, response, console):
                 add("EXPOSED_FILE", "Backup archive signature; archive was not extracted")
         if is_html(response):
             soup = BeautifulSoup(text, "html.parser")
-            heading = " ".join(node.get_text(" ", strip=True) for node in soup.find_all(["title", "h1"]))
+            # Unclosed headings nest, and each one's text covers its whole subtree, so reading every heading is
+            # quadratic in the page: read the first few, and only their start.
+            heading = " ".join(node.get_text(" ", strip=True)[:500] for node in soup.find_all(["title", "h1"], limit=8))
             children = set()
             for link in soup.find_all("a", href=True):
                 href = link["href"]
