@@ -767,6 +767,15 @@ class TestAPIScans:
                            content_type="application/json")
         assert resp.status_code == 400
 
+    @patch("autopwn_suite.web_ui._launch_scan")
+    @pytest.mark.parametrize("flags", ["-oN /etc/cron.d/x", "--oX out.xml", "-iL /etc/shadow", "-6o out", "--appe"])
+    def test_start_scan_rejects_flags_that_read_or_write_files(self, mock_launch, client, flags):
+        resp = client.post("/api/scan/start",
+                           data=json.dumps({"target": "192.168.1.1", "nmap_flags": flags}),
+                           content_type="application/json")
+        assert resp.status_code == 400
+        mock_launch.assert_not_called()
+
     def test_start_scan_negative_timeout(self, client):
         resp = client.post("/api/scan/start",
                            data=json.dumps({"target": "192.168.1.1", "host_timeout": -1}),
