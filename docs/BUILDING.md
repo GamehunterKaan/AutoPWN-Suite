@@ -111,7 +111,9 @@ docker run --rm --network host -e AUTOPWN_WEB_HOST=127.0.0.1 \
 Open `http://127.0.0.1:8080` on the Docker host. This example is for Linux host
 networking; Docker Desktop networking and raw-packet capabilities depend on the
 host's configuration. The image installs runtime Python dependencies and Nmap.
-It starts `python autopwn.py --web`. Do not expose the administrative dashboard
+It starts `python autopwn.py --web`, which is PID 1 of the container; the launcher exits on
+SIGTERM (status 143), because the kernel ignores that signal for PID 1 unless a handler exists and
+`docker stop` would otherwise wait for Docker's 10-second kill timeout. Do not expose the administrative dashboard
 to untrusted clients. The dashboard requires sign-in with a single administrator
 account and listens on `127.0.0.1` by default (the image itself sets
 `AUTOPWN_WEB_HOST=0.0.0.0` inside the container, which is why the example above

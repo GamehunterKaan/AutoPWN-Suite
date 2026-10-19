@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 """Every way of starting the CLI or importing the library reaches the same code."""
+import importlib.util
 import io
 import re
+import signal
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -37,6 +40,40 @@ def test_pyproject_declares_the_console_script():
 def test_cli_launchers_report_the_package_version(command):
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=60, check=False)
     assert f"AutoPWN Suite v{VERSION}" in result.stdout
+
+
+def load_launcher():
+    spec = importlib.util.spec_from_file_location("autopwn_launcher", ROOT / "autopwn.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # not __main__: nothing is started
+    return module
+
+
+def test_the_container_entrypoint_exits_on_sigterm_because_pid_1_gets_no_default_action(monkeypatch):
+    # `docker stop` sends SIGTERM to PID 1, which the kernel ignores unless the process installed a handler.
+    launcher = load_launcher()
+    handlers = {}
+    monkeypatch.setattr(launcher, "os", SimpleNamespace(getpid=lambda: 1))
+    monkeypatch.setattr(launcher, "signal", SimpleNamespace(
+        SIGTERM=signal.SIGTERM, signal=lambda signum, handler: handlers.update({signum: handler})))
+
+    launcher.exit_on_sigterm_as_pid_1()
+
+    with pytest.raises(SystemExit) as stopped:
+        handlers[signal.SIGTERM](signal.SIGTERM, None)
+    assert stopped.value.code == 128 + signal.SIGTERM
+
+
+def test_any_other_process_keeps_the_default_sigterm_action(monkeypatch):
+    launcher = load_launcher()
+    handlers = {}
+    monkeypatch.setattr(launcher, "os", SimpleNamespace(getpid=lambda: 4242))
+    monkeypatch.setattr(launcher, "signal", SimpleNamespace(
+        SIGTERM=signal.SIGTERM, signal=lambda signum, handler: handlers.update({signum: handler})))
+
+    launcher.exit_on_sigterm_as_pid_1()
+
+    assert handlers == {}
 
 
 def test_library_is_importable_from_the_package_and_the_root_shim():
