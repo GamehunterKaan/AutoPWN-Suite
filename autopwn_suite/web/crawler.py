@@ -47,7 +47,11 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
             links = link_finder(page, log)
             fetched += 1
             if not current or current.problem_revision == revision:
-                graph[page] = sorted(links)
+                # Keep what this page can still add to the crawl: its links in crawl order, up to one past the
+                # largest URL budget a scan can have (a resume with raised limits reads this list again, and the
+                # extra link tells the crawl its budget ran out). A hostile page with 55,000 links would otherwise
+                # leave about 11 MB in the job's checkpoint for every page it serves.
+                links = graph[page] = prioritize_urls(url for url in links if not skip_discovered_url(url))[:LIMITS["max_urls"][2] + 1]
         discovered = set()
         for url in prioritize_urls(links):
             if not same_origin(target_url, url) or url in urls or skip_discovered_url(url):

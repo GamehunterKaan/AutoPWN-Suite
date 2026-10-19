@@ -9,6 +9,9 @@ import pytest
 from requests.exceptions import ConnectionError
 
 from autopwn_suite.web.crawler import crawl, link_finder
+from autopwn_suite.web.options import LIMITS
+from autopwn_suite.web.planning import prioritize_urls
+from autopwn_suite.web.runtime import ScanContext
 
 
 @pytest.mark.unit
@@ -196,3 +199,31 @@ def test_malformed_base_links_and_actions_are_skipped(web_response):
     response = web_response('<base href="http://[broken"><a href="http://[broken">Bad</a><a href="/good">Good</a><form action="http://[broken"><input name="q"></form>')
     with patch("autopwn_suite.web.crawler.get", return_value=response):
         assert link_finder("http://example.com/", MagicMock()) == {"http://example.com/good"}
+
+
+@pytest.mark.unit
+def test_checkpoint_keeps_a_bounded_list_of_links_per_page_and_a_raised_limit_resumes_from_it():
+    root = "http://example.com/"
+    links = {f"{root}p{i}?id={i}" for i in range(12_000)}
+    ordered = prioritize_urls(links)
+    state = {}
+    with patch("autopwn_suite.web.crawler.link_finder", return_value=set(links)) as finder:
+        with ScanContext(root, MagicMock(), checkpoint=state).activate():
+            assert len(crawl(root, MagicMock(), max_pages=1, max_urls=5)) == 5
+        # One more than the largest URL budget, not the 12,000 links the hostile page offered.
+        assert state["crawl"][root] == ordered[:LIMITS["max_urls"][2] + 1]
+        with ScanContext(root, MagicMock(), checkpoint=state).activate():
+            found = crawl(root, MagicMock(), max_pages=1, max_urls=LIMITS["max_urls"][2])
+    assert found == {root, *ordered[:LIMITS["max_urls"][2] - 1]}
+    assert [call.args[0] for call in finder.call_args_list].count(root) == 1
+
+
+@pytest.mark.unit
+def test_links_the_crawl_never_follows_do_not_use_up_the_stored_list():
+    root = "http://example.com/"
+    pages = [root + "one", root + "two"]
+    state = {}
+    with patch("autopwn_suite.web.crawler.link_finder", return_value={f"{root}a{i:05}.css" for i in range(10_500)} | set(pages)):
+        with ScanContext(root, MagicMock(), checkpoint=state).activate():
+            assert crawl(root, MagicMock(), max_pages=1, max_urls=5) == {root, *pages}
+    assert state["crawl"][root] == pages
