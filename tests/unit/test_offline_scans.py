@@ -133,6 +133,31 @@ def test_cli_keeps_the_recorded_output_when_the_lookup_aborts_the_scan(tmp_path,
     assert any(level == "error" and text == "The recorded output could not be saved." for level, text in logged) == bool(save_failure)
 
 
+def test_cli_keeps_the_recorded_output_when_host_discovery_fails(tmp_path, monkeypatch):
+    """README: a scan that stops on a RuntimeError such as a failed host discovery saves its output and ends with its text."""
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    scanner = importlib.import_module("autopwn_suite.scanner")
+    monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)  # -y sets it; restored afterwards.
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(tmp_path / "missing.sqlite3"),
+                                    "-t", "192.0.2.10", "-y", "--skip-exploit-download"])
+    nm = MagicMock()
+    nm.scan.side_effect = RuntimeError("nmap exploded")
+    monkeypatch.setattr(scanner, "PortScanner", lambda: nm)
+    monkeypatch.setattr(autopwn, "Logger", lambda console: MagicMock())
+    monkeypatch.setattr(autopwn, "check_nmap", MagicMock())
+    monkeypatch.setattr(autopwn, "VulnerabilityLookup", MagicMock())
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock())
+
+    with pytest.raises(SystemExit) as stopped:
+        autopwn.main()
+
+    assert stopped.value.code == "nmap exploded"
+    autopwn.SaveOutput.assert_called_once()
+
+
 def test_database_management_commands_do_not_start_a_scan(local_database, monkeypatch):
     from rich.console import Console
 
