@@ -168,7 +168,8 @@ The crawler follows same-origin links and discovers
 GET forms, preserving blank inputs, repeated parameter names and other query values. It skips
 POST forms, password forms and uploads. The default crawl limits are 250 pages, 1,000 discovered
 URLs and five levels of links; reaching a limit is reported as limited coverage. A page with more than
-100 forms, or with forms that hold more than 2,000 controls, is analysed only in part and reported the same way.
+100 forms, with more than 2,000 form controls, or with forms that hold more than 200,000 elements in all, is analysed only in part and reported the same way, and a link or form
+URL longer than 8,192 characters is not followed.
 
 SQLi and LFI checks compare against the original response and repeat promising probes before
 reporting new database errors or Unix/Windows file signatures. Reflected XSS checks require an
@@ -244,7 +245,7 @@ findings = webvuln("https://example.com:8443/app/", log, console)
 
 Each returned finding contains `type`, `url`, `parameter`, `severity`, `confidence`, `evidence`,
 an ID, timestamp, detection/impact/remediation context, captured exchanges and a reproduction plan.
-Sensitive query values and URL credentials are redacted, in the web scan's log lines and coverage notes as well. Captured exchanges include request roles,
+Sensitive query values and URL credentials are redacted in findings and, for URLs that start with a lowercase `http://` or `https://`, in the web scan's log lines and coverage notes as well (the line that announces a web scan and a target typed without that scheme still show the URL as given). Captured exchanges include request roles,
 diagnostic headers, status, response-prefix hash/size, latency and truncation state; response bodies
 and cookie values are omitted. The CLI prints these results through its existing console/export flow.
 

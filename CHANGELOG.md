@@ -198,9 +198,16 @@ existing release summaries; they do not retroactively claim artifact signing.
   discovery, the PoC) compare a shorter prefix of a hostile body of many different characters (ordinary
   pages are compared exactly as before), and recording findings no longer copies all the earlier ones for
   each new one. The crawler's resume checkpoint keeps at most 10,001 links per crawled page, in crawl order
-  and without links it would never follow, and it analyses at most 100 forms and 2,000 form controls per
-  page (a page that exceeds that is reported as partly analysed, like a reached crawl limit), because a
-  page of thousands of unclosed `<form>` or `<select>` tags made its form analysis quadratic.
+  and without links it would never follow, and at most 4 million characters of links in all (a page past
+  that is crawled but read again on a resume). The crawler does not follow a link or form URL longer
+  than 8,192 characters (a server rejects it anyway), takes no links from a page whose `<base href>` is that
+  long, and keeps at most 4 million characters of links per page; a page that exceeds one of these is
+  reported as partly crawled. It analyses at most 100 forms, 2,000 form controls and 200,000 elements per
+  page (reported as partly analysed, like a reached crawl limit), because a page of thousands of unclosed
+  `<form>` or `<select>` tags made its form analysis quadratic and a long `<base href>` multiplied the
+  length of every link. The Java stack-trace signature reads at most 1,000 characters before a frame and
+  100 characters of a frame's file name; with an unbounded frame a 100 KB error page stalled a scan for
+  over a minute.
 - Web scan log lines and coverage notes show query secrets in URLs as `REDACTED`, like findings do, and the
   crawler logs a fixed message instead of the request exception. Web findings drop terminal control
   characters (ESC, CR and the C1 codes; newlines and tabs stay) from target-controlled text. Query
@@ -296,22 +303,70 @@ existing release summaries; they do not retroactively claim artifact signing.
   100,000 newlines, or a page repeating `microsoft odbc `) could freeze a scan, its Stop button and
   the whole dashboard for minutes. The checks now use bounded gaps and read a capped part of the
   body, and a test feeds 100 KB to 1 MB hostile bodies to each of them.
-- `FLASK_DEBUG` in the environment no longer enables the Werkzeug debugger: with it set, the
-  interactive `/console` and the debugger resources were reachable without sign-in, so every
-  dashboard route requires sign-in again.
-- The daemon configuration (SMTP password, NVD key, webhook URL) is created and installed with mode
-  0600 instead of 0644, so other local users cannot read it (POSIX; Windows has no POSIX modes).
 - A failed webhook delivery logs only the HTTP status and a failed dashboard email only the exception
   class: webhook response bodies (which can echo the secret URL path or carry terminal escape
   sequences) and SMTP error text no longer reach the console, the daemon log or the dashboard log.
-- The sudo Nmap install offer and the exploit download can no longer be accepted by an answer such as
-  "no" or "nope".
 - Four silent gaps in coverage or reporting are closed: a host that timed out reported as clean, stale cached NVD
   results in long-lived scans, root-level files skipped behind a redirecting front page, and notifications
   dropped after an NVD fallback. A hostile banner can no longer crash a scan through Rich markup.
 - The loopback and Origin checks are unchanged; the Docker documentation now states that
   publishing to loopback keeps the port off the network but does not make a bridge-published port
   loopback for sign-in.
+- AUTOPWN-SA-2026-007: The dashboard writes its settings, profiles and schedules files owner-only (mode 0600
+  on POSIX) instead of with the process umask, which exposed the SMTP password, NVD key and webhook URL in
+  the settings file to other local users (affects v2.6.0 and v2.6.1). A file saved by an earlier release
+  keeps its mode until it is next saved, so run `chmod 600` on the existing ones after upgrading.
+- AUTOPWN-SA-2026-008: A failed test email or scan-notification email writes only the exception class, not
+  the SMTP server's reply with its host and account names, to the dashboard process's log output and the
+  dashboard log (affects v2.6.0 and v2.6.1).
+- AUTOPWN-SA-2026-009: A sign-in with a lone-surrogate username is an ordinary failed sign-in (HTTP 401) that
+  counts toward the throttle, instead of an uncounted HTTP 500 that let one client keep both hashing slots
+  busy and block other sign-ins (affects v2.6.1), and a request body of deeply nested JSON is handled as
+  malformed JSON instead of ending in HTTP 500 on every dashboard JSON route (affects v2.6.0 and v2.6.1).
+- AUTOPWN-SA-2026-010: Stops `FLASK_DEBUG` from enabling Werkzeug's debugger and the unauthenticated
+  `/console` in the dashboard.
+- AUTOPWN-SA-2026-011: A hostile web target can no longer stall a scan, or the whole dashboard where a regular
+  expression held the interpreter lock, with a crafted response body: the regular expressions over bodies
+  (including the Java stack-trace signature), deeply nested HTML, difflib body comparisons, recording
+  findings, the crawler's form analysis and very long links are bounded, and the crawl checkpoint no longer
+  grows with the links or the pages crawled (affects v2.6.0 and v2.6.1). The HTML parser of the standard
+  library is still slow on some inputs in older Python releases; run a current patch release.
+- AUTOPWN-SA-2026-012: The dashboard now shows a vulnerability's severity only as critical, high, medium,
+  low or unknown and escapes its CVSS score, because an attacker-chosen severity from a poisoned NVD answer
+  or a copied vulnerability database could run script in the dashboard origin (affects v2.6.0 and v2.6.1).
+- AUTOPWN-SA-2026-013: The daemon configuration written by --create-config and --daemon-install (SMTP
+  password, NVD key, webhook URL) is now created and installed with mode 0600 instead of 0644 so other local
+  users cannot read it at rest, but the installed copy is still created with the process umask and tightened
+  a moment later, so a short race during the first --daemon-install remains.
+- AUTOPWN-SA-2026-014: Dashboard Nmap options that write, read or resume files (`-oN`, `-oG`, `-6o`, `--oX`,
+  `-iL`, `--excludefile` and their abbreviations) are now refused with HTTP 400, closing a way for a
+  signed-in user of a root dashboard to create, overwrite or read files (affects v2.6.0 and v2.6.1), while
+  NSE script options are still accepted and still reach files, so the issue is only partly fixed.
+- AUTOPWN-SA-2026-015: Do not follow redirects when posting the CLI webhook report or the dashboard webhook
+  events: a 307 or 308 re-sent the report or event to the origin named in Location, and any redirect answer
+  is now a failed delivery.
+- AUTOPWN-SA-2026-016: Terminal control characters (ESC, CR, DEL and the C1 codes) from a hostile web target
+  no longer reach web findings, web scan log lines and coverage notes of a CLI scan, where they could clear
+  the screen, set the window title or overwrite a result line (affects v2.6.0 and v2.6.1; partially
+  mitigated, because line breaks are kept and a folded Location header can still add a forged result line).
+- AUTOPWN-SA-2026-017: Partially mitigates URL query secrets in web scan log lines, coverage notes and
+  reports: they are redacted, but the console line that announces the scan and a target without a lowercase
+  http:// or https:// scheme still show them.
+- AUTOPWN-SA-2026-018: Inflate the stored records of a copied vulnerability database within size limits and
+  check their types, so a hostile or damaged mirror ends the lookup as incomplete instead of using unbounded
+  memory or crashing the scan (affects v2.6.0 and v2.6.1; NaN and Infinity scores and lone-surrogate text
+  are still accepted).
+- AUTOPWN-SA-2026-019: Rich markup in a service banner, NVD record or Exploit-DB record no longer aborts a
+  CLI or daemon scan run or fails a dashboard job, because that text is now printed as text and not parsed
+  as markup (affects v2.6.0 and v2.6.1).
+- AUTOPWN-SA-2026-020: The interactive confirmations and the Nmap install offer declined only on a bare "n",
+  so "no", "nope" or a padded "n" still ran the refused step, including the exploit download and the sudo
+  Nmap install; an unrecognized answer is now asked again instead of being taken as yes.
+- AUTOPWN-SA-2026-021: Partially mitigated in 2.7.0: one client address now keeps at most 16 of the 128
+  pending sign-in challenges, so cookie-less GET /api/auth/login requests from one address no longer evict
+  another address's pending sign-in (affects v2.6.1), but clients behind one proxy or Docker bridge address
+  share the cap and a flood from 8 or more addresses still evicts, so rate-limit that route at the reverse
+  proxy.
 
 ## [2.6.1] - 2026-10-16
 
