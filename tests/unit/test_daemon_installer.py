@@ -356,6 +356,31 @@ class TestCreateConfig:
 class TestInstallDaemon:
     """Tests for the InstallDaemon function."""
 
+    @pytest.fixture(autouse=True)
+    def installable(self, monkeypatch):
+        """The preflight touches /opt and the interpreter; its own tests live in TestCopyFiles and TestPreflight."""
+        check = MagicMock(return_value=True)
+        monkeypatch.setattr(daemon_installer, "_check_installable", check)
+        return check
+
+    @patch("autopwn_suite.daemon.daemon_installer.CopyFiles")
+    @patch("autopwn_suite.daemon.daemon_installer.CreateConfig")
+    @patch("autopwn_suite.daemon.daemon_installer.print_banner")
+    @patch("autopwn_suite.daemon.daemon_installer.system", return_value="Linux")
+    @patch("autopwn_suite.daemon.daemon_installer.is_root", return_value=True)
+    def test_install_refuses_an_unusable_installation_before_asking_any_question(
+        self, mock_is_root, mock_system, mock_banner, mock_create_config, mock_copy_files, mock_console, installable
+    ):
+        """The wizard writes a configuration that can hold secrets; a refusal must not come after it."""
+        installable.return_value = False
+
+        InstallDaemon(mock_console)
+
+        installable.assert_called_once()
+        assert str(installable.call_args.args[1]) == str(Path("/opt/autopwn-suite"))
+        mock_create_config.assert_not_called()
+        mock_copy_files.assert_not_called()
+
     @patch("autopwn_suite.daemon.daemon_installer.CopyFiles")
     @patch("autopwn_suite.daemon.daemon_installer.CreateConfig")
     @patch("autopwn_suite.daemon.daemon_installer.print_banner")
@@ -406,6 +431,7 @@ class TestCopyFiles:
     @pytest.fixture(autouse=True)
     def root_controlled(self, monkeypatch):
         monkeypatch.setattr(daemon_installer, "_service_files_are_root_controlled", lambda install_path: True)
+        monkeypatch.setattr(daemon_installer, "_service_can_import_package", lambda install_path: True)
 
     @staticmethod
     def _paths(mock_path, config_exists=True, same_file=False):
@@ -524,6 +550,24 @@ class TestCopyFiles:
     @patch("autopwn_suite.daemon.daemon_installer.shutil")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
+    def test_copy_files_refuses_a_unit_that_could_not_import_the_package(
+        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console, monkeypatch
+    ):
+        # A source checkout run as `python autopwn.py`: root-owned and importable here, not from /opt/autopwn-suite.
+        self._paths(mock_path)
+        monkeypatch.setattr(daemon_installer, "_service_can_import_package", lambda install_path: False)
+
+        CopyFiles(mock_console)
+
+        mock_shutil.copy2.assert_not_called()
+        mock_subprocess.check_call.assert_not_called()
+        mock_open.assert_not_called()
+        assert any("cannot import autopwn_suite" in str(c) for c in mock_console.print.call_args_list)
+
+    @patch("autopwn_suite.daemon.daemon_installer.subprocess")
+    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer.Path")
+    @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_stops_when_the_config_is_missing(
         self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
     ):
@@ -617,6 +661,76 @@ class TestExecStart:
     def test_paths_with_spaces_are_quoted(self, monkeypatch):
         monkeypatch.setattr(sys, "executable", "/opt/my tools/python")
         assert _exec_start(Path("/opt/autopwn-suite")).startswith("'/opt/my tools/python' -m autopwn_suite")
+
+
+@pytest.mark.unit
+class TestPackageImportCheck:
+    """The unit runs `python -m autopwn_suite` from /opt/autopwn-suite: a source checkout that only works
+    because `python autopwn.py` has it next to the script would give a service that restarts forever."""
+
+    @staticmethod
+    def probe_result(monkeypatch, **outcome):
+        run = MagicMock(**outcome)
+        monkeypatch.setattr(daemon_installer.subprocess, "run", run)
+        return run
+
+    def test_the_probe_starts_the_interpreter_the_way_the_unit_does(self, monkeypatch):
+        run = self.probe_result(monkeypatch, return_value=SimpleNamespace(returncode=0))
+
+        assert daemon_installer._service_can_import_package(Path("/opt/autopwn-suite")) is True
+
+        command = run.call_args.args[0]
+        assert command[:3] == [sys.executable, "-E", "-c"]  # no PYTHONPATH of the person running the installer
+        assert "find_spec('autopwn_suite')" in command[3]
+        assert run.call_args.kwargs["cwd"] == Path("/opt/autopwn-suite")
+
+    @pytest.mark.parametrize("outcome", [
+        {"return_value": SimpleNamespace(returncode=1)},
+        {"side_effect": OSError("interpreter vanished")},
+        {"side_effect": subprocess.TimeoutExpired("python", 60)},
+    ])
+    def test_a_package_the_service_cannot_import_is_reported(self, monkeypatch, outcome):
+        self.probe_result(monkeypatch, **outcome)
+        assert daemon_installer._service_can_import_package(Path("/opt/autopwn-suite")) is False
+
+    def test_a_frozen_binary_needs_no_probe(self, monkeypatch):
+        run = self.probe_result(monkeypatch, return_value=SimpleNamespace(returncode=1))
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+
+        assert daemon_installer._service_can_import_package(Path("/opt/autopwn-suite")) is True
+        run.assert_not_called()
+
+
+@pytest.mark.unit
+class TestCheckInstallable:
+    @pytest.fixture
+    def install_path(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(daemon_installer, "_service_files_are_root_controlled", lambda path: True)
+        monkeypatch.setattr(daemon_installer, "_service_can_import_package", lambda path: True)
+        return tmp_path / "opt" / "autopwn-suite"
+
+    def test_a_usable_installation_creates_the_directory_once(self, install_path, mock_console):
+        assert daemon_installer._check_installable(mock_console, install_path) is True
+        assert install_path.is_dir()
+        assert daemon_installer._check_installable(mock_console, install_path) is True  # InstallDaemon, then CopyFiles
+        creating = [c for c in mock_console.print.call_args_list if "Creating install directory" in str(c)]
+        assert len(creating) == 1
+
+    def test_a_directory_another_user_can_modify_is_refused_with_the_reason(self, install_path, mock_console, monkeypatch):
+        monkeypatch.setattr(daemon_installer, "_service_files_are_root_controlled", lambda path: False)
+        assert daemon_installer._check_installable(mock_console, install_path) is False
+        assert "can be modified by another user" in str(mock_console.print.call_args_list)
+
+    def test_a_package_the_service_cannot_import_is_refused_with_the_reason(self, install_path, mock_console, monkeypatch):
+        monkeypatch.setattr(daemon_installer, "_service_can_import_package", lambda path: False)
+        assert daemon_installer._check_installable(mock_console, install_path) is False
+        printed = str(mock_console.print.call_args_list)
+        assert "cannot import autopwn_suite" in printed and "python autopwn.py" in printed
+
+    def test_an_uncreatable_directory_is_refused(self, install_path, mock_console):
+        install_path.parent.write_text("a file where a directory is needed")
+        assert daemon_installer._check_installable(mock_console, install_path) is False
+        assert "Failed to create install directory" in str(mock_console.print.call_args_list)
 
 
 @pytest.mark.unit

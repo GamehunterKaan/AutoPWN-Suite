@@ -539,7 +539,10 @@ For more details about usage and flags use `-h` flag.
 autopwn-suite --daemon-install
 ```
 
-Run it as root on Linux from an installed copy of AutoPWN Suite (pipx, `install.sh` or a standalone binary).
+Run it as root on Linux from a root-owned installation of AutoPWN Suite: `sudo bash install.sh` or a
+standalone binary kept in a root-owned directory. The service runs as root, so it refuses an installation
+that another user can modify (a pipx or `uv tool` environment or a virtual environment in a home directory) and a
+source checkout started with `python autopwn.py`, which the service could not import. It checks this before asking any question.
 The systemd service starts that same installation, and the generated configuration is kept in
 `/opt/autopwn-suite/autopwn-daemon.conf` (mode `0600`, as it can hold the SMTP password, NVD key or webhook URL).
 Running `--daemon-install` again rewrites the service and restarts it, so a new configuration or a newer

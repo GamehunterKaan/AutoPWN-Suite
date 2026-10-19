@@ -14,6 +14,8 @@ from platform import system
 from autopwn_suite.banners import print_banner
 from autopwn_suite.utils import is_root
 
+INSTALL_DIR = "/opt/autopwn-suite"
+
 
 def _get_menu_choice(console, prompt: str, options: dict, default: str = None) -> str:
     """
@@ -245,26 +247,63 @@ def _exec_start(install_path):
     return " ".join(shlex.quote(part) for part in command)
 
 
-def CopyFiles(console):
-    DAEMON_INSTALL_PATH = Path("/opt/autopwn-suite")
-    SERVICE_PATH = Path("/etc/systemd/system/autopwn-daemon.service")
-    LOG_PATH = Path("/var/log/autopwn-daemon.log")
-
+def _service_can_import_package(install_path):
+    """The unit runs `python -m autopwn_suite` with the install directory as its working directory. A source
+    checkout started with `python autopwn.py` finds the package next to the script, which the service does not,
+    and the service would then restart every 5 seconds without ever scanning. The probe starts the interpreter
+    the way the unit does: from the install directory and without the caller's PYTHON* variables."""
+    if getattr(sys, "frozen", False):
+        return True  # the unit runs the binary itself
+    probe = "import importlib.util, sys; sys.exit(importlib.util.find_spec('autopwn_suite') is None)"
     try:
-        console.print(f"Creating install directory: {DAEMON_INSTALL_PATH}")
-        DAEMON_INSTALL_PATH.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        console.print(f"[red]Failed to create install directory {DAEMON_INSTALL_PATH}: {e}[/red]")
-        return
+        result = subprocess.run([sys.executable, "-E", "-c", probe], cwd=install_path, timeout=60,
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
 
-    if not _service_files_are_root_controlled(DAEMON_INSTALL_PATH):
+
+def _check_installable(console, install_path):
+    """Create the install directory and refuse, with the reason, an installation the root service must not
+    use. InstallDaemon runs it before asking any question, so a refusal does not follow a whole wizard that
+    leaves its secret-bearing configuration behind."""
+    try:
+        if not install_path.exists():
+            console.print(f"Creating install directory: {install_path}")
+        install_path.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        console.print(f"[red]Failed to create install directory {install_path}: {e}[/red]")
+        return False
+
+    if not _service_files_are_root_controlled(install_path):
         console.print(
             "[red]Refusing to install the daemon: it runs as root, but the interpreter, the package or "
-            f"{DAEMON_INSTALL_PATH} can be modified by another user.[/red]"
+            f"{install_path} can be modified by another user.[/red]"
         )
         console.print("[yellow]Install AutoPWN Suite as root (for example with 'sudo bash install.sh' or a "
                       "standalone binary kept in a root-owned directory) and run --daemon-install from that "
                       "installation.[/yellow]")
+        return False
+
+    if not _service_can_import_package(install_path):
+        console.print(
+            "[red]Refusing to install the daemon: the service would run "
+            f"'{_exec_start(install_path)}' from {install_path}, but this interpreter cannot import "
+            "autopwn_suite from there.[/red]"
+        )
+        console.print("[yellow]A source checkout started with 'python autopwn.py' is not enough. Install "
+                      "AutoPWN Suite as root (for example with 'sudo bash install.sh' or a standalone binary "
+                      "kept in a root-owned directory) and run --daemon-install from that installation.[/yellow]")
+        return False
+    return True
+
+
+def CopyFiles(console):
+    DAEMON_INSTALL_PATH = Path(INSTALL_DIR)
+    SERVICE_PATH = Path("/etc/systemd/system/autopwn-daemon.service")
+    LOG_PATH = Path("/var/log/autopwn-daemon.log")
+
+    if not _check_installable(console, DAEMON_INSTALL_PATH):
         return
 
     # The service runs the installed program; only the configuration written by CreateConfig is placed here.
@@ -353,6 +392,9 @@ def InstallDaemon(console):
         console.print("Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!")
         return
     print_banner(console)
+    # Refuse an unusable installation first: the wizard below writes a configuration that can hold secrets.
+    if not _check_installable(console, Path(INSTALL_DIR)):
+        return
     if CreateConfig(console, "autopwn-daemon.conf") is False:
         return
     CopyFiles(console)
