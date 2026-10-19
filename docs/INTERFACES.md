@@ -206,6 +206,8 @@ while the scan it started last is still running or stopping; it logs one skip an
 starts when that scan ends.
 A due schedule that fails validation (for example a hand-edited file) is disabled
 and logged once instead of failing every minute; enable it again after fixing it.
+Each such disabling, and one caused by a profile edit, is also written to the server
+log as a fixed-text warning with the schedule ID (no exception text).
 
 ## Files, configuration and integrations
 

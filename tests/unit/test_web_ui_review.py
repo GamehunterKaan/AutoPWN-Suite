@@ -254,7 +254,7 @@ def test_schedule_waits_for_its_own_unfinished_scan_and_logs_the_skip_once(clien
     assert wu_review._launch_scan.call_count == 2
 
 
-def test_profile_edit_disables_the_schedules_it_no_longer_fits(client_review, wu_review):
+def test_profile_edit_disables_the_schedules_it_no_longer_fits(client_review, wu_review, caplog):
     profile_id = _profile(client_review)
     cidr = client_review.post("/api/schedules", json={"target": "192.0.2.0/24", "profile_id": profile_id}).get_json()["id"]
     host = client_review.post("/api/schedules", json={"target": "example.test", "profile_id": profile_id}).get_json()["id"]
@@ -264,11 +264,14 @@ def test_profile_edit_disables_the_schedules_it_no_longer_fits(client_review, wu
     assert wu_review._schedules[cidr]["enabled"] is False and wu_review._schedules[host]["enabled"] is True
     assert json.loads(wu_review._SCHEDULES_FILE.read_text())[cidr]["enabled"] is False
     assert any("Disabled after a profile edit" in entry["msg"] for entry in wu_review._log_history)
+    warnings = [record for record in caplog.records if record.levelname == "WARNING"]
+    assert [record.getMessage() for record in warnings] == [
+        f"Scheduled scan disabled after a profile edit (schedule '{cidr}')"]
     _one_scheduler_tick(wu_review)
     assert [call.args[0]["target"] for call in wu_review._launch_scan.call_args_list] == ["example.test"]
 
 
-def test_schedule_that_fails_validation_is_disabled_instead_of_erroring_every_minute(client_review, wu_review):
+def test_schedule_that_fails_validation_is_disabled_instead_of_erroring_every_minute(client_review, wu_review, caplog):
     profile_id = _profile(client_review)
     schedule_id = _schedule(client_review, profile_id)
     wu_review._schedules[schedule_id]["target"] = "192.0.2.10;bad"
@@ -279,6 +282,9 @@ def test_schedule_that_fails_validation_is_disabled_instead_of_erroring_every_mi
     assert json.loads(wu_review._SCHEDULES_FILE.read_text())[schedule_id]["enabled"] is False
     errors = [entry["msg"] for entry in wu_review._log_history if entry["level"] == "error"]
     assert len(errors) == 1 and "disabled" in errors[0]
+    # The server log (the only record for a headless daemon) names the schedule but carries no exception text.
+    assert [record.getMessage() for record in caplog.records if record.levelname == "WARNING"] == [
+        f"Scheduled scan disabled after a validation failure (schedule '{schedule_id}')"]
 
 
 def test_put_can_turn_off_an_invalid_schedule_but_not_turn_it_on(client_review, wu_review):

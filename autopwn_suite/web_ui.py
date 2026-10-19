@@ -1632,6 +1632,11 @@ def _skip_scheduled_run(schedule: dict, reason: str) -> None:
     _scheduler_note("warning", f"[*] Scheduled scan skipped ({schedule.get('name') or schedule['id'][:8]}): {reason}")
 
 
+def _log_schedule_disabled(schedule: dict, cause: str) -> None:
+    """The dashboard log lives in memory; leave a trace for an operator reading the journal. Fixed text and the id."""
+    logging.warning("Scheduled scan disabled after %s (schedule %r)", cause, str(schedule.get("id", ""))[:40])
+
+
 def _disable_invalid_schedule(schedule: dict, error: ValueError) -> None:
     """Validation fails the same way until the schedule or its profile is edited, so stop retrying each minute."""
     with _schedules_lock:
@@ -1640,6 +1645,7 @@ def _disable_invalid_schedule(schedule: dict, error: ValueError) -> None:
             return
         stored["enabled"] = False
     _save_schedules()
+    _log_schedule_disabled(schedule, "a validation failure")
     _scheduler_note("error", f"[!] Scheduled scan disabled ({schedule.get('name') or schedule['id'][:8]}): {error}. "
                     "Edit the schedule or its profile and enable it again.")
 
@@ -2200,6 +2206,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                         except ValueError:
                             schedule["enabled"] = False
                             disabled.append(schedule.get("name") or str(schedule.get("id", ""))[:8])
+                            _log_schedule_disabled(schedule, "a profile edit")
         _save_profiles()
         if disabled:
             _save_schedules()
