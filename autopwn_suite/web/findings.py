@@ -16,9 +16,11 @@ def printable(value):
 
 
 def finding(kind, url, evidence, *, parameter=None, severity="low", confidence="candidate", reproduction=None):
-    from autopwn_suite.web.runtime import ACTIVE
+    from autopwn_suite.web.runtime import ACTIVE, redact_text
+    # Evidence can quote a URL the target chose (a Location header): its credential-named query values go, as in `url`.
     result = {"type": kind, "url": printable(url), "parameter": printable(parameter),
-              "severity": severity, "confidence": confidence, "evidence": printable(evidence)}
+              "severity": severity, "confidence": confidence,
+              "evidence": redact_text(evidence, names_only=True) if isinstance(evidence, str) else evidence}
     current = ACTIVE.get()
     return current.annotate(result, reproduction) if current else result
 

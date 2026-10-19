@@ -102,7 +102,8 @@ def _execute_webvuln(target, log, console):
         else:
             log.logger("warning", f"No reachable in-scope web endpoint on {target}.")
         return []
-    banner(f"Testing web application on {target_url} ...", "purple", console)
+    # The banner goes straight to the console, which a CLI scan records into its reports, so it is redacted here.
+    banner(redact_text(f"Testing web application on {target_url} ..."), "purple", console)
     current = ACTIVE.get()
     if current:
         current.target = target_url
@@ -213,4 +214,4 @@ def webvuln(target, log, console, *, controls=None, should_stop=None, progress=N
             on_complete({"status": "stopped" if context.should_stop() else "partial" if context.issues else "completed", "requests": context.requests,
                          "total_requests": context.state["requests"], "attempts": context.state["attempts"],
                          "completed_tasks": len(context.state["tasks"]),
-                         "issues": context.issues, "target": context.target, "controls": context.options})
+                         "issues": context.issues, "target": redact_text(context.target), "controls": context.options})

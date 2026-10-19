@@ -247,7 +247,7 @@ findings = webvuln("https://example.com:8443/app/", log, console)
 
 Each returned finding contains `type`, `url`, `parameter`, `severity`, `confidence`, `evidence`,
 an ID, timestamp, detection/impact/remediation context, captured exchanges and a reproduction plan.
-Sensitive query values and URL credentials are redacted in findings and, for URLs that start with a lowercase `http://` or `https://`, in the web scan's log lines and coverage notes as well (the line that announces a web scan and a target typed without that scheme still show the URL as given). Captured exchanges include request roles,
+A finding replaces a query value with `REDACTED` when its parameter name looks like a credential (`token`, `session`, `key`, `sig`, `otp`, `pwd`, `api_key` and similar) and drops URL credentials (userinfo and fragment), so that a PoC can still replay the other values; a secret in a parameter with another name, or in the URL path, is not recognized there. Everything else the web scan writes about a URL (the line that announces a scan, log lines, coverage notes, and the target a dashboard job record, export, notification or the CLI parameter summary shows) replaces every query value with `REDACTED` whatever the parameter is called (`?id=REDACTED&x=REDACTED`) and drops userinfo and fragments, for any case of the scheme and for a target typed without a scheme; only a secret in the URL path stays visible. The scan itself uses the target as typed. Captured exchanges include request roles,
 diagnostic headers, status, response-prefix hash/size, latency and truncation state; response bodies
 and cookie values are omitted. The CLI prints these results through its existing console/export flow.
 

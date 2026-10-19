@@ -14,7 +14,7 @@ from difflib import SequenceMatcher
 from html import escape
 from html.parser import HTMLParser
 from time import monotonic
-from urllib.parse import parse_qs, parse_qsl, quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
+from urllib.parse import parse_qs, quote, unquote, unquote_plus, urljoin, urlsplit, urlunsplit
 
 import requests
 
@@ -52,17 +52,24 @@ def validate_plan(plan):
     return scope
 
 
-# Same as SENSITIVE_PARAMETER in runtime.py, which a downloaded PoC does not have.
+# Same as SENSITIVE_PARAMETER and redact_url in runtime.py, which a downloaded PoC does not have.
 _SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?<!by)(?<!com)(?<!sur)(?<!tres)pass(?!age|enger|port|ive|ion|able|over)"
-                                  r"|secret|token|api.?key|session|jwt|signature|csrf", re.I)
+                                  r"|secret|token|session|sessid|jwt|signature|csrf|xsrf|credential|bearer|pwd|cookie|hmac"
+                                  r"|(?:api|access|private|app|client|consumer|licen[cs]e|encryption|signing|master|service|ssh|developer).?key|^key$"
+                                  r"|(?<![a-z])(?:sig|sid|otp|totp|hotp|cred|creds)(?![a-z])|(?-i:(?<=[a-z0-9])(?:Sig|Sid|Otp)(?![a-zA-Z]))"
+                                  r"|(?<![a-z])(?:verif(?:y|ication)|reset|recovery|backup|activation|invite|mfa|2fa|sms|login)[_-]?code", re.I)
+
+
+def _public_pair(pair):
+    name, _, item = pair.partition("=")
+    return f"{name}=REDACTED" if item and _SENSITIVE_PARAMETER.search(unquote_plus(name)) else pair
 
 
 def _public_url(value):
     try:
         parts = urlsplit(value)
-        pairs = [(key, "REDACTED" if item and _SENSITIVE_PARAMETER.search(key) else item)
-                 for key, item in parse_qsl(parts.query, keep_blank_values=True)]
-        return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1], query=urlencode(pairs), fragment=""))
+        query = "".join(part if index % 2 else _public_pair(part) for index, part in enumerate(re.split(r"([&;])", parts.query)))
+        return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1], query=query, fragment=""))
     except ValueError:
         return "Invalid URL"
 

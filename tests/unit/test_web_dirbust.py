@@ -115,3 +115,20 @@ def test_findings_keep_newlines_and_tabs_and_drop_other_control_characters():
     assert result["url"] == "http://example.com/ab" and result["parameter"] == "q"
     assert result["evidence"] == "one\ntwo\tthree"
     assert finding("X", "http://example.com/", "plain", parameter=None)["parameter"] is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("location,shown", [
+    ("/login?session=abc123&next=/admin", "/login?session=REDACTED&next=/admin"),
+    ("https://user:pw@example.com/login?api_key=abc123&next=/admin#token=abc123", "https://example.com/login?api_key=REDACTED&next=/admin"),
+])
+def test_a_redirect_in_the_evidence_of_a_finding_hides_credential_values(web_response, location, shown):
+    def respond(url, **kwargs):
+        if "__autopwn_missing_" in url:
+            return web_response("not found", status=404, url=url)
+        return web_response("admin panel", status=301, url=url, headers={"Location": location})
+
+    with patch("autopwn_suite.web.dirbust.open", mock_open(read_data="admin")), patch("autopwn_suite.web.dirbust.get", side_effect=respond):
+        found = dirbust("http://example.com", MagicMock(), MagicMock())
+    assert found[0]["evidence"].endswith("; redirect to " + shown)
+    assert "abc123" not in str(found)

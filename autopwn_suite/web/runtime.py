@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from datetime import datetime, timezone
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import unquote_plus, urlsplit, urlunsplit
 
 from autopwn_suite.nmap_progress import ScanCancelled
 from autopwn_suite.web.findings import printable
@@ -40,28 +40,100 @@ def allowed(kind):
 
 # Query parameters that hold a credential. A redacted value cannot be replayed, so a few ordinary words that contain
 # a keyword are left alone: "author" (but not "authorization") and "bypass" or "passenger" (but "pass", "userpass",
-# "newPass"). Every other name containing "pass" is redacted, because credential names are not words.
+# "newPass"). Every other name containing "pass" is redacted, because credential names are not words. The short
+# names (sig, sid, otp, cred) count only as a whole word or as a camelCase part ("x_sig", "userSid" but not "design",
+# "inside"), and "key" alone or after a credential word ("access_key", "appKey" but not "sort_key", "monkey"). A bare
+# "code" is not listed (country_code, zipcode), only the verification kinds. Replays keep working for every other
+# parameter, and a secret in a parameter with any other name is shown as is.
 SENSITIVE_PARAMETER = re.compile(r"auth(?!or(?!iz|is))|(?<!by)(?<!com)(?<!sur)(?<!tres)pass(?!age|enger|port|ive|ion|able|over)"
-                                 r"|secret|token|api.?key|session|jwt|signature|csrf", re.I)
+                                 r"|secret|token|session|sessid|jwt|signature|csrf|xsrf|credential|bearer|pwd|cookie|hmac"
+                                 r"|(?:api|access|private|app|client|consumer|licen[cs]e|encryption|signing|master|service|ssh|developer).?key|^key$"
+                                 r"|(?<![a-z])(?:sig|sid|otp|totp|hotp|cred|creds)(?![a-z])|(?-i:(?<=[a-z0-9])(?:Sig|Sid|Otp)(?![a-zA-Z]))"
+                                 r"|(?<![a-z])(?:verif(?:y|ication)|reset|recovery|backup|activation|invite|mfa|2fa|sms|login)[_-]?code", re.I)
+_SEPARATOR = re.compile(r"([&;])")
+_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*")
+_AUTHORITY_END = re.compile(r"[/\\?#]")
+_PATH_PARAMETER = re.compile(r";([^=;/]*)=([^;/]+)")
+_TOKEN = re.compile(r"[^\s<>\"']+")
+
+
+def _rewrite_query(query, rewrite):
+    """Apply `rewrite(name, equals, value)` to each pair of a query string (pairs end at & or ;) and keep every other
+    character as given, so an unredacted URL still replays byte for byte."""
+    parts = _SEPARATOR.split(query)
+    for index in range(0, len(parts), 2):
+        parts[index] = rewrite(*parts[index].partition("="))
+    return "".join(parts)
+
+
+def _hide_named(name, equals, value):
+    return f"{name}=REDACTED" if value and SENSITIVE_PARAMETER.search(unquote_plus(name)) else name + equals + value
+
+
+def _hide_values(name, equals, value):
+    return f"{name}=REDACTED" if value else name + equals
+
+
+def _hide_every(name, equals, value):
+    # A part without "=" is no name: "/verify?3f9a7c" is a bare token as often as a flag, so it goes whole.
+    return _hide_values(name, equals, value) if equals else "REDACTED" if name else ""
 
 
 def redact_url(url):
+    """Redact the credential-named query values and the userinfo of a URL, for findings and the requests a PoC
+    replays: a value of any other name stays so that the request can still be sent. Use `redact_text` for diagnostics."""
     try:
         parts = urlsplit(url)
-        pairs = [(key, "REDACTED" if value and SENSITIVE_PARAMETER.search(key) else value)
-                 for key, value in parse_qsl(parts.query, keep_blank_values=True)]
-        return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1], query=urlencode(pairs), fragment=""))
+        return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1],
+                                         query=_rewrite_query(parts.query, _hide_named), fragment=""))
     except ValueError:
         return "Invalid URL"
 
 
-def redact_text(message):
-    """Redact every URL in a log line or coverage issue, which reach the console, exports and saved reports,
-    and drop the control characters a crawled URL can carry (see `printable`)."""
-    def redact(match):
-        url = match[0].rstrip(".,;:)")
-        return redact_url(url) + match[0][len(url):]
-    return re.sub(r"https?://[^\s<>\"']+", redact, printable(str(message)))
+def _redact_target(target, rewrites):
+    """Rewrite the query and the `;name=value` parameters of one URL, or of a target typed without a scheme
+    (`host:80/p?x=y`, `[::1]:80?x=y`), and drop its userinfo and fragment. Plain string work: it never raises.
+    `rewrites` holds the rewrite for a target without a scheme and the one for a URL."""
+    cut = target.find("://")
+    scheme = target[:cut + 3] if cut == 0 or cut > 0 and _SCHEME.fullmatch(target, 0, cut) else ""
+    rewrite = rewrites[bool(scheme)]
+    rest = target[len(scheme):]
+    lead = "//" if rest.startswith("//") else ""  # a network-path reference, //user:pw@host/
+    rest = rest[len(lead):]
+    found = _AUTHORITY_END.search(rest)
+    end = found.start() if found else len(rest)
+    userinfo, _, host = rest[:end].rpartition("@")
+    path, question, query = rest[end:].partition("#")[0].partition("?")
+    path = _PATH_PARAMETER.sub(lambda match: ";" + rewrite(match[1], "=", match[2]), path)
+    return scheme + lead + (host if userinfo else rest[:end]) + path + (question + _rewrite_query(query, rewrite) if question else "")
+
+
+def _redact_token(token, rewrites):
+    core = token.rstrip(".,;:)")
+    start = core.find("://")
+    if start >= 0:
+        # `url=http://h/?a=b` or `(http://h/?a=b`: begin at the scheme, unless what precedes it is itself a URL part.
+        while start and core[start - 1].isascii() and (core[start - 1].isalnum() or core[start - 1] in "+.-"):
+            start -= 1
+        if any(mark in core[:start] for mark in "?#@"):
+            start = 0
+    elif any(mark in core for mark in "?@") or core.find("#") > 0:
+        start = len(core) - len(core.lstrip("("))
+    else:
+        return token
+    return core[:start] + _redact_target(core[start:], rewrites) + token[len(core):]
+
+
+def redact_text(message, *, names_only=False):
+    """Redact the URLs and the targets typed without a scheme in a log line, coverage note or echoed target: every query
+    value (names stay: `?id=REDACTED&x=REDACTED`), the userinfo, the fragment and `;name=value` path parameters, whatever
+    the parameter is called and whatever the case of the scheme. Diagnostics reach the console, exports and saved reports,
+    so unlike findings they cannot keep a value for a replay: `names_only=True` redacts the values of credential names
+    only, as `redact_url` does, for the text of a finding. A query part without `=` goes whole in a URL (`?3f9a7c`) and
+    stays in a target without a scheme (`what?`). The message also loses the control characters a crawled URL can carry
+    (see `printable`). A secret in the path of a URL stays."""
+    rewrites = (_hide_named, _hide_named) if names_only else (_hide_values, _hide_every)
+    return _TOKEN.sub(lambda match: _redact_token(match[0], rewrites), printable(str(message)))
 
 
 def public_request(method, url, headers=None, role="probe"):
@@ -190,7 +262,8 @@ class ScanContext:
         reproduction = deepcopy(reproduction or {"strategy": "response", "requests": [{"method": "GET", "url": result["url"]}]})
         reproduction["requests"] = [public_request(row.get("method", "GET"), row["url"], row.get("headers"), row.get("role", "probe"))
                                     for row in reproduction.get("requests", [])[:12]]
-        reproduction["target"] = redact_url(reproduction.get("target", self.target))
+        # A replay reads only the origin of the target; the requests carry the URLs, so every value can go here.
+        reproduction["target"] = redact_text(reproduction.get("target", self.target))
         reproduction["verify_tls"] = self.options["verify_tls"]
         result["reproduction"] = reproduction
         result["observations"] = []

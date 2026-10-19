@@ -70,9 +70,15 @@ def test_invalid_or_redacted_plans_are_rejected_before_any_request(mutate):
 CREDENTIAL_NAMES = ["password", "passwd", "pass", "user_pass", "userPass", "passphrase", "secret", "client_secret", "token", "access_token",
                     "api_key", "apikey", "api-key", "auth", "auth_token", "authorization", "oauth", "authorize", "session", "sessionid",
                     "jwt", "signature", "csrf", "csrf_token", "PASSWORD", "userpass", "adminpass", "dbpass", "newpass", "oldpass",
-                    "confirmpass", "upass", "passkey", "passhash", "PassKey", "passw"]
+                    "confirmpass", "upass", "passkey", "passhash", "PassKey", "passw",
+                    "pwd", "PWD", "newpwd", "otp", "totp", "otp_code", "sig", "x-amz-sig", "sid", "userSid", "key", "KEY", "access_key", "accessKey",
+                    "private-key", "app_key", "appKey", "client_key", "license_key", "bearer", "credentials", "x-amz-credential", "cred", "creds",
+                    "cookie", "hmac", "xsrf", "sessid", "PHPSESSID", "x-amz-security-token", "verification_code", "reset_code", "recovery_code",
+                    "mfa_code", "%74oken", "to%6Ben"]
 PLAIN_NAMES = ["author", "authors", "author_id", "authorId", "authored", "bypass", "bypassed", "compass", "encompass", "surpass", "trespass",
-               "passenger", "passage", "passport", "passive", "passion", "page", "id", "q"]
+               "passenger", "passage", "passport", "passive", "passion", "page", "id", "q",
+               "sort_key", "primary_key", "cache_key", "monkey", "keyword", "keys", "key_id", "design", "signal", "side", "inside", "credit",
+               "hotpot", "code", "country_code", "zipcode", "nonce", "ticket"]
 
 
 @pytest.mark.unit
@@ -81,6 +87,47 @@ def test_only_credential_parameters_are_redacted_from_urls(name, credential):
     value = "REDACTED" if credential else "value"
     for redact in (redact_url, _public_url):
         assert redact(f"http://example.com/?{name}=value&page=2") == f"http://example.com/?{name}={value}&page=2"
+
+
+@pytest.mark.unit
+def test_scanner_and_standalone_poc_redact_alike():
+    from autopwn_suite.web.poc_runtime import _SENSITIVE_PARAMETER
+    from autopwn_suite.web.runtime import SENSITIVE_PARAMETER
+    assert _SENSITIVE_PARAMETER.pattern == SENSITIVE_PARAMETER.pattern and _SENSITIVE_PARAMETER.flags == SENSITIVE_PARAMETER.flags
+    for url in ["http://u:p@example.com:81/a b?x=1&token=2;key=3#f", "http://example.com/?&&=&a&b=%zz&sid=1;sig=2", "/relative?access_key=1&q=2", "?", "", "http://[::1"]:
+        assert redact_url(url) == _public_url(url)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("url,expected", [
+    # A URL with no credential-named value is returned as it was, byte for byte, so that replaying it sends the same request.
+    ("http://example.com/p?q=a,b&x=%7e&y=a+b&flag&&z=%zz&e=", "http://example.com/p?q=a,b&x=%7e&y=a+b&flag&&z=%zz&e="),
+    # ; ends a pair as well as &.
+    ("http://example.com/p?a=1;token=abc&b=2", "http://example.com/p?a=1;token=REDACTED&b=2"),
+    ("http://example.com/p?a=1&sid=abc;b=2", "http://example.com/p?a=1&sid=REDACTED;b=2"),
+    ("http://u:pw@example.com/p?%74oken=abc#access_token=1", "http://example.com/p?%74oken=REDACTED"),
+])
+def test_redacting_a_url_keeps_everything_but_the_credential_values(url, expected):
+    assert redact_url(url) == expected
+    assert _public_url(url) == expected
+
+
+@pytest.mark.unit
+def test_finding_replays_every_parameter_that_is_not_a_credential_name():
+    # The keyword list is extended (key, sig, otp ...), but a replay still has everything it needs but the credential values.
+    url = "http://example.com/page?id=1&sort_key=name&country_code=US&access_key=hunter2&sig=abc"
+    with ScanContext(url, MagicMock(), controls={"speed": 5}).activate():
+        result = finding("SQLI", url, "Repeatable database error", parameter="id",
+                         reproduction={"strategy": "response", "requests": [{"url": url}]})
+    result["endpoint"] = redact_url(url)
+    plan = build_plan(result)
+    assert plan["requests"][0]["url"] == "http://example.com/page?id=1&sort_key=name&country_code=US&access_key=REDACTED&sig=REDACTED"
+    assert plan["target"] == "http://example.com/page?id=REDACTED&sort_key=REDACTED&country_code=REDACTED&access_key=REDACTED&sig=REDACTED"
+    with pytest.raises(ValueError, match="redacted query values"):
+        validate_plan(plan)
+    plan["requests"][0]["url"] = plan["requests"][0]["url"].replace("REDACTED", "restored")
+    # The target of the plan is only an origin to a replay: its redacted values do not stand in the way.
+    assert validate_plan(plan) == ("http", "example.com", 80)
 
 
 @pytest.mark.unit

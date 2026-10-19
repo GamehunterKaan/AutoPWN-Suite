@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from urllib.parse import urlsplit
 
 import pytest
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, SSLError
 from rich.console import Console
 from rich.logging import RichHandler
 
@@ -151,15 +151,17 @@ def test_directory_discovery_stays_under_a_deliberate_sub_path(web_response):
 
 @pytest.mark.unit
 def test_probe_log_lines_and_coverage_issues_do_not_carry_query_secrets(web_response):
-    url = "http://example.com/page?id=1&session=abcdef"
+    # "nick" is no credential name: a diagnostic hides the value of every parameter, not only the ones named like secrets.
+    url = "http://example.com/page?id=1&session=abcdef&nick=hunter2"
     log, summary = MagicMock(), {}
     with patch("autopwn_suite.web.webvuln.get", return_value=web_response(url=url)), patch("autopwn_suite.web.webvuln.crawl", return_value={url}), \
          patch("autopwn_suite.web.sqli.get", side_effect=ConnectionError("HTTPConnectionPool: Max retries exceeded with url: /page?id=1&session=abcdef")):
         webvuln(url, log, MagicMock(), controls={"speed": 5, "checks": {name: name == "sqli" for name in CHECKS}}, on_complete=summary.update)
-    expected = "Connection error raised on: http://example.com/page?id=1&session=REDACTED, skipping"
+    expected = "Connection error raised on: http://example.com/page?id=REDACTED&session=REDACTED&nick=REDACTED, skipping"
     assert expected in summary["issues"]
     log.logger.assert_any_call("error", expected)
-    assert "abcdef" not in str(log.logger.call_args_list) + str(summary["issues"])
+    assert not {"abcdef", "hunter2"} & set(re.findall(r"[A-Za-z0-9]+", str(log.logger.call_args_list) + str(summary["issues"]) + str(summary["target"])))
+    assert summary["target"] == "http://example.com/page?id=REDACTED&session=REDACTED&nick=REDACTED"
 
 
 @pytest.mark.unit
@@ -172,16 +174,74 @@ def test_crawl_failures_are_logged_with_fixed_text_not_the_exception():
 
 @pytest.mark.unit
 @pytest.mark.parametrize("message,expected", [
-    ("Connection error raised on: http://127.0.0.1:8080/?id=1&token=abc, skipping", "Connection error raised on: http://127.0.0.1:8080/?id=1&token=REDACTED, skipping"),
+    ("Connection error raised on: http://127.0.0.1:8080/?id=1&token=abc, skipping", "Connection error raised on: http://127.0.0.1:8080/?id=REDACTED&token=REDACTED, skipping"),
     ("Unable to crawl https://app.test/a?api_key=XYZ.", "Unable to crawl https://app.test/a?api_key=REDACTED."),
     ("Unable to crawl http://user:pw@app.test/x: HTTP 500; coverage is incomplete.", "Unable to crawl http://app.test/x: HTTP 500; coverage is incomplete."),
-    ("Two urls (http://a.test/?jwt=1) and http://b.test/?q=2", "Two urls (http://a.test/?jwt=REDACTED) and http://b.test/?q=2"),
+    ("Two urls (http://a.test/?jwt=1) and http://b.test/?q=2", "Two urls (http://a.test/?jwt=REDACTED) and http://b.test/?q=REDACTED"),
     ("No reachable in-scope web endpoint on 127.0.0.1.", "No reachable in-scope web endpoint on 127.0.0.1."),
     ("Unable to crawl http://a.test/x\x1b[2J\x1b]0;pwned\x07y?token=1: HTTP 500", "Unable to crawl http://a.test/x[2J]0;pwnedy?token=REDACTED: HTTP 500"),
     ("one\ntwo\tthree\r\x85\x7f", "one\ntwo\tthree"),
 ])
 def test_redact_text_hides_query_secrets_in_every_url_of_a_message(message, expected):
     assert redact_text(message) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("message,expected", [
+    # Whatever the parameter is called: a name list cannot know every secret.
+    ("on http://a.test/?key=1&pwd=2&code=3&sig=4&otp=5&bearer=6&nonce=7&x=8", "on http://a.test/?key=REDACTED&pwd=REDACTED&code=REDACTED&sig=REDACTED&otp=REDACTED&bearer=REDACTED&nonce=REDACTED&x=REDACTED"),
+    ("on http://a.test/?a=1;b=2&c=3", "on http://a.test/?a=REDACTED;b=REDACTED&c=REDACTED"),
+    ("on http://a.test/?flag&empty=&v=x=y", "on http://a.test/?REDACTED&empty=&v=REDACTED"),
+    # The scheme is not case sensitive.
+    ("Unable to crawl HTTP://a.test/?session=abc.", "Unable to crawl HTTP://a.test/?session=REDACTED."),
+    ("Unable to crawl HtTpS://a.test/?q=abc", "Unable to crawl HtTpS://a.test/?q=REDACTED"),
+    # A target typed without a scheme.
+    ("No reachable in-scope web endpoint on a.test:8080?q=abc.", "No reachable in-scope web endpoint on a.test:8080?q=REDACTED."),
+    ("No reachable in-scope web endpoint on a.test/app/?q=abc&r=def.", "No reachable in-scope web endpoint on a.test/app/?q=REDACTED&r=REDACTED."),
+    ("No reachable in-scope web endpoint on [::1]:80/?q=abc.", "No reachable in-scope web endpoint on [::1]:80/?q=REDACTED."),
+    ("No reachable in-scope web endpoint on 192.0.2.7:80?q=abc.", "No reachable in-scope web endpoint on 192.0.2.7:80?q=REDACTED."),
+    # Userinfo, with and without a scheme, and fragments, which carry tokens of a redirect-based sign-in.
+    ("on user:pass@a.test:80/x", "on a.test:80/x"),
+    ("on token123@a.test/x", "on a.test/x"),
+    ("on https://user:pass@a.test/x#access_token=abc&state=1.", "on https://a.test/x."),
+    ("on a.test/x?q=1#access_token=abc", "on a.test/x?q=REDACTED"),
+    ("on https://a.test/#/route?token=abc", "on https://a.test/"),
+    # ;name=value path parameters (a Java session id) lose their value.
+    ("on https://a.test/app;jsessionid=ABC123/page?q=1", "on https://a.test/app;jsessionid=REDACTED/page?q=REDACTED"),
+    # Ordinary words and an already redacted text are left alone.
+    ("Found 3 testable urls (4/60 probes) at a.test:8080/path, what? #5 @name", "Found 3 testable urls (4/60 probes) at a.test:8080/path, what? #5 @name"),
+    ("on http://a.test/?q=REDACTED", "on http://a.test/?q=REDACTED"),
+    # A part without "=" is a bare token in a URL, and a question or a glob in a target typed without a scheme.
+    ("on http://a.test/verify?3f9a7c", "on http://a.test/verify?REDACTED"),
+    ("on a.test:80/p?flag", "on a.test:80/p?flag"),
+])
+def test_redact_text_hides_every_query_value_userinfo_and_fragment_of_a_target(message, expected):
+    assert redact_text(message) == expected
+    assert redact_text(expected) == expected
+
+
+@pytest.mark.unit
+def test_the_announcement_line_of_a_web_scan_does_not_carry_query_secrets(web_response):
+    # The line goes to the console, which the CLI records into its html, svg and txt reports and its emailed report.
+    url = "http://example.com/page?nick=hunter2&session=abcdef"
+    console = Console(file=io.StringIO(), record=True, width=200, color_system=None)
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response(url=url)):
+        webvuln(url, MagicMock(), console, controls={"speed": 5, "checks": {name: name == "headers" for name in CHECKS}})
+    # A finding line keeps the values of non-credential names (it is what a PoC replays); the announcement does not.
+    announcement = next(line for line in console.export_text().splitlines() if "Testing web application" in line)
+    assert announcement.strip() == "Testing web application on http://example.com/page?nick=REDACTED&session=REDACTED ..."
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("target", ["HTTP://127.0.0.1:9/?nick=hunter2", "127.0.0.1:9?nick=hunter2", "127.0.0.1:9/app?nick=hunter2", "[::1]:9/?nick=hunter2"])
+def test_the_target_as_typed_is_redacted_in_the_unreachable_and_certificate_messages(target):
+    for error, word in ((ConnectionError, "No reachable in-scope web endpoint"), (SSLError, "presented a certificate")):
+        log, summary = MagicMock(), {}
+        with patch("autopwn_suite.web.webvuln.get", side_effect=error):
+            webvuln(target, log, MagicMock(), on_complete=summary.update)
+        logged = " ".join(call.args[1] for call in log.logger.call_args_list)
+        assert word in logged and "?nick=REDACTED" in logged
+        assert "hunter2" not in logged + str(summary)
 
 
 @pytest.mark.unit

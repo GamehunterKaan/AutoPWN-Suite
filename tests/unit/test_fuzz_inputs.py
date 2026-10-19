@@ -528,3 +528,73 @@ def test_text_a_target_controls_is_cleaned_and_compared_without_raising(monkeypa
         # The package function and the copy that downloaded PoCs carry agree with each other and with difflib.
         assert similarity_module.similarity(left, right) == poc_runtime._similarity(left, right) == ratio
         assert similarity_module.similarity(left, left) == poc_runtime._similarity(left, left) == 1.0
+
+
+def test_redact_text_never_raises_and_leaves_no_value_of_a_diagnostic_target():
+    from autopwn_suite.web import poc_runtime
+    from autopwn_suite.web.runtime import SENSITIVE_PARAMETER, redact_text, redact_url
+    rng = random.Random(SEED + 3)
+    schemes = ["http://", "https://", "HTTP://", "HtTpS://", "ftp://", "a+b.c-d://", "://", "//", ""]
+    userinfos = ["", "", "user@", "user:{s}@", "{s}@", ":{s}@", "@"]
+    hosts = ["a.test", "a.test:8080", "[::1]", "[::1]:80", "192.0.2.7:81", "x"]
+    credential_names = ["token", "api_key", "PASSWORD", "session", "sid", "otp", "key", "access_key", "x-amz-sig", "jwt", "%74oken", "pwd", "csrf_token"]
+    plain_names = ["id", "q", "page", "nick", "code", "x", "n%61me", "a.b", "", "sort_key"]
+
+    def secret():
+        return "ZQ" + "".join(rng.choice("0123456789abcdef") for _ in range(rng.randint(4, 14)))
+
+    for _ in range(3000):
+        everything, guarded, always = [], [], []  # values in the text; the ones a credential name guards; the ones that never stay
+        scheme, userinfo = rng.choice(schemes), rng.choice(userinfos)
+        if "{s}" in userinfo:
+            value = secret()
+            everything.append(value)
+            always.append(value)
+            userinfo = userinfo.replace("{s}", value)
+        query = ""
+        if rng.random() < .85:
+            pairs = []
+            for _ in range(rng.randint(1, 5)):
+                name = rng.choice(credential_names if rng.random() < .4 else plain_names)
+                if rng.random() < .1:
+                    pairs.append(name)  # no "=": the part is replaced whole
+                    continue
+                value = secret()
+                everything.append(value)
+                if SENSITIVE_PARAMETER.search(name.replace("%74", "t").replace("%61", "a")):
+                    guarded.append(value)
+                pairs.append(f"{name}={value}")
+            query = "?" + rng.choice(["&", "&", "&", ";"]).join(pairs)
+        fragment = ""
+        if rng.random() < .3:
+            value = secret()
+            everything.append(value)
+            always.append(value)
+            fragment = rng.choice(["#", "#/route?token=", "#access_token="]) + value
+        path = "".join("/" + rng.choice(["a", "app", "x.php", "", "%2e"]) for _ in range(rng.randint(0, 3)))
+        # A target typed without a scheme is parsed only when it shows a query, userinfo or fragment.
+        if "://" in scheme or query or userinfo or fragment:
+            path = path or "/"
+            for _ in range(rng.randint(0, 2)):
+                value = secret()
+                everything.append(value)
+                name = rng.choice(["jsessionid", "v"])
+                if name == "jsessionid":
+                    guarded.append(value)
+                path += f";{name}={value}"
+        url = scheme + userinfo + rng.choice(hosts) + path + query + fragment
+        # A `//` after a prefix (`target=//user@host`) is not read as a network-path reference.
+        text = rng.choice(["", "see ", "(", "'", "<"] if scheme == "//" else ["", "see ", "target=", "(", "'", "<"]) + url + rng.choice(["", ".", ",", ")", ".)", ":", " and more", "\n" + url])
+        shown = redact_text(text)
+        assert isinstance(shown, str) and redact_text(shown) == shown
+        # A diagnostic leaves no value, whatever the parameter is called, and neither the userinfo nor the fragment.
+        assert not [value for value in everything if value in shown], (text, shown)
+        # A finding keeps the values that no credential name guards, but not the userinfo, the fragment or a guarded value.
+        kept = redact_text(text, names_only=True)
+        assert not [value for value in always + guarded if value in kept], (text, kept)
+    # Arbitrary text: never an exception, always a string, and the same answer from the scanner and from a downloaded PoC.
+    alphabet = string.ascii_letters + string.digits + "?&=;#@:/\\.%[]()<>\"' \t\n\x1b\x00\x85\ud800é-_+~"
+    for _ in range(3000):
+        text = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 60)))
+        assert isinstance(redact_text(text), str) and isinstance(redact_text(text, names_only=True), str)
+        assert redact_url(text) == poc_runtime._public_url(text)
