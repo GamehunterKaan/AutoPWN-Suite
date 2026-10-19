@@ -281,6 +281,26 @@ assert.equal(button.disabled,false);
 """)
 
 
+def test_start_scan_returns_keyboard_focus_to_its_button_unless_focus_moved_on():
+    run_js("""
+const button=document.getElementById('start-scan');
+let disabled=false;
+// A browser drops focus to <body> when the focused button becomes disabled.
+Object.defineProperty(button,'disabled',{get(){return disabled},set(value){disabled=value;if(value&&document.activeElement===button)document.activeElement=document.body}});
+button.focus=()=>{document.activeElement=button};
+fetch=async()=>({ok:true,json:async()=>({scan_id:'0123456789abcdef'})});
+document.getElementById('f-target').value='192.0.2.1';
+document.activeElement=button;
+await startScan();
+assert.equal(document.activeElement,button);
+const other=document.getElementById('f-nmap');
+document.getElementById('f-target').value='192.0.2.2';
+document.activeElement=other;
+await startScan();
+assert.equal(document.activeElement,other);
+""")
+
+
 def test_accepted_scan_start_shows_no_error_toast():
     run_js("""
 document.getElementById('f-target').value='192.0.2.1';
@@ -488,6 +508,26 @@ assert.equal(requests,2);
 document.hidden=true; requests=0;
 listeners.visibilitychange.forEach(handler=>handler());
 assert.equal(requests,0);
+""")
+
+
+def test_a_poll_that_finds_a_running_scan_replaces_the_pending_idle_timer():
+    run_js("""
+renderScans=renderHosts=renderVulnTable=updateBadges=()=>{};
+const timers=[], cleared=[];
+setTimeout=(callback,delay)=>{timers.push([callback,delay]);return timers.length};
+clearTimeout=id=>cleared.push(id);
+let answer=[];
+fetch=async url=>({ok:true,json:async()=>url==='/api/scans'?answer:[]});
+schedulePoll();
+assert.equal(timers.at(-1)[1],10000);
+answer=[{id:'a',target:'192.0.2.1',status:'running'}];
+await poll();
+assert.equal(timers.at(-1)[1],1500);           // not another 10 s wait after the scan started
+assert.ok(cleared.includes(1));                // and the pending idle timer is gone, so only one timer is armed
+answer=[{id:'a',target:'192.0.2.1',status:'completed'}];
+await poll();
+assert.equal(timers.at(-1)[1],10000);          // back to the slow pace once nothing is running
 """)
 
 
@@ -870,6 +910,19 @@ assert.equal(nodes.get('settings-unavailable').hidden,true);
 assert.equal(Object.keys(profiles).length,failing==='/api/profiles'?0:1);
 assert.equal(Object.keys(scans).length,failing==='/api/scans'?0:1);
 assert.equal(Object.keys(hosts).length,failing==='/api/hosts'?0:1);
+assert.ok(nodes.get('term').children.some(line=>line.innerHTML.includes('Refresh to retry.')));
+""")
+
+
+def test_a_render_failure_at_startup_does_not_stop_the_event_stream_or_polling():
+    run_js("""
+const started=[];
+initDashboard=async()=>{throw new TypeError('a host without a field')};
+connectSSE=()=>started.push('stream');
+schedulePoll=()=>started.push('poll');
+setInterval=()=>started.push('database status');
+await startDashboard();
+assert.deepEqual(started,['stream','poll','database status']);
 assert.ok(nodes.get('term').children.some(line=>line.innerHTML.includes('Refresh to retry.')));
 """)
 

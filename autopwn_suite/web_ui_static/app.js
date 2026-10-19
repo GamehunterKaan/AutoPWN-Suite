@@ -535,7 +535,9 @@ async function startScan(){
     ...(window.webSecurity?.readControls('f') || {}),
   };
   startingScan = true;
-  document.getElementById('start-scan').disabled = true;
+  const startButton = document.getElementById('start-scan');
+  const hadFocus = document.activeElement === startButton;  // disabling a focused button drops focus to <body>
+  startButton.disabled = true;
   try{
     const r = await fetch('/api/scan/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     // A proxy or crash can answer with an HTML page; that is a server answer, not an unreachable server.
@@ -547,7 +549,12 @@ async function startScan(){
     else switchTab('scans', document.querySelector('.tab'));
     poll();
   }catch(e){ reportUnreachable(e); }
-  finally{ startingScan = false; document.getElementById('start-scan').disabled = false; }
+  finally{
+    startingScan = false;
+    startButton.disabled = false;
+    // Give focus back only if nothing else took it meanwhile, so a keyboard user stays where they were.
+    if(hadFocus && (!document.activeElement || document.activeElement === document.body)) startButton.focus();
+  }
 }
 
 async function stopScan(scanId){
@@ -607,8 +614,11 @@ function connectSSE(){
 function pollDelay(){
   return Object.values(scans).some(j=>j.status==='running'||j.status==='stopping') ? 1500 : 10000;
 }
+let pollScheduledDelay = 0;
 function schedulePoll(){
-  pollT = setTimeout(async()=>{ if(!document.hidden) await poll(); schedulePoll(); }, pollDelay());
+  clearTimeout(pollT);
+  pollScheduledDelay = pollDelay();
+  pollT = setTimeout(async()=>{ if(!document.hidden) await poll(); schedulePoll(); }, pollScheduledDelay);
 }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) poll(); });
 async function poll(){
@@ -637,6 +647,9 @@ async function poll(){
     });
     hosts = latestHostObservations(hostsR);
     renderScans(); renderHosts(); renderVulnTable(); updateBadges();
+    // The pending timer was set before this scan started (or finished): replace it at once instead of
+    // letting a 10 s idle wait run out while a scan is active.
+    if(pollT !== null && pollDelay() !== pollScheduledDelay) schedulePoll();
     if(selIp && hosts[selIp]) {
       if(previousSelection !== JSON.stringify(hosts[selIp])) renderDetail(hosts[selIp]);
     } else if(selIp){
@@ -1336,9 +1349,15 @@ async function initDashboard(){
   if(failed) addLog(null,'Some dashboard data could not be loaded. Refresh to retry.','error');
 }
 
-(async()=>{
-  await initDashboard();
+// A render that throws on an unexpected field must not leave the page without its event stream and polling.
+async function startDashboard(){
+  try{ await initDashboard(); }
+  catch(_){ addLog(null,'Some dashboard data could not be loaded. Refresh to retry.','error'); }
   connectSSE();
   schedulePoll();
   setInterval(()=>loadDatabaseStatus().catch(()=>{}), 5000);
+}
+
+(async()=>{
+  await startDashboard();
 })();
