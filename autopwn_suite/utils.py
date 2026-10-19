@@ -875,7 +875,13 @@ def install_nmap_linux(log) -> None:
         else:
             raise CalledProcessError(1, "cmd")
 
+    except FileNotFoundError:
+        log.logger("error", "Couldn't install nmap (Linux): /usr/bin/sudo was not found.")
+        raise SystemExit(1) from None
     except CalledProcessError:
+        if DontAskForConfirmation:
+            log.logger("error", "Couldn't install nmap (Linux)")
+            raise SystemExit(1) from None
         _distro_choice_ = input(
             "Cannot recognize the needed package manager for your "
             + f"system that seems to be running in: {distro_} and "
@@ -895,10 +901,12 @@ def install_nmap_linux(log) -> None:
         if _distro_choice_ in pkg_cmds:
             try:
                 check_call(pkg_cmds[_distro_choice_], stderr=DEVNULL, env=child_environment())
-            except CalledProcessError:
+            except (CalledProcessError, FileNotFoundError):
                 log.logger("error", "Couldn't install nmap (Linux)")
+                raise SystemExit(1) from None
         else:
             log.logger("error", "Couldn't install nmap (Linux)")
+            raise SystemExit(1) from None
 
 
 def install_nmap_windows(log) -> None:
@@ -922,9 +930,11 @@ def install_nmap_windows(log) -> None:
 
 def install_nmap_mac(log) -> None:
     try:
-        check_call(["/usr/bin/sudo", "brew", "install", "nmap"], stderr=DEVNULL)
-    except CalledProcessError:
+        # Homebrew refuses to run as root, so it must not be started through sudo.
+        check_call(["brew", "install", "nmap"], stderr=DEVNULL)
+    except (CalledProcessError, FileNotFoundError):
         log.logger("error", "Couldn't install nmap! (Mac)")
+        raise SystemExit(1) from None
 
 
 def check_nmap(log, *, offline=False) -> None:

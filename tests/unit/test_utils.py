@@ -636,8 +636,9 @@ class TestNmapInstallation:
 
     @patch("autopwn_suite.utils.check_call")
     @patch("builtins.input", return_value="1") # User selects 'apt-get'
-    def test_install_nmap_linux_interactive_fallback(self, mock_input, mock_check_call):
+    def test_install_nmap_linux_interactive_fallback(self, mock_input, mock_check_call, monkeypatch):
         """Verify interactive fallback for unrecognized distros."""
+        monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
         # Mock distro.id() to return an unknown distro
         with patch("autopwn_suite.utils.distro", create=True) as mock_distro:
             # First call is unknown, second (recursive) call is the user's choice
@@ -652,6 +653,43 @@ class TestNmapInstallation:
             mock_check_call.assert_called_once_with(
                 ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"], stderr=DEVNULL, env=None
             )
+
+    @patch("autopwn_suite.utils.check_call", side_effect=FileNotFoundError("/usr/bin/sudo"))
+    def test_install_nmap_linux_without_sudo_stops_instead_of_a_traceback(self, mock_check_call, monkeypatch):
+        monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
+        log = MagicMock()
+        with patch("autopwn_suite.utils.distro", create=True) as mock_distro,                 patch("builtins.input", side_effect=AssertionError("prompted")), pytest.raises(SystemExit) as exit_:
+            mock_distro.id.return_value = "ubuntu"
+            from autopwn_suite.utils import install_nmap_linux
+            install_nmap_linux(log)
+        assert exit_.value.code == 1
+        assert "sudo" in log.logger.call_args.args[1]
+
+    @patch("autopwn_suite.utils.check_call")
+    def test_install_nmap_linux_in_automatic_mode_never_waits_for_input(self, mock_check_call, monkeypatch):
+        """-y means nobody is there to answer the package manager question."""
+        monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", True)
+        log = MagicMock()
+        with patch("autopwn_suite.utils.distro", create=True) as mock_distro,                 patch("builtins.input", side_effect=AssertionError("prompted")), pytest.raises(SystemExit) as exit_:
+            mock_distro.id.return_value = "unknown_distro"
+            from autopwn_suite.utils import install_nmap_linux
+            install_nmap_linux(log)
+        assert exit_.value.code == 1
+        mock_check_call.assert_not_called()
+        log.logger.assert_called_once_with("error", "Couldn't install nmap (Linux)")
+
+    @pytest.mark.parametrize("answer, failure", [("1", CalledProcessError(1, "apt-get")), ("1", FileNotFoundError("sudo")), ("0", None), ("9", None)])
+    @patch("autopwn_suite.utils.check_call")
+    def test_install_nmap_linux_stops_when_the_chosen_fallback_does_not_install(self, mock_check_call, answer, failure, monkeypatch):
+        monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
+        mock_check_call.side_effect = failure
+        log = MagicMock()
+        with patch("autopwn_suite.utils.distro", create=True) as mock_distro,                 patch("builtins.input", return_value=answer), pytest.raises(SystemExit) as exit_:
+            mock_distro.id.return_value = "unknown_distro"
+            from autopwn_suite.utils import install_nmap_linux
+            install_nmap_linux(log)
+        assert exit_.value.code == 1
+        log.logger.assert_called_with("error", "Couldn't install nmap (Linux)")
 
     @patch("autopwn_suite.utils.check_call")
     def test_install_nmap_windows(self, mock_check_call):
@@ -678,9 +716,23 @@ class TestNmapInstallation:
         mock_log = MagicMock()
         from autopwn_suite.utils import install_nmap_mac
         install_nmap_mac(mock_log)
-        mock_check_call.assert_called_once_with(
-            ["/usr/bin/sudo", "brew", "install", "nmap"], stderr=DEVNULL
-        )
+        mock_check_call.assert_called_once_with(["brew", "install", "nmap"], stderr=DEVNULL)
+
+    @patch("autopwn_suite.utils.check_call")
+    def test_install_nmap_mac_runs_homebrew_as_the_user(self, mock_check_call):
+        """Homebrew refuses to run as root, so `sudo brew` can never install Nmap."""
+        from autopwn_suite.utils import install_nmap_mac
+        install_nmap_mac(MagicMock())
+        assert mock_check_call.call_args.args[0] == ["brew", "install", "nmap"]
+
+    @pytest.mark.parametrize("failure", [CalledProcessError(1, "brew"), FileNotFoundError("brew")])
+    def test_install_nmap_mac_failure_stops_the_scan(self, failure):
+        from autopwn_suite.utils import install_nmap_mac
+        log = MagicMock()
+        with patch("autopwn_suite.utils.check_call", side_effect=failure), pytest.raises(SystemExit) as exit_:
+            install_nmap_mac(log)
+        assert exit_.value.code == 1
+        log.logger.assert_called_once_with("error", "Couldn't install nmap! (Mac)")
 
 
 @pytest.mark.unit
