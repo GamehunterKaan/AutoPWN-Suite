@@ -667,6 +667,71 @@ class TestShouldFire:
         sched = {"id": "s1", "enabled": True, "type": "custom"}
         assert not wu._should_fire(sched)
 
+    @pytest.fixture
+    def fire_at(self, wu, monkeypatch):
+        """Ask _should_fire with the clock at a chosen UTC time; the dates are Monday 2026-10-19 and earlier."""
+        class InstanceOfDatetime(type):
+            def __instancecheck__(cls, value):
+                return isinstance(value, datetime)
+
+        def ask(schedule, now, last=None):
+            class Clock(datetime, metaclass=InstanceOfDatetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return now
+
+            monkeypatch.setattr(wu, "datetime", Clock)
+            wu._schedule_last_run.clear()
+            if last is not None:
+                wu._schedule_last_run[schedule["id"]] = last
+            return wu._should_fire(schedule)
+        return ask
+
+    @staticmethod
+    def utc(day, hour, minute, second=0):
+        return datetime(2026, 10, day, hour, minute, second, tzinfo=timezone.utc)
+
+    def test_daily_slot_survives_a_restart_or_a_slow_tick_within_the_catch_up_window(self, fire_at):
+        daily = {"id": "s1", "enabled": True, "type": "daily", "time_utc": "02:00"}
+        yesterday = self.utc(18, 2, 0, 5)
+        assert fire_at(daily, self.utc(19, 1, 59, 50), yesterday) is False  # not yet
+        assert fire_at(daily, self.utc(19, 2, 0, 20), yesterday) is True
+        # The daemon restarted at 01:59:50 and came back at 02:00:40 (or later): the day used to be skipped.
+        assert fire_at(daily, self.utc(19, 2, 1, 20), yesterday) is True
+        assert fire_at(daily, self.utc(19, 2, 59, 0), yesterday) is True
+        assert fire_at(daily, self.utc(19, 3, 1, 0), yesterday) is False  # too late to be useful; tomorrow instead
+        assert fire_at(daily, self.utc(20, 2, 0, 10), yesterday) is True
+
+    def test_daily_slot_runs_once(self, fire_at):
+        daily = {"id": "s1", "enabled": True, "type": "daily", "time_utc": "02:00"}
+        assert fire_at(daily, self.utc(19, 2, 30), self.utc(19, 2, 0, 10)) is False
+        assert fire_at(daily, self.utc(19, 2, 30), self.utc(19, 2, 20)) is False  # run late by a catch-up, not twice
+
+    def test_a_new_schedule_does_not_run_for_a_slot_that_passed_before_it_existed(self, fire_at):
+        daily = {"id": "s1", "enabled": True, "type": "daily", "time_utc": "02:00",
+                 "created_at": "2026-10-19T02:30:00Z", "last_run": ""}
+        assert fire_at(daily, self.utc(19, 2, 45)) is False
+        assert fire_at(daily, self.utc(20, 2, 0, 20)) is True
+        assert fire_at({**daily, "created_at": "2026-10-19T01:50:00Z"}, self.utc(19, 2, 0, 20)) is True
+        # A hand-written record without created_at still fires inside the window.
+        assert fire_at({"id": "s1", "enabled": True, "type": "daily", "time_utc": "02:00"}, self.utc(19, 2, 10)) is True
+
+    def test_weekly_slot_survives_a_restart_and_runs_once_a_week(self, fire_at):
+        weekly = {"id": "s1", "enabled": True, "type": "weekly", "weekday": 0, "time_utc": "02:00"}
+        last_week = self.utc(12, 2, 0, 5)
+        assert fire_at(weekly, self.utc(19, 1, 59), last_week) is False
+        assert fire_at(weekly, self.utc(19, 2, 0, 20), last_week) is True
+        assert fire_at(weekly, self.utc(19, 2, 5, 0), last_week) is True  # missed the exact minute
+        assert fire_at(weekly, self.utc(19, 3, 5, 0), last_week) is False
+        assert fire_at(weekly, self.utc(20, 2, 0, 20), last_week) is False  # Tuesday is not the slot
+        assert fire_at(weekly, self.utc(19, 2, 5, 0), self.utc(19, 2, 0, 20)) is False
+        assert fire_at(weekly, self.utc(26, 2, 0, 20), self.utc(19, 2, 0, 20)) is True
+
+    @pytest.mark.parametrize("kind", ["daily", "weekly"])
+    def test_out_of_range_time_never_fires_or_raises(self, fire_at, kind):
+        schedule = {"id": "s1", "enabled": True, "type": kind, "time_utc": "25:99"}
+        assert fire_at(schedule, self.utc(19, 2, 0)) is False
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Notifications

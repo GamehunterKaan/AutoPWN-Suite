@@ -194,6 +194,10 @@ interval_unit,time_utc,weekday`. Types are `interval`, `daily`, `weekly`;
 interval units are minutes/hours/days, with a positive value; time is `HH:MM`
 UTC and weekday is 0–6 (Monday–Sunday). Saved records add `id,created_at,last_run`.
 Schedules use the selected profile when firing and must satisfy offline policy.
+The scheduler checks once a minute. A daily or weekly schedule whose time was
+missed (a restart, a suspend or a slow check) still runs once when the check
+comes within an hour of that time, and never for a time that passed before the
+schedule was created.
 
 ## Files, configuration and integrations
 

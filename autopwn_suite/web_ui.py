@@ -60,7 +60,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import wraps
@@ -1518,6 +1518,30 @@ def _parse_interval_minutes(schedule: dict) -> Optional[int]:
     return None
 
 
+# A daily or weekly slot that was missed (a restart, a suspend, a slow tick) still runs for this long.
+_SCHEDULE_CATCH_UP = timedelta(hours=1)
+
+
+def _parse_utc(value):
+    """An ISO timestamp as an aware UTC datetime, or None."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+
+
+def _slot_due(schedule: dict, last, slot, now) -> bool:
+    """Whether the daily or weekly slot at or before now still has to run: once, within the catch-up
+    window, and never for a slot that passed before the schedule was created."""
+    if now - slot > _SCHEDULE_CATCH_UP:
+        return False
+    since = last or _parse_utc(schedule.get("created_at"))
+    return since is None or since < slot
+
+
 def _should_fire(schedule: dict) -> bool:
     """Check whether a schedule should fire right now."""
     if not isinstance(schedule, dict) or schedule.get("enabled", True) is not True:
@@ -1551,11 +1575,12 @@ def _should_fire(schedule: dict) -> bool:
         fire_time = schedule.get("time_utc", "00:00")  # "HH:MM"
         try:
             fh, fm = (int(x) for x in fire_time.split(":"))
+            slot = now.replace(hour=fh, minute=fm, second=0, microsecond=0)
         except Exception:
             return False
-        if last is not None and last.date() == now.date():
-            return False
-        return now.hour == fh and now.minute == fm
+        if slot > now:
+            slot -= timedelta(days=1)
+        return _slot_due(schedule, last, slot, now)
 
     elif stype == "weekly":
         # Fire once per week on the specified weekday (0=Mon) and UTC time
@@ -1566,11 +1591,13 @@ def _should_fire(schedule: dict) -> bool:
         fire_time = schedule.get("time_utc", "00:00")
         try:
             fh, fm = (int(x) for x in fire_time.split(":"))
+            slot = now.replace(hour=fh, minute=fm, second=0, microsecond=0)
         except Exception:
             return False
-        if last is not None and (now - last).total_seconds() < 7 * 86400 - 3600:
-            return False
-        return now.weekday() == fire_day and now.hour == fh and now.minute == fm
+        slot -= timedelta(days=(now.weekday() - fire_day) % 7)
+        if slot > now:
+            slot -= timedelta(days=7)
+        return _slot_due(schedule, last, slot, now)
 
     return False
 
