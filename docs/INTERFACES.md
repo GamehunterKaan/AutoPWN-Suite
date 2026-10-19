@@ -114,7 +114,7 @@ updates return 202.
 | `GET /`, `/favicon.ico`, static assets | Asset path | HTML, JavaScript, CSS or icon; static assets are served from the application static directory. |
 | `GET /api/version` | None | `{version}`. |
 | `GET /login`, `/login.js`, `/login.css` | None | Since v2.6.1. Sign-in page assets, public. |
-| `GET /api/auth/login` | None | Since v2.6.1. Starts a sign-in challenge: `{csrf_token}` and a 5-minute `autopwn_login` cookie. |
+| `GET /api/auth/login` | None | Since v2.6.1. Starts a sign-in challenge: `{csrf_token}` and a 5-minute `autopwn_login` cookie. A client address keeps at most 16 pending challenges (128 in all), so a flood of these requests evicts only that address's own. |
 | `POST /api/auth/login` | `{username,password}` plus the challenge `X-CSRF-Token` | Since v2.6.1. `{username,csrf_token}` and the session cookie; 401 for wrong credentials, 429 when rate limited. |
 | `GET /api/auth/session` | None | Since v2.6.1. `{username,csrf_token}` for the current session. |
 | `POST /api/auth/logout` | None | Since v2.6.1. `{ok}`; revokes the session. |

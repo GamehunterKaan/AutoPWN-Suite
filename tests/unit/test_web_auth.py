@@ -15,7 +15,15 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from autopwn_suite.web_auth import ACCOUNT_FILE, COOKIE, LOGIN_COOKIE, AccountStore, AccountUnavailable, password_matches
+from autopwn_suite.web_auth import (
+    ACCOUNT_FILE,
+    COOKIE,
+    LOGIN_COOKIE,
+    PENDING_CHALLENGES_PER_ADDRESS,
+    AccountStore,
+    AccountUnavailable,
+    password_matches,
+)
 
 
 @pytest.fixture
@@ -296,6 +304,19 @@ def test_login_throttling_cannot_be_bypassed_by_new_challenges(dashboard_login):
         assert sign_in(client, d.password).status_code == 429
         verify.assert_not_called()
     assert sign_in(d.app.test_client(), d.password, environ_overrides={"REMOTE_ADDR": "127.0.0.2"}).status_code == 200
+
+
+def test_cookieless_challenge_flood_cannot_evict_another_clients_pending_sign_in(dashboard_login):
+    d = dashboard_login
+    operator = d.app.test_client()
+    challenge = operator.get("/api/auth/login").json["csrf_token"]
+    for _ in range(200):  # far beyond the 128 pending challenges the server keeps
+        d.app.test_client().get("/api/auth/login", environ_overrides={"REMOTE_ADDR": "127.0.0.2"})
+    pending = [entry for entry in d.auth.sessions.values() if not entry.authenticated and entry.address == "127.0.0.2"]
+    assert len(pending) == PENDING_CHALLENGES_PER_ADDRESS
+    response = operator.post("/api/auth/login", json={"username": "admin", "password": d.password},
+                             headers={"X-CSRF-Token": challenge})
+    assert response.status_code == 200
 
 
 def test_login_input_is_bounded_and_malformed_values_are_safe(dashboard_login):

@@ -96,8 +96,8 @@ HTTPS (or the operator sets `AUTOPWN_WEB_SECURE_COOKIE=1` behind a
 TLS-terminating proxy); providing that HTTPS and network restriction remains an
 operator obligation. A request relayed by a reverse proxy on the same host
 arrives from a loopback address and is treated as local, and failed-login
-throttling is keyed by that peer address, so restrict such a proxy's backend and
-exposure. v2.6.0 has none of this. GitHub protection and provider credentials are
+throttling and the cap of 16 pending sign-in challenges are keyed by that peer
+address, so restrict such a proxy's backend and exposure. v2.6.0 has none of this. GitHub protection and provider credentials are
 independently enforced external controls; a diagram does not establish their live
 configuration.
 

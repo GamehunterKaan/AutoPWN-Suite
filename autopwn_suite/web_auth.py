@@ -18,6 +18,9 @@ ACCOUNT_FILE = "web_ui_auth.json"
 COOKIE = "autopwn_session"
 LOGIN_COOKIE = "autopwn_login"
 SESSION_SECONDS = 8 * 60 * 60
+# One client address cannot hold more pending sign-in challenges than this, so a flood of cookie-less
+# GET /api/auth/login requests only evicts its own challenges rather than the operator's.
+PENDING_CHALLENGES_PER_ADDRESS = 16
 LOGIN_ASSETS = frozenset({"/login", "/login.js", "/login.css"})
 # The sign-in page uses no inline script or style, so it gets a strict policy.
 LOGIN_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
@@ -182,6 +185,7 @@ class LoginSession:
     csrf: str
     expires: float
     authenticated: bool
+    address: str = ""
 
 
 class DashboardAuth:
@@ -192,13 +196,18 @@ class DashboardAuth:
         self.lock = threading.RLock()
         self.hash_slots = threading.BoundedSemaphore(2)
 
-    def new_session(self, revision, *, authenticated):
+    def new_session(self, revision, *, authenticated, address=""):
         token = secrets.token_urlsafe(32)
-        entry = LoginSession(revision, secrets.token_urlsafe(32), time.monotonic() + (SESSION_SECONDS if authenticated else 300), authenticated)
+        entry = LoginSession(revision, secrets.token_urlsafe(32), time.monotonic() + (SESSION_SECONDS if authenticated else 300), authenticated, address)
         with self.lock:
             self.sessions = {key: value for key, value in self.sessions.items() if value.expires > time.monotonic()}
             # Keep unauthenticated challenge floods from evicting logged-in users.
             matching = [key for key, value in self.sessions.items() if value.authenticated == authenticated]
+            if not authenticated:
+                own = [key for key in matching if self.sessions[key].address == address]
+                if len(own) >= PENDING_CHALLENGES_PER_ADDRESS:
+                    self.sessions.pop(own[0])
+                    matching.remove(own[0])
             if len(matching) >= 128:
                 self.sessions.pop(matching[0])
             self.sessions[hashlib.sha256(token.encode()).hexdigest()] = entry
@@ -321,7 +330,7 @@ def install_auth(app, static_dir, account_path):
             data = store.load()
             if request.method == "GET":
                 auth.revoke(request.cookies.get(LOGIN_COOKIE))
-                token, entry = auth.new_session(data["revision"], authenticated=False)
+                token, entry = auth.new_session(data["revision"], authenticated=False, address=request.remote_addr or "unknown")
                 response = jsonify({"csrf_token": entry.csrf})
                 set_cookie(response, token, login=True)
                 return response
