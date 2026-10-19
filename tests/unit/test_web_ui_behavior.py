@@ -228,6 +228,20 @@ assert.ok(nodes.get('term').children[0].innerHTML.includes(message));
 """)
 
 
+@pytest.mark.parametrize("status,ok", [(500, False), (502, False), (200, True)])
+def test_scan_start_with_a_non_json_response_reports_the_status_not_an_unreachable_server(status, ok):
+    run_js(f"const status={status}, ok={json.dumps(ok)};" + """
+document.getElementById('f-target').value='192.0.2.1';
+fetch=async()=>({ok,status,json:async()=>{throw new SyntaxError("Unexpected token '<', \\"<html>\\" is not valid JSON")}});
+await startScan();
+const message=`Failed to start scan (HTTP ${status}).`;
+assert.equal(document.getElementById('toast-el').textContent,message);
+assert.equal(document.getElementById('toast-el').className,'toast err');
+assert.ok(nodes.get('term').children[0].innerHTML.includes(message));
+assert.equal(nodes.get('f-target').value,'192.0.2.1');
+""")
+
+
 def test_accepted_scan_start_shows_no_error_toast():
     run_js("""
 document.getElementById('f-target').value='192.0.2.1';

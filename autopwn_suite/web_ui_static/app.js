@@ -525,8 +525,9 @@ async function startScan(){
   };
   try{
     const r = await fetch('/api/scan/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d = await r.json();
-    if(!r.ok){ reportScanError(d.error||'Failed to start scan.'); return; }
+    // A proxy or crash can answer with an HTML page; that is a server answer, not an unreachable server.
+    const d = await r.json().catch(()=>null);
+    if(!r.ok || !d){ reportScanError(d ? (d.error||'Failed to start scan.') : `Failed to start scan (HTTP ${r.status}).`); return; }
     document.getElementById('f-target').value='';
     addTermFilterOption(d.scan_id, target);
     if(body.scan_web && body.scan_ports === false) switchTab('web', document.getElementById('web-tab-button'));
