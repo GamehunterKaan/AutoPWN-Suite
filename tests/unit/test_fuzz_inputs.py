@@ -636,3 +636,49 @@ def test_redact_text_never_raises_and_leaves_no_value_of_a_diagnostic_target():
         text = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 60)))
         assert isinstance(redact_text(text), str) and isinstance(redact_text(text, names_only=True), str) and isinstance(redact_target(text), str)
         assert redact_url(text) == poc_runtime._public_url(text)
+
+
+def test_random_unicode_never_leaves_a_line_break_a_control_or_a_layout_character():
+    """Whatever code points a host or a data provider sends, the text that is printed, stored or exported keeps none of
+    the characters listed in test_hostile_text, and cleaning it a second time changes nothing."""
+    from autopwn_suite.logger import console_safe
+    from autopwn_suite.nist_search import Vulnerability
+    from autopwn_suite.web.findings import finding, printable
+    from autopwn_suite.web.runtime import redact_text
+    from tests.unit.test_hostile_text import FORBIDDEN, FORBIDDEN_EXCEPT_NEWLINE, FORBIDDEN_TEXT
+    rng = random.Random(SEED + 7)
+    pieces = [*FORBIDDEN_TEXT, "\r\n", "\x1b[2J", "\x1b]0;t\x07", "[/red]", "[bold]", "http://a.test/?token=1", " ", "a", "é", "日本"]
+
+    def random_text():
+        chars = []
+        for _ in range(rng.randint(0, 24)):
+            kind = rng.random()
+            if kind < .5:
+                chars.append(rng.choice(pieces))
+            elif kind < .75:
+                chars.append(chr(rng.randrange(0x10000)))
+            else:
+                chars.append(chr(rng.randrange(0x10000, 0x110000)))
+        return "".join(chars)
+
+    def xml_reference(text):
+        """The characters XML can hold, as character references, which keep line breaks inside an attribute."""
+        return "".join(f"&#{ord(char)};" for char in text if ord(char) in (9, 10, 13) or 0x20 <= ord(char) <= 0xD7FF
+                       or 0xE000 <= ord(char) <= 0xFFFD or 0x10000 <= ord(char))
+
+    for _ in range(3000):
+        text = random_text()
+        single, multi = printable(text), printable(text, multiline=True)
+        assert not FORBIDDEN.search(single) and not FORBIDDEN_EXCEPT_NEWLINE.search(multi)
+        assert printable(single) == single and printable(multi, multiline=True) == multi
+        assert single == multi.replace("\n", " ") and len(single.splitlines()) <= 1
+        assert Text.from_markup(console_safe(text), emoji=False).plain == single
+        assert not FORBIDDEN.search(redact_text(text))
+        result = finding("X", "http://a.test/" + text, text, parameter=text)
+        assert not any(FORBIDDEN.search(result[key]) for key in ("url", "parameter", "evidence"))
+        vulnerability = Vulnerability(text, text, text, text, 1.0, text, 1.0)
+        assert not any(FORBIDDEN.search(getattr(vulnerability, name)) for name in ("CVEID", "description", "severity", "details_url"))
+        valid = xml_reference(text)
+        xml = VALID_XML.replace('name="http"', f'name="{valid}"').replace("</service>", f'</service><script id="s" output="{valid}"/>')
+        port = parse_nmap_xml(xml)["scan"]["192.0.2.10"]["tcp"][80]
+        assert not FORBIDDEN.search(port["name"]) and not FORBIDDEN_EXCEPT_NEWLINE.search(port["script"]["s"])
