@@ -173,7 +173,9 @@ or ports outside the lists above, is kept as it was and never used: at startup a
 set aside as `<name>.corrupt-<UTC timestamp>` (one copy of an identical file), a schedule that uses it is
 disabled when it next comes due with one log line that names the reason, and nothing scans with it.
 `PUT /api/profiles/<pid>` (the form's Save) replaces the stored options, so saving the profile again
-removes them; the schedule is then enabled again by hand. Boolean fields require JSON booleans. Web-only mode sets
+removes them, even when the request does not mention `nmap_flags`; the enabled schedules that use the
+profile are disabled at that point, with a log line and a dashboard note, because they would run without
+the options they had, and each is enabled again by hand. Boolean fields require JSON booleans. Web-only mode sets
 `scan_ports:false,scan_web:true` and disables discovery/CVE lookup. Noise mode
 falls back to normal in the dashboard. Job statuses are `running`, `stopping`,
 `completed`, `partial`, `stopped` or `error`; progress can have a null percentage.
@@ -246,7 +248,10 @@ log as a fixed-text warning with the schedule ID (no exception text).
   `<name>.corrupt-<UTC timestamp>` before the dashboard starts without it, and a
   file with some non-object entries loads the valid ones, logs the count and keeps
   a copy of the original the same way (once: a restart with an identical copy
-  already kept does not add another), so the next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
+  already kept does not add another). A file that parses but holds a profile or
+  schedule that this release refuses (Nmap options saved by an earlier release, or
+  a technique or ports outside the lists in the scan section) keeps every entry and is
+  copied the same way. The next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
   versions; never edit an active database directly.
 - Nmap receives argv and returns XML/progress. Online NVD receives service
   keywords and optional API key over HTTPS; Exploit-DB supplies references and

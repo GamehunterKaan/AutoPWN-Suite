@@ -1160,7 +1160,7 @@ function editProfile(pid){
   document.getElementById('pf-vuln-source').value=c.vulnerability_source||'auto';
   window.webSecurity?.setControls('pf', c);
   updateProfilePreview();
-  if(hasLegacyOptions(c)) toast('This profile holds Nmap options from an earlier release. Saving it removes them.', false);
+  if(hasLegacyOptions(c)) toast('This profile holds Nmap options from an earlier release. Saving it removes them and turns off the scheduled scans that use it.', false);
 }
 async function saveProfile(){
   const pid=document.getElementById('pf-id').value;

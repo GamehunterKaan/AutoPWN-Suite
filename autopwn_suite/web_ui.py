@@ -2323,6 +2323,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                     return jsonify({"error": "'description' must be a string"}), 400
                 p["description"] = body["description"]
             stored = p.get("config", {})
+            dropped = isinstance(stored, dict) and _holds_options(stored)
             if isinstance(stored, dict):  # saving replaces what an earlier release stored as Nmap options
                 stored = {key: value for key, value in stored.items() if key != "nmap_flags"}
             try:
@@ -2331,22 +2332,29 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                 return jsonify({"error": _refusal(error, "Invalid scan configuration")}), 400
             _profiles[pid] = p
             # A schedule that no longer validates against the edited profile (a CIDR target on a
-            # web-only profile, say) would fail every minute; turn it off now, as a delete does.
+            # web-only profile, say) would fail every minute; turn it off now, as a delete does. So is
+            # every schedule of a profile that lost stored Nmap options: it would run without them.
+            cause = "a profile edit that removed its stored Nmap options" if dropped else "a profile edit"
             disabled = []
             with _schedules_lock:
                 for schedule in _schedules.values():
-                    if isinstance(schedule, dict) and schedule.get("profile_id") == pid and schedule.get("enabled") is True:
+                    if not (isinstance(schedule, dict) and schedule.get("profile_id") == pid and schedule.get("enabled") is True):
+                        continue
+                    if not dropped:
                         try:
                             _schedule_data(schedule)
+                            continue
                         except ValueError:
-                            schedule["enabled"] = False
-                            disabled.append(str(schedule.get("name") or str(schedule.get("id", ""))[:8]))
-                            _log_schedule_disabled(schedule, "a profile edit")
+                            pass
+                    schedule["enabled"] = False
+                    disabled.append(str(schedule.get("name") or str(schedule.get("id", ""))[:8]))
+                    _log_schedule_disabled(schedule, cause)
         _save_profiles()
         if disabled:
             _save_schedules()
-            _scheduler_note("warning", f"[*] Disabled after a profile edit: {', '.join(disabled)}. "
-                            "Edit the schedule and enable it again.")
+            _scheduler_note("warning", f"[*] Disabled after {cause}: {', '.join(disabled)}. "
+                            + ("Check the profile's settings, then enable the schedule again." if dropped
+                               else "Edit the schedule and enable it again."))
         return jsonify(p)
 
     @app.route("/api/profiles/<pid>", methods=["DELETE"])

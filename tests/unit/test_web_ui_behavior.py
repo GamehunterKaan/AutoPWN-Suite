@@ -565,7 +565,7 @@ assert.match(shown[0][0],/not applied/);
 shown.length=0;
 editProfile('old');
 assert.equal(nodes.get('pf-ports').value,'22,80');
-assert.match(shown[0][0],/Saving it removes them/);
+assert.match(shown[0][0],/Saving it removes them and turns off the scheduled scans that use it/);
 assert.doesNotMatch(nodes.get('pf-nmap-preview').value,/script|passwd/);
 // Saving sends the structured fields and nothing of the old options.
 let posted;

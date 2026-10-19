@@ -217,6 +217,55 @@ def test_stored_profile_that_a_request_still_sends_options_for_is_refused_not_re
     assert wu_review._profiles[profile_id]["config"]["nmap_flags"] == ""
 
 
+@pytest.mark.parametrize("options", ["-T2 --open", "--script banner", " -T5 ", None, ["-sV"]])
+def test_saving_a_profile_that_held_options_disables_the_schedules_that_would_run_without_them(
+        client_review, wu_review, caplog, options):
+    profile_id = _profile(client_review)
+    due_later = _schedule(client_review, profile_id)
+    already_off = _schedule(client_review, profile_id)
+    wu_review._schedules[already_off]["enabled"] = False
+    other_profile = _profile(client_review)
+    unrelated = client_review.post("/api/schedules", json={"target": "192.0.2.20", "profile_id": other_profile}).get_json()["id"]
+    wu_review._profiles[profile_id]["config"]["nmap_flags"] = options  # what an earlier release stored
+    # A request that still sends options is refused and changes nothing.
+    assert client_review.put(f"/api/profiles/{profile_id}", json={"nmap_flags": "-sV"}).status_code == 400
+    assert wu_review._schedules[due_later]["enabled"] is True
+    # A rename, which sends no options, replaces the stored ones; the schedule must not then run without them.
+    response = client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed"})
+    assert response.status_code == 200 and response.get_json()["config"]["nmap_flags"] == ""
+    assert wu_review._schedules[due_later]["enabled"] is False
+    assert json.loads(wu_review._SCHEDULES_FILE.read_text())[due_later]["enabled"] is False
+    assert wu_review._schedules[already_off]["enabled"] is False
+    assert wu_review._schedules[unrelated]["enabled"] is True
+    assert [record.getMessage() for record in caplog.records if record.levelname == "WARNING"] == [
+        f"Scheduled scan disabled after a profile edit that removed its stored Nmap options (schedule '{due_later}')"]
+    notices = [entry["msg"] for entry in wu_review._log_history if "Disabled after a profile edit" in entry["msg"]]
+    assert len(notices) == 1 and "removed its stored Nmap options" in notices[0]
+    assert notices[0].endswith("then enable the schedule again.") and "-T" not in notices[0] and "script" not in notices[0]
+    _one_scheduler_tick(wu_review)
+    assert [call.args[0]["target"] for call in wu_review._launch_scan.call_args_list] == ["192.0.2.20"]
+    # Enabling the schedule again, by hand, scans with the structured settings alone.
+    assert client_review.put(f"/api/schedules/{due_later}", json={"enabled": True}).status_code == 200
+    _one_scheduler_tick(wu_review)
+    assert [call.args[0]["target"] for call in wu_review._launch_scan.call_args_list] == ["192.0.2.20", "192.0.2.10"]
+    assert wu_review._launch_scan.call_args.args[0]["nmap_flags"] == ""
+
+
+@pytest.mark.parametrize("stored", [None, "", "   "])
+def test_saving_a_profile_that_held_no_options_leaves_its_schedules_enabled(client_review, wu_review, caplog, stored):
+    profile_id = _profile(client_review)
+    schedule_id = _schedule(client_review, profile_id)
+    if stored is None:
+        wu_review._profiles[profile_id]["config"].pop("nmap_flags", None)
+    else:
+        wu_review._profiles[profile_id]["config"]["nmap_flags"] = stored
+    assert client_review.put(f"/api/profiles/{profile_id}", json={"name": "Renamed", "ports": "22"}).status_code == 200
+    assert wu_review._schedules[schedule_id]["enabled"] is True
+    assert not [record for record in caplog.records if record.levelname == "WARNING"]
+    _one_scheduler_tick(wu_review)
+    assert wu_review._launch_scan.call_args.args[0]["nmap_flags"] == "-p 22"
+
+
 @pytest.mark.parametrize("flags", [
     "-oN /etc/cron.d/x", "--script=http-fetch", "-sS", "-sS -p 22", "\xe9" + chr(0x4E2D) + chr(0x202E) + "-sS", pytest.param("-sS " * 2000, id="repeated-technique"), pytest.param("A" * 200000, id="200000-characters"),
     "--script http-put --script-args-file=/etc/shadow", "; id", "$(id)"])
