@@ -7,6 +7,7 @@ from itertools import islice
 from urllib.parse import urldefrag, urlencode, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 from requests import get
 from requests.exceptions import RequestException
 
@@ -15,6 +16,24 @@ from autopwn_suite.web.http import is_html, resolve_url, same_origin, scoped_get
 from autopwn_suite.web.options import LIMITS
 from autopwn_suite.web.planning import prioritize_urls, skip_discovered_url
 from autopwn_suite.web.runtime import ACTIVE
+
+# html.parser nests unclosed <form>, <select> and <textarea> tags, so looking through the whole subtree of each
+# one is quadratic on a hostile page (tens of seconds for 48 KB). Every walk below is cut to a fixed number of
+# elements, far above what an ordinary page has, and the page is reported as only partly analysed when one was.
+MAX_FORMS = 100
+MAX_FORM_ELEMENTS = 5_000
+MAX_CONTROLS = 2_000
+MAX_OPTION_ELEMENTS = 200
+
+
+def _below(tag, limit):
+    """(the first `limit` nodes below `tag`, whether there were more)."""
+    nodes = list(islice(tag.descendants, limit + 1))
+    return nodes[:limit], len(nodes) > limit
+
+
+def _text(tag):
+    return "".join(islice(tag.strings, 50))  # tag.get_text() would read a whole nested subtree
 
 
 def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS["max_urls"][0], max_depth=LIMITS["max_depth"][0], on_discovered=None) -> set[str]:
@@ -110,16 +129,28 @@ def link_finder(target_url, log) -> set[str]:
         if url and same_origin(target_url, url):
             urls.add(url)
     # Build URLs only for GET forms. Do not submit POST, passwords or uploads.
-    for form in soup.find_all("form"):
+    forms = soup.find_all("form", limit=MAX_FORMS + 1)
+    limited = len(forms) > MAX_FORMS
+    controls_left = MAX_CONTROLS
+    for form in forms[:MAX_FORMS]:
         if form.get("method", "get").lower() != "get":
             continue
-        if form.find("input", attrs={"type": lambda value: value and value.lower() in ("password", "file")}):
+        nodes, more = _below(form, MAX_FORM_ELEMENTS)
+        limited = limited or more
+        tags = [node for node in nodes if isinstance(node, Tag)]
+        if any(tag.name == "input" and (tag.get("type") or "").lower() in ("password", "file") for tag in tags):
             continue
         action = resolve_url(base_url, form.get("action") or page_url)
         if not action or not same_origin(target_url, action):
             continue
         params = []
-        for control in form.find_all(["input", "textarea", "select"]):
+        for control in tags:
+            if control.name not in ("input", "textarea", "select"):
+                continue
+            if controls_left <= 0:
+                limited = True
+                break
+            controls_left -= 1
             name = control.get("name")
             kind = control.get("type", "text").lower()
             if not name or control.has_attr("disabled") or kind in ("submit", "button", "reset", "image"):
@@ -127,14 +158,23 @@ def link_finder(target_url, log) -> set[str]:
             if kind in ("checkbox", "radio") and not control.has_attr("checked"):
                 continue
             if control.name == "select":
-                options = control.find_all("option", disabled=False)
+                below, more = _below(control, MAX_OPTION_ELEMENTS)
+                limited = limited or more
+                options = [node for node in below if isinstance(node, Tag) and node.name == "option" and not node.has_attr("disabled")]
                 selected = [option for option in options if option.has_attr("selected")]
                 for option in selected or options[:1]:
-                    params.append((name, option.get("value", option.get_text())))
+                    params.append((name, option["value"] if option.has_attr("value") else _text(option)))
             else:
-                value = control.get_text() if control.name == "textarea" else control.get("value", "on" if kind in ("checkbox", "radio") else "")
+                value = _text(control) if control.name == "textarea" else control.get("value", "on" if kind in ("checkbox", "radio") else "")
                 params.append((name, value))
         if params:
             # Browsers replace an action's query when submitting a GET form.
             urls.add(urlunsplit(urlsplit(action)._replace(query=urlencode(params))))
+    if limited:
+        message = f"Only part of the forms of {page_url} were analysed; coverage is incomplete."
+        current = ACTIVE.get()
+        if current:
+            current.issue(message)
+        else:
+            log.logger("warning", message)
     return urls

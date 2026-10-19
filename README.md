@@ -167,7 +167,8 @@ TCP HTTP(S) service, including nonstandard ports; otherwise it tries the host's 
 The crawler follows same-origin links and discovers
 GET forms, preserving blank inputs, repeated parameter names and other query values. It skips
 POST forms, password forms and uploads. The default crawl limits are 250 pages, 1,000 discovered
-URLs and five levels of links; reaching a limit is reported as limited coverage.
+URLs and five levels of links; reaching a limit is reported as limited coverage. A page with more than
+100 forms, or with forms that hold more than 2,000 controls, is analysed only in part and reported the same way.
 
 SQLi and LFI checks compare against the original response and repeat promising probes before
 reporting new database errors or Unix/Windows file signatures. Reflected XSS checks require an

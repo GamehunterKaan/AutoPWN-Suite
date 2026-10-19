@@ -16,6 +16,14 @@ WORK_BUDGET = 500_000
 SECONDS = .5
 
 
+def _work(left, right):
+    """Character pairs one search for the longest common block visits: for each character of the left text, the
+    places it occurs in the right text, unless it makes up more than 1% of it (then difflib ignores it)."""
+    counts = Counter(right)
+    popular = len(right) // 100 + 1 if len(right) >= 200 else len(right)
+    return sum(counts[char] for char in left if counts[char] <= popular)
+
+
 def similarity(left, right):
     """difflib's ratio, bounded in work and in time.
 
@@ -27,12 +35,13 @@ def similarity(left, right):
     here, as SequenceMatcher.get_matching_blocks does, stopping after SECONDS and counting the blocks found so
     far. Keep this in step with `_similarity` in poc_runtime.py, which downloaded PoCs carry without this package.
     """
-    counts = Counter(right)
-    popular = len(right) // 100 + 1 if len(right) >= 200 else len(right)
-    work = sum(counts[char] for char in left if counts[char] <= popular)
-    if work > WORK_BUDGET:
-        keep = max(1000, int(len(left) * (WORK_BUDGET / work) ** .5))
+    work = _work(left, right)
+    while work > WORK_BUDGET and len(left) > 1000:
+        # Cutting both texts changes which characters of the right text difflib ignores (more than 1% of it), so
+        # the work is measured again on the cut pair and the cut repeated until it fits.
+        keep = max(1000, int(len(left) * (WORK_BUDGET / work) ** .5 * .9))
         left, right = left[:keep], right[:keep]
+        work = _work(left, right)
     matcher = SequenceMatcher(None, left, right)
     ranges, matched, deadline = [(0, len(left), 0, len(right))], 0, monotonic() + SECONDS
     while ranges and monotonic() < deadline:

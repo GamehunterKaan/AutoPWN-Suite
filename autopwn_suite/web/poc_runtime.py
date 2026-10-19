@@ -145,12 +145,16 @@ def _similarity(left, right):
     # Same as similarity() in similarity.py, which a downloaded PoC does not have: difflib's ratio, on a shorter
     # prefix when a hostile body of many different characters would make one search take minutes, and counting
     # only the blocks found within half a second when a periodic body would make it search for thousands.
-    counts = Counter(right)
-    popular = len(right) // 100 + 1 if len(right) >= 200 else len(right)
-    work = sum(counts[char] for char in left if counts[char] <= popular)
-    if work > 500_000:
-        keep = max(1000, int(len(left) * (500_000 / work) ** .5))
+    def work_of(first, second):
+        counts = Counter(second)
+        popular = len(second) // 100 + 1 if len(second) >= 200 else len(second)
+        return sum(counts[char] for char in first if counts[char] <= popular)
+
+    work = work_of(left, right)
+    while work > 500_000 and len(left) > 1000:  # measured again on the cut pair: the characters difflib ignores change
+        keep = max(1000, int(len(left) * (500_000 / work) ** .5 * .9))
         left, right = left[:keep], right[:keep]
+        work = work_of(left, right)
     matcher = SequenceMatcher(None, left, right)
     ranges, matched, deadline = [(0, len(left), 0, len(right))], 0, monotonic() + .5
     while ranges and monotonic() < deadline:

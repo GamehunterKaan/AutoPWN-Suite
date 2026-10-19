@@ -198,7 +198,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   discovery, the PoC) compare a shorter prefix of a hostile body of many different characters (ordinary
   pages are compared exactly as before), and recording findings no longer copies all the earlier ones for
   each new one. The crawler's resume checkpoint keeps at most 10,001 links per crawled page, in crawl order
-  and without links it would never follow.
+  and without links it would never follow, and it analyses at most 100 forms and 2,000 form controls per
+  page (a page that exceeds that is reported as partly analysed, like a reached crawl limit), because a
+  page of thousands of unclosed `<form>` or `<select>` tags made its form analysis quadratic.
 - Web scan log lines and coverage notes show query secrets in URLs as `REDACTED`, like findings do, and the
   crawler logs a fixed message instead of the request exception. Web findings drop terminal control
   characters (ESC, CR and the C1 codes; newlines and tabs stay) from target-controlled text. Query

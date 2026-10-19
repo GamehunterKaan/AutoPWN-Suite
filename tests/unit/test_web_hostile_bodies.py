@@ -9,7 +9,7 @@ with the unbounded patterns they replaced).
 import random
 import time
 from difflib import SequenceMatcher
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -17,6 +17,7 @@ from autopwn_suite.web import poc_runtime
 from autopwn_suite.web import similarity as similarity_module
 from autopwn_suite.web.boolean_sqli import _similar
 from autopwn_suite.web.content import inspect_content
+from autopwn_suite.web.crawler import MAX_FORMS, link_finder
 from autopwn_suite.web.dirbust import _catch_all
 from autopwn_suite.web.similarity import similarity
 from autopwn_suite.web.sqli import SQLIScanner
@@ -157,6 +158,29 @@ def test_similarity_stays_fast_on_periodic_bodies(compare, size):
     assert ratio < .5
 
 
+def popularity_shift_pair(size=100_000, kept=80_000):
+    """One character is more than 1% of the right text, so difflib ignores it, but not more than 1% of the first
+    `kept` characters of it: cutting both texts there would make every one of the left text's `kept` copies of it
+    scan 700 places (a work estimate made before the cut says there is nothing to scan)."""
+    generator = random.Random(5)
+    common, noise = "一", [chr(0x5000 + index) for index in range(2492)]
+    head = [common] * 700 + [noise[index % len(noise)] for index in range(kept - 700)]
+    tail = [common] * 2000 + [noise[index % len(noise)] for index in range(size - kept - 2000)]
+    generator.shuffle(head)
+    generator.shuffle(tail)
+    return common * kept + "".join(generator.choice(noise) for _ in range(size - kept)), "".join(head + tail)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("compare", [similarity, _similar, poc_runtime._similarity], ids=["similarity", "boolean_sqli", "poc_runtime"])
+def test_similarity_stays_fast_when_cutting_the_texts_changes_which_characters_difflib_ignores(compare):
+    one, other = popularity_shift_pair()
+    started = time.perf_counter()
+    ratio = compare(one, other)
+    assert time.perf_counter() - started < LIMIT_SECONDS  # 5.6 s before the work was measured again on the cut texts
+    assert 0 <= ratio <= 1
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize("compare,module", COMPARISONS, ids=["similarity", "poc_runtime"])
 def test_the_search_for_common_blocks_stops_at_its_deadline_and_counts_what_it_found(compare, module, monkeypatch):
@@ -219,3 +243,40 @@ def test_ordinary_pages_are_compared_exactly_as_difflib_does(compare):
     changed = page.replace("Item 7 ", "Item seven ").replace("</body>", "<p>You have an error</p></body>")
     for left, right in ((page, page), (page, changed), (page, page[:5000]), (page[:3000], "<html>Not found</html>"), ("", page), (page, "")):
         assert compare(left, right) == SequenceMatcher(None, left, right).ratio()
+
+
+NESTED_FORM_PAGES = {
+    "forms": "<html><body>" + "<form>" * 16_000 + "<input name=a>",
+    "selects": "<form>" + "<select name=s>" * 16_000 + "<option>x",
+    "textareas": "<form>" + "<textarea name=t>" * 16_000 + "x",
+    "options": "<form><select name=s>" + "<option>" * 16_000 + "x",
+    "forms_with_controls": "<form><input name=a>" * 16_000,
+}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("page", NESTED_FORM_PAGES.values(), ids=NESTED_FORM_PAGES.keys())
+def test_deeply_nested_forms_and_controls_stay_fast_for_the_crawler(web_response, page):
+    """html.parser nests unclosed tags, so every walk below a form, select or textarea covered the whole rest of the page."""
+    response = web_response(page)
+    log = MagicMock()
+    with patch("autopwn_suite.web.crawler.get", return_value=response), patch("autopwn_suite.web.crawler.random_user_agent", return_value=iter(["UA"])):
+        started = time.perf_counter()
+        link_finder("http://example.com/", log)
+    assert time.perf_counter() - started < LIMIT_SECONDS
+    if "textarea" not in page:  # newer html.parser versions read the inside of a textarea as text, older ones nest it
+        assert any("coverage is incomplete" in call.args[1] for call in log.logger.call_args_list)
+
+
+@pytest.mark.unit
+def test_a_page_with_more_forms_than_the_limit_is_analysed_up_to_it_and_reported(web_response):
+    page = "".join(f'<form action="/search{number}"><input name="q"></form>' for number in range(MAX_FORMS + 20))
+    log = MagicMock()
+    with patch("autopwn_suite.web.crawler.get", return_value=web_response(page)), patch("autopwn_suite.web.crawler.random_user_agent", return_value=iter(["UA"])):
+        urls = link_finder("http://example.com/", log)
+    assert len(urls) == MAX_FORMS
+    assert any("Only part of the forms" in call.args[1] for call in log.logger.call_args_list)
+    with patch("autopwn_suite.web.crawler.get", return_value=web_response(page[:page.index('<form action="/search5"')])), patch("autopwn_suite.web.crawler.random_user_agent", return_value=iter(["UA"])):
+        log = MagicMock()
+        assert len(link_finder("http://example.com/", log)) == 5
+    assert not log.logger.called  # an ordinary page is not reported
