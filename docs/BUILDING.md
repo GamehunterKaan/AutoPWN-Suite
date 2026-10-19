@@ -172,7 +172,7 @@ touching anything so that you can decide which environment to keep. A daemon ins
 copy of the source in `$APPDIR`, which `install.sh` does not replace, so that service keeps
 running the older version. `install.sh` therefore warns when the unit still starts
 `autopwn.py`; run `sudo autopwn-suite --daemon-install` once, which asks for the
-configuration again, and restart the service.
+configuration again and restarts the service.
 
 With `DESTDIR` set, the script stages the source in `$APPDIR/src` and writes the
 command link only: no `sudo`, no ownership changes, no systemd calls, and no

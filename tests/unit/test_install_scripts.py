@@ -294,7 +294,8 @@ def test_install_warns_when_a_daemon_from_an_earlier_release_still_runs_its_own_
     result, unit = install_with_unit(source_tree, tmp_path, LEGACY_UNIT)
     assert "WARNING:" in result.stdout and "autopwn.py" in result.stdout
     assert "sudo autopwn-suite --daemon-install" in result.stdout
-    assert "sudo systemctl restart autopwn-daemon" in result.stdout
+    # --daemon-install restarts the service itself, so no separate restart step is asked for.
+    assert "also restarts it" in result.stdout and "systemctl restart" not in result.stdout
     if os.geteuid() != 0:
         assert "sudo bash install.sh" in result.stdout
     # The installer only reports: the service file is never rewritten or restarted.

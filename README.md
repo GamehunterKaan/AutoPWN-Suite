@@ -541,8 +541,10 @@ autopwn-suite --daemon-install
 
 Run it as root on Linux from an installed copy of AutoPWN Suite (pipx, `install.sh` or a standalone binary).
 The systemd service starts that same installation, and the generated configuration is kept in
-`/opt/autopwn-suite/autopwn-daemon.conf` (mode `0600`, as it can hold the SMTP password, NVD key or webhook URL). A daemon installed by release 2.6 or earlier keeps running
-its old copy of the source until you run `--daemon-install` once more (`install.sh` warns when it finds
+`/opt/autopwn-suite/autopwn-daemon.conf` (mode `0600`, as it can hold the SMTP password, NVD key or webhook URL).
+Running `--daemon-install` again rewrites the service and restarts it, so a new configuration or a newer
+installation takes effect. A daemon installed by release 2.6 or earlier keeps running
+its old copy of the source until you do (`install.sh` warns when it finds
 one).
 
 ### Web UI

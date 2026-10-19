@@ -7,6 +7,7 @@ import os
 import re
 import shlex
 import stat
+import subprocess
 import sys
 from configparser import ConfigParser
 from pathlib import Path
@@ -441,9 +442,12 @@ class TestCopyFiles:
         mock_subprocess.check_call.assert_has_calls(
             [
                 call(["systemctl", "daemon-reload"]),
-                call(["systemctl", "enable", "--now", "autopwn-daemon.service"]),
+                call(["systemctl", "enable", "autopwn-daemon.service"]),
+                call(["systemctl", "restart", "autopwn-daemon.service"]),
             ]
         )
+        # `enable --now` would leave a daemon that is already running on the old program and configuration.
+        assert all("--now" not in c.args[0] for c in mock_subprocess.check_call.call_args_list)
         # No virtualenv or pip is involved: the unit starts the interpreter that performed the install.
         assert all("pip" not in str(c) for c in mock_subprocess.check_call.call_args_list)
         unit = mock_open.return_value.__enter__.return_value.write.call_args.args[0]
@@ -481,6 +485,23 @@ class TestCopyFiles:
 
         mock_shutil.copy2.assert_not_called()
         mock_subprocess.check_call.assert_any_call(["systemctl", "daemon-reload"])
+
+    @patch("autopwn_suite.daemon.daemon_installer.subprocess")
+    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer.Path")
+    @patch("autopwn_suite.daemon.daemon_installer.open")
+    def test_copy_files_does_not_report_success_when_the_restart_fails(
+        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
+    ):
+        self._paths(mock_path)
+        mock_subprocess.CalledProcessError = subprocess.CalledProcessError
+        mock_subprocess.check_call.side_effect = [None, None, subprocess.CalledProcessError(1, "systemctl")]
+
+        CopyFiles(mock_console)
+
+        printed = " ".join(str(c) for c in mock_console.print.call_args_list)
+        assert "systemctl restart autopwn-daemon.service" in printed
+        assert "installation complete" not in printed
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
     @patch("autopwn_suite.daemon.daemon_installer.shutil")

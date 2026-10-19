@@ -328,17 +328,19 @@ WantedBy=multi-user.target
         console.print(service_content)
         return
 
-    # Reload, enable and start the service
+    # Reload, enable and (re)start the service. `enable --now` leaves a running service alone, so installing
+    # again would keep the old program and configuration running; restart starts a stopped one as well.
     try:
         console.print("Reloading systemd daemon ...")
         subprocess.check_call(["systemctl", "daemon-reload"])
         console.print("Enabling and starting service ...")
-        subprocess.check_call(["systemctl", "enable", "--now", "autopwn-daemon.service"])
+        subprocess.check_call(["systemctl", "enable", "autopwn-daemon.service"])
+        subprocess.check_call(["systemctl", "restart", "autopwn-daemon.service"])
         console.print("[green]Service enabled and started successfully.[/green]")
         console.print("[blue]Check status with: sudo systemctl status autopwn-daemon.service[/blue]")
     except subprocess.CalledProcessError as e:
         console.print(f"[red]Systemctl command failed: {e}[/red]")
-        console.print("[yellow]You may need to run manually: sudo systemctl daemon-reload && sudo systemctl enable --now autopwn-daemon.service[/yellow]")
+        console.print("[yellow]You may need to run manually: sudo systemctl daemon-reload && sudo systemctl enable autopwn-daemon.service && sudo systemctl restart autopwn-daemon.service[/yellow]")
         return
 
     console.print("[green]AutoPWN daemon installation complete.[/green]")
