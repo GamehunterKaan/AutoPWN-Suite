@@ -6,7 +6,7 @@ added for at least 50% of the bugs fixed in the last six months. This ledger cov
 
 ## Method
 
-1. Take every non-merge commit reachable from the 2.7.0 release in the window (**273**).
+1. Take every non-merge commit reachable from the 2.7.0 release in the window (**291**).
 2. Select the commits that fix a defect in product behavior. Read the subject and the change:
    the words `fix`, `bug`, `vulnerability`, `prevent`, `resolve`, `regression`, `correct`, `handle`,
    `avoid`, `harden` and `escape` find some of them, but most fixes of 2.7.0 use other verbs
@@ -32,6 +32,16 @@ this window; the most recent bug report (#67) predates it.
 
 | Commit | Date | Fix | Regression tests changed in the same commit |
 | --- | --- | --- | --- |
+| `ec9ef0f` | 2026-10-19 | Read a URL whole before a line separator turns into a space, and encode URLs alike in the PoC runtime | `tests/unit/test_hostile_text.py`, `tests/unit/test_hostile_urls.py`, `tests/unit/test_web_webvuln.py` |
+| `50a9284` | 2026-10-19 | Keep the OS fingerprint's lines and clean what Nmap and the dashboard log when a scan fails | `tests/unit/test_hostile_nmap_text.py` |
+| `e1352a1` | 2026-10-19 | Store the URLs of a finding as percent-encoding instead of raw control characters | `tests/unit/test_fuzz_inputs.py`, `tests/unit/test_hostile_text.py`, `tests/unit/test_hostile_urls.py` and others |
+| `fb85285` | 2026-10-19 | Remove unpaired surrogates from printed text | `tests/unit/test_hostile_provider_text.py`, `tests/unit/test_hostile_text.py` |
+| `e794c88` | 2026-10-19 | Clean NVD, local database and Exploit-DB text before it is printed | `tests/unit/test_hostile_provider_text.py` |
+| `14bbf58` | 2026-10-19 | Clean Nmap banners, hostnames and script output when the XML is read | `tests/unit/test_hostile_nmap_text.py` |
+| `cd778c3` | 2026-10-19 | Print web scan text as one line without control or layout characters | `tests/unit/test_hostile_text.py`, `tests/unit/test_web_dirbust.py`, `tests/unit/test_web_webvuln.py` |
+| `2e5e2e0` | 2026-10-19 | Redact a typed target as one string and keep a quote or a Unicode space from cutting a URL | `tests/unit/test_fuzz_inputs.py`, `tests/unit/test_utils.py`, `tests/unit/test_web_dashboard.py` and others |
+| `dc0f265` | 2026-10-19 | Show the typed target redacted in job records, exports and the CLI summary | `tests/unit/test_utils.py`, `tests/unit/test_web_dashboard.py` |
+| `649a67e` | 2026-10-19 | Redact every query value, userinfo and fragment in web scan diagnostics | `tests/unit/test_fuzz_inputs.py`, `tests/unit/test_web_dirbust.py`, `tests/unit/test_web_poc.py` and others |
 | `fed9a3c` | 2026-10-19 | Turn off a profile's schedules when saving it drops stored Nmap options | `tests/unit/test_web_ui_behavior.py`, `tests/unit/test_web_ui_review.py` |
 | `35e79a7` | 2026-10-19 | Refuse Nmap options in the dashboard and check technique and ports against fixed lists | `tests/unit/test_fuzz_inputs.py`, `tests/unit/test_web_ui.py`, `tests/unit/test_web_ui_review.py` |
 | `5a0a416` | 2026-10-19 | Send the scan and profile forms' structured Nmap controls and drop the free-text field | `tests/unit/test_web_ui_behavior.py`, `tests/unit/test_web_ui_static.py` |
@@ -175,7 +185,7 @@ this window; the most recent bug report (#67) predates it.
 
 ## Result
 
-**127 of 128** product-defect fixes in the window (99%) added or changed automated tests in the
+**137 of 138** product-defect fixes in the window (99%) added or changed automated tests in the
 same commit, above the 50% requirement. CodeQL alerts #4 and #5 (DOM XSS and attribute
 sanitization) and #1 (workflow permissions) were fixed outside the window (2026-04-15 and
 2025-10-18).
