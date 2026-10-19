@@ -16,6 +16,9 @@ import string
 import sys
 import zlib
 from contextlib import closing
+
+
+from argparse import ArgumentTypeError
 from types import SimpleNamespace
 
 import pytest
@@ -24,6 +27,9 @@ from rich.text import Text
 from autopwn_suite.logger import markup_safe
 from autopwn_suite.nmap_backend import parse_nmap_xml
 from autopwn_suite.vulnerability_db import SCHEMA_VERSION, DatabaseUnavailable, OfflineDatabase
+
+
+from autopwn_suite.utils import _port, _report_name
 from autopwn_suite.web.options import normalize_options
 from autopwn_suite.web_auth import ACCOUNT_FILE, password_matches, validate_account
 
@@ -172,6 +178,32 @@ def test_copied_mirror_records_only_raise_database_unavailable(tmp_path):
         assert all(isinstance(value, str) for finding in findings
                    for value in (finding.CVEID, finding.description, finding.severity))
     assert accepted and rejected  # the corpus exercises both outcomes
+
+
+def test_web_port_validator_only_raises_its_documented_error():
+    rng = random.Random(SEED + 41)
+    alphabet = string.digits * 3 + string.printable + "\u0663\u00e9\u0000"
+    accepted = rejected = 0
+    for _ in range(3000):
+        text = str(rng.randint(-5, 70000)) if rng.random() < .5 else "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 8)))
+        try:
+            port = _port(text)
+        except ArgumentTypeError:
+            rejected += 1
+            continue
+        assert isinstance(port, int) and 1 <= port <= 65535
+        accepted += 1
+    assert accepted and rejected  # the corpus exercises both outcomes
+
+
+def test_report_name_only_contains_filesystem_safe_characters():
+    rng = random.Random(SEED + 42)
+    alphabet = string.printable + "\u00e9\u20ac\u0000:*?<>|\\/\ud800"
+    for _ in range(3000):
+        name = _report_name("".join(rng.choice(alphabet) for _ in range(rng.randint(0, 150))))
+        assert len(name) <= 100
+        assert re.fullmatch(r"[A-Za-z0-9._-]*", name)
+    assert _report_name(["192.0.2.1", "198.51.100.1"]) == "multihost"
 
 
 @pytest.fixture
