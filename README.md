@@ -118,7 +118,8 @@ password is stored in `web_ui_auth.json` (inside `AUTOPWN_DATA_DIR`, or the per-
 default). Change the username and password after signing in under **Settings → Account**. If you
 forget the password, run `autopwn-suite --web-reset-account` on the server to restore `admin`
 with a new random password and sign out all sessions. Remote access requires HTTPS (or set
-`AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy); localhost works over plain HTTP.
+`AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy that passes the browser's `Host` header
+through, or sign-in is refused as cross-origin); localhost works over plain HTTP.
 
 - **Multiple concurrent scans** - Launch and monitor several scans at the same time
 - **Live terminal output** - Watch nmap commands and results in real time via SSE
@@ -589,7 +590,7 @@ The dashboard listens on `127.0.0.1` by default. With a custom host and port:
 autopwn-suite --web --web-host 0.0.0.0 --web-port 3000
 ```
 
-Listening beyond localhost exposes the sign-in page to the network. Remote clients must then use HTTPS (terminate TLS in a reverse proxy, set `AUTOPWN_WEB_SECURE_COOKIE=1`, and firewall the service). Inside containers, `-p 127.0.0.1:8080:8080` keeps the published port off the network, but a port published from Docker's bridge network reaches the dashboard from the bridge gateway, which is not loopback, so sign-in over plain HTTP is refused. For plain-HTTP sign-in on the Docker host use host networking with `AUTOPWN_WEB_HOST=127.0.0.1` (as `docker-compose.yml` does); otherwise put a TLS reverse proxy that keeps the `Host` header in front and set `AUTOPWN_WEB_SECURE_COOKIE=1`.
+Listening beyond localhost exposes the sign-in page to the network. Remote clients must then use HTTPS (terminate TLS in a reverse proxy that passes the `Host` header through, e.g. nginx `proxy_set_header Host $http_host;`, which keeps a non-default port, set `AUTOPWN_WEB_SECURE_COOKIE=1`, and firewall the service). Inside containers, `-p 127.0.0.1:8080:8080` keeps the published port off the network, but a port published from Docker's bridge network reaches the dashboard from the bridge gateway, which is not loopback, so sign-in over plain HTTP is refused. For plain-HTTP sign-in on the Docker host use host networking with `AUTOPWN_WEB_HOST=127.0.0.1` (as `docker-compose.yml` does); otherwise put a TLS reverse proxy that keeps the `Host` header in front and set `AUTOPWN_WEB_SECURE_COOKIE=1`.
 
 ![Scan Running](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/scan-running.png)
 
