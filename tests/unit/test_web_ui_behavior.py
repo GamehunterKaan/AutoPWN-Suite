@@ -335,6 +335,39 @@ assert.equal(requests,0);
 """)
 
 
+@pytest.mark.parametrize("scrolled,follows", [(790, True), (800, True), (100, False), (759, False)])
+def test_terminal_follows_new_lines_only_while_the_reader_is_at_the_end(scrolled, follows):
+    run_js(f"const scrolled={scrolled}, follows={json.dumps(follows)};" + """
+const term=document.getElementById('term');
+term.scrollHeight=1000; term.clientHeight=200; term.scrollTop=scrolled;
+addLog(null,'new line');
+assert.equal(term.scrollTop,follows?1000:scrolled);
+assert.equal(term.children.length,1);
+""")
+
+
+def test_terminal_filter_lists_every_scan_the_dashboard_sees_once():
+    run_js("""
+renderScans=renderHosts=renderVulnTable=updateBadges=()=>{};
+const filter=document.getElementById('term-filter');
+const listed=()=>filter.children.map(option=>option.value).join(',');
+let jobs=[{id:'aaaaaaaa-1',target:'192.0.2.1',started_at:'2026-10-19T00:00:00Z'}];
+fetch=async url=>({ok:true,json:async()=>url==='/api/scans'?jobs:[]});
+// A scan started from this page is listed at once; the next poll must not list it again.
+addTermFilterOption('aaaaaaaa-1','192.0.2.1');
+await poll();
+assert.equal(listed(),'aaaaaaaa-1');
+// A scan that the dashboard started itself (a schedule) or another tab started appears with the next poll.
+jobs=[...jobs,{id:'bbbbbbbb-2',target:'192.0.2.0/24',started_at:'2026-10-19T01:00:00Z'}];
+await poll();
+assert.equal(listed(),'aaaaaaaa-1,bbbbbbbb-2');
+assert.equal(filter.children[1].textContent,'#bbbbbbbb — 192.0.2.0/24');
+jobs=[...jobs];
+await poll();
+assert.equal(listed(),'aaaaaaaa-1,bbbbbbbb-2');
+""")
+
+
 def test_profile_source_is_loaded_and_new_profile_resets_it():
     run_js("""
 profiles={airgap:{id:'airgap',name:'Airgap',config:{vulnerability_source:'offline'}}};

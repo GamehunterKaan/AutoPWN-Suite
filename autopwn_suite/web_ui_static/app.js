@@ -621,6 +621,7 @@ async function poll(){
         s.finished_at = previous.finished_at;
       }
       scans[s.id]=s;
+      addTermFilterOption(s.id,s.target);  // also lists scans this page did not start, such as scheduled ones
     });
     hosts = latestHostObservations(hostsR);
     renderScans(); renderHosts(); renderVulnTable(); updateBadges();
@@ -841,6 +842,7 @@ const MAX_TERM_LINES = 2000;
 function addLog(scanId,msg,level='info',ts=null){
   const f=document.getElementById('term-filter').value;
   const term=document.getElementById('term');
+  const atEnd=term.scrollHeight-term.scrollTop-term.clientHeight<40;
   const time=ts||new Date().toTimeString().slice(0,8);
   const sid=scanId?`#${shortId(scanId)}`:'system';
   const line=document.createElement('div');
@@ -849,9 +851,13 @@ function addLog(scanId,msg,level='info',ts=null){
   line.innerHTML=`<span class="ll-sid">${esc(sid)}</span><span class="ll-ts">${time}</span><span class="ll-msg">${esc(msg)}</span>`;
   term.appendChild(line);
   if(term.children.length>MAX_TERM_LINES) term.firstElementChild.remove();
-  term.scrollTop=term.scrollHeight;
+  // A reader who scrolled up to read an earlier line keeps their place; only a reader at the end follows.
+  if(atEnd) term.scrollTop=term.scrollHeight;
 }
+const termFilterIds=new Set();
 function addTermFilterOption(scanId,target){
+  if(termFilterIds.has(scanId)) return;
+  termFilterIds.add(scanId);
   const sel=document.getElementById('term-filter');
   const opt=document.createElement('option'); opt.value=scanId; opt.textContent=`#${shortId(scanId)} — ${target}`;
   sel.appendChild(opt);
