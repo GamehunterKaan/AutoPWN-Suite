@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 from os import get_terminal_size
 from platform import platform, system
-from re import search
+from re import search, sub
 from socket import AF_INET, SOCK_DGRAM, socket
 from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
 from sys import platform as sys_platform
@@ -1026,6 +1026,11 @@ def CheckConnection(log) -> bool:
 
 
 
+def _report_name(target) -> str:
+    """The target as a file name every platform accepts; Windows refuses `*`, `?` and `:` (a colon names a data stream)."""
+    return "multihost" if isinstance(target, list) else sub(r"[^A-Za-z0-9._-]", "_", str(target))[:100]
+
+
 def SaveOutput(console, out_type, output_file, output_folder, target) -> None:
     if output_file:
         # User provided a path, use it directly
@@ -1034,16 +1039,12 @@ def SaveOutput(console, out_type, output_file, output_folder, target) -> None:
         os.makedirs(os.path.dirname(full_path) or '.', exist_ok=True)
     elif output_folder:
         os.makedirs(output_folder, exist_ok=True)
-        base_name = 'multihost' if isinstance(target, list) else str(target).replace('/', '_')
-        sanitized_name = base_name.replace('\\', '_')
-        full_path = os.path.join(output_folder, f"{datetime.now().strftime('%Y-%m-%d')}_{sanitized_name}")
+        full_path = os.path.join(output_folder, f"{datetime.now().strftime('%Y-%m-%d')}_{_report_name(target)}")
     else:
         # No path provided, create a default one in the 'outputs' directory
         output_dir = "outputs"
         os.makedirs(output_dir, exist_ok=True)
-        base_name = 'multihost' if isinstance(target, list) else str(target).replace('/', '_')
-        sanitized_name = base_name.replace('\\', '_')
-        full_path = os.path.join(output_dir, f"{datetime.now().strftime('%Y-%m-%d')}_{sanitized_name}")
+        full_path = os.path.join(output_dir, f"{datetime.now().strftime('%Y-%m-%d')}_{_report_name(target)}")
 
     # Ensure the file has the correct extension
     if not full_path.endswith(f".{out_type}"):

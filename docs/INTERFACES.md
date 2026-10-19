@@ -28,7 +28,7 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `-sed/--skip-exploit-download` | Suppress optional exploit reference downloads. Downloading does not execute the files. |
 | `--offline`, `--vuln-source`, `--vuln-db` | Force offline integration policy; select `auto`/`online`/`offline` CVE source; choose SQLite database path. Offline mode still sends requested Nmap target traffic. |
 | `--update-vuln-db`, `--vuln-db-status` | Explicitly update the official local NVD mirror or print database readiness/freshness and exit. |
-| `-o/--output`, `-of/--output-folder`, `-ot/--output-type` | Explicit output path or generated file under an output directory; `html`, `txt`, or `svg`. Output defaults to `outputs/` relative to the working directory. |
+| `-o/--output`, `-of/--output-folder`, `-ot/--output-type` | Explicit output path or generated file under an output directory; `html`, `txt`, or `svg`. Output defaults to `outputs/` relative to the working directory. A generated name is the date and the target with every character other than letters, digits, `.`, `_` and `-` replaced by `_` (at most 100 characters), so `192.168.*.*` or an IPv6 address also saves on Windows. |
 | `-rp/--report`, `-rpw/--report-webhook` | Select `email`/`webhook` notification and webhook destination. When no destination is given, `AUTOPWN_WEBHOOK_URL_FILE` (since v2.6.1) names a one-line file holding it, before the interactive prompt. |
 | `-rpe/--report-email`, `-rpep/--report-email-password` | SMTP username and password. When no password is given, `AUTOPWN_SMTP_PASSWORD_FILE` (since v2.6.1) names a one-line password file, before the interactive prompt. |
 | `-rpet/--report-email-to`, `-rpef/--report-email-from` | Report recipient and From address. |

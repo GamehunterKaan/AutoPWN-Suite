@@ -127,6 +127,46 @@ class TestSaveOutput:
         # Verify the confirmation message is printed
         mock_console.print.assert_called_with(f"Report saved to [cyan]{expected_relative_path}[/cyan]")
 
+    @pytest.mark.parametrize("folder", ["outputs", None])
+    @pytest.mark.parametrize(
+        "target, expected",
+        [
+            ("192.168.*.*", "192.168._._"),
+            ("2001:db8::10", "2001_db8__10"),
+            ("host.test:8080", "host.test_8080"),
+            ("what?.test", "what_.test"),
+            ("10.0.0.0/24", "10.0.0.0_24"),
+            ("a\\b\"c<d>e|f", "a_b_c_d_e_f"),
+            ("x" * 300, "x" * 100),
+        ],
+    )
+    @patch("autopwn_suite.utils.datetime")
+    def test_automatic_filename_is_valid_on_every_platform(
+        self, mock_datetime, mock_console, temp_dir, monkeypatch, target, expected, folder
+    ):
+        """A target such as `192.168.*.*` or an IPv6 address must not break saving the report after a long scan."""
+        mock_datetime.now.return_value = datetime(2023, 10, 27)
+
+        with monkeypatch.context() as patch_context:
+            patch_context.chdir(temp_dir)
+            SaveOutput(mock_console, "txt", None, folder, target)
+
+        saved = mock_console.save_text.call_args.args[0]
+        assert os.path.basename(saved) == f"2023-10-27_{expected}.txt"
+        assert not set(os.path.basename(saved)) & set(':*?"<>|\\/')
+
+    def test_report_with_a_wildcard_target_is_really_written(self, temp_dir, monkeypatch):
+        from rich.console import Console
+
+        console = Console(record=True, width=60)
+        console.print("report body")
+        with monkeypatch.context() as patch_context:
+            patch_context.chdir(temp_dir)
+            SaveOutput(console, "txt", None, "outputs", "192.168.*.*:80")
+        written = [path.name for path in (temp_dir / "outputs").iterdir()]
+        assert len(written) == 1 and written[0].endswith("_192.168._.__80.txt")
+        assert "report body" in (temp_dir / "outputs" / written[0]).read_text(encoding="utf-8")
+
 
 @pytest.mark.unit
 class TestInitArgsConf:
