@@ -20,9 +20,11 @@ name: Dynamic analysis
 #     prints on first start (a throwaway account in a temporary data directory),
 #     and hands the session cookie to ZAP so the dashboard, its scripts and its
 #     read-only API GET routes are spidered (traditional and AJAX spider). ZAP
-#     baseline is passive: it does not attack, fuzz or submit state-changing
-#     requests, and a failed login stops the job instead of silently skipping
-#     this pass.
+#     baseline applies passive rules only and no active attack rules, but its
+#     spiders can submit forms and follow controls with the session cookie: the
+#     throwaway data directory contains that, and the dashboard's CSRF check
+#     rejects such submissions. A failed login stops the job instead of silently
+#     skipping this pass.
 #   * It is a baseline, not an active scan: it will not find injection or
 #     logic flaws. Those are covered by the unit/integration tests and SAST.
 #

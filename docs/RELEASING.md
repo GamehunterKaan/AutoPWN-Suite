@@ -127,10 +127,12 @@ Only tags from v2.7.0 on can be dispatched, here and for `publish-docker.yml` or
 against the tag's own source, and the policy scans `packaging/requirements-build.txt`,
 `packaging/requirements-publish.txt` and `.security/requirements-bandit.txt` there,
 which v2.6.1 and older do not have. A dispatch for such a tag stops before anything is
-signed or published: in the validate job of `publish-docker.yml` and of the backfill
-for a release that already has uploaded assets (v2.6.1 and v2.6.0 have), otherwise in
-the source security job, with an error that names the missing file. Those releases
-keep the layouts they were published with.
+signed or published. A tag before v2.6.0 fails release validation (its version files or
+its changelog section do not meet it). v2.6.0 and v2.6.1 pass validation and have
+uploaded assets, so they are refused in the validate job of `publish-docker.yml` and of
+the backfill; only `publish-pypi.yml`, which does not look at release assets, carries on
+to the source security job, where the error names the missing file. Those releases keep
+the layouts they were published with.
 
 This path does **not rebuild or replace application source or Docker images** and
 does not change version/latest image tags. It snapshots the existing official

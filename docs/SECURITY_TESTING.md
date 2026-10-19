@@ -109,9 +109,12 @@ rule/path exclusions or change severity merely to pass a check.
 `dynamic-analysis.yml` starts the dashboard from the source under test on loopback
 with a throwaway data directory and runs the ZAP baseline scan against it twice:
 once without a session (the sign-in surface) and once with the session cookie of the
-generated account (the dashboard, its scripts and the read-only API routes). The scan
-is passive: it spiders and inspects responses and sends no attacks or state-changing
-requests, so it complements the tests and SAST and does not replace them. Pull
+generated account (the dashboard, its scripts and the read-only API routes). Baseline
+mode applies passive rules only and no active attack rules, so the scan complements the
+tests and SAST and does not replace them. Its spiders can still submit forms and follow
+controls with the session cookie, which is why the scan runs against a throwaway data
+directory and why the dashboard's CSRF check, which every non-GET request must pass,
+rejects such submissions. Pull
 requests and pushes to `main` run it, and `publish-docker.yml` and `publish-pypi.yml`
 call it on the release commit, so nothing is pushed or published unless it passed.
 
@@ -159,9 +162,10 @@ Every file in `.github/workflows/` is listed here; a test fails when one is miss
 or when this table names a file that does not exist. Third-party actions are pinned
 to full commit SHAs, every checkout sets `persist-credentials: false`, and each
 workflow declares its permissions at workflow level and a job states its own where it
-needs more or less. The third column lists everything beyond read-only contents. The required status checks are `test`, `Tests (ubuntu-latest)`,
-`Tests (macos-latest)`, `Security policy` and `Independent human approval`, plus
-CodeQL's default setup; the workflows behind them have no `paths:` filter.
+needs more or less. The third column lists everything beyond read-only contents. The
+required status checks are `test`, `Tests (ubuntu-latest)`, `Tests (macos-latest)`,
+`Security policy` and `Independent human approval`, plus CodeQL's default setup; the
+workflows behind them have no `paths:` filter.
 
 | Workflow | Runs on | Permissions beyond read-only contents | What it checks or does |
 | --- | --- | --- | --- |

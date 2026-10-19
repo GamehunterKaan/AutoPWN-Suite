@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing published release tag to publish to PyPI (for example v2.7.0)
+        description: Existing release tag to run the PyPI gates and build for (for example v2.7.0); only the release event itself can publish
         required: true
         type: string
 

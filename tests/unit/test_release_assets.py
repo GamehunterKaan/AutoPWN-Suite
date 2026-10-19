@@ -451,6 +451,8 @@ def test_old_tag_dispatch_doc_says_where_each_workflow_stops():
     for name in ("publish-docker.yml", "backfill-release-signatures.yml"):
         assert "jq '.assets | length'" in (workflows / name).read_text(encoding="utf-8")
     assert "jq '.assets | length'" not in (workflows / "publish-pypi.yml").read_text(encoding="utf-8")
-    docs = (root / "docs/RELEASING.md").read_text(encoding="utf-8")
+    docs = " ".join((root / "docs/RELEASING.md").read_text(encoding="utf-8").split())  # rewrapping must not matter
     assert "in the validate job of `publish-docker.yml` and of the backfill" in docs
-    assert "stops in the source\nsecurity job" not in docs.replace("\r\n", "\n")
+    assert "A tag before v2.6.0 fails release validation" in docs
+    assert "only `publish-pypi.yml`, which does not look at release assets, carries on to the source security job" in docs
+    assert "stops in the source security job" not in docs
