@@ -118,6 +118,8 @@ def build_tool_pins(repo):
     """(name, version) pairs pinned in the release build requirements, named the way OSV normalizes them."""
     pins = set()
     for name in BUILD_REQUIREMENTS:
+        if not (repo / name).is_file():
+            raise ValueError(f"Release source has no {name}: tags before v2.7.0 predate the files the policy scans and cannot be released or backfilled")
         text = (repo / name).read_text(encoding="utf-8")
         pins.update((re.sub(r"[-_.]+", "-", package).lower(), version)
                     for package, version in re.findall(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;\\]+)", text, re.MULTILINE))
@@ -183,12 +185,15 @@ def main():
     violations, count = evaluate_sca(report, version, expected=expected)
     build_count = 0
     if not args.image_archive:
+        # Read the pins first: a tag without the build requirement files stops here with a clear message,
+        # not with the scanner's error for a missing lockfile.
+        build_pins = build_tool_pins(repo)
         build_report_path = args.output / "sca-build.json"
         build_command = [args.osv, "scan", "source", "--all-packages", "--all-vulns", "--format=json",
                          f"--output-file={build_report_path.resolve()}", "--no-call-analysis=go", "--no-call-analysis=rust",
                          *(f"--lockfile=requirements.txt:{repo / name}" for name in BUILD_REQUIREMENTS)]
         build_report = run_scanner(build_command, build_report_path)
-        build_violations, build_count = evaluate_sca(build_report, version, expected=build_tool_pins(repo), licenses=False)
+        build_violations, build_count = evaluate_sca(build_report, version, expected=build_pins, licenses=False)
         violations += [f"build tool {violation}" for violation in build_violations]
         tracked = subprocess.check_output(["git", "-C", str(repo), "ls-files", "--", "*.py"], text=True).splitlines()
         sources = [str(repo / p) for p in tracked if not p.startswith("tests/")]

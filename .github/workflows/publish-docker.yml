@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing published release tag to build and sign (for example v2.6.0)
+        description: Existing published release tag to build and sign (for example v2.7.0; tags before v2.7.0 lack the packaging files and are refused)
         required: true
         type: string
 

@@ -122,6 +122,23 @@ def test_poetry_core_pin_matches_the_release_toolchain():
     assert ("poetry-core", backend[1]) in policy.build_tool_pins(root)
 
 
+def test_a_tag_without_the_build_requirement_files_is_refused_with_a_clear_message(tmp_path, monkeypatch):
+    """Dispatching publish-docker or the backfill for a tag before v2.7.0 must say why it stops."""
+    with pytest.raises(ValueError, match="before v2.7.0"):
+        policy.build_tool_pins(tmp_path)
+    repo = tmp_path / "v2.6.1"
+    repo.mkdir()
+    (repo / "pyproject.toml").write_text('[tool.poetry]\nversion = "2.6.1"\n')
+    (repo / "poetry.lock").write_text('[[package]]\nname = "example"\nversion = "1.0"\n')
+    scans = []
+    monkeypatch.setattr(policy, "run_scanner", lambda command, output: scans.append(command) or report())
+    monkeypatch.setattr(policy.sys, "argv", ["security_policy.py", "--repo", str(repo), "--output", str(tmp_path / "reports")])
+    with pytest.raises(ValueError, match="before v2.7.0"):
+        policy.main()
+    # Only the source scan ran: the build tool scan was never started against missing files.
+    assert len(scans) == 1
+
+
 def test_vex_exemption_binds_product_component_and_version(root):
     write_vex(root)
     assert not policy.evaluate_sca(report(["CVE-TEST-1"]), "2.6.0", root)[0]

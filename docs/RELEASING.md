@@ -80,16 +80,26 @@ run. Only GitHub's latest stable release updates the image's `latest` alias.
 ## Authenticity backfill for an existing release
 
 Use **Backfill release signatures**, dispatched from main, when adding signatures
-to an already published release such as v2.6.0:
+to an already published release that has no uploaded assets (v2.6.0 was signed
+this way):
 
 ```sh
-gh workflow run backfill-release-signatures.yml --ref main -f tag=v2.6.0 \
-  -f image-digest=sha256:7a241cc52d8afda6c63e5a67cceda69cee691e4570aaf674f5dae5c05c8748bb
+gh workflow run backfill-release-signatures.yml --ref main -f tag=vVERSION \
+  -f image-digest=sha256:ORIGINAL_IMAGE_INDEX_DIGEST
 ```
 
 Record the expected original index digest independently before dispatch; the
-example above is the verified original v2.6.0 digest. A tag that has moved to a
-different digest is rejected rather than silently signed.
+verified original v2.6.0 digest was
+`sha256:7a241cc52d8afda6c63e5a67cceda69cee691e4570aaf674f5dae5c05c8748bb`. A tag
+that has moved to a different digest is rejected rather than silently signed.
+
+Only tags from v2.7.0 on can be dispatched, here and for `publish-docker.yml` or
+`publish-pypi.yml` run by hand. Those workflows run the policy scripts from `main`
+against the tag's own source, and the policy scans `packaging/requirements-build.txt`,
+`packaging/requirements-publish.txt` and `.security/requirements-bandit.txt` there,
+which v2.6.1 and older do not have. A dispatch for such a tag stops in the source
+security job with an error that names the missing file, before anything is signed or
+published. Those releases keep the layouts they were published with.
 
 This path does **not rebuild or replace application source or Docker images** and
 does not change version/latest image tags. It snapshots the existing official

@@ -340,3 +340,11 @@ def test_current_version_has_matching_release_notes_and_runtime_version():
     # Needs a '## [<version>]' section with non-empty Functional and Security notes, as the release workflow does.
     notes = release.release_notes((root / "CHANGELOG.md").read_text(encoding="utf-8"), f"v{version}")
     assert notes.startswith(f"# AutoPWN Suite v{version}")
+
+
+@pytest.mark.parametrize("workflow", ["publish-docker.yml", "publish-pypi.yml"])
+def test_dispatch_example_tag_has_the_layout_the_policy_scans(workflow):
+    """Tags before v2.7.0 lack packaging/requirements-*.txt, so the dispatch input must not suggest one."""
+    text = (Path(__file__).resolve().parents[2] / ".github/workflows" / workflow).read_text(encoding="utf-8")
+    example = release.re.search(r"for example v(\d+)\.(\d+)\.(\d+)", text)
+    assert example and tuple(map(int, example.groups())) >= (2, 7, 0)
