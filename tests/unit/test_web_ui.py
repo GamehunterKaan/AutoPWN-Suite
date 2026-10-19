@@ -151,7 +151,7 @@ class TestValidateNmapFlags:
         "-oN /etc/cron.d/x", "-oG out", "-oS out", "-oX out", "--oX out", "-oA out", "--oA out", "-o out", "-ox out",
         "-sV -6o out", "-Rno out", "-iL /etc/shadow", "-iL=hosts", "-iLhosts", "-6i hosts", "--excludefile hosts",
         "--datadir /tmp/x", "--servicedb=x", "--versiondb=x", "--stylesheet=x.xsl", "--resume scan.log",
-        "--appe", "-appe", "-p 80 -oN out",
+        "--appe", "-appe", "-p 80 -oN out", "-m /etc/cron.d/x", "-m=out", "-6m out", "-nm out",
     ])
     def test_flags_that_read_or_write_files_are_rejected(self, wu, flags):
         assert wu._validate_nmap_flags(flags) == "nmap_flags cannot read or write files"
@@ -159,6 +159,7 @@ class TestValidateNmapFlags:
     @pytest.mark.parametrize("flags", [
         "-sS -sV -O -T 4", "-p 1-1000 --version-intensity 3", "--open --osscan-limit", "--exclude 192.0.2.9 --data-length 10",
         "--script=http-title --script-args=a=b", "-Pn -n -r -vv", "-6 -sn", "-iR 0", "--version",
+        "--max-retries 2 --min-rate=100 --mtu 8 --max-rtt-timeout 100 --min-parallelism 3", "-M 5",
     ])
     def test_ordinary_scan_flags_are_still_accepted(self, wu, flags):
         assert wu._validate_nmap_flags(flags) is None

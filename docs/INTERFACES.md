@@ -156,9 +156,10 @@ Configuration fields are `mode` (normal/evade/noise), `speed` (0–5), `scan_typ
 `os_detection`, `nmap_flags`, `host_timeout` (positive seconds), `scan_ports`,
 `scan_vulns`, `skip_discovery`, `scan_web`, `vulnerability_source` and
 `web_options`. The three Nmap fields (`scan_technique`, `ports`, `nmap_flags`) are rejected with HTTP 400
-when they name a file: output options (`-oN`, `-oG`, `-oS`, `-oM`, `-oX`, `-oA`, `-o`, however
+when they name a file: output options (`-oN`, `-oG`, `-oS`, `-oM`, `-oX`, `-oA`, `-o`, `-m`, however
 spelled or clustered, as in `-6o`), `-iL`, `--excludefile`, `--datadir`, `--servicedb`, `--versiondb`,
-`--stylesheet`, `--resume` and `--append-output`. Boolean fields require JSON booleans. Web-only mode sets
+`--stylesheet`, `--resume` and `--append-output`. A single-dash spelling of a long option that starts with
+`o`, `i` or `m` (`-max-retries`) is refused as well; write long options with `--`. Boolean fields require JSON booleans. Web-only mode sets
 `scan_ports:false,scan_web:true` and disables discovery/CVE lookup. Noise mode
 falls back to normal in the dashboard. Job statuses are `running`, `stopping`,
 `completed`, `partial`, `stopped` or `error`; progress can have a null percentage.

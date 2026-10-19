@@ -157,7 +157,8 @@ def test_trusted_operator_flags_that_leave_the_managed_output_alone_still_run(fa
     "-oN", "-oNout.txt", "--oN", "-oG", "--oG", "-oS", "-oM", "-oX", "--oX", "-oA", "--oA", "-o", "-ox", "--o",
     "-6o", "-Rno", "-Fo", "-6iL", "-i", "-iL", "--iL", "-iLhosts", "-6i", "--excludefile", "--excludef=hosts",
     "--datadir", "--datad=/tmp", "--servicedb=x", "--serv=x", "--versiondb", "--versiond=x", "--stylesheet=x.xsl",
-    "--styl=x.xsl", "--resume", "--resu", "--append-output", "--appe",
+    "--styl=x.xsl", "--resume", "--resu", "--append-output", "--appe", "-m", "-m=x", "-mout", "-6m", "-nm",
+    "-max-retries",  # documented over-match: a single-dash long option that starts like -m, -o or -i cannot be told from a cluster
 ])
 def test_file_options_are_recognised_by_name(flag):
     assert monitored.uses_files(flag)
@@ -169,7 +170,7 @@ def test_file_options_are_recognised_by_name(flag):
     "--open", "--osscan-limit", "--osscan-guess", "-open", "--exclude", "--exclude=192.0.2.9", "--data", "--data-length",
     "--data-string", "--version", "--version-intensity", "--script=default", "--script-args=a=b", "--top-ports",
     "--host-timeout", "--stats-every", "--no-stylesheet", "--min-rate=100", "--reason", "--traceroute", "--iflist",
-    "-iR", "--iR", "--system-dns", "--dns-servers", "--max-retries",
+    "-iR", "--iR", "--system-dns", "--dns-servers", "--max-retries", "--mtu", "--min-rate", "--max-rtt-timeout", "--min-parallelism", "-M",
 ])
 def test_ordinary_scan_options_are_not_file_options(flag):
     assert not monitored.uses_files(flag)

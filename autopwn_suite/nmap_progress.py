@@ -89,7 +89,9 @@ def uses_files(flag):
         return True
     if flag.startswith("--"):
         return name.startswith(("o", "iL"))
-    return name.lstrip(_SHORT_WITHOUT_ARGUMENT)[:1] in ("o", "i")
+    # -o and -m (the -oM alias) write a file and -i reads one. A single-dash spelling of a long option that starts with
+    # one of them (-max-retries) is therefore refused as well; write long options with "--".
+    return name.lstrip(_SHORT_WITHOUT_ARGUMENT)[:1] in ("o", "i", "m")
 
 
 def scan_with_progress(scanner, hosts, arguments, progress=None, should_stop=None, *, timeout=None):
