@@ -226,7 +226,10 @@ def test_requests_work_when_descriptors_are_above_the_select_limit(diagnostic_se
     soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
     if hard != resource.RLIM_INFINITY and hard < 1400:
         pytest.skip("The descriptor limit cannot be raised past select()'s 1024")
-    resource.setrlimit(resource.RLIMIT_NOFILE, (max(soft, 1400), hard))
+    try:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (max(soft, 1400), hard))
+    except (ValueError, OSError):  # for example a platform that caps the soft limit below the one asked for
+        pytest.skip("The descriptor limit cannot be raised past select()'s 1024")
     held = []
     try:
         # Sockets opened now get descriptors of 1100 and more, which select() rejects with ValueError.
