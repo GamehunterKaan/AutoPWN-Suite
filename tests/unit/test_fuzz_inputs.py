@@ -15,10 +15,9 @@ import sqlite3
 import string
 import sys
 import zlib
-from contextlib import closing
-
-
 from argparse import ArgumentTypeError
+from contextlib import closing
+from difflib import SequenceMatcher
 from types import SimpleNamespace
 
 import pytest
@@ -26,11 +25,13 @@ from rich.text import Text
 
 from autopwn_suite.logger import markup_safe
 from autopwn_suite.nmap_backend import parse_nmap_xml
-from autopwn_suite.vulnerability_db import SCHEMA_VERSION, DatabaseUnavailable, OfflineDatabase
-
-
 from autopwn_suite.utils import _port, _report_name
+from autopwn_suite.vulnerability_db import SCHEMA_VERSION, DatabaseUnavailable, OfflineDatabase
+from autopwn_suite.web import poc_runtime
+from autopwn_suite.web import similarity as similarity_module
+from autopwn_suite.web.findings import printable
 from autopwn_suite.web.options import normalize_options
+from autopwn_suite.web.runtime import redact_text
 from autopwn_suite.web_auth import ACCOUNT_FILE, password_matches, validate_account
 
 SEED = 20261016
@@ -204,6 +205,35 @@ def test_report_name_only_contains_filesystem_safe_characters():
         assert len(name) <= 100
         assert re.fullmatch(r"[A-Za-z0-9._-]*", name)
     assert _report_name(["192.0.2.1", "198.51.100.1"]) == "multihost"
+
+
+def test_text_a_target_controls_is_cleaned_and_compared_without_raising(monkeypatch):
+    rng = random.Random(SEED + 2)
+    monkeypatch.setattr(similarity_module, "monotonic", lambda: 0.0)  # no deadline: small texts are compared as difflib does
+    monkeypatch.setattr(poc_runtime, "monotonic", lambda: 0.0)
+    control = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+    pieces = ["http://", "https://a.test/", "?token=1&", "&session=", "x", "/", ".", ")", " ", "\x1b[2J", "\x1b]0;t\x07", "\r", "\n", "\t", "\x85", "\x7f", "\ud800", "é", "[", "]", "\"", "<", "@", ":", "%zz"]
+    for _ in range(2000):
+        text = "".join(rng.choice(pieces) for _ in range(rng.randint(0, 14)))
+        assert not control.search(printable(text)) and printable(printable(text)) == printable(text)
+        assert not control.search(redact_text(text))
+    # Control characters inside a URL (even inside its scheme or the parameter name) must not hide a secret from redaction.
+    for _ in range(1000):
+        secret = "S3cr" + "".join(rng.choice("0123456789abcdef") for _ in range(rng.randint(1, 12)))
+        text = list(f"see http://app.test/p?id=1&token={secret}, then")
+        for _ in range(rng.randint(0, 4)):
+            text.insert(rng.randrange(len(text) + 1), rng.choice(["\x00", "\x07", "\x1b", "\r", "\x7f", "\x85", "\x9b"]))
+        assert secret not in redact_text("".join(text))
+    alphabets = ["ab", "abc d", string.ascii_letters + string.digits + " <>/=\"'", "".join(chr(0x4E00 + index) for index in range(150))]
+    for _ in range(300):
+        alphabet = rng.choice(alphabets)
+        left = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 400)))
+        right = mutate(left, rng) if rng.random() < .7 else "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 400)))
+        ratio = SequenceMatcher(None, left, right).ratio()
+        assert 0 <= ratio <= 1
+        # The package function and the copy that downloaded PoCs carry agree with each other and with difflib.
+        assert similarity_module.similarity(left, right) == poc_runtime._similarity(left, right) == ratio
+        assert similarity_module.similarity(left, left) == poc_runtime._similarity(left, left) == 1.0
 
 
 @pytest.fixture
