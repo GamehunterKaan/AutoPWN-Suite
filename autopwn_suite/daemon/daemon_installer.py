@@ -2,12 +2,13 @@
 # Copyright 2022-2026 Kaan Gültekin
 import os
 import re
+import secrets
 import shlex
-import shutil
 import stat
 import subprocess
 import sys
 from configparser import ConfigParser
+from contextlib import contextmanager
 from pathlib import Path
 from platform import system
 
@@ -17,6 +18,7 @@ from autopwn_suite.utils import is_root
 
 INSTALL_DIR = "/opt/autopwn-suite"
 SERVICE_FILE = "/etc/systemd/system/autopwn-daemon.service"
+LOG_FILE = "/var/log/autopwn-daemon.log"
 
 
 def _get_menu_choice(console, prompt: str, options: dict, default: str = None) -> str:
@@ -81,12 +83,29 @@ def _get_non_empty_input(console, prompt: str) -> str:
             return user_input
         console.print("[red]This field cannot be empty.[/red]")
 
+@contextmanager
+def _private_file(path, **options):
+    """Create `path` for its owner only: it can hold an SMTP password, an NVD key and a webhook URL. The content
+    goes into a new temporary file beside it (O_EXCL, mode 0600: the mode applies when the file is created, so
+    no other user can open it, not even briefly), and that file replaces `path` in one step. Nothing is ever
+    written into an existing file, so a file that was group or world readable, or a symlink, does not decide
+    who can read the new content, and a failure leaves neither a partial file nor the temporary one behind.
+    Windows has no POSIX modes and ignores the group and other bits."""
+    path = Path(path)
+    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+    try:
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, **options) as stream:
+            yield stream
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _write_config(config, config_file):
-    """Write the configuration for its owner only: it can hold an SMTP password, an NVD key and a webhook URL.
-    The mode applies when the file is created, so it is never readable by others, not even briefly; Windows
-    has no POSIX modes and ignores the group and other bits."""
-    descriptor = os.open(config_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, 'w', encoding='utf-8') as configfile:
+    with _private_file(config_file, mode='w', encoding='utf-8') as configfile:
         config.write(configfile)
 
 def CreateConfig(console, config_filename=""):
@@ -209,7 +228,6 @@ def CreateConfig(console, config_filename=""):
             console.print(f"[red]Config file '{config_file}' not overwritten.[/red]")
             return False
         else:
-            os.remove(config_file)
             _write_config(config, config_file)
 
     except FileNotFoundError:
@@ -272,7 +290,8 @@ def _check_installable(console, install_path):
     try:
         if not install_path.exists():
             console.print(f"Creating install directory: {install_path}")
-        install_path.mkdir(parents=True, exist_ok=True)
+        # Not 0777 under an unusual umask: the root-ownership check below refuses a directory others can write.
+        install_path.mkdir(mode=0o755, parents=True, exist_ok=True)
     except Exception as e:
         console.print(f"[red]Failed to create install directory {install_path}: {e}[/red]")
         return False
@@ -300,10 +319,19 @@ def _check_installable(console, install_path):
     return True
 
 
+def _install_config(src, dst):
+    """Put the wizard's configuration at `dst` for root only, from its first byte: it is read into memory and
+    written through `_private_file`, never copied with the process umask and tightened afterwards (the copy
+    would be readable by others, and stay readable through an open descriptor, until the mode changed)."""
+    data = src.read_bytes()
+    with _private_file(dst, mode="wb") as output:
+        output.write(data)
+
+
 def CopyFiles(console):
     DAEMON_INSTALL_PATH = Path(INSTALL_DIR)
     SERVICE_PATH = Path(SERVICE_FILE)
-    LOG_PATH = Path("/var/log/autopwn-daemon.log")
+    LOG_PATH = Path(LOG_FILE)
 
     if not _check_installable(console, DAEMON_INSTALL_PATH):
         return
@@ -315,10 +343,11 @@ def CopyFiles(console):
         if not src.exists():
             console.print(f"[red]Configuration file {src} does not exist.[/red]")
             return
-        if src.resolve() != dst.resolve():
-            shutil.copy2(src, dst)
         # The configuration can hold the SMTP password, NVD key and webhook URL; the unit runs as root, so only root reads it.
-        dst.chmod(0o600)
+        if src.resolve() != dst.resolve():
+            _install_config(src, dst)
+        else:
+            dst.chmod(0o600)  # it is already in place (the wizard ran here): the wizard created it owner-only
         console.print(f"[green]Configuration available at {dst}[/green]")
     except Exception as e:
         console.print(f"[red]Error copying {src} -> {dst}: {e}[/red]")

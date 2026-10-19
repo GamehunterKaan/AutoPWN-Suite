@@ -25,8 +25,9 @@ quarterly, on role changes, and immediately after a suspected compromise.
   The current dashboard stores values entered in its settings page in
   **unencrypted** `web_ui_settings.json`; CLI/daemon configuration and optional
   `api.txt` are also plaintext. `--create-config` and `--daemon-install` create the
-  INI file with mode `0600`, and the daemon installer sets the installed
-  `/opt/autopwn-suite/autopwn-daemon.conf` to `0600` too (Windows has no POSIX
+  INI file with mode `0600`, and the daemon installer creates the installed
+  `/opt/autopwn-suite/autopwn-daemon.conf` owner-only from its first byte too,
+  replacing, not rewriting, a copy that an earlier release left readable (Windows has no POSIX
   modes) and `--daemon-uninstall` deletes that installed copy; a configuration file or `api.txt` you write yourself keeps whatever mode
   you give it. Since v2.6.1, credential files are supported:
   `AUTOPWN_NIST_API_KEY_FILE`, `AUTOPWN_SMTP_PASSWORD_FILE` and

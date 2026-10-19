@@ -6,9 +6,11 @@ Unit tests for the daemon installer in autopwn_suite/daemon/daemon_installer.py.
 import os
 import re
 import shlex
+import shutil
 import stat
 import subprocess
 import sys
+import threading
 from configparser import ConfigParser
 from pathlib import Path
 from types import SimpleNamespace
@@ -335,9 +337,15 @@ class TestCreateConfig:
         with patch.object(daemon_installer.os, "open", wraps=os.open) as opened:
             assert CreateConfig(mock_console, str(config_path)) is True
 
-        modes = [c.args[2] for c in opened.call_args_list if c.args[0] == str(config_path)]
-        assert modes == [0o600]
+        # One new file beside it, never the final name itself: it is created exclusively, with mode 0600, and
+        # replaces the final name in one step, so nothing readable by others exists at any moment.
+        creations = [c.args for c in opened.call_args_list if Path(c.args[0]).parent == tmp_path]
+        assert len(creations) == 1
+        created, flags, mode = creations[0]
+        assert Path(created) != config_path and mode == 0o600
+        assert flags == os.O_WRONLY | os.O_CREAT | os.O_EXCL
         assert "https://hooks.example.test/h" in config_path.read_text(encoding="utf-8")
+        assert [entry.name for entry in tmp_path.iterdir()] == [config_path.name]
 
     @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX file modes")
     @pytest.mark.parametrize("existing", [False, True])
@@ -357,6 +365,45 @@ class TestCreateConfig:
             os.umask(previous_umask)
 
         assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+
+    @pytest.mark.skipif(os.name == "nt", reason="needs hard links and POSIX file modes")
+    def test_create_config_never_writes_into_the_file_it_replaces(self, mock_console, tmp_path):
+        """The wizard's secrets must not enter an old 0644 file (or one another user has open): the old file is replaced."""
+        config_path = tmp_path / "autopwn-daemon.conf"
+        config_path.write_text("old", encoding="utf-8")
+        config_path.chmod(0o644)
+        witness = tmp_path / "witness"
+        os.link(config_path, witness)  # the same inode, as a reader who already opened the old file would hold it
+        mock_console.input.side_effect = [*self._webhook_answers(), "y"]
+
+        assert CreateConfig(mock_console, str(config_path)) is True
+
+        assert witness.read_text(encoding="utf-8") == "old"
+        assert stat.S_IMODE(witness.stat().st_mode) == 0o644
+        assert "hooks.example.test" in config_path.read_text(encoding="utf-8")
+        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+
+    @pytest.mark.skipif(os.name == "nt", reason="symlinks need privileges on Windows")
+    def test_create_config_does_not_write_through_a_dangling_symlink(self, mock_console, tmp_path):
+        """A planted link at the file name must not make the wizard create (as root) the file the link points to."""
+        target = tmp_path / "elsewhere"
+        config_path = tmp_path / "autopwn-daemon.conf"
+        config_path.symlink_to(target)
+        mock_console.input.side_effect = self._webhook_answers()
+
+        assert CreateConfig(mock_console, str(config_path)) is True
+
+        assert not target.exists()
+        assert not config_path.is_symlink() and "hooks.example.test" in config_path.read_text(encoding="utf-8")
+
+    def test_create_config_leaves_no_file_behind_when_it_cannot_finish(self, mock_console, tmp_path):
+        config_path = tmp_path / "autopwn-daemon.conf"
+        mock_console.input.side_effect = self._webhook_answers()
+
+        with patch.object(daemon_installer.os, "replace", side_effect=OSError("disk full")), pytest.raises(OSError):
+            CreateConfig(mock_console, str(config_path))
+
+        assert list(tmp_path.iterdir()) == []  # neither a partial configuration nor the temporary file
 
 
 @pytest.mark.unit
@@ -459,19 +506,18 @@ class TestCopyFiles:
         return install, source, target
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer._install_config")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_installs_only_the_config_and_runs_the_installed_program(
-        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
+        self, mock_open, mock_path, mock_install, mock_subprocess, mock_console
     ):
         install, source, target = self._paths(mock_path)
 
         CopyFiles(mock_console)
 
-        install.mkdir.assert_called_once()
-        mock_shutil.copy2.assert_called_once_with(source, target)
-        mock_shutil.copytree.assert_not_called()
+        install.mkdir.assert_called_once_with(mode=0o755, parents=True, exist_ok=True)  # never 0777 under an odd umask
+        mock_install.assert_called_once_with(source, target)
         mock_subprocess.check_call.assert_has_calls(
             [
                 call(["systemctl", "daemon-reload"], env=None),
@@ -489,42 +535,41 @@ class TestCopyFiles:
         assert "autopwn.py" not in unit and ".venv" not in unit
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer._install_config")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
-    def test_copy_files_leaves_the_installed_config_readable_by_its_owner_only(
-        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
+    def test_copy_files_installs_the_config_through_the_owner_only_path_and_does_not_chmod_afterwards(
+        self, mock_open, mock_path, mock_install, mock_subprocess, mock_console
     ):
         install, source, target = self._paths(mock_path)
-        order = []
-        mock_shutil.copy2.side_effect = lambda *args: order.append("copy")
-        target.chmod.side_effect = lambda mode: order.append(("chmod", mode))
 
         CopyFiles(mock_console)
 
-        # The copy carries the SMTP password, NVD key and webhook URL: tighten it after copying, whatever the source mode was.
-        assert order == ["copy", ("chmod", 0o600)]
+        # The copy carries the SMTP password, NVD key and webhook URL: it is created owner-only, not tightened afterwards.
+        mock_install.assert_called_once_with(source, target)
+        target.chmod.assert_not_called()
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer._install_config")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_does_not_copy_a_config_onto_itself(
-        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
+        self, mock_open, mock_path, mock_install, mock_subprocess, mock_console
     ):
-        self._paths(mock_path, same_file=True)
+        install, source, target = self._paths(mock_path, same_file=True)
 
         CopyFiles(mock_console)
 
-        mock_shutil.copy2.assert_not_called()
+        mock_install.assert_not_called()
+        target.chmod.assert_called_once_with(0o600)  # already in place: the wizard created it owner-only
         mock_subprocess.check_call.assert_any_call(["systemctl", "daemon-reload"], env=None)
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer._install_config")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_starts_systemctl_without_the_bundle_of_a_standalone_binary(
-        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console, monkeypatch
+        self, mock_open, mock_path, mock_install, mock_subprocess, mock_console, monkeypatch
     ):
         # The binary's bootloader puts its unpacked libraries first in LD_LIBRARY_PATH; systemctl must not load them.
         monkeypatch.setattr(sys, "frozen", True, raising=False)
@@ -541,11 +586,11 @@ class TestCopyFiles:
             assert "LD_LIBRARY_PATH" not in systemctl.kwargs["env"]
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer._install_config")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_does_not_report_success_when_the_restart_fails(
-        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
+        self, mock_open, mock_path, mock_install, mock_subprocess, mock_console
     ):
         self._paths(mock_path)
         mock_subprocess.CalledProcessError = subprocess.CalledProcessError
@@ -558,28 +603,28 @@ class TestCopyFiles:
         assert "installation complete" not in printed
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer._install_config")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_refuses_a_service_that_an_unprivileged_user_could_modify(
-        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console, monkeypatch
+        self, mock_open, mock_path, mock_install, mock_subprocess, mock_console, monkeypatch
     ):
         self._paths(mock_path)
         monkeypatch.setattr(daemon_installer, "_service_files_are_root_controlled", lambda install_path: False)
 
         CopyFiles(mock_console)
 
-        mock_shutil.copy2.assert_not_called()
+        mock_install.assert_not_called()
         mock_subprocess.check_call.assert_not_called()
         mock_open.assert_not_called()
         assert any("Refusing to install the daemon" in str(c) for c in mock_console.print.call_args_list)
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer._install_config")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_refuses_a_unit_that_could_not_import_the_package(
-        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console, monkeypatch
+        self, mock_open, mock_path, mock_install, mock_subprocess, mock_console, monkeypatch
     ):
         # A source checkout run as `python autopwn.py`: root-owned and importable here, not from /opt/autopwn-suite.
         self._paths(mock_path)
@@ -587,26 +632,205 @@ class TestCopyFiles:
 
         CopyFiles(mock_console)
 
-        mock_shutil.copy2.assert_not_called()
+        mock_install.assert_not_called()
         mock_subprocess.check_call.assert_not_called()
         mock_open.assert_not_called()
         assert any("cannot import autopwn_suite" in str(c) for c in mock_console.print.call_args_list)
 
     @patch("autopwn_suite.daemon.daemon_installer.subprocess")
-    @patch("autopwn_suite.daemon.daemon_installer.shutil")
+    @patch("autopwn_suite.daemon.daemon_installer._install_config")
     @patch("autopwn_suite.daemon.daemon_installer.Path")
     @patch("autopwn_suite.daemon.daemon_installer.open")
     def test_copy_files_stops_when_the_config_is_missing(
-        self, mock_open, mock_path, mock_shutil, mock_subprocess, mock_console
+        self, mock_open, mock_path, mock_install, mock_subprocess, mock_console
     ):
         self._paths(mock_path, config_exists=False)
 
         CopyFiles(mock_console)
 
-        mock_shutil.copy2.assert_not_called()
+        mock_install.assert_not_called()
         mock_subprocess.check_call.assert_not_called()
         mock_open.assert_not_called()
         assert any("does not exist" in str(c) for c in mock_console.print.call_args_list)
+
+
+@pytest.mark.unit
+class TestOwnerOnlyConfigInstall:
+    """AUTOPWN-SA-2026-013: the installed configuration (SMTP password, NVD key, webhook URL) is never readable by
+    others, not even while `--daemon-install` creates it for the first time. These run CopyFiles on a real
+    directory; only systemd, the unit file's writer, the log file and the root-ownership probes are replaced."""
+
+    SECRET = "email_password = synthetic-secret-for-tests\n"
+
+    @pytest.fixture
+    def installation(self, tmp_path, monkeypatch, mock_console):
+        opt, cwd = tmp_path / "opt" / "autopwn-suite", tmp_path / "work"
+        cwd.mkdir()
+        (cwd / "autopwn-daemon.conf").write_text(self.SECRET, encoding="utf-8")
+        (cwd / "autopwn-daemon.conf").chmod(0o600)  # as the wizard writes it
+        monkeypatch.chdir(cwd)
+        monkeypatch.setattr(daemon_installer, "INSTALL_DIR", str(opt))
+        monkeypatch.setattr(daemon_installer, "SERVICE_FILE", str(tmp_path / "autopwn-daemon.service"))
+        monkeypatch.setattr(daemon_installer, "_service_files_are_root_controlled", lambda install_path: True)
+        monkeypatch.setattr(daemon_installer, "_service_can_import_package", lambda install_path: True)
+        systemctl = MagicMock()
+        monkeypatch.setattr(daemon_installer.subprocess, "check_call", systemctl)
+        log = MagicMock()
+        log.exists.return_value = True  # nothing is created under /var/log
+
+        def path(*parts):
+            return log if parts == ("/var/log/autopwn-daemon.log",) else Path(*parts)
+
+        path.cwd = Path.cwd
+        monkeypatch.setattr(daemon_installer, "Path", path)
+        return SimpleNamespace(opt=opt, installed=opt / "autopwn-daemon.conf", console=mock_console, systemctl=systemctl)
+
+    @staticmethod
+    def _install_under_umask(installation, umask):
+        previous = os.umask(umask)
+        try:
+            CopyFiles(installation.console)
+        finally:
+            os.umask(previous)
+
+    def test_the_installed_config_is_never_copied_onto_its_final_name(self, installation, monkeypatch):
+        """shutil.copy2 created the file with the process umask and tightened it afterwards."""
+        def forbidden(*args, **kwargs):
+            raise AssertionError("the configuration must not be copied with shutil")
+
+        for name in ("copy", "copy2", "copyfile", "copyfileobj", "move"):
+            monkeypatch.setattr(shutil, name, forbidden)
+
+        CopyFiles(installation.console)
+
+        assert installation.installed.read_text(encoding="utf-8") == self.SECRET
+        installation.systemctl.assert_called()
+
+    def test_the_installed_config_is_created_exclusively_with_mode_0600_and_replaces_the_final_name(self, installation):
+        real_open, real_replace = os.open, os.replace
+        opened, replaced = [], []
+
+        def recording_open(path, flags, mode=0o777, **kwargs):
+            opened.append((Path(path), flags, mode))
+            return real_open(path, flags, mode, **kwargs)
+
+        def recording_replace(source, destination):
+            replaced.append((Path(source), Path(destination)))
+            return real_replace(source, destination)
+
+        with patch.object(daemon_installer.os, "open", recording_open), \
+                patch.object(daemon_installer.os, "replace", recording_replace):
+            CopyFiles(installation.console)
+
+        creations = [entry for entry in opened if entry[0].parent == installation.opt]
+        assert len(creations) == 1
+        temporary, flags, mode = creations[0]
+        assert temporary != installation.installed
+        assert flags == os.O_WRONLY | os.O_CREAT | os.O_EXCL and mode == 0o600
+        assert replaced == [(temporary, installation.installed)]
+        assert [entry.name for entry in installation.opt.iterdir()] == ["autopwn-daemon.conf"]
+        assert installation.installed.read_text(encoding="utf-8") == self.SECRET
+
+    @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX file modes")
+    @pytest.mark.parametrize("umask, source_mode", [(0o022, 0o600), (0o022, 0o644), (0o000, 0o666)])
+    def test_nothing_in_the_install_directory_is_readable_by_others_when_the_file_is_put_in_place(
+        self, installation, umask, source_mode
+    ):
+        (Path.cwd() / "autopwn-daemon.conf").chmod(source_mode)  # a wizard file an earlier release left readable
+        real_replace = os.replace
+        seen = []
+
+        def inspecting_replace(source, destination):
+            seen.append({entry.name: stat.S_IMODE(entry.stat(follow_symlinks=False).st_mode) for entry in os.scandir(installation.opt)})
+            return real_replace(source, destination)
+
+        with patch.object(daemon_installer.os, "replace", inspecting_replace):
+            self._install_under_umask(installation, umask)
+
+        assert len(seen) == 1, "the configuration must be put in place with one atomic replacement"
+        assert len(seen[0]) == 1 and all(mode & 0o077 == 0 for mode in seen[0].values())
+        assert stat.S_IMODE(installation.installed.stat().st_mode) == 0o600
+
+    @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX file modes")
+    def test_a_local_user_polling_the_directory_never_sees_a_readable_file(self, installation):
+        """The attack: watch the directory and open the file the moment it appears."""
+        (Path.cwd() / "autopwn-daemon.conf").write_text(self.SECRET + "# " + "x" * (24 * 1024 * 1024) + "\n", encoding="utf-8")
+        installation.opt.mkdir(parents=True)
+        stop, exposed = threading.Event(), []
+
+        def poll():
+            while not stop.is_set():
+                try:
+                    for entry in os.scandir(installation.opt):
+                        mode = stat.S_IMODE(entry.stat(follow_symlinks=False).st_mode)
+                        if mode & 0o077:
+                            exposed.append((entry.name, oct(mode)))
+                except OSError:
+                    pass
+
+        poller = threading.Thread(target=poll)
+        poller.start()
+        try:
+            self._install_under_umask(installation, 0o022)
+        finally:
+            stop.set()
+            poller.join()
+
+        assert exposed == []
+        assert installation.installed.stat().st_size > 24 * 1024 * 1024
+
+    @pytest.mark.skipif(os.name == "nt", reason="needs hard links and POSIX file modes")
+    def test_an_existing_0644_installed_config_is_replaced_not_written_into(self, installation):
+        installation.opt.mkdir(parents=True)
+        installation.installed.write_text("old secrets", encoding="utf-8")
+        installation.installed.chmod(0o644)
+        witness = installation.opt.parent / "witness"
+        os.link(installation.installed, witness)  # the old inode, as a reader that already opened it holds it
+
+        self._install_under_umask(installation, 0o022)
+
+        assert witness.read_text(encoding="utf-8") == "old secrets"  # the new content never entered the old file
+        assert installation.installed.read_text(encoding="utf-8") == self.SECRET
+        assert stat.S_IMODE(installation.installed.stat().st_mode) == 0o600
+
+    def test_a_failed_installation_leaves_the_old_config_and_no_temporary_file(self, installation):
+        installation.opt.mkdir(parents=True)
+        installation.installed.write_text("old secrets", encoding="utf-8")
+
+        with patch.object(daemon_installer.os, "replace", side_effect=OSError("disk full")):
+            CopyFiles(installation.console)
+
+        assert installation.installed.read_text(encoding="utf-8") == "old secrets"
+        assert [entry.name for entry in installation.opt.iterdir()] == ["autopwn-daemon.conf"]
+        assert "Error copying" in str(installation.console.print.call_args_list)
+        installation.systemctl.assert_not_called()  # the service is not (re)started on a configuration that is not there
+
+    def test_a_write_that_fails_halfway_leaves_no_temporary_file(self, installation):
+        with patch.object(daemon_installer.os, "fsync", side_effect=OSError("I/O error")):
+            CopyFiles(installation.console)
+
+        assert list(installation.opt.iterdir()) == []
+        assert "Error copying" in str(installation.console.print.call_args_list)
+        installation.systemctl.assert_not_called()
+
+    @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX file modes")
+    def test_a_config_already_in_the_install_directory_is_made_owner_only_and_not_copied(self, installation, monkeypatch):
+        installation.opt.mkdir(parents=True)
+        installation.installed.write_text(self.SECRET, encoding="utf-8")
+        installation.installed.chmod(0o644)
+        monkeypatch.chdir(installation.opt)
+
+        with patch.object(daemon_installer.os, "replace") as replace:
+            CopyFiles(installation.console)
+
+        replace.assert_not_called()
+        assert stat.S_IMODE(installation.installed.stat().st_mode) == 0o600
+
+    @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX file modes")
+    def test_a_new_install_directory_is_not_writable_by_others_whatever_the_umask(self, installation):
+        self._install_under_umask(installation, 0o000)
+
+        assert stat.S_IMODE(installation.opt.stat().st_mode) == 0o755
 
 
 CONFIG = str(Path("/opt/autopwn-suite") / "autopwn-daemon.conf")
