@@ -81,7 +81,7 @@ def replaces_xml_output(flag):
 
 
 def uses_files(flag):
-    """Whether an Nmap argument names a file to write, read or replace (output, input, data and script files)."""
+    """Whether an Nmap argument names a file to write, read or replace (output, input, data and stylesheet files)."""
     name = _option_name(flag)
     if name is None or name in _OTHER_OPTIONS:
         return False
