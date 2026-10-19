@@ -99,6 +99,9 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px}
 .scan-card.completed{border-left:3px solid var(--green2)}
 .scan-card.partial,.scan-card.stopped{border-left:3px solid var(--orange)}
 .scan-card.error{border-left:3px solid var(--red)}
+.sc-slot{display:contents}
+.sc-foot{display:flex;align-items:center;justify-content:space-between}
+.sc-actions{display:flex;gap:8px}
 .sc-header{display:flex;align-items:center;gap:10px}
 .sc-target{font-family:var(--mono);font-size:14px;color:var(--text);flex:1;word-break:break-all}
 .sc-id{font-family:var(--mono);font-size:10px;color:var(--text3)}

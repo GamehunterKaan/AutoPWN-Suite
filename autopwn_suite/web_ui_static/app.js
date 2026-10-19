@@ -674,6 +674,28 @@ function scanProgressMarkup(job){
       <div class="sc-bar-fill ${indeterminate ? 'indeterminate' : esc(job.status)}" style="width:${indeterminate ? 30 : percent || 0}%"></div>
     </div>${targetText ? `<div class="sc-time">${esc(targetText)}</div>` : ''}`;
 }
+// A scan keeps one card element for as long as it is listed, and a part of the card is rewritten only when
+// its markup changed. The buttons are a part of their own, so a progress update no longer replaces the Stop
+// button under the keyboard focus or under a click that is in progress (mouse down on one button, up on its
+// replacement, and no click at all). Parts that hold no content of their own use display:contents.
+const scanCards = new Map();
+function scanCardFor(job){
+  let part = scanCards.get(job.id);
+  if(!part){
+    const make = className=>{ const el = document.createElement('div'); el.className = className; return el; };
+    part = {card: make('scan-card'), top: make('sc-slot'), foot: make('sc-foot'), time: make('sc-time'),
+      actions: make('sc-actions'), bottom: make('sc-slot'), markup: {}};
+    part.foot.appendChild(part.time); part.foot.appendChild(part.actions);
+    [part.top, part.foot, part.bottom].forEach(el=>part.card.appendChild(el));
+    scanCards.set(job.id, part);
+  }
+  return part;
+}
+function setPartHtml(part, name, html){
+  if(part.markup[name] === html) return;
+  part.markup[name] = html;
+  part[name].innerHTML = html;
+}
 function renderScans(){
   const container = document.getElementById('tc-scans');
   const empty     = document.getElementById('scans-empty');
@@ -683,7 +705,8 @@ function renderScans(){
     return d||new Date(b.started_at)-new Date(a.started_at);
   });
   empty.style.display = jobs.length?'none':'flex';
-  container.querySelectorAll('.scan-card').forEach(e=>e.remove());
+  const listed = new Set();
+  let previous = empty;  // the empty-state element comes first in the container, the cards follow in order
   jobs.forEach(job=>{
     const running = job.status==='running'||job.status==='stopping';
     const c = job.config||{};
@@ -698,9 +721,10 @@ function renderScans(){
       if(f) base += ' ' + f;
     }
     if(c.scan_ports === false && c.scan_web) base = 'Website scan · ' + Object.values(c.web_options?.checks || {}).filter(Boolean).length + ' checks enabled';
-    const card = document.createElement('div');
-    card.className = `scan-card ${job.status}`;
-    card.innerHTML = `
+    const part = scanCardFor(job);
+    listed.add(job.id);
+    part.card.className = `scan-card ${job.status}`;
+    setPartHtml(part, 'top', `
       <div class="sc-header">
         <div class="sc-target">${esc(job.target)}</div>
         <div class="sc-id">#${shortId(job.id)}</div>
@@ -714,20 +738,22 @@ function renderScans(){
         ${c.scan_web ? `<div class="sc-stat"><div class="sv">${job.web_finding_count || 0}</div><div class="sl">Web findings</div></div>` : ''}
       </div>
       ${scanProgressMarkup(job)}
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div class="sc-time">${esc(job.finished_at?`Finished ${timeAgo(job.finished_at)}`:`Started ${timeAgo(job.started_at)}`)}</div>
-        <div style="display:flex;gap:8px">
+    `);
+    setPartHtml(part, 'time', esc(job.finished_at?`Finished ${timeAgo(job.finished_at)}`:`Started ${timeAgo(job.started_at)}`));
+    setPartHtml(part, 'actions', `
           ${running?`<button class="btn btn-danger btn-sm" data-action="stop-scan" data-id="${esc(job.id)}">Stop</button>`:''}
           ${job.can_resume?`<button class="btn btn-primary btn-sm" data-action="resume-scan" data-id="${esc(job.id)}">Resume</button>`:''}
           ${!running?`<button class="btn btn-ghost btn-sm" data-action="print-scan" data-id="${esc(job.id)}">Export PDF</button>`:''}
           ${!running?`<a class="btn btn-ghost btn-sm" href="/api/scans/${encodeURIComponent(job.id)}/download" download style="text-decoration:none">Export JSON</a>`:''}
-        </div>
-      </div>
+    `);
+    setPartHtml(part, 'bottom', `
       ${job.error?`<div style="font-family:var(--mono);font-size:11px;color:var(--red)">${esc(job.error)}</div>`:''}
       <div class="sc-time">Vulnerability data: ${esc(c.vulnerability_source_used || c.vulnerability_source || 'online')}${c.vulnerability_database_updated_at ? ' · Updated ' + esc(c.vulnerability_database_updated_at) : ''}</div>
-    `;
-    container.appendChild(card);
+    `);
+    if(previous.nextSibling !== part.card) container.insertBefore(part.card, previous.nextSibling);
+    previous = part.card;
   });
+  scanCards.forEach((part,id)=>{ if(!listed.has(id)){ part.card.remove(); scanCards.delete(id); } });
   document.getElementById('active-count').textContent =
     jobs.filter(j=>j.status==='running'||j.status==='stopping').length;
 }

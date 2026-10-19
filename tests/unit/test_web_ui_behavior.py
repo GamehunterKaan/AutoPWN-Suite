@@ -21,10 +21,20 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const nodes = new Map();
 const listeners = {};  // what the script registered with document.addEventListener, by event type
-function node() {
-  return {value:'', checked:false, innerHTML:'', textContent:'', style:{}, dataset:{}, children:[],
+function node() {  // children, parentNode, appendChild, insertBefore, nextSibling and remove behave like the DOM's
+  return {value:'', checked:false, innerHTML:'', textContent:'', style:{}, dataset:{}, children:[], parentNode:null,
     classList:{add(){}, remove(){}, toggle(){}}, addEventListener(){}, querySelectorAll(){return []},
-    appendChild(child){this.children.push(child)}, click(){}, remove(){}};
+    appendChild(child){return this.insertBefore(child, null)},
+    insertBefore(child, reference){
+      if (child.parentNode) child.remove();
+      const at = reference ? this.children.indexOf(reference) : -1;
+      if (at < 0) this.children.push(child); else this.children.splice(at, 0, child);
+      child.parentNode = this;
+      return child;
+    },
+    get nextSibling(){ const siblings = this.parentNode && this.parentNode.children; return siblings ? siblings[siblings.indexOf(this) + 1] || null : null; },
+    click(){},
+    remove(){ if (this.parentNode) { this.parentNode.children.splice(this.parentNode.children.indexOf(this), 1); this.parentNode = null; } }};
 }
 const document = {getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)},
   createElement(){return node()}, querySelectorAll(){return []}, querySelector(){return node()},
@@ -515,8 +525,68 @@ scans={old:{id:'old',target:'running target',status:'running',started_at:'2026-0
   newer:{id:'newer',target:'completed target',status:'completed',started_at:'2026-01-02'}};
 renderScans();
 const cards=nodes.get('tc-scans').children;
-assert.match(cards[0].innerHTML,/running target/);
-assert.match(cards[0].innerHTML,/-T 0/);
+assert.match(cards[0].children[0].innerHTML,/running target/);
+assert.match(cards[0].children[0].innerHTML,/-T 0/);
+assert.match(cards[1].children[0].innerHTML,/completed target/);
+""")
+
+
+SCAN_CARDS_SCRIPT = r"""
+const container=document.getElementById('tc-scans');
+container.appendChild(document.getElementById('scans-empty'));   // the page puts the empty state first
+const job=(id,status,started,extra={})=>({id,target:'target '+id,status,started_at:started,host_count:0,port_count:0,vuln_count:0,...extra});
+const cardOf=id=>container.children.find(card=>card.children[0]&&card.children[0].innerHTML.includes('target '+id));
+const actionsOf=card=>card.children[1].children[1];
+"""
+
+
+def test_progress_updates_keep_the_scan_card_and_its_buttons_in_place():
+    run_js(SCAN_CARDS_SCRIPT + r"""
+scans={a:job('a','running','2026-10-19T00:00:00Z',{progress:{revision:1,percent:10}})};
+renderScans();
+const card=cardOf('a'), actions=actionsOf(card);
+assert.match(actions.innerHTML,/data-action="stop-scan" data-id="a"/);
+assert.match(card.children[0].innerHTML,/10%/);
+actions.innerHTML='the Stop button the operator is pressing';   // stands in for the live button node
+scans.a.progress={revision:2,percent:55};
+renderScans();
+assert.equal(cardOf('a'),card);
+assert.equal(actionsOf(card),actions);
+assert.equal(actions.innerHTML,'the Stop button the operator is pressing');   // not replaced by the update
+assert.match(card.children[0].innerHTML,/55%/);
+// The buttons are rewritten only when the set of buttons changes.
+scans.a.status='completed'; scans.a.finished_at='2026-10-19T00:10:00Z';
+renderScans();
+assert.equal(cardOf('a'),card);
+assert.doesNotMatch(actions.innerHTML,/stop-scan/);
+assert.match(actions.innerHTML,/data-action="print-scan" data-id="a"/);
+assert.match(actions.innerHTML,/href="\/api\/scans\/a\/download"/);
+assert.equal(card.className,'scan-card completed');
+""")
+
+
+def test_scan_cards_are_reordered_and_removed_without_rebuilding_the_others():
+    run_js(SCAN_CARDS_SCRIPT + r"""
+scans={a:job('a','running','2026-10-19T00:00:00Z'),b:job('b','completed','2026-10-19T01:00:00Z')};
+renderScans();
+const [empty,first,second]=container.children;
+assert.equal(first,cardOf('a')); assert.equal(second,cardOf('b'));
+const a=cardOf('a'), b=cardOf('b');
+// a finishes: both are completed now, newest first, so b comes before a and neither is rebuilt.
+scans.a.status='completed';
+renderScans();
+assert.deepEqual([...container.children],[empty,b,a]);
+assert.equal(cardOf('a'),a); assert.equal(cardOf('b'),b);
+// A new running scan goes to the top; a removed scan's card leaves the page.
+scans.c=job('c','running','2026-10-19T02:00:00Z');
+delete scans.b;
+renderScans();
+assert.deepEqual([...container.children],[empty,cardOf('c'),a]);
+assert.equal(b.parentNode,null);
+scans={};
+renderScans();
+assert.deepEqual([...container.children],[empty]);
+assert.equal(empty.style.display,'flex');
 """)
 
 

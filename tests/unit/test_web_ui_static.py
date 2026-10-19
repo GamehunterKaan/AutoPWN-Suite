@@ -77,6 +77,15 @@ def test_host_detail_stays_reachable_on_a_narrow_viewport() -> None:
 
 
 @pytest.mark.unit
+def test_scan_card_parts_keep_the_card_layout() -> None:
+    """The card is built from parts so the buttons can stay in place while progress changes; the parts
+    that hold no content of their own must not add a box to the card's flex column."""
+    assert "display:contents" in css_rule(".sc-slot")
+    assert "justify-content:space-between" in css_rule(".sc-foot")
+    assert "gap:8px" in css_rule(".sc-actions")
+
+
+@pytest.mark.unit
 def test_the_faded_toast_never_intercepts_clicks() -> None:
     """The toast stays in the page (it is a live region) and only fades to opacity 0, so it must not
     receive pointer events or it blocks the corner of the page it sits over."""

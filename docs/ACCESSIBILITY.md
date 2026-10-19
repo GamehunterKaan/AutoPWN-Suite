@@ -32,7 +32,9 @@ Only features that exist in the source are listed.
   in browsers. Dialogs are labelled through `aria-labelledby`, and their close
   buttons have `aria-label`.
 - Scan progress bars expose `role="progressbar"` with `aria-valuemin`, `aria-valuemax`,
-  `aria-valuenow`, `aria-valuetext` and an `aria-label`.
+  `aria-valuenow`, `aria-valuetext` and an `aria-label`. Live progress updates leave the
+  buttons of a scan card (Stop, Resume, Export) in place, so keyboard focus on one of them
+  survives an update.
 - Toast messages (confirmations and errors) are announced through a polite live region
   (`role="status"`, `aria-live="polite"`) that is in `index.html` before the first message.
 - The Web Security page uses real `<button>` elements for finding rows and
