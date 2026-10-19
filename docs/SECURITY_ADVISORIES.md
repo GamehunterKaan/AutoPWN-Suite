@@ -152,6 +152,67 @@ release that contains it.
 - Found 2026-10-18 during a review of the repository documentation; it is not part
   of the 2026-10-15 assessment.
 
+## AUTOPWN-SA-2026-007 — Dashboard settings file readable by other local users
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-732; low, requiring a local account on the same host and a directory that
+  account can enter (an installed package directory, or a Compose volume created
+  with mode 0755).
+- Impact: `web_ui_settings.json` (SMTP password, NVD API key and webhook URL, unless
+  `*_FILE` credential files supply them), the profiles and the schedules were
+  written through a temporary file created with the process umask, usually mode
+  0644, so another local user could read the credentials.
+- Mitigation: keep the data directory owner-only, supply credentials through
+  `*_FILE` files, and rotate a credential that was stored in a readable directory.
+- Source: `_write_json` in `autopwn_suite/web_ui.py`.
+- Fix in v2.7.0: the temporary file is created with `O_EXCL` and mode 0600 on POSIX,
+  like the account file, so the saved file is owner-only whatever the umask; a file
+  written by an earlier release is rewritten with that mode on its next save. An
+  existing data directory keeps its own mode. Regression:
+  `tests/unit/test_web_ui.py` (persisted files are created owner-only), which fails
+  on the previous code.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-008 — Test-email failure writes the SMTP server's reply to the server log
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-532; low, requiring a failed test email and access to the server log.
+- Impact: the test-email endpoint logged a failure with its traceback, which carries
+  the SMTP server's reply (host names, account names and server text). The
+  other delivery paths already logged the exception class only.
+- Mitigation: keep server logs private.
+- Source: `api_test_email` in `autopwn_suite/web_ui.py`.
+- Fix in v2.7.0: the failure is logged as the exception class only
+  (`delivery_error_summary` in `autopwn_suite/credential_files.py`). Regression:
+  `tests/unit/test_web_ui.py` raises an SMTP error that carries a host name and a
+  marker and fails on the previous code.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-009 — Malformed sign-in and JSON bodies end in HTTP 500
+
+- Assessed affected version: **2.6.1**. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-755; low and availability only: neither case signs anyone in.
+- Prerequisite: network access to the sign-in route, which is public by design
+  (a valid challenge from `GET /api/auth/login` is enough).
+- Impact: a sign-in with a lone-surrogate username (`"\ud800"`) raised an encoding
+  error after the password hash had run, so the answer was HTTP 500, the attempt
+  was not counted as a failed sign-in and each request held a hashing slot for the
+  whole hash time. A JSON body nested about a thousand levels deep (a 2 KB body, on
+  Python 3.10 and 3.11) raised `RecursionError`, which Flask does not treat as
+  malformed JSON, on every JSON route, including that sign-in route.
+- Mitigation: restrict network access to the dashboard and rate-limit sign-in
+  requests at a reverse proxy.
+- Source: `install_auth` in `autopwn_suite/web_auth.py`.
+- Fix in v2.7.0: the username is compared as UTF-8 with `surrogatepass`, so it is an
+  ordinary 401 that counts toward the throttle, and the app's JSON provider reports
+  `RecursionError` as malformed JSON (HTTP 400 on the sign-in route, not 500).
+  Regressions in `tests/unit/test_web_auth.py` and `tests/unit/test_web_ui.py`
+  fail on the previous code.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
 ## Local fix validation — 2026-10-16
 
 `python -m pytest -q --tb=short`: **986 passed, 2 platform-specific skips**.
@@ -177,7 +238,8 @@ pass locally. These are local results, not CI or release evidence.
 ## Record maintenance
 
 Assessment date: **2026-10-15**; local remediation update: **2026-10-16**;
-AUTOPWN-SA-2026-006 added **2026-10-18**. Publication
+AUTOPWN-SA-2026-006 added **2026-10-18**; AUTOPWN-SA-2026-007 through 009 added
+**2026-10-19**. Publication
 occurs when this document is merged into the public repository. Update affected
 and fixed versions, mitigations and references as validation or fixes progress.
 See [assessment scope and limitations](SECURITY_ASSESSMENT.md); this list does
