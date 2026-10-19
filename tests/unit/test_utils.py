@@ -695,7 +695,11 @@ class TestNmapInstallation:
     def test_install_nmap_linux_without_sudo_stops_instead_of_a_traceback(self, mock_check_call, monkeypatch):
         monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
         log = MagicMock()
-        with patch("autopwn_suite.utils.distro", create=True) as mock_distro,                 patch("builtins.input", side_effect=AssertionError("prompted")), pytest.raises(SystemExit) as exit_:
+        with (
+            patch("autopwn_suite.utils.distro", create=True) as mock_distro,
+            patch("builtins.input", side_effect=AssertionError("prompted")),
+            pytest.raises(SystemExit) as exit_,
+        ):
             mock_distro.id.return_value = "ubuntu"
             from autopwn_suite.utils import install_nmap_linux
             install_nmap_linux(log)
@@ -707,7 +711,11 @@ class TestNmapInstallation:
         """-y means nobody is there to answer the package manager question."""
         monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", True)
         log = MagicMock()
-        with patch("autopwn_suite.utils.distro", create=True) as mock_distro,                 patch("builtins.input", side_effect=AssertionError("prompted")), pytest.raises(SystemExit) as exit_:
+        with (
+            patch("autopwn_suite.utils.distro", create=True) as mock_distro,
+            patch("builtins.input", side_effect=AssertionError("prompted")),
+            pytest.raises(SystemExit) as exit_,
+        ):
             mock_distro.id.return_value = "unknown_distro"
             from autopwn_suite.utils import install_nmap_linux
             install_nmap_linux(log)
@@ -721,7 +729,11 @@ class TestNmapInstallation:
         monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)
         mock_check_call.side_effect = failure
         log = MagicMock()
-        with patch("autopwn_suite.utils.distro", create=True) as mock_distro,                 patch("builtins.input", return_value=answer), pytest.raises(SystemExit) as exit_:
+        with (
+            patch("autopwn_suite.utils.distro", create=True) as mock_distro,
+            patch("builtins.input", return_value=answer),
+            pytest.raises(SystemExit) as exit_,
+        ):
             mock_distro.id.return_value = "unknown_distro"
             from autopwn_suite.utils import install_nmap_linux
             install_nmap_linux(log)

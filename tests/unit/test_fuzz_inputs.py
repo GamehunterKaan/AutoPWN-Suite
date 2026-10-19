@@ -232,7 +232,7 @@ def test_flag_allowlist_rejects_every_file_option_spelling_among_random_flags(we
     for _ in range(2000):
         tokens = [rng.choice(ordinary) for _ in range(rng.randint(0, 5))]
         assert check(" ".join(tokens)) is None
-        tokens.insert(rng.randint(0, len(tokens)), rng.choice(file_options) + rng.choice(["", "=out.txt", " out.txt", "	."]))
+        tokens.insert(rng.randint(0, len(tokens)), rng.choice(file_options) + rng.choice(["", "=out.txt", " out.txt", "\t."]))
         assert check(" ".join(tokens)) == "nmap_flags cannot read or write files"
 
 
