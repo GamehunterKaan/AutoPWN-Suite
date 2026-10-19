@@ -21,10 +21,14 @@ Do not list secret values, recovery codes, or private reporting details here.
 
 GitHub Actions uses short-lived `GITHUB_TOKEN` credentials. The repository default
 is read-only, and each workflow declares its permissions. Builds and scans have
-read-only access; only signing and PyPI trusted publishing receive OIDC and only
-publication receives release-write permissions. Docker Hub push/sign access uses
-the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. An OIDC identity
-signs release artifacts through Sigstore; no long-lived signing key is stored.
+read-only access; only signing, PyPI trusted publishing and the OpenSSF Scorecard
+workflow receive OIDC and only publication receives release-write permissions. Docker
+Hub push/sign access uses the repository secrets `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN`. An OIDC identity signs release artifacts through Sigstore; no
+long-lived signing key is stored. The Scorecard workflow (`scorecard.yml`) uses its
+OIDC token only to publish its results to the OpenSSF API and has
+`security-events: write` only to upload them to code scanning; it holds no secret and
+can neither publish nor sign.
 Dependabot proposes dependency updates; it does not approve or merge them.
 The separate authenticity-backfill workflow inventories existing image digests
 and adds signatures/reports to an existing release without rebuilding images or

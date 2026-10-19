@@ -181,6 +181,16 @@ def test_a_tag_without_the_build_requirement_files_is_refused_with_a_clear_messa
     assert len(scans) == 1
 
 
+def test_security_testing_doc_lists_every_workflow_and_only_existing_ones():
+    """AGENTS.md: a new or changed workflow is documented in docs/SECURITY_TESTING.md in the same change."""
+    project = Path(__file__).resolve().parents[2]
+    document = (project / "docs/SECURITY_TESTING.md").read_text(encoding="utf-8")
+    workflows = {path.name for path in (project / ".github/workflows").glob("*.yml")}
+    assert workflows
+    assert not sorted(name for name in workflows if f"`{name}`" not in document)
+    assert set(re.findall(r"`([A-Za-z0-9_-]+\.yml)`", document)) <= workflows
+
+
 def test_vex_exemption_binds_product_component_and_version(root):
     write_vex(root)
     assert not policy.evaluate_sca(report(["CVE-TEST-1"]), "2.6.0", root)[0]

@@ -13,7 +13,10 @@ quarterly, on role changes, and immediately after a suspected compromise.
   image builds receive none. GitHub job tokens are short-lived with explicit
   minimum permissions. OIDC signs releases without a stored signing key, and the
   PyPI package is published through trusted publishing, so no PyPI token or
-  password exists in the repository or its settings; never create one.
+  password exists in the repository or its settings; never create one. The
+  OpenSSF Scorecard workflow publishes its results with its OIDC token; the
+  optional personal access token its template offers (`SCORECARD_TOKEN`) is not
+  configured and must not be added.
 - Never commit secrets, recovery codes, private keys, `.env` values, scanner
   configuration or credential-bearing scan evidence. Secret scanning and push
   protection are enabled on the authoritative repository. Do not bypass an alert

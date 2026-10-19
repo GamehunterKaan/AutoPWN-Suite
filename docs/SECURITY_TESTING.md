@@ -126,3 +126,30 @@ Exit 0 and `no blocking findings` mean the configured thresholds passed. Inspect
 The scanner installer verifies pinned upstream binary checksums and does not
 execute downloaded install scripts. Run unit tests under
 [CONTRIBUTING.md](../.github/CONTRIBUTING.md) as a separate required check.
+
+## Workflows
+
+Every file in `.github/workflows/` is listed here; a test fails when one is missing
+or when this table names a file that does not exist. Third-party actions are pinned
+to full commit SHAs, every checkout sets `persist-credentials: false`, and each
+workflow declares its permissions at workflow level (jobs repeat or narrow them),
+read-only unless the third column says otherwise. The required status checks are `test`, `Tests (ubuntu-latest)`,
+`Tests (macos-latest)`, `Security policy` and `Independent human approval`, plus
+CodeQL's default setup; the workflows behind them have no `paths:` filter.
+
+| Workflow | Runs on | Permissions beyond read-only contents | What it checks or does |
+| --- | --- | --- | --- |
+| `poetry-tests.yml` | Pull request and push to `main` | None | Check `test`: lockfile check, Ruff, JavaScript syntax and ESLint, the locked-requirements export, then pytest with 80% branch coverage. |
+| `tests.yml` | Pull request and push to `main` and `dev` | None | Checks `Tests (ubuntu-latest)` and `Tests (macos-latest)`: Python 3.10 with `requirements.txt`, an import smoke test and a scan of `127.0.0.1` with Nmap. |
+| `install-smoke.yml` | Pull request and push to `main` and `dev` | None | Installs the built wheel into a clean environment and starts it (Ubuntu, macOS and Windows, Python 3.10 and 3.14); archives the commit the way a release does and builds the standalone binaries from that archive through `build-binary.yml`. |
+| `build-binary.yml` | Reusable: called by `install-smoke.yml` and `publish-docker.yml` | None | Builds each standalone binary twice on its own runner (Linux amd64 and arm64, Windows amd64, macOS arm64) from the pinned interpreter and hash-pinned requirements, fails unless both builds are identical, smoke-tests it and writes its SBOM. |
+| `security.yml` | Pull request and push to `main`; reusable with a release commit | None | Check `Security policy`: `scripts/security_policy.py` (OSV-Scanner SCA of the lockfile and the pinned release build tools, Bandit SAST). The release workflows run it on the exact release commit. |
+| `dynamic-analysis.yml` | Pull request and push to `main`, manually; reusable with a release commit | None | OWASP ZAP baseline scan of the running dashboard, unauthenticated and signed in. The release workflows need it before they push or publish anything. |
+| `cflite_pr.yml` | Pull requests that change `autopwn_suite/`, `fuzz/`, `.clusterfuzzlite/`, `requirements-locked.txt` or the workflow itself (a path filter; not a required check) | None (the job token is read-only) | ClusterFuzzLite builds the Atheris harnesses in `fuzz/` and fuzzes the changed code for 180 seconds. |
+| `scorecard.yml` | Weekly, on push to `main` and on branch-protection changes | `security-events: write` and `id-token: write` in its one job | OpenSSF Scorecard analysis; uploads the SARIF results to code scanning and publishes them to the OpenSSF API for the badge. It gates nothing and stores no secret. |
+| `human-review.yml` | Pull request | `pull-requests: read` | Check `Independent human approval`: a human other than the author must approve the current revision. |
+| `human-review-events.yml` | Pull request review submitted or dismissed | None (`permissions: {}`) | Credential-free notification that a review changed. |
+| `human-review-refresh.yml` | `workflow_run` of the notification, from `main` | `actions: write` and `pull-requests: read` in its one job | Reruns the approval check for the pull request's current revision; never checks out pull request code. |
+| `publish-docker.yml` | Published release; manually from `main` to recover one | `id-token: write` (sign job), `contents: write` (publish job), Docker Hub secrets (push and sign jobs) | Validates the tag, runs the security and dynamic-analysis workflows and the binary builds, builds and scans each image architecture, pushes, signs with Sigstore and uploads the release assets. See [Releasing](RELEASING.md). |
+| `publish-pypi.yml` | Published release; manually from `main` to recover one | `id-token: write` in the publish job, which runs in the `pypi` environment | The same validation and gates, two identical builds of the wheel and source distribution, a clean-install smoke test, then PyPI trusted publishing with attestations. See [Releasing](RELEASING.md). |
+| `backfill-release-signatures.yml` | Manually from `main` | `id-token: write` (sign job), `contents: write` (publish job), Docker Hub secrets (sign job) | Signs an existing release and its original image digest without rebuilding anything. See [Releasing](RELEASING.md#authenticity-backfill-for-an-existing-release). |
