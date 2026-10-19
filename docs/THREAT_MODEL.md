@@ -210,7 +210,10 @@ the dashboard administration boundary.
 
 External provider data enters NVD parsing, local DB updates and exploit-reference
 storage. Database readers use read-only snapshots and parameterized operations;
-updates validate/stage/replace. Advertised feed hashes and feed bytes share the
+updates validate/stage/replace. A mirror copied from another system is not
+validated again as a whole, so each stored record is inflated with a size limit
+and type-checked when read, and a malformed one fails the lookup as incomplete
+instead of crashing the scan. Advertised feed hashes and feed bytes share the
 same provider HTTPS boundary, not an independent signature
 (`autopwn_suite/vulnerability_db.py:214`). Downloads save bytes without executing them.
 Replay validates a generated recorded-evidence plan; it does not accept arbitrary
