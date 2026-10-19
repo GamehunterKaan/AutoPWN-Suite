@@ -8,8 +8,8 @@
    A prerelease tag such as `v2.8.0-rc.1` needs that text (`2.8.0-rc.1`) as the version
    in both files, and its PyPI files are named with the PEP 440 form (`2.8.0rc1`),
    which `publish-pypi.yml` works out itself. Use only `-alpha.N`, `-beta.N` or `-rc.N`
-   suffixes: a suffix PEP 440 cannot express stops the PyPI build after the
-   container release has already run.
+   suffixes: a suffix PEP 440 cannot express fails the PyPI build while the
+   container release still goes ahead.
 2. Add a `## [VERSION] - YYYY-MM-DD` changelog entry with descriptive
    `### Functional changes` and `### Security changes`. Describe security impact
    and link applicable advisories; do not publish uncoordinated exploit details.
