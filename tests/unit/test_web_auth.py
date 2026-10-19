@@ -383,6 +383,31 @@ def test_lone_surrogate_username_is_a_throttled_failed_sign_in_not_a_server_erro
     assert sign_in(client, d.password).status_code == 429
 
 
+def test_sign_in_body_nested_too_deeply_is_malformed_json_not_a_server_error(dashboard_login, monkeypatch):
+    d = dashboard_login
+    real_loads = json.loads
+
+    def loads(text, *args, **kwargs):  # what Python 3.10 and 3.11 do with a body this deep
+        if len(text) >= 4000:
+            raise RecursionError("maximum recursion depth exceeded")
+        return real_loads(text, *args, **kwargs)
+
+    monkeypatch.setattr(json, "loads", loads)
+    client = d.app.test_client()
+    challenge = client.get("/api/auth/login").json["csrf_token"]
+    response = client.post("/api/auth/login", data="[" * 4090, content_type="application/json", headers={"X-CSRF-Token": challenge})
+    assert response.status_code == 400 and response.json == {"error": "Enter your username and password."}
+    assert sign_in(client, d.password).status_code == 200  # the valid sign-in still works
+
+
+def test_account_file_that_cannot_be_parsed_is_unavailable_not_a_crash(tmp_path):
+    store = AccountStore(tmp_path / ACCOUNT_FILE)
+    store.reset()
+    with patch("autopwn_suite.web_auth.json.loads", side_effect=RecursionError("maximum recursion depth exceeded")):
+        with pytest.raises(AccountUnavailable):
+            store.load()
+
+
 def test_https_cookie_is_secure_and_no_auth_configuration_is_downloadable(dashboard_login):
     d = dashboard_login
     client = d.app.test_client()

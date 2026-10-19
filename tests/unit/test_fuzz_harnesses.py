@@ -67,6 +67,13 @@ def test_harness_accepts_its_seeds_and_survives_junk(harness, path):
         module.TestOneInput(bytes(rng.randrange(256) for _ in range(rng.randrange(0, 200))))
 
 
+@pytest.mark.parametrize("nested", [b"[" * 200000, b"[" * 4096, b'{"a":' * 3000], ids=["lists-200000", "lists-4096", "objects-3000"])
+def test_the_options_harness_survives_json_nested_deeper_than_python_allows(harness, nested):
+    # json.loads raises RecursionError (not ValueError) beyond about a thousand levels on Python 3.10 and 3.11,
+    # and beyond a much larger depth on newer versions; the fuzzer must not report that as a finding.
+    harness(ROOT / "fuzz" / "fuzz_web_options.py").TestOneInput(nested)
+
+
 def test_the_nmap_seed_is_a_document_the_parser_accepts(harness):
     from autopwn_suite.nmap_backend import parse_nmap_xml
 

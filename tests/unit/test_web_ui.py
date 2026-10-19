@@ -1108,6 +1108,26 @@ class TestAPIEvents:
         assert not wu._sse_subscribers
 
 
+class TestNestedJSONBodies:
+    """Deeply nested JSON must be malformed input, never a server error (RecursionError is not a ValueError)."""
+
+    @pytest.mark.parametrize("path", ["/api/profiles", "/api/scan/start", "/api/schedules", "/api/scan/stop"])
+    @pytest.mark.parametrize("body", ["[" * 200000, '{"a":' * 50000], ids=["lists", "objects"])
+    def test_post_is_rejected_without_a_server_error(self, client, path, body):
+        response = client.post(path, data=body, content_type="application/json")
+        assert response.status_code in (400, 404)
+
+    def test_put_is_handled_without_a_server_error(self, client):
+        for path in ("/api/settings", "/api/profiles/missing", "/api/schedules/missing"):
+            assert client.put(path, data="[" * 200000, content_type="application/json").status_code in (200, 400, 404)
+
+    def test_a_settings_file_nested_too_deeply_is_preserved_and_defaults_load(self, wu):
+        wu._SETTINGS_FILE.write_text("[" * 200000, encoding="utf-8")
+        wu._load_settings()
+        assert wu._settings["email"]["enabled"] is False
+        assert wu._SETTINGS_FILE.read_text(encoding="utf-8") == "[" * 200000
+
+
 class TestAPISettings:
     def test_get_settings(self, client):
         resp = client.get("/api/settings")

@@ -130,7 +130,7 @@ class AccountStore:
                     or not isinstance(data["revision"], str) or not re.fullmatch(r"[0-9a-f]{32}", data["revision"])):
                 raise ValueError("Invalid account configuration")
             return data
-        except (OSError, ValueError, UnicodeError):
+        except (OSError, ValueError, UnicodeError, RecursionError):
             raise AccountUnavailable(ACCOUNT_UNAVAILABLE) from None
 
     def _save(self, username, encoded):
@@ -263,7 +263,18 @@ def install_auth(app, static_dir, account_path):
     from urllib.parse import urlsplit
 
     from flask import g, jsonify, redirect, request, send_from_directory
+    from flask.json.provider import DefaultJSONProvider
 
+    class BoundedJSONProvider(DefaultJSONProvider):
+        def loads(self, s, **kwargs):
+            # Python 3.10 and 3.11 raise RecursionError for about a thousand nested brackets, which is
+            # not a ValueError, so a 2 KB request body would be a server error instead of malformed JSON.
+            try:
+                return super().loads(s, **kwargs)
+            except RecursionError:
+                raise ValueError("JSON is nested too deeply") from None
+
+    app.json = BoundedJSONProvider(app)
     store = AccountStore(account_path)
     show_credentials(store.initialize(), store.path)
     auth = DashboardAuth(store)

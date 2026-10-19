@@ -239,7 +239,7 @@ def _load_settings() -> None:
             with _settings_lock:
                 _settings = merged
             return
-        except (OSError, ValueError, TypeError):
+        except (OSError, ValueError, TypeError, RecursionError):
             logging.exception("Could not load settings; preserving the existing file")
     with _settings_lock:
         _settings = _deep_merge(_DEFAULT_SETTINGS, {})

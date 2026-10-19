@@ -14,8 +14,8 @@ def TestOneInput(data):
     text = atheris.FuzzedDataProvider(data).ConsumeUnicodeNoSurrogates(len(data))
     try:
         candidate = json.loads(text)
-    except ValueError:
-        return  # not JSON, so it never reaches the schema
+    except (ValueError, RecursionError):
+        return  # not JSON (or nested too deeply for Python 3.10 and 3.11), so it never reaches the schema
     try:
         result = normalize_options(candidate, None)
     except ValueError:
