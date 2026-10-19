@@ -215,9 +215,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   white box, the fields and the Update account button are spaced like the other Settings sections, the new and confirm
   password fields stack whenever the column is too narrow for both, and fields filled in by the browser keep the dark
   theme on the dashboard and on the sign-in page.
-- Web scan log lines and coverage notes show query secrets in URLs as `REDACTED`, like findings do, and the
-  crawler logs a fixed message instead of the request exception. Web findings drop terminal control
-  characters (ESC, CR and the C1 codes; newlines and tabs stay) from target-controlled text. Query
+- Web scan log lines and coverage notes replace every query value of a URL with `REDACTED` and drop its userinfo
+  and fragment (findings still redact credential-named parameters only, so that PoCs can be replayed), and the
+  crawler logs a fixed message instead of the request exception. Text that a scanned host or a data provider
+  controls is printed, saved and returned as one line without control, bidirectional or zero-width characters
+  (a URL keeps them as percent-encoding, so a replay sends the request the scan sent). Query
   parameters that only contain "auth" or "pass" inside another word, such as `author`, `bypass` and
   `passenger`, are no longer redacted, so findings on them can be replayed as PoCs; credential names such as
   `auth`, `password`, `passwd`, `userpass`, `token` and `session` still are.
@@ -365,13 +367,31 @@ existing release summaries; they do not retroactively claim artifact signing.
 - AUTOPWN-SA-2026-015: Do not follow redirects when posting the CLI webhook report or the dashboard webhook
   events: a 307 or 308 re-sent the report or event to the origin named in Location, and any redirect answer
   is now a failed delivery.
-- AUTOPWN-SA-2026-016: Terminal control characters (ESC, CR, DEL and the C1 codes) from a hostile web target
-  no longer reach web findings, web scan log lines and coverage notes of a CLI scan, where they could clear
-  the screen, set the window title or overwrite a result line (affects v2.6.0 and v2.6.1; partially
-  mitigated, because line breaks are kept and a folded Location header can still add a forged result line).
-- AUTOPWN-SA-2026-017: Partially mitigates URL query secrets in web scan log lines, coverage notes and
-  reports: they are redacted, but the console line that announces the scan and a target without a lowercase
-  http:// or https:// scheme still show them.
+- AUTOPWN-SA-2026-016: Text that a scanned host or a data provider controls (web finding text, log lines and
+  coverage notes, response headers kept with a finding, Nmap banners, hostnames, script output and failure
+  messages, certificate names, NVD and local-database descriptions, Exploit-DB details and file names) is
+  now one line without control, bidirectional or zero-width characters wherever it is printed, saved,
+  returned or sent, so a hostile target can no longer forge a result line (a folded Location header used to)
+  or drive the terminal, and the txt, svg and html reports, the webhook and email reports, the dashboard job
+  log and the API results carry the same text. A URL that a host controls (a crawled link, a redirect)
+  cannot lose those characters, because replay and the PoCs must send the same request: it keeps them as the
+  percent-encoding that the HTTP client sends, in the finding, its recorded requests, observations and
+  target and in the generated curl and Python PoCs (affects v2.6.0 and v2.6.1; fixed). NSE script output and
+  the OS fingerprint keep their newlines, the zero-width joiner and non-joiner and the Mongolian vowel
+  separator are removed from scanned text, and a lone surrogate in provider text no longer ends a scan with
+  a UnicodeEncodeError.
+- AUTOPWN-SA-2026-017: Web scan diagnostics now replace every query value of a URL with REDACTED whatever
+  the parameter is called, and drop its userinfo and fragment, for any case of the scheme and for a target
+  typed without a scheme; a target is redacted as one string, so an apostrophe, a quote, an angle bracket or
+  a Unicode space inside a URL can no longer leave a later part of its query visible. This covers the line
+  that announces a web scan, log lines, coverage notes, the target shown in dashboard job records, exports,
+  history, webhook events and emails, the CLI parameter summary and generated report file names; the target
+  the scan runs and resumes with is unchanged. The dashboard's server log, job log and job error now name
+  the class of an unexpected exception instead of quoting its text (a failed scan shows "Unexpected error
+  (<class>)"). Findings still redact only credential-named parameters so that proof-of-concept replays keep
+  working, now with a longer list of credential names (code, key, sig, sid, otp, pw, pwd, ticket, nonce,
+  bearer, cookie and others), so a secret in a parameter with another name, in a URL path or nested inside
+  another parameter's value is still shown in a finding.
 - AUTOPWN-SA-2026-018: Inflate the stored records of a copied vulnerability database within size limits and
   check their types, so a hostile or damaged mirror ends the lookup as incomplete instead of using unbounded
   memory or crashing the scan (affects v2.6.0 and v2.6.1; NaN and Infinity scores and lone-surrogate text
