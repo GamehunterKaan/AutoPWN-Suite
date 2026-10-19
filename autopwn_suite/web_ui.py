@@ -1896,6 +1896,11 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
 
     @app.route("/api/events")
     def api_events():
+        stream_headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        if request.method == "HEAD":
+            # Nothing iterates a HEAD response, so its generator never runs its cleanup; a subscriber
+            # added below would stay registered, and queue every event, for the life of the process.
+            return Response(mimetype="text/event-stream", headers=stream_headers)
         session_token = request.cookies.get(COOKIE)
         # Without a resume point only later entries are sent: the page reads the history from /api/log, and
         # replaying it here would show every line twice. A page that reconnects (the browser sends
@@ -1934,8 +1939,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             finally:
                 with _sse_subscribers_lock:
                     _sse_subscribers.remove(client_q)
-        return Response(generate(), mimetype="text/event-stream",
-                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return Response(generate(), mimetype="text/event-stream", headers=stream_headers)
 
     # ── Settings ──
 

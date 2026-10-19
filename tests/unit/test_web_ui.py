@@ -1036,6 +1036,12 @@ class TestAPIEvents:
             stream.close()
         assert not wu._sse_subscribers
 
+    def test_head_request_does_not_leave_a_subscriber_behind(self, client, wu):
+        """A HEAD response is never iterated, so nothing would ever remove the queue it registered."""
+        response = client.head("/api/events")
+        assert response.status_code == 200 and response.mimetype == "text/event-stream"
+        assert not wu._sse_subscribers
+
 
 class TestAPISettings:
     def test_get_settings(self, client):
