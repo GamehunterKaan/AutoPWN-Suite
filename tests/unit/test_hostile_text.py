@@ -266,7 +266,8 @@ def test_a_coverage_issue_and_its_log_line_are_one_clean_line():
     log = MagicMock()
     context = ScanContext("http://example.com/", log)
     context.issue("Unable to crawl http://a.test/x?token=1\U00002028\U0000202e\nFORGED: HTTP 500")
-    expected = "Unable to crawl http://a.test/x?token=REDACTED  FORGED: HTTP 500"
+    # The line separator belongs to the value of the URL, which is redacted whole; only the line feed is left as a space.
+    expected = "Unable to crawl http://a.test/x?token=REDACTED FORGED: HTTP 500"
     assert context.issues == [expected]
     log.logger.assert_called_once_with("warning", expected)
     assert redact_text("one\ntwo\tthree\r\x85\x7f\U00002028four") == "one two three four"

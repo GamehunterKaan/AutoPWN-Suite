@@ -143,13 +143,27 @@ def _redact_token(token, rewrites):
     return core[:start] + _redact_target(core[start:], rewrites) + tail
 
 
+_SEPARATOR_MARK = ""  # a private-use character stands in for a line or paragraph separator while a URL is read
+
+
+def _one_line(text):
+    """`printable`, except that a line or paragraph separator is kept as a mark and not turned into a space yet: an
+    ordinary space ends a URL in free text, so a separator inside a query value would cut the redaction short. The
+    caller turns the marks into spaces with `_unmark` once the URLs are redacted."""
+    return printable(str(text).replace(" ", _SEPARATOR_MARK).replace(" ", _SEPARATOR_MARK))
+
+
+def _unmark(text):
+    return text.replace(_SEPARATOR_MARK, " ")
+
+
 def redact_target(target):
     """Redact a string that is known to be one target as typed (a job record, an answer, a report file name): every
     query value, a query part without `=`, the userinfo, the fragment and `;name=value` path parameters, whatever the
     parameter is called and whatever the case of the scheme. The whole string is one target, so nothing in it (a quote,
     an angle bracket, any kind of space) can end the URL early and leave a later part unredacted. Network targets
     (`192.0.2.0/24`) come back as they were. The control characters a target can carry are dropped (see `printable`)."""
-    return _redact_target(printable(str(target)), (_hide_every, _hide_every))
+    return _unmark(_redact_target(_one_line(target), (_hide_every, _hide_every)))
 
 
 def redact_text(message, *, names_only=False):
@@ -165,7 +179,7 @@ def redact_text(message, *, names_only=False):
     carry (see `printable`). A secret in the path of a URL stays, and so does a URL with a space inside it: its part after
     the space is another word."""
     rewrites = (_hide_named, _hide_named) if names_only else (_hide_values, _hide_every)
-    return _WORD.sub(lambda match: _redact_token(match[0], rewrites), printable(str(message)))
+    return _unmark(_WORD.sub(lambda match: _redact_token(match[0], rewrites), _one_line(message)))
 
 
 def public_request(method, url, headers=None, role="probe"):

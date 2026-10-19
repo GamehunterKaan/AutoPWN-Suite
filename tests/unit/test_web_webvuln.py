@@ -245,7 +245,9 @@ def test_a_quote_an_angle_bracket_or_a_unicode_space_inside_a_url_does_not_cut_t
         assert redact_text(f"on {opener}a.test:80?t=ZQ1{closer}") == f"on {opener}a.test:80?t=REDACTED{closer}"
     # A finding keeps the values no credential name guards, and a breaker is no way around the names that do.
     assert redact_text(f"on http://a.test/?token=ZQ1{breaker}ZQ2&q=1", names_only=True) == "on http://a.test/?token=REDACTED&q=1"
-    assert redact_text(f"on http://a.test/?q=O{breaker}Brien&token=ZQ1", names_only=True) == f"on http://a.test/?q=O{breaker}Brien&token=REDACTED"
+    # A line or paragraph separator is turned into a space in the output (the text is one line), after the URL was read.
+    kept = " " if breaker == "\u2028" else breaker
+    assert redact_text(f"on http://a.test/?q=O{breaker}Brien&token=ZQ1", names_only=True) == f"on http://a.test/?q=O{kept}Brien&token=REDACTED"
 
 
 @pytest.mark.unit

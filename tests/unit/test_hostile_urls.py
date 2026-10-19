@@ -174,3 +174,11 @@ def test_every_encoded_character_is_encoded_as_the_http_client_sends_it():
             continue
         assert wire_url(url) == requests.Request("GET", url).prepare().url == f"http://a.test/p{quote(char, safe='')}q?x=1", hex(ord(char))
     assert wire_url("http://a.test/caf\u00e9 \u65e5\u672c") == "http://a.test/caf\u00e9 \u65e5\u672c" and wire_url(None) is None
+
+
+@pytest.mark.unit
+def test_the_standalone_poc_runtime_encodes_urls_like_the_package():
+    from autopwn_suite.text import wire_url
+    from autopwn_suite.web import poc_runtime
+    assert all(poc_runtime._wire_url(chr(code)) == wire_url(chr(code)) for code in range(0x110000))
+    assert poc_runtime._wire_url(7) == 7 and poc_runtime._public_url("http://a.test/x\x1b\u202e?token=1") == "http://a.test/x%1B%E2%80%AE?token=REDACTED"

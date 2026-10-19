@@ -66,9 +66,18 @@ def _public_pair(pair):
     return f"{name}=REDACTED" if item and _SENSITIVE_PARAMETER.search(unquote_plus(name)) else pair
 
 
+# The same characters as `wire_url` in autopwn_suite/text.py (a test pins the two): a URL that a host controls keeps
+# them as percent-encoding, so what is stored names the request that was sent.
+_ENCODED = re.compile("[\\x00-\\x1f\\x7f-\\x9f\\u061c\\u180e\\u200b-\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb\\U000e0000-\\U000e007f\\ud800-\\udfff]")
+
+
+def _wire_url(value):
+    return _ENCODED.sub(lambda match: quote(match[0], safe="", errors="surrogatepass"), value) if isinstance(value, str) else value
+
+
 def _public_url(value):
     try:
-        parts = urlsplit(value)
+        parts = urlsplit(_wire_url(value))
         query = "".join(part if index % 2 else _public_pair(part) for index, part in enumerate(re.split(r"([&;])", parts.query)))
         return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[-1], query=query, fragment=""))
     except ValueError:
