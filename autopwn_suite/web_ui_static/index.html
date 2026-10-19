@@ -112,10 +112,6 @@
           <div class="chk-row"><input type="checkbox" id="f-os" onchange="updateNmapPreview()"/><label for="f-os">OS Detection</label></div>
         </div>
       </div>
-      <div><div class="fl">Extra Nmap Flags</div>
-        <input type="text" id="f-nmap-custom" placeholder="e.g. --script=banner" oninput="updateNmapPreview()"/>
-        <input type="hidden" id="f-nmap" />
-      </div>
       <div class="chk-row"><input type="checkbox" id="f-skipd"/><label for="f-skipd">Skip host discovery</label></div>
       <div class="chk-row"><input type="checkbox" id="f-vulns" checked/><label for="f-vulns">Search vulnerabilities (NIST)</label></div>
       <div><div class="fl">Nmap Command Preview</div>
@@ -335,7 +331,6 @@
               <div class="chk-row"><input type="checkbox" id="pf-os" onchange="updateProfilePreview()"/><label for="pf-os">OS Detection</label></div>
             </div>
           </div>
-          <div><div class="fl">Extra Nmap Flags</div><input type="text" id="pf-nmap" placeholder="e.g. --script=banner" oninput="updateProfilePreview()"/></div>
           <div class="row2">
             <div class="chk-row"><input type="checkbox" id="pf-skipd"/><label for="pf-skipd">Skip host discovery</label></div>
             <div class="chk-row"><input type="checkbox" id="pf-vulns" checked/><label for="pf-vulns">Search vulnerabilities</label></div>

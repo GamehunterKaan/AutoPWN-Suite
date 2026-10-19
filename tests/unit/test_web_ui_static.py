@@ -108,3 +108,22 @@ def test_toast_is_a_polite_live_region_that_exists_before_its_first_message(app_
     body = re.search(r"function toast\(.*?\n\}", app_js, re.S)
     assert body, "toast() not found in app.js"
     assert "createElement" not in body.group(0), "toast() must not create its own, unannounced element"
+
+
+@pytest.mark.unit
+def test_the_dashboard_has_no_free_text_nmap_options_field(app_js: str, index_page: BeautifulSoup) -> None:
+    """The dashboard builds the Nmap arguments from structured controls; no form lets a person type Nmap options,
+    and no request body from the page carries them (the server refuses them as well)."""
+    for ident in ("f-nmap", "f-nmap-custom", "pf-nmap"):
+        assert index_page.find(id=ident) is None, ident
+    page = str(index_page)
+    assert "Extra Nmap" not in page and "--script" not in page
+    assert not re.search(r"nmap_flags\s*:", app_js), "a request body from app.js carries nmap_flags"
+    assert not re.search(r"""['"](?:f-nmap|f-nmap-custom|pf-nmap)['"]""", app_js)
+    # The only text box of the advanced scan options and of the profile form besides names is the port list.
+    assert [i["id"] for i in index_page.select("#adv-body input[type=text]")] == ["f-ports"]
+    assert [i["id"] for i in index_page.select("#profile-form input[type=text]")] == ["pf-name", "pf-desc", "pf-ports"]
+    # The structured controls are all still there.
+    for ident in ("f-scantech", "f-ports", "f-vint", "f-os", "f-timeout", "f-mode", "f-speed",
+                  "pf-scantech", "pf-ports", "pf-vint", "pf-os", "pf-timeout", "pf-mode", "pf-speed"):
+        assert index_page.find(id=ident) is not None, ident

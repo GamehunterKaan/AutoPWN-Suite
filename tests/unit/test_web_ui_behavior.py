@@ -293,7 +293,7 @@ document.getElementById('f-target').value='192.0.2.1';
 document.activeElement=button;
 await startScan();
 assert.equal(document.activeElement,button);
-const other=document.getElementById('f-nmap');
+const other=document.getElementById('f-timeout');
 document.getElementById('f-target').value='192.0.2.2';
 document.activeElement=other;
 await startScan();
@@ -414,6 +414,168 @@ assert.equal(filter.children[1].textContent,'#bbbbbbbb — 192.0.2.0/24');
 jobs=[...jobs];
 await poll();
 assert.equal(listed(),'aaaaaaaa-1,bbbbbbbb-2');
+""")
+
+
+def test_the_ports_check_accepts_what_the_server_accepts_and_names_the_rule_otherwise():
+    run_js("""
+for (const ok of ['', '80', '22,80,443', '1-1000', '22,80,1-1000', '1-65535', '65535', '80-80'])
+  assert.equal(portsError(ok),'',ok);
+const bad=['0','65536','100000','1-65536','80-22','-','80-','-80',',80','80,','80,,443','22, 80','22 80','T:80','U:53','http',
+  '80;id','--script=banner','-oN x','080','80.5','+80','80/tcp','*','9'.repeat(40),Array(800).fill('80').join(',')];
+for (const value of bad) assert.match(portsError(value),/Ports must be port numbers from 1 to 65535/,value);
+""")
+
+
+@pytest.mark.parametrize("ports", ["22, 80", "0", "65536", "80-22", "T:80", "--script=banner", "80 -oN x"])
+def test_scan_and_profile_forms_report_a_ports_value_the_server_would_refuse_without_sending_it(ports):
+    run_js(f"const ports={json.dumps(ports)};" + """
+const shown=[];
+toast=(...args)=>{shown.push(args)};
+let requests=0;
+fetch=async()=>{requests++;return {ok:true,json:async()=>({scan_id:'0123456789abcdef'})}};
+document.getElementById('f-target').value='192.0.2.1';
+document.getElementById('f-ports').value=ports;
+await startScan();
+document.getElementById('pf-name').value='Profile';
+document.getElementById('pf-ports').value=ports;
+await saveProfile();
+assert.equal(requests,0);
+assert.equal(shown.length,2);
+for (const [message,ok] of shown) { assert.match(message,/Ports must be port numbers from 1 to 65535/); assert.equal(ok,false); }
+assert.equal(nodes.get('f-target').value,'192.0.2.1');   // the form keeps what was typed
+""")
+
+
+def test_scan_form_sends_the_structured_nmap_controls_and_no_free_text_options():
+    run_js("""
+document.getElementById('f-target').value='192.0.2.1';
+document.getElementById('f-mode').value='evade';
+document.getElementById('f-speed').value='4';
+document.getElementById('f-scantech').value='-sU';
+document.getElementById('f-ports').value='  22,80,1-1000 ';
+document.getElementById('f-vint').value='4';
+document.getElementById('f-os').checked=true;
+document.getElementById('f-timeout').value='90';
+let posted;
+fetch=async(url,opts)=>{if(url==='/api/scan/start')posted=JSON.parse(opts.body);return {ok:true,json:async()=>({scan_id:'0123456789abcdef'})}};
+await startScan();
+assert.equal(posted.target,'192.0.2.1');
+assert.equal(posted.scan_technique,'-sU');
+assert.equal(posted.ports,'22,80,1-1000');
+assert.equal(posted.version_intensity,4);
+assert.equal(posted.os_detection,true);
+assert.equal(posted.host_timeout,90);
+assert.equal('nmap_flags' in posted,false);
+// An empty intensity is sent as null, and zero stays zero.
+document.getElementById('f-target').value='192.0.2.2';
+document.getElementById('f-vint').value='';
+document.getElementById('f-os').checked=false;
+await startScan();
+assert.equal(posted.version_intensity,null);
+assert.equal(posted.os_detection,false);
+document.getElementById('f-target').value='192.0.2.3';
+document.getElementById('f-vint').value='0';
+await startScan();
+assert.equal(posted.version_intensity,0);
+""")
+
+
+def test_profile_form_sends_the_structured_nmap_controls_and_no_free_text_options():
+    run_js("""
+toast=()=>{};
+loadProfilesFromServer=async()=>{};
+let posted;
+fetch=async(url,opts)=>{posted=JSON.parse(opts.body);return {ok:true,json:async()=>({})}};
+document.getElementById('pf-name').value='Quick UDP';
+document.getElementById('pf-scantech').value='-sU';
+document.getElementById('pf-ports').value='53,161';
+document.getElementById('pf-vint').value='0';
+document.getElementById('pf-os').checked=true;
+await saveProfile();
+assert.equal(posted.name,'Quick UDP');
+assert.equal(posted.scan_technique,'-sU');
+assert.equal(posted.ports,'53,161');
+assert.equal(posted.version_intensity,0);
+assert.equal(posted.os_detection,true);
+assert.equal('nmap_flags' in posted,false);
+""")
+
+
+def test_no_form_reads_or_writes_a_free_text_nmap_options_field():
+    run_js("""
+toast=()=>{};
+loadProfilesFromServer=loadSchedulesFromServer=async()=>{};
+fetch=async()=>({ok:true,json:async()=>({scan_id:'0123456789abcdef'})});
+profiles={p:{id:'p',name:'P',config:{scan_technique:'-sT',ports:'22',nmap_flags:'--script banner'}}};
+document.getElementById('f-profile').value='p';
+document.getElementById('f-target').value='192.0.2.1';
+document.getElementById('pf-name').value='P';
+showProfileForm(); editProfile('p'); loadProfile(); updateNmapPreview(); updateProfilePreview();
+await startScan(); await saveProfile();
+for (const id of ['f-nmap','f-nmap-custom','pf-nmap']) assert.equal(nodes.has(id),false,id);
+// The previews show only what the structured controls build.
+assert.doesNotMatch(nodes.get('f-nmap-preview').value,/script|banner/);
+assert.doesNotMatch(nodes.get('pf-nmap-preview').value,/script|banner/);
+assert.match(nodes.get('f-nmap-preview').value,/-sT/);
+""")
+
+
+def test_a_profile_saved_with_nmap_options_shows_a_notice_and_never_applies_or_resends_them():
+    run_js("""
+const shown=[];
+toast=(...args)=>{shown.push(args)};
+loadProfilesFromServer=loadSchedulesFromServer=async()=>{};
+const legacy={id:'old',name:'Old',description:'',config:{mode:'normal',speed:3,scan_technique:'-sT',ports:'22,80',
+  nmap_flags:'-sV --script http-put --script-args http-put.file=/etc/passwd'}};
+profiles={old:legacy,clean:{id:'clean',name:'Clean',config:{nmap_flags:'   '}}};
+document.getElementById('f-profile').value='old';
+loadProfile();
+assert.equal(nodes.get('f-ports').value,'22,80');
+assert.equal(nodes.get('f-scantech').value,'-sT');
+assert.doesNotMatch(nodes.get('f-nmap-preview').value,/script|passwd/);
+assert.deepEqual(shown.map(a=>a[1]),[false]);
+assert.match(shown[0][0],/Nmap options from an earlier release/);
+assert.match(shown[0][0],/not applied/);
+shown.length=0;
+editProfile('old');
+assert.equal(nodes.get('pf-ports').value,'22,80');
+assert.match(shown[0][0],/Saving it removes them/);
+assert.doesNotMatch(nodes.get('pf-nmap-preview').value,/script|passwd/);
+// Saving sends the structured fields and nothing of the old options.
+let posted;
+fetch=async(url,opts)=>{posted=JSON.parse(opts.body);return {ok:true,json:async()=>({})}};
+document.getElementById('pf-id').value='old';
+document.getElementById('pf-name').value='Old';
+await saveProfile();
+assert.equal(/http-put|passwd|--script/.test(JSON.stringify(posted)),false);
+assert.equal('nmap_flags' in posted,false);
+// A profile with a blank value, or none, raises no notice.
+shown.length=0;
+document.getElementById('f-profile').value='clean';
+loadProfile(); editProfile('clean');
+assert.equal(shown.length,0);
+// The profile list says which profiles still carry them.
+renderProfiles();
+const html=nodes.get('profiles-list').innerHTML;
+assert.equal((html.match(/Nmap options no longer accepted/g)||[]).length,1);
+""")
+
+
+def test_scan_cards_show_the_command_built_from_the_structured_job_settings():
+    run_js("""
+scans={a:{id:'a',target:'192.0.2.1',status:'completed',started_at:'2026-10-19T00:00:00Z',host_count:0,port_count:0,vuln_count:0,
+  config:{mode:'normal',speed:4,host_timeout:90,scan_technique:'-sU',ports:'53,161',version_intensity:3,os_detection:true,
+    nmap_flags:'-sU -p 53,161 --version-intensity 3 -O'}},
+  b:{id:'b',target:'192.0.2.2',status:'completed',started_at:'2026-10-18T00:00:00Z',host_count:0,port_count:0,vuln_count:0,
+    config:{mode:'normal',speed:3,scan_technique:'',version_intensity:0,nmap_flags:'--script banner'}}};
+renderScans();
+const cards=nodes.get('tc-scans').children;
+const first=cards[0].children[0].innerHTML, second=cards[1].children[0].innerHTML;
+assert.match(first,/nmap 192.0.2.1 -sU -sV --host-timeout 90 -Pn -O -T 4 -p 53,161 --version-intensity 3/);
+assert.equal((first.match(/-sU/g)||[]).length,1);
+assert.match(second,/nmap 192.0.2.2 -sS -sV .* --version-intensity 0/);
+assert.doesNotMatch(second,/script|banner/);   // free text in an old job's settings is never shown as a command
 """)
 
 

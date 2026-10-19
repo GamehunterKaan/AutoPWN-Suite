@@ -38,9 +38,6 @@ function updateNmapPreview() {
   const os = document.getElementById('f-os');
   if (os && os.checked) flags.push('-O');
 
-  const custom = document.getElementById('f-nmap-custom');
-  if (custom && custom.value.trim()) flags.push(custom.value.trim());
-
   const combinedFlags = flags.join(' ').trim();
   let previewCmd = base;
   if (combinedFlags) {
@@ -53,10 +50,6 @@ function updateNmapPreview() {
 
   const previewEl = document.getElementById('f-nmap-preview');
   if (previewEl) previewEl.value = previewCmd.trim();
-
-  // Store technique separately so _build_nmap_flags on the backend also uses it
-  const hiddenEl = document.getElementById('f-nmap');
-  if (hiddenEl) hiddenEl.value = (technique ? technique + ' ' : '') + flags.join(' ').trim();
 }
 function updateProfilePreview() {
   const mode = document.getElementById('pf-mode').value;
@@ -74,9 +67,6 @@ function updateProfilePreview() {
   if (vint && vint.value) flags.push('--version-intensity ' + vint.value);
   const os = document.getElementById('pf-os');
   if (os && os.checked) flags.push('-O');
-
-  const custom = document.getElementById('pf-nmap');
-  if (custom && custom.value.trim()) flags.push(custom.value.trim());
 
   const combinedFlags = flags.join(' ').trim();
   let previewCmd = base;
@@ -482,6 +472,19 @@ function toggleAdv(){
 }
 
 // ── Profile loader (scan form) ─────────────────────────────────────────────────
+// A profile saved by an earlier release can still hold free-text Nmap options. The dashboard no longer
+// accepts them, shows no field for them and never applies them.
+function hasLegacyOptions(c){ return typeof c.nmap_flags === 'string' && c.nmap_flags.trim() !== ''; }
+// The ports field takes what the server accepts: port numbers from 1 to 65535, ranges and comma lists.
+function portsError(ports){
+  if(!ports) return '';
+  const ranges = ports.match(/[0-9]+-[0-9]+/g) || [];
+  const valid = ports.length <= 2048
+    && /^[1-9][0-9]{0,4}(-[1-9][0-9]{0,4})?(,[1-9][0-9]{0,4}(-[1-9][0-9]{0,4})?)*$/.test(ports)
+    && ports.match(/[0-9]+/g).every(number => Number(number) <= 65535)
+    && ranges.every(range => Number(range.split('-')[0]) <= Number(range.split('-')[1]));
+  return valid ? '' : 'Ports must be port numbers from 1 to 65535, ranges and commas, such as 22,80,1-1000.';
+}
 function loadProfile(){
   const pid = document.getElementById('f-profile').value;
   if(!pid || !profiles[pid]) return;
@@ -489,7 +492,6 @@ function loadProfile(){
   if(c.mode)       document.getElementById('f-mode').value    = c.mode;
   if(c.speed != null) document.getElementById('f-speed').value = String(c.speed);
   if(c.scan_type !== undefined) document.getElementById('f-scantype').value = c.scan_type || '';
-  document.getElementById('f-nmap-custom').value = c.nmap_flags || '';
   document.getElementById('f-scantech').value = c.scan_technique || '';
   document.getElementById('f-ports').value = c.ports || '';
   document.getElementById('f-vint').value = c.version_intensity != null ? String(c.version_intensity) : '';
@@ -500,6 +502,7 @@ function loadProfile(){
   document.getElementById('f-vuln-source').value = offlineServer ? 'offline' : (c.vulnerability_source || 'auto');
   window.webSecurity?.setControls('f', c);
   updateNmapPreview();
+  if(hasLegacyOptions(c)) toast('This profile holds Nmap options from an earlier release. They are not applied.', false);
 }
 
 function refreshProfileSelects(){
@@ -521,13 +524,18 @@ async function startScan(){
   if(!target){ reportScanError('Please enter a target.'); return; }
   const webError = window.webSecurity?.validateControls('f');
   if(webError){ toast(webError, false); return; }
+  const portsProblem = portsError(document.getElementById('f-ports').value.trim());
+  if(portsProblem){ toast(portsProblem, false); return; }
 
   const body = {
     target,
     mode:           document.getElementById('f-mode').value,
     speed:          parseInt(document.getElementById('f-speed').value),
     scan_type:      document.getElementById('f-scantype').value || null,
-    nmap_flags:     document.getElementById('f-nmap').value,
+    scan_technique: document.getElementById('f-scantech').value,
+    ports:          document.getElementById('f-ports').value.trim(),
+    version_intensity: document.getElementById('f-vint').value ? parseInt(document.getElementById('f-vint').value) : null,
+    os_detection:   document.getElementById('f-os').checked,
     host_timeout:   parseInt(document.getElementById('f-timeout').value)||240,
     scan_vulns:     document.getElementById('f-vulns').checked,
     vulnerability_source: document.getElementById('f-vuln-source').value,
@@ -725,16 +733,9 @@ function renderScans(){
   jobs.forEach(job=>{
     const running = job.status==='running'||job.status==='stopping';
     const c = job.config||{};
-    const techMatch = (c.nmap_flags||'').match(/-s[STAUWMNFX]/);
-    const cardTech = techMatch ? techMatch[0] : '';
-    let base = _buildNmapBase(job.target, c.mode||'normal', c.speed??3, c.host_timeout||240, cardTech);
-    if(c.nmap_flags){
-      let f = c.nmap_flags;
-      // Remove the technique flag since it's already in the base
-      if(cardTech) f = f.replace(cardTech, '').trim();
-      if(base.includes('-O') && f.includes('-O')) f = f.replace(/(^|\s)-O(\s|$)/g, ' ').trim();
-      if(f) base += ' ' + f;
-    }
+    let base = _buildNmapBase(job.target, c.mode||'normal', c.speed??3, c.host_timeout||240, c.scan_technique||'');
+    if(c.ports) base += ' -p ' + c.ports;
+    if(c.version_intensity != null && c.version_intensity !== '') base += ' --version-intensity ' + c.version_intensity;
     if(c.scan_ports === false && c.scan_web) base = 'Website scan · ' + Object.values(c.web_options?.checks || {}).filter(Boolean).length + ' checks enabled';
     const part = scanCardFor(job);
     listed.add(job.id);
@@ -1109,7 +1110,7 @@ function renderProfiles(){
     <div class="item-card">
       <div class="item-card-info">
         <div class="item-card-name">${esc(p.name)}</div>
-        <div class="item-card-meta">Mode: ${esc(p.config?.mode||'normal')} · Speed: ${esc(p.config?.speed??3)} · ${esc(p.description||'No description')}</div>
+        <div class="item-card-meta">Mode: ${esc(p.config?.mode||'normal')} · Speed: ${esc(p.config?.speed??3)} · ${esc(p.description||'No description')}${hasLegacyOptions(p.config||{})?' · Nmap options no longer accepted: edit and save to remove them':''}</div>
       </div>
       <div class="item-card-actions">
         <button class="btn btn-ghost btn-sm" data-action="edit-profile" data-id="${esc(p.id)}">Edit</button>
@@ -1131,7 +1132,6 @@ function showProfileForm(){
   document.getElementById('pf-ports').value='';
   document.getElementById('pf-vint').value='';
   document.getElementById('pf-os').checked=false;
-  document.getElementById('pf-nmap').value='';
   document.getElementById('pf-skipd').checked=false;
   document.getElementById('pf-vulns').checked=true;
   document.getElementById('pf-vuln-source').value='auto';
@@ -1155,12 +1155,12 @@ function editProfile(pid){
   document.getElementById('pf-ports').value=c.ports||'';
   document.getElementById('pf-vint').value=c.version_intensity!=null?String(c.version_intensity):'';
   document.getElementById('pf-os').checked=!!c.os_detection;
-  document.getElementById('pf-nmap').value=c.nmap_flags||'';
   document.getElementById('pf-skipd').checked=!!c.skip_discovery;
   document.getElementById('pf-vulns').checked=c.scan_vulns!==false;
   document.getElementById('pf-vuln-source').value=c.vulnerability_source||'auto';
   window.webSecurity?.setControls('pf', c);
   updateProfilePreview();
+  if(hasLegacyOptions(c)) toast('This profile holds Nmap options from an earlier release. Saving it removes them.', false);
 }
 async function saveProfile(){
   const pid=document.getElementById('pf-id').value;
@@ -1168,17 +1168,18 @@ async function saveProfile(){
   if(!name){ toast('Profile name is required',false); return; }
   const webError = window.webSecurity?.validateControls('pf');
   if(webError){ toast(webError, false); return; }
+  const portsProblem = portsError(document.getElementById('pf-ports').value.trim());
+  if(portsProblem){ toast(portsProblem, false); return; }
   const body={
     name, description:document.getElementById('pf-desc').value,
     mode:    document.getElementById('pf-mode').value,
     speed:   parseInt(document.getElementById('pf-speed').value),
     scan_type:      document.getElementById('pf-scantype').value||null,
     scan_technique: document.getElementById('pf-scantech').value,
-    ports:          document.getElementById('pf-ports').value,
+    ports:          document.getElementById('pf-ports').value.trim(),
     version_intensity: document.getElementById('pf-vint').value?parseInt(document.getElementById('pf-vint').value):null,
     os_detection:   document.getElementById('pf-os').checked,
     host_timeout:parseInt(document.getElementById('pf-timeout').value)||240,
-    nmap_flags:  document.getElementById('pf-nmap').value,
     skip_discovery: document.getElementById('pf-skipd').checked,
     scan_vulns:     document.getElementById('pf-vulns').checked,
     vulnerability_source: document.getElementById('pf-vuln-source').value,
