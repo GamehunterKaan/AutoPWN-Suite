@@ -397,6 +397,15 @@ def test_pypi_upload_skips_existing_files_only_for_a_dispatched_recovery_run():
     assert "gh workflow run publish-pypi.yml --ref main -f tag=vVERSION" in docs
 
 
+def test_pypi_deployment_link_is_the_version_page_without_the_tag_prefix():
+    """PyPI addresses a release as /project/autopwn-suite/2.7.0/; the tag is v2.7.0."""
+    workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/publish-pypi.yml").read_text(encoding="utf-8")
+    assert "url: https://pypi.org/project/autopwn-suite/${{ needs.validate.outputs.version }}/" in workflow
+    assert "version: ${{ steps.release.outputs.version }}" in workflow
+    assert "\"$commit\" \"${RELEASE_TAG#v}\" \"$epoch\" >> \"$GITHUB_OUTPUT\"" in workflow
+    assert "project/autopwn-suite/${{ github.event.release.tag_name" not in workflow
+
+
 def test_verification_docs_name_every_signer_identity_the_workflows_can_produce():
     """The certificate identity is GITHUB_WORKFLOW_REF: the tag for a release event, main for a dispatch."""
     root = Path(__file__).resolve().parents[2]

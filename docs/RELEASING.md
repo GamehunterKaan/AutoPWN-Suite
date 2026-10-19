@@ -35,6 +35,11 @@ One-time PyPI setup (the project `autopwn-suite` already exists and is owned by 
 maintainer account): add a trusted publisher on pypi.org with owner
 `GamehunterKaan`, repository `AutoPWN-Suite`, workflow `publish-pypi.yml` and
 environment `pypi`. No PyPI token or password is stored anywhere; never add one.
+The publish job runs in that GitHub environment, whose deployment link is the version
+page of the release (`https://pypi.org/project/autopwn-suite/VERSION/`, without the
+tag's `v`). The workflow does not require a deployment protection rule on it: the
+earlier jobs are the gate. A required reviewer would add a manual approval before the
+immutable upload; that is a repository setting for the maintainer to decide.
 Keep at least two project owners (see [continuity](CONTINUITY.md)).
 
 Read-only jobs validate/archive the release and run source security checks, then

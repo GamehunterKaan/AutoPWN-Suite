@@ -28,6 +28,7 @@ jobs:
       contents: read
     outputs:
       commit: ${{ steps.release.outputs.commit }}
+      version: ${{ steps.release.outputs.version }}
       source_date_epoch: ${{ steps.release.outputs.source_date_epoch }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -47,7 +48,7 @@ jobs:
           # Commit time of the reviewed release commit; fixes the timestamps inside the distributions.
           epoch="$(git show --no-patch --format=%ct "$commit")"
           [[ "$epoch" =~ ^[0-9]+$ ]]
-          printf 'commit=%s\nsource_date_epoch=%s\n' "$commit" "$epoch" >> "$GITHUB_OUTPUT"
+          printf 'commit=%s\nversion=%s\nsource_date_epoch=%s\n' "$commit" "${RELEASE_TAG#v}" "$epoch" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-source
@@ -118,7 +119,8 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/autopwn-suite/${{ github.event.release.tag_name || inputs.tag }}
+      # PyPI version pages have no "v" prefix.
+      url: https://pypi.org/project/autopwn-suite/${{ needs.validate.outputs.version }}/
     permissions:
       id-token: write
     steps:
