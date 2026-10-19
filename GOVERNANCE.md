@@ -10,8 +10,9 @@ dependencies and distribution channels, not additional project source repositori
 | Member | Role | Sensitive resources and responsibilities |
 | --- | --- | --- |
 | [Kaan Gültekin (@GamehunterKaan)](https://github.com/GamehunterKaan) | Owner, maintainer, release manager, security contact | Repository administration and collaborator permissions; branch protection and Actions settings; CI secret administration; Docker Hub publishing credentials; release approval and publication; private vulnerability reports and coordinated disclosure. |
+| [@autosec-overflow](https://github.com/autosec-overflow) | Second maintainer account (per the owner's attestation) | Repository write access; administration is not granted. Successor arrangements are held privately ([continuity plan](docs/CONTINUITY.md)). |
 
-This is the human access inventory as of 2026-10-15. The owner updates it whenever
+This is the human access inventory as of 2026-10-19. The owner updates it whenever
 access changes. Contributors do not gain sensitive access by submitting a pull
 request. Invitations and permission changes are manual. Require MFA or a passkey
 for accounts with sensitive access, and revoke access that is no longer needed.
