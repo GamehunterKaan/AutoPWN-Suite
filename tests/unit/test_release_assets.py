@@ -385,16 +385,23 @@ def test_the_pypi_workflow_checks_file_names_with_the_normalising_helper(tmp_pat
     assert shown.stdout.split() == release.pypi_files("v2.8.0-rc.1")
 
 
-def test_pypi_upload_skips_existing_files_only_for_a_dispatched_recovery_run():
-    """A partial upload is completed by dispatching the workflow; the automatic run keeps uploading strictly."""
+def test_pypi_upload_skips_existing_files_only_when_a_release_run_is_retried():
+    """A partial upload is completed by re-running the release run, whose tag ref the pypi environment admits (v* tags)."""
     root = Path(__file__).resolve().parents[2]
     publish = (root / ".github/workflows/publish-pypi.yml").read_text(encoding="utf-8").split("\n  publish:\n", 1)[1]
-    assert "skip-existing: ${{ github.event_name == 'workflow_dispatch' }}" in publish
+    assert "skip-existing: ${{ github.run_attempt > 1 }}" in publish
+    assert "workflow_dispatch" not in publish
     assert "attestations: true" in publish
     # Nothing is uploaded unless every earlier gate passed, whichever way the run was started.
     assert "needs: [validate, source-security, dynamic-analysis, build]" in publish
     docs = (root / "docs/RELEASING.md").read_text(encoding="utf-8")
-    assert "gh workflow run publish-pypi.yml --ref main -f tag=vVERSION" in docs
+    assert "gh run rerun RUN_ID --failed" in docs
+    # A dispatch runs from main, which the environment's v* tag rule refuses: it must not be offered as the recovery.
+    assert "gh workflow run publish-pypi.yml" not in docs
+    assert "deployment rules admit only tags that match `v*`" in docs
+    assert "does not require a deployment protection rule" not in docs
+    model = (root / "docs/THREAT_MODEL.md").read_text(encoding="utf-8")
+    assert "without comparing them" in model and "`pypi` environment admits only `v*` tags" in model
 
 
 def test_pypi_deployment_link_is_the_version_page_without_the_tag_prefix():

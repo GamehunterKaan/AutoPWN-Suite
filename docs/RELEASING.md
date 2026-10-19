@@ -37,9 +37,13 @@ maintainer account): add a trusted publisher on pypi.org with owner
 environment `pypi`. No PyPI token or password is stored anywhere; never add one.
 The publish job runs in that GitHub environment, whose deployment link is the version
 page of the release (`https://pypi.org/project/autopwn-suite/VERSION/`, without the
-tag's `v`). The workflow does not require a deployment protection rule on it: the
-earlier jobs are the gate. A required reviewer would add a manual approval before the
-immutable upload; that is a repository setting for the maintainer to decide.
+tag's `v`). The environment's deployment rules admit only tags that match `v*`, so
+only a run of the release event, whose ref is the tag, can publish: a run dispatched
+from `main` runs the gates and the build and is then refused at the publish job.
+Adding a `main` rule to the environment would change that, which is a repository
+setting for the maintainer to decide; nothing here relies on it. The earlier jobs are
+the gate. A required reviewer would add a manual approval before the immutable
+upload, which is also the maintainer's decision.
 Keep at least two project owners (see [continuity](CONTINUITY.md)).
 
 Read-only jobs validate/archive the release and run source security checks, then
@@ -83,17 +87,18 @@ also uploads PEP 740 attestations binding each file to this repository and
 workflow. This workflow does not touch GitHub release assets or notes.
 
 If the upload stops after one of the two files (PyPI keeps what it received and
-cannot replace it), dispatch the workflow from `main` for the same tag:
+cannot replace it), re-run only the failed jobs of the release run:
 
 ```sh
-gh workflow run publish-pypi.yml --ref main -f tag=vVERSION
+gh run rerun RUN_ID --failed
 ```
 
-That run repeats the validation, the security gates and the build, and uploads with
+The re-run keeps the tag ref that the `pypi` environment admits and publishes the
+`pypi-dist` artifact of the first attempt. Every attempt after the first uploads with
 `skip-existing`, so a file already on PyPI is left alone and only the missing one is
-added. Only a dispatched run skips existing files: re-running the failed jobs of the
-original release run fails again with "File already exists", and the automatic run
-never skips. A skipped file is not compared with the new build, so afterwards check
+added; the first attempt of the release run never skips. A run dispatched from `main`
+is not a recovery path, because the environment refuses its publish job (see the
+setup above). A skipped file is not compared with the new build, so afterwards check
 that the hashes on the PyPI release page equal those of the run's `pypi-dist` artifact.
 
 The build/publish workflow validates tag syntax, source package version and

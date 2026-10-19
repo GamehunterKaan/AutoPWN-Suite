@@ -131,10 +131,11 @@ jobs:
       # Trusted publishing: PyPI trusts this workflow and the `pypi` environment, so no token is stored.
       # The action also uploads PEP 740 attestations that bind each file to this repository and workflow.
       # PyPI files are immutable, so a run that uploaded only one of the two files cannot be repeated as it was
-      # ("File already exists"). A run started by hand, which only validates the tag again and rebuilds the same
-      # bytes, may skip files that are already there; the automatic release run never does.
+      # ("File already exists"). Re-running the failed jobs of the release run keeps the tag ref, which is the only
+      # kind of ref the `pypi` environment admits (v* tags), and may skip files that are already there; the first
+      # attempt of a run never does.
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           packages-dir: dist/
           attestations: true
-          skip-existing: ${{ github.event_name == 'workflow_dispatch' }}
+          skip-existing: ${{ github.run_attempt > 1 }}
