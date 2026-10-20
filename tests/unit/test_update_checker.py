@@ -48,6 +48,9 @@ def repos(tmp_path):
     upstream = _init_repo(tmp_path / "upstream")
     local = tmp_path / "local"
     subprocess.run(["git", "clone", str(upstream), str(local)], check=True, capture_output=True, text=True)
+    # A clone does not inherit the upstream's identity, and a CI runner has no global one.
+    _git(local, "config", "user.name", "Update Test")
+    _git(local, "config", "user.email", "update@example.test")
     return upstream, local
 
 
