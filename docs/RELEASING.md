@@ -75,6 +75,16 @@ signatures are Sigstore signatures only. The signing job is the only job in
 `publish-docker.yml` that holds `id-token:write`; keep signing there so the
 certificate identity stays the `publish-docker.yml` workflow.
 
+Right after `cosign sign`, the same step checks the image signature with `cosign verify`
+against the workflow identity, the GitHub Actions issuer and the pushed digest. Docker Hub
+can list a just-pushed signature (cosign v3 stores it as an OCI referrer) a moment late, and
+cosign then falls back to the legacy `.sig` tag and fails with "no signatures found" (exit
+code 10); the v2.7.0 release run hit this once, and re-running its failed jobs recovered it.
+The step therefore asks again, up to seven times over about two minutes, and fails only if
+no attempt verifies. Only `cosign verify` is retried: `cosign sign` runs once, because
+every run attaches another bundle, and the identity, issuer and digest never change. The
+backfill workflow does the same. The first real run of this retry is the next release.
+
 `publish-pypi.yml` runs on the same release event. It validates the tag with the
 same `release_assets.py` checks, calls the same security and dynamic-analysis
 workflows, extracts the validated source archive and builds the wheel and source
@@ -105,6 +115,11 @@ The build/publish workflow validates tag syntax, source package version and
 ancestry in `origin/main`. It refuses existing uploaded assets and never silently
 overwrites them. Resolve partial uploads manually after inspecting the failed
 run. Only GitHub's latest stable release updates the image's `latest` alias.
+
+Re-running the failed jobs of a `publish-docker.yml` release run (`gh run rerun RUN_ID --failed`)
+is safe too: the image digest comes from the `push` job of the first attempt, so nothing is
+rebuilt or pushed again, and the signature that an earlier attempt already attached stays on
+the digest as a second valid bundle with the same identity and commit. Nothing needs cleaning up.
 
 ## Authenticity backfill for an existing release
 

@@ -235,7 +235,14 @@ jobs:
           python scripts/release_assets.py manifest --tag "$RELEASE_TAG" --output assets --image "$IMAGE" --digest "$DIGEST" --binaries
           identity="https://github.com/$GITHUB_WORKFLOW_REF"
           cosign sign --yes "$IMAGE@$DIGEST"
-          cosign verify --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$IMAGE@$DIGEST"
+          # Docker Hub can list a just-pushed signature late; cosign v3 then falls back to the legacy .sig tag and
+          # exits 10 ("no signatures found"). Ask again before failing; the identity, issuer and digest are unchanged.
+          verified=false
+          for delay in 0 5 10 15 20 30 30; do
+            sleep "$delay"
+            if cosign verify --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$IMAGE@$DIGEST"; then verified=true; break; fi
+          done
+          [ "$verified" = true ]
           cosign sign-blob --yes --bundle assets/release-manifest.sigstore.json assets/release-manifest.json
           cosign verify-blob --bundle assets/release-manifest.sigstore.json --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com assets/release-manifest.json
           # The checksum file gets its own signature so the binaries can be verified with two standard commands.

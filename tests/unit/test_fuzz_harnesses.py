@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
-"""The ClusterFuzzLite harnesses in fuzz/ must keep importing, accept their seeds and never fail on junk."""
+"""The ClusterFuzzLite harnesses in scripts/fuzz/ must keep importing, accept their seeds and never fail on junk."""
 import importlib.util
 import random
 import sys
@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-HARNESSES = sorted((ROOT / "fuzz").glob("fuzz_*.py"))
+HARNESSES = sorted((ROOT / "scripts" / "fuzz").glob("fuzz_*.py"))
 
 
 class FuzzedDataProvider:
@@ -52,15 +52,15 @@ def harness(monkeypatch):
 def test_every_harness_has_a_seed_directory_with_a_valid_seed():
     assert len(HARNESSES) >= 3
     for path in HARNESSES:
-        seeds = [seed for seed in (ROOT / "fuzz" / "seeds" / path.stem).glob("*") if seed.is_file()]
-        assert seeds, f"{path.name} needs a seed corpus in fuzz/seeds/{path.stem}/"
+        seeds = [seed for seed in (ROOT / "scripts" / "fuzz" / "seeds" / path.stem).glob("*") if seed.is_file()]
+        assert seeds, f"{path.name} needs a seed corpus in scripts/fuzz/seeds/{path.stem}/"
 
 
 @pytest.mark.parametrize("path", HARNESSES, ids=lambda path: path.name)
 def test_harness_accepts_its_seeds_and_survives_junk(harness, path):
     module = harness(path)
     assert callable(module.TestOneInput) and callable(module.main)
-    for seed in (ROOT / "fuzz" / "seeds" / path.stem).glob("*"):
+    for seed in (ROOT / "scripts" / "fuzz" / "seeds" / path.stem).glob("*"):
         module.TestOneInput(seed.read_bytes())
     rng = random.Random(20261018)
     for _ in range(300):
@@ -71,13 +71,13 @@ def test_harness_accepts_its_seeds_and_survives_junk(harness, path):
 def test_the_options_harness_survives_json_nested_deeper_than_python_allows(harness, nested):
     # json.loads raises RecursionError (not ValueError) beyond about a thousand levels on Python 3.10 and 3.11,
     # and beyond a much larger depth on newer versions; the fuzzer must not report that as a finding.
-    harness(ROOT / "fuzz" / "fuzz_web_options.py").TestOneInput(nested)
+    harness(ROOT / "scripts" / "fuzz" / "fuzz_web_options.py").TestOneInput(nested)
 
 
 def test_the_nmap_seed_is_a_document_the_parser_accepts(harness):
     from autopwn_suite.nmap_backend import parse_nmap_xml
 
-    assert parse_nmap_xml((ROOT / "fuzz/seeds/fuzz_nmap_xml/valid.xml").read_text(encoding="utf-8"))
+    assert parse_nmap_xml((ROOT / "scripts/fuzz/seeds/fuzz_nmap_xml/valid.xml").read_text(encoding="utf-8"))
 
 
 def test_the_options_seed_passes_the_schema(harness):
@@ -85,11 +85,11 @@ def test_the_options_seed_passes_the_schema(harness):
 
     from autopwn_suite.web.options import normalize_options
 
-    assert normalize_options(json.loads((ROOT / "fuzz/seeds/fuzz_web_options/valid.json").read_text(encoding="utf-8")))["verify_tls"] is True
+    assert normalize_options(json.loads((ROOT / "scripts/fuzz/seeds/fuzz_web_options/valid.json").read_text(encoding="utf-8")))["verify_tls"] is True
 
 
 def test_the_update_harness_drives_each_check_with_real_input(harness):
-    module = harness(ROOT / "fuzz" / "fuzz_update_checker.py")
+    module = harness(ROOT / "scripts" / "fuzz" / "fuzz_update_checker.py")
     # The first byte picks the check: 0 repository, 1 branch or tag name, 2 GitHub's release response.
     module.TestOneInput(b"\x00GamehunterKaan/AutoPWN-Suite")
     module.TestOneInput(b"\x00../etc")  # refused through the documented error
@@ -103,15 +103,15 @@ def test_the_update_harness_drives_each_check_with_real_input(harness):
 
 def test_the_workflow_and_build_script_cover_the_harnesses():
     build = (ROOT / ".clusterfuzzlite/build.sh").read_text(encoding="utf-8")
-    assert "fuzz/fuzz_*.py" in build and "compile_python_fuzzer" in build and "--require-hashes" in build
+    assert "scripts/fuzz/fuzz_*.py" in build and "compile_python_fuzzer" in build and "--require-hashes" in build
     workflow = (ROOT / ".github/workflows/cflite_pr.yml").read_text(encoding="utf-8")
     assert "build_fuzzers@" in workflow and "run_fuzzers@" in workflow and "mode: code-change" in workflow
 
 
 def test_fuzz_files_are_kept_out_of_the_product_image_but_not_out_of_the_fuzzing_image():
     product = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
-    assert "fuzz" in product and ".clusterfuzzlite" in product
+    assert "scripts/fuzz" in product and ".clusterfuzzlite" in product
     # ClusterFuzzLite builds with the repository's .dockerignore unless a Dockerfile-specific one exists,
     # and would then lose .clusterfuzzlite/build.sh from its build context.
     own = (ROOT / ".clusterfuzzlite/Dockerfile.dockerignore").read_text(encoding="utf-8").splitlines()
-    assert "fuzz" not in own and ".clusterfuzzlite" not in own
+    assert "scripts/fuzz" not in own and ".clusterfuzzlite" not in own
