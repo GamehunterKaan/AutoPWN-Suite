@@ -44,6 +44,15 @@ existing release summaries; they do not retroactively claim artifact signing.
   the rules are in `autopwn_suite/data/vulnerability_categories.json`. New findings carry a `categories` list;
   scans saved earlier have none and appear only under "All". The command line, the saved reports and the Python
   library are unchanged.
+- The release workflows `publish-docker.yml` and `backfill-release-signatures.yml` now retry the image
+  `cosign verify` for about two minutes before failing. Docker Hub can list a just-pushed signature late, and
+  cosign v3 then reports "no signatures found" (this failed the `sign` job of the v2.7.0 release run once; re-running
+  the failed jobs recovered it). `cosign sign` still runs once, and the workflow paths and check names are unchanged.
+  The first real run of the retry is the next release.
+- The ClusterFuzzLite fuzz harnesses and their seed inputs moved from `fuzz/` to `scripts/fuzz/`. The build
+  integration stays in `.clusterfuzzlite/`, which ClusterFuzzLite requires at the repository root. The
+  `cflite_pr.yml` path filter and `.clusterfuzzlite/build.sh` follow the move, and the harnesses stay out of the
+  product image through `.dockerignore`.
 
 ### Security changes
 
@@ -73,6 +82,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   the NVD or from a copied database, so they are untrusted: a CWE ID must match `CWE-` and up to five digits, the
   description is only searched for fixed phrases (no regular expression), and the page ignores any category ID that
   is not in its fixed list.
+- Release signing: no security impact. The image signature is still verified against the same identity, issuer and
+  digest, and a verification that never succeeds still fails the step. The retry adds no permission, secret or
+  network destination.
+- Moving the fuzz harnesses is no security impact: the same harnesses and seeds run in the same job, and they
+  stay out of the product image.
 
 ## [2.7.0] - 2026-10-19
 
