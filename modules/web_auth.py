@@ -251,7 +251,7 @@ def install_auth(app, static_dir, account_path):
     auth = DashboardAuth(store)
     app.extensions["dashboard_auth"] = auth
     secure_cookie = os.environ.get("AUTOPWN_WEB_SECURE_COOKIE") == "1"
-    public = {"/login", "/login.js", "/login.css", "/favicon.ico", "/api/auth/login"}
+    public = {"/login", "/login.js", "/login.css", "/favicon.ico", "/api/auth/login", "/i18n.js"}
 
     def set_cookie(response, token, *, login=False):
         response.set_cookie(LOGIN_COOKIE if login else COOKIE, token, max_age=300 if login else SESSION_SECONDS,

@@ -92,5 +92,5 @@ def additional_checks(target_url, urls, response, log, console, headers=None, *,
                 tested_paths.add(path)
                 stage("Host header advisories")
                 results.extend(run_task("host_headers", host_key(url), lambda: check_host_headers(client, url, console)))
-    log.logger("info", f"Additional web checks used {client.requests}/{client.max_requests} HTTP probes.")
+    log.logger("info", _("Additional web checks used {used}/{total} HTTP probes.").format(used=client.requests, total=client.max_requests))
     return results

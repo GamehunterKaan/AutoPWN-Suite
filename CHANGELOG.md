@@ -9,6 +9,14 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Functional changes
 
+- Add localization support (English source, Turkish as the first translated language)
+  to both the CLI and the web dashboard: `--lang {en,tr}` (or `--language`) selects the
+  CLI/daemon/report language, remembered for later runs; otherwise it follows
+  `AUTOPWN_LANG`, then the system locale, then the last explicit choice, then English.
+  The dashboard gets its own language selector (including on the sign-in page), backed
+  by `localStorage` and a stable `X-App-Language` request header. See
+  [docs/INTERNATIONALIZATION.md](docs/INTERNATIONALIZATION.md) for scope, the
+  machine-translated/fuzzy-flagged Turkish catalog, and known limitations.
 - Add `--check-update` to check GitHub for a newer AutoPWN Suite and exit, and `--apply-update`
   to actually fast-forward this git checkout to it. Both support release-based
   (`--update-channel release`, default: the latest GitHub release tag) and commit-based

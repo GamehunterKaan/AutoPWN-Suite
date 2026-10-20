@@ -24,6 +24,7 @@
     await ready;
     const headers = new Headers(options.headers || (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined));
     const method = (options.method || input.method || 'GET').toUpperCase();
+    headers.set('X-App-Language', window.i18n.getLang());
     if(!['GET','HEAD','OPTIONS'].includes(method)) headers.set('X-CSRF-Token', csrf);
     const response = await nativeFetch(input, {...options, headers, credentials:'same-origin'});
     if(response.status === 401) expired();

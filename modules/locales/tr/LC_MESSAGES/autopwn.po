@@ -1,0 +1,1749 @@
+# Turkish translations for AutoPWN package.
+# Copyright (C) 2026 Kaan Gültekin
+# This file is distributed under the same license as the AutoPWN Suite package.
+# Automatically generated, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: AutoPWN Suite\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-20 03:52+0300\n"
+"PO-Revision-Date: 2026-10-20 03:52+0300\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: modules/daemon/daemon_installer.py:36
+#, fuzzy, python-brace-format
+msgid "Enter your choice ({choices}): "
+msgstr "Seçiminizi girin ({choices}): "
+
+#: modules/daemon/daemon_installer.py:42
+#, fuzzy, python-brace-format
+msgid "[red]Invalid choice. Please enter one of {choices}.[/red]"
+msgstr "[red]Geçersiz seçim. Lütfen {choices} içinden birini girin.[/red]"
+
+#: modules/daemon/daemon_installer.py:54
+#, fuzzy
+msgid "[red]Invalid input. Please enter a whole number.[/red]"
+msgstr "[red]Geçersiz giriş. Lütfen bir tam sayı girin.[/red]"
+
+#: modules/daemon/daemon_installer.py:66
+#, fuzzy
+msgid "[red]Invalid email format. Please enter a valid email address.[/red]"
+msgstr "[red]Geçersiz e-posta biçimi. Lütfen geçerli bir e-posta adresi girin.[/red]"
+
+#: modules/daemon/daemon_installer.py:74
+#, fuzzy
+msgid "[red]This field cannot be empty.[/red]"
+msgstr "[red]Bu alan boş bırakılamaz.[/red]"
+
+#: modules/daemon/daemon_installer.py:77
+#, fuzzy
+msgid "Welcome to AutoPWN Suite Config Creator!"
+msgstr "AutoPWN Suite Yapılandırma Oluşturucusuna hoş geldiniz!"
+
+#: modules/daemon/daemon_installer.py:79
+#, fuzzy
+msgid ""
+"Enter the scan interval in [cyan]seconds[/cyan] (Set to 0 for no interval - "
+"if not using as daemon): "
+msgstr ""
+"Tarama aralığını [cyan]saniye[/cyan] cinsinden girin (daemon olarak "
+"kullanmıyorsanız aralık olmaması için 0 girin): "
+
+#: modules/daemon/daemon_installer.py:83
+#, fuzzy
+msgid "Would you like to enable email or webhook notifications?"
+msgstr "E-posta veya webhook bildirimlerini etkinleştirmek ister misiniz?"
+
+#: modules/daemon/daemon_installer.py:84
+#, fuzzy
+msgid "Email"
+msgstr "E-posta"
+
+#: modules/daemon/daemon_installer.py:84
+#, fuzzy
+msgid "Webhook"
+msgstr "Webhook"
+
+#: modules/daemon/daemon_installer.py:84
+#, fuzzy
+msgid "None"
+msgstr "Hiçbiri"
+
+#: modules/daemon/daemon_installer.py:89
+#, fuzzy
+msgid "Enter your [cyan]email address[/cyan]: "
+msgstr "[cyan]E-posta adresinizi[/cyan] girin: "
+
+#: modules/daemon/daemon_installer.py:90
+#, fuzzy
+msgid "Enter your [cyan]email password[/cyan]: "
+msgstr "[cyan]E-posta şifrenizi[/cyan] girin: "
+
+#: modules/daemon/daemon_installer.py:91
+#, fuzzy
+msgid "Enter the email address to [cyan]send the report to[/cyan]: "
+msgstr "Raporun [cyan]gönderileceği[/cyan] e-posta adresini girin: "
+
+#: modules/daemon/daemon_installer.py:92
+#, fuzzy
+msgid ""
+"Enter the email address to [cyan]send from[/cyan] (leave empty to use login "
+"email): "
+msgstr ""
+"[cyan]Gönderen[/cyan] e-posta adresini girin (oturum açma e-postasını "
+"kullanmak için boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:93
+#, fuzzy
+msgid "Enter the [cyan]email server[/cyan] to send the report from: "
+msgstr "Raporun gönderileceği [cyan]e-posta sunucusunu[/cyan] girin: "
+
+#: modules/daemon/daemon_installer.py:94
+#, fuzzy
+msgid "Enter the [cyan]email port[/cyan] to send the report from: "
+msgstr "Raporun gönderileceği [cyan]e-posta portunu[/cyan] girin: "
+
+#: modules/daemon/daemon_installer.py:95
+#, fuzzy
+msgid "[green]Email notifications enabled.[/green]"
+msgstr "[green]E-posta bildirimleri etkinleştirildi.[/green]"
+
+#: modules/daemon/daemon_installer.py:98
+#, fuzzy
+msgid "Enter your [cyan]webhook URL[/cyan]: "
+msgstr "[cyan]Webhook URL'nizi[/cyan] girin: "
+
+#: modules/daemon/daemon_installer.py:99
+#, fuzzy
+msgid "[green]Webhook notifications enabled.[/green]"
+msgstr "[green]Webhook bildirimleri etkinleştirildi.[/green]"
+
+#: modules/daemon/daemon_installer.py:102
+#, fuzzy
+msgid "[yellow]No notifications enabled.[/yellow]"
+msgstr "[yellow]Hiçbir bildirim etkinleştirilmedi.[/yellow]"
+
+#: modules/daemon/daemon_installer.py:104
+#, fuzzy
+msgid "Enter your [cyan]target[/cyan] (Leave empty for auto detection): "
+msgstr "[cyan]Hedefinizi[/cyan] girin (otomatik algılama için boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:105
+#, fuzzy
+msgid ""
+"Enter [cyan]host file[/cyan] (Leave empty for none - will override target): "
+msgstr ""
+"[cyan]Host dosyasını[/cyan] girin (yoksa boş bırakın - hedefi geçersiz "
+"kılar): "
+
+#: modules/daemon/daemon_installer.py:110
+#, fuzzy
+msgid "Would you like to [cyan]skip discovery[/cyan]? (y/n) "
+msgstr "[cyan]Keşfi atlamak[/cyan] ister misiniz? (y/n) "
+
+#: modules/daemon/daemon_installer.py:113
+#, fuzzy
+msgid "Enter [cyan]API key[/cyan] (Leave empty for none): "
+msgstr "[cyan]API anahtarını[/cyan] girin (yoksa boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:114
+#, fuzzy
+msgid "Enter [cyan]nmap flags[/cyan] (Leave empty for none): "
+msgstr "[cyan]nmap bayraklarını[/cyan] girin (yoksa boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:115
+#, fuzzy
+msgid "Enter [cyan]speed[/cyan] (0-5, Leave empty for default): "
+msgstr "[cyan]Hızı[/cyan] girin (0-5, varsayılan için boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:120
+#, fuzzy
+msgid "Pick [cyan]scan type[/cyan] for host discovery (Leave empty for ARP): "
+msgstr "Host keşfi için [cyan]tarama türünü[/cyan] seçin (ARP için boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:121
+#, fuzzy
+msgid "ARP"
+msgstr "ARP"
+
+#: modules/daemon/daemon_installer.py:121
+#, fuzzy
+msgid "Ping"
+msgstr "Ping"
+
+#: modules/daemon/daemon_installer.py:126
+#, fuzzy
+msgid "Enter [cyan]host timeout[/cyan] (Leave empty for default): "
+msgstr "[cyan]Host zaman aşımını[/cyan] girin (varsayılan için boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:130
+#, fuzzy
+msgid "Enter [cyan]Scan Method[/cyan] (Leave empty for Normal): "
+msgstr "[cyan]Tarama Yöntemini[/cyan] girin (Normal için boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:131
+#, fuzzy
+msgid "Normal"
+msgstr "Normal"
+
+#: modules/daemon/daemon_installer.py:131
+#, fuzzy
+msgid "Evade"
+msgstr "Kaçınma"
+
+#: modules/daemon/daemon_installer.py:136
+#, fuzzy
+msgid "Enter [cyan]output folder[/cyan] (Leave empty for default): "
+msgstr "[cyan]Çıktı klasörünü[/cyan] girin (varsayılan için boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:139
+#, fuzzy
+msgid "Enter [cyan]output type[/cyan] (Leave empty for html): "
+msgstr "[cyan]Çıktı türünü[/cyan] girin (html için boş bırakın): "
+
+#: modules/daemon/daemon_installer.py:143
+#, fuzzy
+msgid "Creating config file..."
+msgstr "Yapılandırma dosyası oluşturuluyor..."
+
+#: modules/daemon/daemon_installer.py:179
+#, fuzzy
+msgid "Enter [cyan]config file name[/cyan] (Leave empty for autopwn.conf): "
+msgstr ""
+"[cyan]Yapılandırma dosyası adını[/cyan] girin (autopwn.conf için boş "
+"bırakın): "
+
+#: modules/daemon/daemon_installer.py:188
+#, fuzzy, python-brace-format
+msgid ""
+"[yellow]Config file '{config_file}' already exists. Would you like to "
+"overwrite it?[/yellow] (y/n): "
+msgstr ""
+"[yellow]'{config_file}' yapılandırma dosyası zaten mevcut. Üzerine yazmak "
+"ister misiniz?[/yellow] (y/n): "
+
+#: modules/daemon/daemon_installer.py:193
+#, fuzzy, python-brace-format
+msgid "[red]Config file '{config_file}' not overwritten.[/red]"
+msgstr "[red]'{config_file}' yapılandırma dosyasının üzerine yazılmadı.[/red]"
+
+#: modules/daemon/daemon_installer.py:205
+#, fuzzy, python-brace-format
+msgid "[green]Config file '{config_file}' created successfully![/green]"
+msgstr "[green]'{config_file}' yapılandırma dosyası başarıyla oluşturuldu![/green]"
+
+#: modules/daemon/daemon_installer.py:216
+#, fuzzy, python-brace-format
+msgid "Creating install directory: {path}"
+msgstr "Kurulum dizini oluşturuluyor: {path}"
+
+#: modules/daemon/daemon_installer.py:219
+#, fuzzy, python-brace-format
+msgid "[red]Failed to create install directory {path}: {error}[/red]"
+msgstr "[red]{path} kurulum dizini oluşturulamadı: {error}[/red]"
+
+#: modules/daemon/daemon_installer.py:223
+#, fuzzy
+msgid "Copying files..."
+msgstr "Dosyalar kopyalanıyor..."
+
+#: modules/daemon/daemon_installer.py:230
+#, fuzzy, python-brace-format
+msgid "[yellow]Warning: {src} does not exist — skipping[/yellow]"
+msgstr "[yellow]Uyarı: {src} mevcut değil — atlanıyor[/yellow]"
+
+#: modules/daemon/daemon_installer.py:239
+#, fuzzy, python-brace-format
+msgid "[green]Copied {src} -> {dst}[/green]"
+msgstr "[green]{src} -> {dst} kopyalandı[/green]"
+
+#: modules/daemon/daemon_installer.py:241
+#, fuzzy, python-brace-format
+msgid "[red]Error copying {src} -> {dst}: {error}[/red]"
+msgstr "[red]{src} -> {dst} kopyalanırken hata: {error}[/red]"
+
+#: modules/daemon/daemon_installer.py:251
+#, fuzzy, python-brace-format
+msgid "[green]Copied and marked executable: {path}[/green]"
+msgstr "[green]Kopyalandı ve çalıştırılabilir olarak işaretlendi: {path}[/green]"
+
+#: modules/daemon/daemon_installer.py:253
+#, fuzzy, python-brace-format
+msgid "[yellow]Warning copying optional daemon script: {error}[/yellow]"
+msgstr "[yellow]İsteğe bağlı daemon betiği kopyalanırken uyarı: {error}[/yellow]"
+
+#: modules/daemon/daemon_installer.py:259
+#, fuzzy, python-brace-format
+msgid "Creating virtualenv at {path} ..."
+msgstr "{path} konumunda sanal ortam (virtualenv) oluşturuluyor ..."
+
+#: modules/daemon/daemon_installer.py:262
+#, fuzzy, python-brace-format
+msgid "[green]Virtualenv created at {path}[/green]"
+msgstr "[green]{path} konumunda sanal ortam oluşturuldu[/green]"
+
+#: modules/daemon/daemon_installer.py:264
+#, fuzzy, python-brace-format
+msgid ""
+"[yellow]Virtualenv already exists at {path}, skipping creation.[/yellow]"
+msgstr ""
+"[yellow]{path} konumunda sanal ortam zaten mevcut, oluşturma atlanıyor.[/"
+"yellow]"
+
+#: modules/daemon/daemon_installer.py:266
+#, fuzzy, python-brace-format
+msgid "[red]Failed to create virtualenv: {error}[/red]"
+msgstr "[red]Sanal ortam oluşturulamadı: {error}[/red]"
+
+#: modules/daemon/daemon_installer.py:272
+#, fuzzy, python-brace-format
+msgid "Installing requirements from {path} ..."
+msgstr "{path} konumundan bağımlılıklar kuruluyor ..."
+
+#: modules/daemon/daemon_installer.py:277
+#, fuzzy
+msgid "[green]Dependencies installed.[/green]"
+msgstr "[green]Bağımlılıklar kuruldu.[/green]"
+
+#: modules/daemon/daemon_installer.py:279
+#, fuzzy, python-brace-format
+msgid "[red]pip install failed: {error}[/red]"
+msgstr "[red]pip install başarısız oldu: {error}[/red]"
+
+#: modules/daemon/daemon_installer.py:282
+#, fuzzy
+msgid ""
+"[yellow]No requirements.txt found; skipping dependency install.[/yellow]"
+msgstr ""
+"[yellow]requirements.txt bulunamadı; bağımlılık kurulumu atlanıyor.[/yellow]"
+
+#: modules/daemon/daemon_installer.py:288
+#, fuzzy, python-brace-format
+msgid "[green]Marked entrypoint executable: {path}[/green]"
+msgstr "[green]Giriş noktası çalıştırılabilir olarak işaretlendi: {path}[/green]"
+
+#: modules/daemon/daemon_installer.py:296
+#, fuzzy, python-brace-format
+msgid "[green]Created log file: {path}[/green]"
+msgstr "[green]Günlük dosyası oluşturuldu: {path}[/green]"
+
+#: modules/daemon/daemon_installer.py:298
+#, fuzzy, python-brace-format
+msgid "[yellow]Warning: could not create log file {path}: {error}[/yellow]"
+msgstr "[yellow]Uyarı: {path} günlük dosyası oluşturulamadı: {error}[/yellow]"
+
+#: modules/daemon/daemon_installer.py:326
+#, fuzzy, python-brace-format
+msgid "Writing systemd service file to {path} ..."
+msgstr "systemd servis dosyası {path} konumuna yazılıyor ..."
+
+#: modules/daemon/daemon_installer.py:329
+#, fuzzy, python-brace-format
+msgid "[green]Service file written to {path}[/green]"
+msgstr "[green]Servis dosyası {path} konumuna yazıldı[/green]"
+
+#: modules/daemon/daemon_installer.py:331
+#, fuzzy, python-brace-format
+msgid ""
+"[red]Permission denied writing {path}. Run this script as root or use sudo.[/"
+"red]"
+msgstr ""
+"[red]{path} konumuna yazma izni reddedildi. Bu betiği root olarak çalıştırın "
+"veya sudo kullanın.[/red]"
+
+#: modules/daemon/daemon_installer.py:332
+#, fuzzy
+msgid "[yellow]Here’s the unit content to save manually:[/yellow]"
+msgstr "[yellow]Manuel olarak kaydedilecek birim (unit) içeriği:[/yellow]"
+
+#: modules/daemon/daemon_installer.py:338
+#, fuzzy
+msgid "Reloading systemd daemon ..."
+msgstr "systemd daemon yeniden yükleniyor ..."
+
+#: modules/daemon/daemon_installer.py:340
+#, fuzzy
+msgid "Enabling and starting service ..."
+msgstr "Servis etkinleştiriliyor ve başlatılıyor ..."
+
+#: modules/daemon/daemon_installer.py:342
+#, fuzzy
+msgid "[green]Service enabled and started successfully.[/green]"
+msgstr "[green]Servis başarıyla etkinleştirildi ve başlatıldı.[/green]"
+
+#: modules/daemon/daemon_installer.py:343
+#, fuzzy
+msgid ""
+"[blue]Check status with: sudo systemctl status autopwn-daemon.service[/blue]"
+msgstr ""
+"[blue]Durumu kontrol etmek için: sudo systemctl status autopwn-daemon."
+"service[/blue]"
+
+#: modules/daemon/daemon_installer.py:345
+#, fuzzy, python-brace-format
+msgid "[red]Systemctl command failed: {error}[/red]"
+msgstr "[red]Systemctl komutu başarısız oldu: {error}[/red]"
+
+#: modules/daemon/daemon_installer.py:346
+#, fuzzy
+msgid ""
+"[yellow]You may need to run manually: sudo systemctl daemon-reload && sudo "
+"systemctl enable --now autopwn-daemon.service[/yellow]"
+msgstr ""
+"[yellow]Şunu manuel olarak çalıştırmanız gerekebilir: sudo systemctl daemon-"
+"reload && sudo systemctl enable --now autopwn-daemon.service[/yellow]"
+
+#: modules/daemon/daemon_installer.py:349
+#, fuzzy
+msgid "[green]AutoPWN daemon installation complete.[/green]"
+msgstr "[green]AutoPWN daemon kurulumu tamamlandı.[/green]"
+
+#: modules/daemon/daemon_installer.py:356
+#, fuzzy
+msgid ""
+"Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"
+msgstr ""
+"Daemon yalnızca [cyan]Linux[/cyan] üzerinde ve [cyan]root[/cyan] olarak "
+"kurulabilir!"
+
+#: modules/getexploits.py:48
+#, fuzzy, python-brace-format
+msgid ""
+"Connection error raised while trying to fetch information about: {cve_id}"
+msgstr "{cve_id} hakkında bilgi alınmaya çalışılırken bağlantı hatası oluştu"
+
+#: modules/getexploits.py:54
+#, fuzzy
+msgid "An error occurred while parsing API response."
+msgstr "API yanıtı ayrıştırılırken bir hata oluştu."
+
+#: modules/getexploits.py:74
+#, fuzzy
+msgid "Skipping a malformed exploit record."
+msgstr "Hatalı biçimlendirilmiş bir exploit kaydı atlanıyor."
+
+#: modules/getexploits.py:105
+#, fuzzy, python-brace-format
+msgid "Connection error raised while trying to fetch: {link}"
+msgstr "{link} alınmaya çalışılırken bağlantı hatası oluştu"
+
+#: modules/getexploits.py:109
+#, fuzzy, python-brace-format
+msgid "Unable to download {link}: {error}"
+msgstr "{link} indirilemedi: {error}"
+
+#: modules/getexploits.py:114
+#, fuzzy, python-brace-format
+msgid "Unable to retrieve contents of {link} {user_agent}"
+msgstr "{link} {user_agent} içeriği alınamadı"
+
+#: modules/getexploits.py:148
+#, fuzzy, python-brace-format
+msgid ""
+"┌─[yellow][ {name} ][/yellow]\n"
+"│"
+msgstr ""
+"┌─[yellow][ {name} ][/yellow]\n"
+"│"
+
+#: modules/getexploits.py:151
+#, fuzzy, python-brace-format
+msgid ""
+"│\n"
+"├─────┤ [red]{cve}[/red]\n"
+"│"
+msgstr ""
+"│\n"
+"├─────┤ [red]{cve}[/red]\n"
+"│"
+
+#: modules/getexploits.py:169
+#, fuzzy, python-brace-format
+msgid ""
+"├──────────# [white]exploits/{path}[/white]\n"
+"│\t\t [cyan]Platform: [/cyan] {platform}\n"
+"│\t\t [cyan]Type: [/cyan] {type}\n"
+"│\t\t [cyan]Author: [/cyan] {author}\n"
+"│\t\t [cyan]Date: [/cyan] [bright_cyan]{date}[/bright_cyan]\n"
+"│\t\t [cyan]Metasploit: [/cyan] {metasploit}\n"
+"│\t\t [cyan]Verified: [/cyan]{verified}\n"
+"│\t\t [cyan]Link: [/cyan] {link}\n"
+"│"
+msgstr ""
+"├──────────# [white]exploits/{path}[/white]\n"
+"│\t\t [cyan]Platform: [/cyan] {platform}\n"
+"│\t\t [cyan]Tür: [/cyan] {type}\n"
+"│\t\t [cyan]Yazar: [/cyan] {author}\n"
+"│\t\t [cyan]Tarih: [/cyan] [bright_cyan]{date}[/bright_cyan]\n"
+"│\t\t [cyan]Metasploit: [/cyan] {metasploit}\n"
+"│\t\t [cyan]Doğrulandı: [/cyan]{verified}\n"
+"│\t\t [cyan]Bağlantı: [/cyan] {link}\n"
+"│"
+
+#: modules/getexploits.py:196
+#, fuzzy, python-brace-format
+msgid "Downloading exploits for {target}..."
+msgstr "{target} için exploitler indiriliyor..."
+
+#: modules/getexploits.py:198
+#, fuzzy
+msgid "Downloading exploits..."
+msgstr "Exploitler indiriliyor..."
+
+#: modules/getexploits.py:201
+#, fuzzy
+msgid "[red]Downloading exploits ...[/red]"
+msgstr "[red]Exploitler indiriliyor ...[/red]"
+
+#: modules/getexploits.py:206
+#, fuzzy, python-brace-format
+msgid ""
+"[white]Downloading exploits for[/white] [red]{title}[/red] [white]...[/white]"
+msgstr ""
+"[white]Şunun için exploitler indiriliyor:[/white] [red]{title}[/red] "
+"[white]...[/white]"
+
+#: modules/getexploits.py:213
+#, fuzzy, python-brace-format
+msgid "Skipping exploits for {title}"
+msgstr "{title} için exploitler atlanıyor"
+
+#: modules/nist_search.py:86
+#, fuzzy
+msgid "Vulnerability source must be auto, online, or offline"
+msgstr "Güvenlik açığı kaynağı auto, online veya offline olmalıdır"
+
+#: modules/nist_search.py:105
+#, fuzzy, python-brace-format
+msgid "Using local NVD database: {count} CVEs; updated {updated_at}."
+msgstr "Yerel NVD veritabanı kullanılıyor: {count} CVE; güncellendi: {updated_at}."
+
+#: modules/nist_search.py:119
+#, fuzzy, python-brace-format
+msgid ""
+"NVD unavailable; using the local vulnerability database updated {updated_at} "
+"for this scan."
+msgstr ""
+"NVD kullanılamıyor; bu tarama için {updated_at} tarihinde güncellenen yerel "
+"güvenlik açığı veritabanı kullanılıyor."
+
+#: modules/nist_search.py:176
+#, fuzzy
+msgid ""
+"Requests are being rate limited by NIST API, please get a NIST API key to "
+"prevent this."
+msgstr ""
+"İstekler NIST API tarafından hız sınırlamasına tabi tutuluyor, bunu önlemek "
+"için bir NIST API anahtarı edinin."
+
+#: modules/nist_search.py:184
+#, fuzzy, python-brace-format
+msgid "NVD lookup failed for {keyword}"
+msgstr "{keyword} için NVD sorgusu başarısız oldu"
+
+#: modules/nist_search.py:187
+#, fuzzy, python-brace-format
+msgid "NVD lookup failed for {keyword}; vulnerability coverage is incomplete."
+msgstr "{keyword} için NVD sorgusu başarısız oldu; güvenlik açığı kapsamı eksik."
+
+#: modules/report.py:53
+#, fuzzy
+msgid "Sending email report..."
+msgstr "E-posta raporu gönderiliyor..."
+
+#: modules/report.py:68 modules/report.py:70
+#, fuzzy
+msgid "AutoPWN Report"
+msgstr "AutoPWN Raporu"
+
+#: modules/report.py:90
+#, fuzzy
+msgid "An error occurred while trying to send email report."
+msgstr "E-posta raporu gönderilmeye çalışılırken bir hata oluştu."
+
+#: modules/report.py:92
+#, fuzzy
+msgid "Email report sent successfully."
+msgstr "E-posta raporu başarıyla gönderildi."
+
+#: modules/report.py:108
+#, fuzzy
+msgid "Sending webhook report..."
+msgstr "Webhook raporu gönderiliyor..."
+
+#: modules/report.py:125
+#, fuzzy
+msgid "Webhook report sent successfully."
+msgstr "Webhook raporu başarıyla gönderildi."
+
+#: modules/report.py:127 modules/report.py:131
+#, fuzzy
+msgid "Webhook report failed to send."
+msgstr "Webhook raporu gönderilemedi."
+
+#: modules/scanner.py:92
+#, fuzzy, python-brace-format
+msgid "Scanning {target} for open ports ..."
+msgstr "{target} açık portlar için taranıyor ..."
+
+#: modules/scanner.py:133
+#, fuzzy, python-brace-format
+msgid "Error: {error}"
+msgstr "Hata: {error}"
+
+#: modules/scanner.py:147
+#, fuzzy
+msgid "Ctr+C, aborting."
+msgstr "Ctrl+C, iptal ediliyor."
+
+#: modules/scanner.py:153
+#, fuzzy
+msgid "Creating noise..."
+msgstr "Gürültü oluşturuluyor..."
+
+#: modules/scanner.py:161
+#, fuzzy
+msgid "No hosts found for noise scan."
+msgstr "Gürültü taraması için host bulunamadı."
+
+#: modules/scanner.py:166
+#, fuzzy
+msgid "Creating noise ..."
+msgstr "Gürültü oluşturuluyor ..."
+
+#: modules/scanner.py:168
+#, fuzzy, python-brace-format
+msgid "Started creating noise on {host}..."
+msgstr "{host} üzerinde gürültü oluşturulmaya başlandı..."
+
+#: modules/scanner.py:179
+#, fuzzy
+msgid "Noise scan complete!"
+msgstr "Gürültü taraması tamamlandı!"
+
+#: modules/scanner.py:182
+#, fuzzy
+msgid "Noise scan interrupted!"
+msgstr "Gürültü taraması kesintiye uğradı!"
+
+#: modules/scanner.py:195
+#, fuzzy, python-brace-format
+msgid "Scanning {count} target(s) using {scantype} scan ..."
+msgstr "{scantype} taraması kullanılarak {count} hedef taranıyor ..."
+
+#: modules/scanner.py:203
+#, fuzzy, python-brace-format
+msgid "Scanning {target} using {scantype} scan ..."
+msgstr "{target}, {scantype} taraması kullanılarak taranıyor ..."
+
+#: modules/scanner.py:284
+#, fuzzy, python-brace-format
+msgid "Target {target} seems to be offline."
+msgstr "{target} hedefi çevrimdışı görünüyor."
+
+#: modules/scanner.py:299 modules/scanner.py:303
+#, fuzzy, python-brace-format
+msgid "Target {target} seems to be us."
+msgstr "{target} hedefi bizim gibi görünüyor."
+
+#: modules/scanner.py:317
+#, fuzzy, python-brace-format
+msgid "Target {target} seems to have no open ports."
+msgstr "{target} hedefinin açık portu yok gibi görünüyor."
+
+#: modules/scanner.py:320
+#, fuzzy, python-brace-format
+msgid "Portscan results for {target}"
+msgstr "{target} için port tarama sonuçları"
+
+#: modules/scanner.py:327
+#, fuzzy
+msgid "Port"
+msgstr "Port"
+
+#: modules/scanner.py:328
+#, fuzzy
+msgid "State"
+msgstr "Durum"
+
+#: modules/scanner.py:329
+#, fuzzy
+msgid "Service"
+msgstr "Servis"
+
+#: modules/scanner.py:330
+#, fuzzy
+msgid "Product"
+msgstr "Ürün"
+
+#: modules/scanner.py:331
+#, fuzzy
+msgid "Version"
+msgstr "Sürüm"
+
+#: modules/searchvuln.py:65
+#, fuzzy, python-brace-format
+msgid "Skipped vulnerability detection for {keyword}"
+msgstr "{keyword} için güvenlik açığı tespiti atlandı"
+
+#: modules/searchvuln.py:89
+#, fuzzy, python-brace-format
+msgid "Insufficient information for {target}"
+msgstr "{target} için yetersiz bilgi"
+
+#: modules/searchvuln.py:94
+#, fuzzy, python-brace-format
+msgid "Searching vulnerability database for {count} keyword(s) ..."
+msgstr "{count} anahtar kelime için güvenlik açığı veritabanında arama yapılıyor ..."
+
+#: modules/searchvuln.py:99
+#, fuzzy
+msgid "[white]Searching vulnerabilities ...[/white]"
+msgstr "[white]Güvenlik açıkları aranıyor ...[/white]"
+
+#: modules/searchvuln.py:104
+#, fuzzy, python-brace-format
+msgid ""
+"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] "
+"[white]...[/white]"
+msgstr ""
+"[white]Güvenlik açığı veritabanında aranıyor:[/white] [red]{keyword}[/red] "
+"[white]...[/white]"
+
+#: modules/searchvuln.py:115
+#, fuzzy, python-brace-format
+msgid "Possible vulnerabilities for {target}"
+msgstr "{target} için olası güvenlik açıkları"
+
+#: modules/searchvuln.py:118
+#, fuzzy, python-brace-format
+msgid "┌─ [yellow][ {keyword} ][/yellow]"
+msgstr "┌─ [yellow][ {keyword} ][/yellow]"
+
+#: modules/searchvuln.py:126
+#, fuzzy
+msgid "│\t\t[cyan]Description: [/cyan]"
+msgstr "│\t\t[cyan]Açıklama: [/cyan]"
+
+#: modules/searchvuln.py:131
+#, fuzzy, python-brace-format
+msgid ""
+"│\t\t[cyan]Severity: [/cyan]{severity} - {severity_score}\n"
+"│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
+"│\t\t[cyan]Details: [/cyan] {details_url}"
+msgstr ""
+"│\t\t[cyan]Önem Derecesi: [/cyan]{severity} - {severity_score}\n"
+"│\t\t[cyan]İstismar Edilebilirlik: [/cyan] {exploitability}\n"
+"│\t\t[cyan]Detaylar: [/cyan] {details_url}"
+
+#: modules/update_checker.py:68
+#, fuzzy, python-brace-format
+msgid "Could not reach GitHub: {error}"
+msgstr "GitHub'a ulaşılamadı: {error}"
+
+#: modules/update_checker.py:70
+#, fuzzy, python-brace-format
+msgid "Nothing found at {url}."
+msgstr "{url} adresinde hiçbir şey bulunamadı."
+
+#: modules/update_checker.py:72
+#, fuzzy
+msgid "GitHub API rate limit exceeded; try again later."
+msgstr "GitHub API hız sınırı aşıldı; lütfen daha sonra tekrar deneyin."
+
+#: modules/update_checker.py:74
+#, fuzzy, python-brace-format
+msgid "GitHub API returned HTTP {status}."
+msgstr "GitHub API HTTP {status} döndürdü."
+
+#: modules/update_checker.py:78
+#, fuzzy
+msgid "GitHub API returned an unexpected response."
+msgstr "GitHub API beklenmeyen bir yanıt döndürdü."
+
+#: modules/update_checker.py:124
+#, fuzzy
+msgid ""
+"Commit-based update checks require a git checkout of AutoPWN Suite; use --"
+"update-channel release instead."
+msgstr ""
+"Commit tabanlı güncelleme kontrolleri, AutoPWN Suite'in bir git checkout'unu "
+"gerektirir; bunun yerine --update-channel release kullanın."
+
+#: modules/update_checker.py:150
+#, fuzzy, python-brace-format
+msgid ""
+"Update available ({mode}): {current} -> {latest}\n"
+"{url}"
+msgstr ""
+"Güncelleme mevcut ({mode}): {current} -> {latest}\n"
+"{url}"
+
+#: modules/update_checker.py:153
+#, fuzzy, python-brace-format
+msgid "Up to date ({mode}): {current} (latest: {latest})."
+msgstr "Güncel ({mode}): {current} (en son: {latest})."
+
+#: modules/update_checker.py:178
+#, fuzzy, python-brace-format
+msgid "git {args} failed: {error}"
+msgstr "git {args} başarısız oldu: {error}"
+
+#: modules/update_checker.py:186
+#, fuzzy
+msgid ""
+"Working tree has uncommitted changes; commit or stash them before applying "
+"an update."
+msgstr ""
+"Çalışma ağacında commit edilmemiş değişiklikler var; bir güncelleme "
+"uygulamadan önce bunları commit edin veya stash'leyin."
+
+#: modules/update_checker.py:203
+#, fuzzy, python-brace-format
+msgid "git fetch {repo} {refspec} failed: {error}"
+msgstr "git fetch {repo} {refspec} başarısız oldu: {error}"
+
+#: modules/update_checker.py:214
+#, fuzzy, python-brace-format
+msgid ""
+"Cannot fast-forward to {onto}: the local branch has diverged. Resolve "
+"manually (e.g. git rebase, or git reset --hard after backing up changes)."
+msgstr ""
+"{onto} üzerine fast-forward yapılamıyor: yerel dal (branch) farklılaştı. "
+"Elle çözün (örn. git rebase veya değişiklikleri yedekledikten sonra git "
+"reset --hard)."
+
+#: modules/update_checker.py:224 modules/update_checker.py:239
+#, fuzzy
+msgid "Applying an update requires a git checkout of AutoPWN Suite."
+msgstr "Bir güncelleme uygulamak, AutoPWN Suite'in bir git checkout'unu gerektirir."
+
+#: modules/update_checker.py:226
+#, fuzzy
+msgid ""
+"HEAD is detached; checkout a branch before applying a commit-based update."
+msgstr ""
+"HEAD ayrık (detached) durumda; commit tabanlı bir güncelleme uygulamadan "
+"önce bir dala (branch) geçiş yapın."
+
+#: modules/update_checker.py:244
+#, fuzzy
+msgid "Latest release has no tag name."
+msgstr "En son sürümün (release) bir etiket (tag) adı yok."
+
+#: modules/update_checker.py:251
+#, fuzzy, python-brace-format
+msgid "git checkout {tag} failed: {error}"
+msgstr "git checkout {tag} başarısız oldu: {error}"
+
+#: modules/update_checker.py:268
+#, fuzzy, python-brace-format
+msgid ""
+"Updated ({mode}) {previous} -> {new} ({ref}). Restart AutoPWN Suite to use "
+"the updated code."
+msgstr ""
+"Güncellendi ({mode}) {previous} -> {new} ({ref}). Güncellenen kodu kullanmak "
+"için AutoPWN Suite'i yeniden başlatın."
+
+#: modules/utils.py:52
+#, fuzzy
+msgid ""
+"AutoPWN Suite | A project for scanning vulnerabilities and exploiting "
+"systems automatically."
+msgstr ""
+"AutoPWN Suite | Güvenlik açıklarını tarayan ve sistemleri otomatik olarak "
+"istismar eden bir proje."
+
+#: modules/utils.py:57
+#, fuzzy
+msgid "Print version and exit."
+msgstr "Sürümü yazdır ve çık."
+
+#: modules/utils.py:62
+#, fuzzy
+msgid "Don't ask for anything. (Full automatic mode)"
+msgstr "Hiçbir şey sorma. (Tam otomatik mod)"
+
+#: modules/utils.py:70
+#, fuzzy
+msgid "Specify a config file to use. (Default : None)"
+msgstr "Kullanılacak yapılandırma dosyasını belirtin. (Varsayılan: Yok)"
+
+#: modules/utils.py:79
+#, fuzzy
+msgid "Disable colors."
+msgstr "Renkleri devre dışı bırak."
+
+#: modules/utils.py:91
+#, fuzzy
+msgid ""
+"Interface language. Setting this explicitly remembers it as the default for "
+"future runs. (Default: your last explicit choice, or the system locale, or "
+"English.)"
+msgstr ""
+"Arayüz dili. Bunu açıkça ayarlamak, gelecekteki çalıştırmalar için "
+"varsayılan olarak hatırlanmasını sağlar. (Varsayılan: son açık seçiminiz, "
+"sistem yereli veya İngilizce.)"
+
+#: modules/utils.py:98
+#, fuzzy
+msgid "Install the AutoPWN Suite daemon."
+msgstr "AutoPWN Suite daemon'unu kur."
+
+#: modules/utils.py:105
+#, fuzzy
+msgid "Uninstall the AutoPWN Suite daemon."
+msgstr "AutoPWN Suite daemon'unu kaldır."
+
+#: modules/utils.py:112
+#, fuzzy
+msgid "Create a config file."
+msgstr "Bir yapılandırma dosyası oluştur."
+
+#: modules/utils.py:117
+#, fuzzy
+msgid "Scanning"
+msgstr "Tarama"
+
+#: modules/utils.py:117
+#, fuzzy
+msgid "Options for scanning"
+msgstr "Tarama seçenekleri"
+
+#: modules/utils.py:119
+#, fuzzy
+msgid ""
+"Use only the local vulnerability database; disable internet integrations."
+msgstr ""
+"Yalnızca yerel güvenlik açığı veritabanını kullan; internet "
+"entegrasyonlarını devre dışı bırak."
+
+#: modules/utils.py:122
+#, fuzzy
+msgid "CVE lookup source (auto falls back to the local database on failure)."
+msgstr "CVE sorgu kaynağı (auto, hata durumunda yerel veritabanına geri döner)."
+
+#: modules/utils.py:124
+#, fuzzy
+msgid "Path to a portable vulnerabilities.sqlite3 database."
+msgstr "Taşınabilir bir vulnerabilities.sqlite3 veritabanının yolu."
+
+#: modules/utils.py:125
+#, fuzzy
+msgid "Vulnerability database"
+msgstr "Güvenlik açığı veritabanı"
+
+#: modules/utils.py:127
+#, fuzzy
+msgid ""
+"Download/update the complete NVD database, then exit. Requires internet."
+msgstr "Tam NVD veritabanını indir/güncelle, ardından çık. İnternet gerektirir."
+
+#: modules/utils.py:129
+#, fuzzy
+msgid "Show local vulnerability database status, then exit."
+msgstr "Yerel güvenlik açığı veritabanı durumunu göster, ardından çık."
+
+#: modules/utils.py:130
+#, fuzzy
+msgid "Self-update"
+msgstr "Kendini güncelleme"
+
+#: modules/utils.py:130
+#, fuzzy
+msgid "Check for or apply a newer AutoPWN Suite"
+msgstr "Daha yeni bir AutoPWN Suite'i kontrol et veya uygula"
+
+#: modules/utils.py:132
+#, fuzzy
+msgid "Check GitHub for a newer AutoPWN Suite, then exit. Requires internet."
+msgstr ""
+"GitHub'da daha yeni bir AutoPWN Suite olup olmadığını kontrol et, ardından "
+"çık. İnternet gerektirir."
+
+#: modules/utils.py:135
+#, fuzzy
+msgid ""
+"Fast-forward this git checkout to the latest release/commit (see --update-"
+"channel), then exit. Requires internet, a git checkout and a clean working "
+"tree."
+msgstr ""
+"Bu git checkout'unu en son sürüme/commit'e fast-forward yap (bkz. --update-"
+"channel), ardından çık. İnternet, bir git checkout ve temiz bir çalışma "
+"ağacı gerektirir."
+
+#: modules/utils.py:142
+#, fuzzy
+msgid ""
+"Compare/update against the latest GitHub release tag or the latest commit on "
+"--update-branch. Setting this explicitly remembers it as the default for "
+"future runs. (Default: release, or your last explicit choice.)"
+msgstr ""
+"En son GitHub sürüm etiketine (release tag) veya --update-branch üzerindeki "
+"en son commit'e göre karşılaştır/güncelle. Bunu açıkça ayarlamak, "
+"gelecekteki çalıştırmalar için varsayılan olarak hatırlanmasını sağlar. "
+"(Varsayılan: release veya son açık seçiminiz.)"
+
+#: modules/utils.py:148
+#, fuzzy
+msgid "Branch to compare against in commit mode. (Default: main)"
+msgstr "Commit modunda karşılaştırılacak dal (branch). (Varsayılan: main)"
+
+#: modules/utils.py:150
+#, fuzzy, python-brace-format
+msgid "GitHub repo to check for updates. (Default: {repo})"
+msgstr "Güncellemelerin kontrol edileceği GitHub deposu (repo). (Varsayılan: {repo})"
+
+#: modules/utils.py:157
+#, fuzzy
+msgid ""
+"Target range to scan. This argument overwrites the hostfile argument. "
+"(192.168.0.1 or 192.168.0.0/24)"
+msgstr ""
+"Taranacak hedef aralığı. Bu argüman, hostfile argümanının üzerine yazar. "
+"(192.168.0.1 veya 192.168.0.0/24)"
+
+#: modules/utils.py:167
+#, fuzzy
+msgid "File containing a list of hosts to scan."
+msgstr "Taranacak host listesini içeren dosya."
+
+#: modules/utils.py:175
+#, fuzzy
+msgid "Skips the host discovery phase."
+msgstr "Host keşif aşamasını atlar."
+
+#: modules/utils.py:183
+#, fuzzy
+msgid "Scan type."
+msgstr "Tarama türü."
+
+#: modules/utils.py:193
+#, fuzzy
+msgid ""
+"Custom nmap flags to use for portscan. (Has to be specified like : -nf=\"-"
+"O\")"
+msgstr ""
+"Port taraması için kullanılacak özel nmap bayrakları. (Şu şekilde "
+"belirtilmelidir: -nf=\"-O\")"
+
+#: modules/utils.py:203
+#, fuzzy
+msgid "Scan speed. (Default : 3)"
+msgstr "Tarama hızı. (Varsayılan: 3)"
+
+#: modules/utils.py:212
+#, fuzzy
+msgid "Timeout for every host. (Default :240)"
+msgstr "Her host için zaman aşımı. (Varsayılan: 240)"
+
+#: modules/utils.py:221
+#, fuzzy
+msgid ""
+"Specify API key for vulnerability detection for faster scanning. (Default : "
+"None)"
+msgstr ""
+"Daha hızlı tarama için güvenlik açığı tespitinde kullanılacak API anahtarını "
+"belirtin. (Varsayılan: Yok)"
+
+#: modules/utils.py:231
+#, fuzzy
+msgid "Scan mode."
+msgstr "Tarama modu."
+
+#: modules/utils.py:240
+#, fuzzy
+msgid "Noise mode timeout."
+msgstr "Gürültü modu zaman aşımı."
+
+#: modules/utils.py:249
+#, fuzzy
+msgid "Skip downloading exploits."
+msgstr "Exploit indirmeyi atla."
+
+#: modules/utils.py:255
+#, fuzzy
+msgid "Reporting"
+msgstr "Raporlama"
+
+#: modules/utils.py:255
+#, fuzzy
+msgid "Options for reporting"
+msgstr "Raporlama seçenekleri"
+
+#: modules/utils.py:259
+#, fuzzy
+msgid "Output file name. Overrides output-folder."
+msgstr "Çıktı dosyası adı. output-folder'ın üzerine yazar."
+
+#: modules/utils.py:267
+#, fuzzy
+msgid "Output file type. (Default : html)"
+msgstr "Çıktı dosyası türü. (Varsayılan: html)"
+
+#: modules/utils.py:276
+#, fuzzy
+msgid "Output file folder. (Default : outputs/)"
+msgstr "Çıktı dosyası klasörü. (Varsayılan: outputs/)"
+
+#: modules/utils.py:284
+#, fuzzy
+msgid "Report sending method."
+msgstr "Rapor gönderme yöntemi."
+
+#: modules/utils.py:293
+#, fuzzy
+msgid "Email address to use for sending report."
+msgstr "Rapor göndermek için kullanılacak e-posta adresi."
+
+#: modules/utils.py:302
+#, fuzzy
+msgid "Password of the email report is going to be sent from."
+msgstr "Raporun gönderileceği e-postanın şifresi."
+
+#: modules/utils.py:311
+#, fuzzy
+msgid "Email address to send report to."
+msgstr "Raporun gönderileceği e-posta adresi."
+
+#: modules/utils.py:320
+#, fuzzy
+msgid "Email to send from."
+msgstr "Gönderen e-posta."
+
+#: modules/utils.py:329
+#, fuzzy
+msgid "Email server to use for sending report."
+msgstr "Rapor göndermek için kullanılacak e-posta sunucusu."
+
+#: modules/utils.py:338
+#, fuzzy
+msgid "Port of the email server."
+msgstr "E-posta sunucusunun portu."
+
+#: modules/utils.py:347
+#, fuzzy
+msgid "Webhook to use for sending report."
+msgstr "Rapor göndermek için kullanılacak webhook."
+
+#: modules/utils.py:357
+#, fuzzy
+msgid ""
+"Do not verify TLS certificates of scanned websites. Use only for targets you "
+"trust, such as lab systems with self-signed certificates. (Default: verify "
+"certificates)"
+msgstr ""
+"Taranan web sitelerinin TLS sertifikalarını doğrulama. Yalnızca kendinden "
+"imzalı sertifikalara sahip laboratuvar sistemleri gibi güvendiğiniz hedefler "
+"için kullanın. (Varsayılan: sertifikaları doğrula)"
+
+#: modules/utils.py:365
+#, fuzzy
+msgid "Web UI"
+msgstr "Web Arayüzü"
+
+#: modules/utils.py:365
+#, fuzzy
+msgid "Browser-based dashboard for controlling scans"
+msgstr "Taramaları kontrol etmek için tarayıcı tabanlı kontrol paneli"
+
+#: modules/utils.py:367
+#, fuzzy
+msgid ""
+"Reset the dashboard account to admin with a new random password, print it, "
+"then exit."
+msgstr ""
+"Kontrol paneli hesabını yeni rastgele bir şifreyle admin olarak sıfırla, "
+"şifreyi yazdır, ardından çık."
+
+#: modules/utils.py:370
+#, fuzzy
+msgid "Start the web UI dashboard (scans are launched from the browser)."
+msgstr "Web arayüzü kontrol panelini başlat (taramalar tarayıcıdan başlatılır)."
+
+#: modules/utils.py:378
+#, fuzzy
+msgid ""
+"Web UI bind address. Use 0.0.0.0 to listen on all interfaces; remote clients "
+"then require HTTPS. (Default: 127.0.0.1, env: AUTOPWN_WEB_HOST)"
+msgstr ""
+"Web arayüzü bağlanma adresi. Tüm arayüzlerde dinlemek için 0.0.0.0 kullanın; "
+"bu durumda uzak istemciler HTTPS gerektirir. (Varsayılan: 127.0.0.1, ortam "
+"değişkeni: AUTOPWN_WEB_HOST)"
+
+#: modules/utils.py:388
+#, fuzzy
+msgid "Web UI port. (Default: 8080, env: AUTOPWN_WEB_PORT)"
+msgstr "Web arayüzü portu. (Varsayılan: 8080, ortam değişkeni: AUTOPWN_WEB_PORT)"
+
+#: modules/utils.py:514
+#, fuzzy
+msgid ""
+"No API key specified and no api.txt file found. Vulnerability detection is "
+"going to be slower! You can get your own NIST API key from https://"
+"nvd.nist.gov/developers/request-an-api-key"
+msgstr ""
+"API anahtarı belirtilmedi ve api.txt dosyası bulunamadı. Güvenlik açığı "
+"tespiti daha yavaş olacak! Kendi NIST API anahtarınızı https://nvd.nist.gov/"
+"developers/request-an-api-key adresinden edinebilirsiniz"
+
+#: modules/utils.py:521
+#, fuzzy
+msgid "Permission denied while trying to read api.txt!"
+msgstr "api.txt okunmaya çalışılırken izin reddedildi!"
+
+#: modules/utils.py:523
+#, fuzzy, python-brace-format
+msgid "Error reading api.txt: {error}"
+msgstr "api.txt okunurken hata: {error}"
+
+#: modules/utils.py:537
+#, fuzzy
+msgid ""
+"You need to be root in order to run arp scan.\n"
+"Changed scan mode to Ping Scan."
+msgstr ""
+"ARP taraması çalıştırmak için root olmanız gerekir.\n"
+"Tarama modu Ping Taramasına değiştirildi."
+
+#: modules/utils.py:559
+#, fuzzy
+msgid "Host file not found!"
+msgstr "Host dosyası bulunamadı!"
+
+#: modules/utils.py:561
+#, fuzzy
+msgid "Permission denied while trying to read host file!"
+msgstr "Host dosyası okunmaya çalışılırken izin reddedildi!"
+
+#: modules/utils.py:563
+#, fuzzy
+msgid "Unknown error while trying to read host file!"
+msgstr "Host dosyası okunmaya çalışılırken bilinmeyen hata!"
+
+#: modules/utils.py:566
+#, fuzzy
+msgid "Host file contains no targets!"
+msgstr "Host dosyası hiçbir hedef içermiyor!"
+
+#: modules/utils.py:579 modules/utils.py:582
+#, fuzzy
+msgid "Enter target range to scan : "
+msgstr "Taranacak hedef aralığını girin: "
+
+#: modules/utils.py:584
+#, fuzzy
+msgid "Ctrl+C pressed. Exiting."
+msgstr "Ctrl+C algılandı. Çıkılıyor."
+
+#: modules/utils.py:595
+#, fuzzy
+msgid "Evasion mode enabled!"
+msgstr "Kaçınma modu etkinleştirildi!"
+
+#: modules/utils.py:600
+#, fuzzy
+msgid "You must be root to use evasion mode! Switching back to normal mode ..."
+msgstr "Kaçınma modunu kullanmak için root olmanız gerekir! Normal moda geri dönülüyor ..."
+
+#: modules/utils.py:606
+#, fuzzy
+msgid "Noise mode enabled!"
+msgstr "Gürültü modu etkinleştirildi!"
+
+#: modules/utils.py:620
+#, fuzzy
+msgid "Enter your email address : "
+msgstr "E-posta adresinizi girin: "
+
+#: modules/utils.py:625
+#, fuzzy
+msgid "Enter your email password : "
+msgstr "E-posta şifrenizi girin: "
+
+#: modules/utils.py:630
+#, fuzzy
+msgid "Enter the email address to send the report to : "
+msgstr "Raporun gönderileceği e-posta adresini girin: "
+
+#: modules/utils.py:641
+#, fuzzy
+msgid "Enter the email server to send the report from : "
+msgstr "Raporun gönderileceği e-posta sunucusunu girin: "
+
+#: modules/utils.py:645
+#, fuzzy
+msgid "Google no longer supports sending mails via SMTP."
+msgstr "Google artık SMTP üzerinden e-posta göndermeyi desteklemiyor."
+
+#: modules/utils.py:654
+#, fuzzy
+msgid "Enter the email port to send the report from : "
+msgstr "Raporun gönderileceği e-posta portunu girin: "
+
+#: modules/utils.py:660
+#, fuzzy
+msgid "Invalid port number!"
+msgstr "Geçersiz port numarası!"
+
+#: modules/utils.py:678
+#, fuzzy
+msgid "Enter your webhook URL : "
+msgstr "Webhook URL'nizi girin: "
+
+#: modules/utils.py:692
+#, fuzzy
+msgid "Do you want to scan ports? [Y/n] : "
+msgstr "Portları taramak ister misiniz? [Y/n] : "
+
+#: modules/utils.py:696
+#, fuzzy
+msgid "Do you want to scan for vulnerabilities? [Y/n] : "
+msgstr "Güvenlik açıklarını taramak ister misiniz? [Y/n] : "
+
+#: modules/utils.py:703
+#, fuzzy
+msgid "Do you want to download exploits? [Y/n] : "
+msgstr "Exploitleri indirmek ister misiniz? [Y/n] : "
+
+#: modules/utils.py:709
+#, fuzzy
+msgid "Do you want to scan for web vulnerabilities? [Y/n] : "
+msgstr "Web güvenlik açıklarını taramak ister misiniz? [Y/n] : "
+
+#: modules/utils.py:715
+#, fuzzy, python-brace-format
+msgid "No hosts found! {time} - Scan completed."
+msgstr "Hiçbir host bulunamadı! {time} - Tarama tamamlandı."
+
+#: modules/utils.py:737
+#, fuzzy
+msgid ""
+"Enter the index number of the host you would like to enumurate further.\n"
+"Enter 'all' to enumurate all hosts.\n"
+"Enter 'exit' to exit "
+msgstr ""
+"Daha fazla numaralandırmak (enumerate) istediğiniz hostun indeks numarasını "
+"girin.\n"
+"Tüm hostları numaralandırmak için 'all' girin.\n"
+"Çıkmak için 'exit' girin "
+
+#: modules/utils.py:744
+#, fuzzy
+msgid "Please enter a valid host number or 'all' or 'exit'"
+msgstr "Lütfen geçerli bir host numarası veya 'all' ya da 'exit' girin"
+
+#: modules/utils.py:758
+#, fuzzy, python-brace-format
+msgid "{time} - Scan completed."
+msgstr "{time} - Tarama tamamlandı."
+
+#: modules/utils.py:843
+#, fuzzy
+msgid "speed must be between 0 and 5"
+msgstr "speed 0 ile 5 arasında olmalıdır"
+
+#: modules/utils.py:845
+#, fuzzy, python-brace-format
+msgid "{option} must not be negative"
+msgstr "{option} negatif olamaz"
+
+#: modules/utils.py:847
+#, fuzzy, python-brace-format
+msgid "{option} must be between 1 and 65535"
+msgstr "{option} 1 ile 65535 arasında olmalıdır"
+
+#: modules/utils.py:856
+#, fuzzy, python-brace-format
+msgid "Invalid value for {section}.{option}"
+msgstr "{section}.{option} için geçersiz değer"
+
+#: modules/utils.py:862
+#, fuzzy
+msgid "Config file not found!"
+msgstr "Yapılandırma dosyası bulunamadı!"
+
+#: modules/utils.py:865
+#, fuzzy
+msgid "Permission denied while trying to read config file!"
+msgstr "Yapılandırma dosyası okunmaya çalışılırken izin reddedildi!"
+
+#: modules/utils.py:868
+#, fuzzy, python-brace-format
+msgid "Invalid config file: {error}"
+msgstr "Geçersiz yapılandırma dosyası: {error}"
+
+#: modules/utils.py:911
+#, fuzzy, python-brace-format
+msgid ""
+"Cannot recognize the needed package manager for your system that seems to be "
+"running in: {distro} and {sys_platform}, {platform}, kindly select the "
+"correct package manager below to proceed to the installation, else, select, "
+"n.\n"
+"\t0 Abort installation\n"
+"\t1 apt-get\n"
+"\t2 dnf\n"
+"\t3 yum\n"
+"\t4 pacman\n"
+"\t5 zypper.\n"
+"Select option [0-5] >"
+msgstr ""
+"Sisteminiz için gerekli paket yöneticisi tanınamadı; şu şekilde çalışıyor "
+"gibi görünüyor: {distro} ve {sys_platform}, {platform}. Kuruluma devam "
+"etmek için aşağıdan doğru paket yöneticisini seçin, aksi takdirde n seçin.\n"
+"\t0 Kurulumu iptal et\n"
+"\t1 apt-get\n"
+"\t2 dnf\n"
+"\t3 yum\n"
+"\t4 pacman\n"
+"\t5 zypper.\n"
+"Seçenek seçin [0-5] >"
+
+#: modules/utils.py:931 modules/utils.py:933
+#, fuzzy
+msgid "Couldn't install nmap (Linux)"
+msgstr "nmap kurulamadı (Linux)"
+
+#: modules/utils.py:948
+#, fuzzy
+msgid "Nmap is installed but shell restart is required."
+msgstr "Nmap kuruldu ancak kabuğun (shell) yeniden başlatılması gerekiyor."
+
+#: modules/utils.py:951
+#, fuzzy
+msgid "Couldn't install nmap! (Windows)"
+msgstr "nmap kurulamadı! (Windows)"
+
+#: modules/utils.py:959
+#, fuzzy
+msgid "Couldn't install nmap! (Mac)"
+msgstr "nmap kurulamadı! (Mac)"
+
+#: modules/utils.py:966
+#, fuzzy
+msgid "Nmap is not installed."
+msgstr "Nmap kurulu değil."
+
+#: modules/utils.py:968
+#, fuzzy
+msgid "Nmap must be installed before using offline mode."
+msgstr "Çevrimdışı modu kullanmadan önce Nmap kurulmalıdır."
+
+#: modules/utils.py:973
+#, fuzzy, python-brace-format
+msgid "Install Nmap on your system ({system})? "
+msgstr "Nmap sisteminize kurulsun mu ({system})? "
+
+#: modules/utils.py:984
+#, fuzzy
+msgid "Unknown OS! Auto installation not supported!"
+msgstr "Bilinmeyen işletim sistemi! Otomatik kurulum desteklenmiyor!"
+
+#: modules/utils.py:986
+#, fuzzy
+msgid "Denied permission to install Nmap."
+msgstr "Nmap kurma izni reddedildi."
+
+#: modules/utils.py:1004
+#, fuzzy
+msgid ""
+"It is recommended to run this script as root since it is more silent and "
+"accurate."
+msgstr ""
+"Daha sessiz ve doğru sonuçlar için bu betiği root olarak çalıştırmanız "
+"önerilir."
+
+#: modules/utils.py:1011
+#, fuzzy
+msgid "Output file"
+msgstr "Çıktı dosyası"
+
+#: modules/utils.py:1011
+#, fuzzy
+msgid "Output folder"
+msgstr "Çıktı klasörü"
+
+#: modules/utils.py:1014
+#, fuzzy
+msgid "Scanning with the following parameters"
+msgstr "Aşağıdaki parametrelerle taranıyor"
+
+#: modules/utils.py:1018
+#, fuzzy, python-brace-format
+msgid "│\tTarget : {target}\n"
+msgstr "│\tHedef : {target}\n"
+
+#: modules/utils.py:1023
+#, fuzzy, python-brace-format
+msgid "│\tAPI Key : {has_key}\n"
+msgstr "│\tAPI Anahtarı : {has_key}\n"
+
+#: modules/utils.py:1024
+#, fuzzy, python-brace-format
+msgid "│\tAutomatic : {automatic}\n"
+msgstr "│\tOtomatik : {automatic}\n"
+
+#: modules/utils.py:1028
+#, fuzzy
+msgid "│\tSkip discovery: True\n"
+msgstr "│\tKeşfi atla: True\n"
+
+#: modules/utils.py:1031
+#, fuzzy, python-brace-format
+msgid "│\tHostfile: {host_file}\n"
+msgstr "│\tHost dosyası: {host_file}\n"
+
+#: modules/utils.py:1034
+#, fuzzy, python-brace-format
+msgid "│\tHost timeout: {host_timeout}\n"
+msgstr "│\tHost zaman aşımı: {host_timeout}\n"
+
+#: modules/utils.py:1038 modules/utils.py:1044
+#, fuzzy, python-brace-format
+msgid "│\tScan type : [red]{scan_type}[/red]\n"
+msgstr "│\tTarama türü : [red]{scan_type}[/red]\n"
+
+#: modules/utils.py:1039 modules/utils.py:1045
+#, fuzzy, python-brace-format
+msgid "│\tScan speed : {speed}\n"
+msgstr "│\tTarama hızı : {speed}\n"
+
+#: modules/utils.py:1043 modules/utils.py:1048
+#, fuzzy, python-brace-format
+msgid "│\tScan mode : {scan_mode}\n"
+msgstr "│\tTarama modu : {scan_mode}\n"
+
+#: modules/utils.py:1051
+#, fuzzy, python-brace-format
+msgid "│\tNmap flags : [blue]{nmap_flags}[/blue]\n"
+msgstr "│\tNmap bayrakları : [blue]{nmap_flags}[/blue]\n"
+
+#: modules/utils.py:1054
+#, fuzzy, python-brace-format
+msgid "│\tReporting method : {report}\n"
+msgstr "│\tRaporlama yöntemi : {report}\n"
+
+#: modules/utils.py:1065
+#, fuzzy
+msgid "Connection failed."
+msgstr "Bağlantı başarısız oldu."
+
+#: modules/utils.py:1104
+#, fuzzy, python-brace-format
+msgid "Report saved to [cyan]{path}[/cyan]"
+msgstr "Rapor şuraya kaydedildi: [cyan]{path}[/cyan]"
+
+#: modules/vulnerability_db.py:45
+#, fuzzy
+msgid "Unsupported vulnerability database; download it again."
+msgstr "Desteklenmeyen güvenlik açığı veritabanı; tekrar indirin."
+
+#: modules/vulnerability_db.py:48
+#, fuzzy
+msgid "Vulnerability database is incomplete; finish its download first."
+msgstr "Güvenlik açığı veritabanı eksik; önce indirmeyi tamamlayın."
+
+#: modules/vulnerability_db.py:51
+#, fuzzy
+msgid "Vulnerability database has no usable CVEs."
+msgstr "Güvenlik açığı veritabanında kullanılabilir CVE yok."
+
+#: modules/vulnerability_db.py:53
+#, fuzzy
+msgid "Vulnerability database has invalid metadata."
+msgstr "Güvenlik açığı veritabanı geçersiz meta veriye sahip."
+
+#: modules/vulnerability_db.py:69
+#, fuzzy
+msgid ""
+"Local vulnerability database is unreadable or incomplete. Download it again."
+msgstr "Yerel güvenlik açığı veritabanı okunamıyor veya eksik. Tekrar indirin."
+
+#: modules/vulnerability_db.py:88
+#, fuzzy
+msgid ""
+"Offline vulnerability database unavailable. Download it while connected, or "
+"copy vulnerabilities.sqlite3 from a connected system."
+msgstr ""
+"Çevrimdışı güvenlik açığı veritabanı kullanılamıyor. Bağlıyken indirin veya "
+"vulnerabilities.sqlite3 dosyasını bağlı bir sistemden kopyalayın."
+
+#: modules/vulnerability_db.py:116
+#, fuzzy
+msgid "Local vulnerability lookup failed; database coverage is incomplete."
+msgstr "Yerel güvenlik açığı sorgusu başarısız oldu; veritabanı kapsamı eksik."
+
+#: modules/vulnerability_db.py:148
+#, fuzzy
+msgid "Invalid NVD JSON feed"
+msgstr "Geçersiz NVD JSON beslemesi"
+
+#: modules/vulnerability_db.py:164
+#, fuzzy
+msgid "Truncated or invalid NVD JSON feed"
+msgstr "Kesilmiş veya geçersiz NVD JSON beslemesi"
+
+#: modules/vulnerability_db.py:177
+#, fuzzy
+msgid "Invalid NVD feed field"
+msgstr "Geçersiz NVD besleme alanı"
+
+#: modules/vulnerability_db.py:181
+#, fuzzy
+msgid "Duplicate NVD vulnerabilities array"
+msgstr "Tekrarlanan NVD güvenlik açıkları dizisi"
+
+#: modules/vulnerability_db.py:191 modules/vulnerability_db.py:201
+#, fuzzy
+msgid "Invalid trailing comma"
+msgstr "Geçersiz sondaki virgül"
+
+#: modules/vulnerability_db.py:204
+#, fuzzy
+msgid "Incomplete NVD feed"
+msgstr "Eksik NVD beslemesi"
+
+#: modules/vulnerability_db.py:210
+#, fuzzy
+msgid "NVD feed metadata has no valid checksum"
+msgstr "NVD besleme meta verisinde geçerli bir sağlama toplamı (checksum) yok"
+
+#: modules/vulnerability_db.py:213
+#, fuzzy
+msgid "NVD feed metadata has an invalid size"
+msgstr "NVD besleme meta verisi geçersiz bir boyuta sahip"
+
+#: modules/vulnerability_db.py:233
+#, fuzzy
+msgid "NVD feed exceeds its advertised size"
+msgstr "NVD beslemesi belirtilen boyutu aşıyor"
+
+#: modules/vulnerability_db.py:237
+#, fuzzy
+msgid "NVD feed checksum or size mismatch"
+msgstr "NVD besleme sağlama toplamı veya boyut uyuşmazlığı"
+
+#: modules/vulnerability_db.py:265
+#, fuzzy
+msgid "A vulnerability database update is already running."
+msgstr "Bir güvenlik açığı veritabanı güncellemesi zaten çalışıyor."
+
+#: modules/vulnerability_db.py:285
+#, fuzzy, python-brace-format
+msgid "Checking NVD {year}"
+msgstr "NVD {year} kontrol ediliyor"
+
+#: modules/vulnerability_db.py:292
+#, fuzzy, python-brace-format
+msgid "Downloading and indexing NVD {year}"
+msgstr "NVD {year} indiriliyor ve indeksleniyor"
+
+#: modules/vulnerability_db.py:300
+#, fuzzy
+msgid "NVD feed contains an invalid CVE ID"
+msgstr "NVD beslemesi geçersiz bir CVE ID içeriyor"
+
+#: modules/vulnerability_db.py:310
+#, fuzzy
+msgid "NVD mirror contains no CVEs"
+msgstr "NVD yansısı (mirror) hiçbir CVE içermiyor"
+
+#: modules/vulnerability_db.py:320
+#, fuzzy
+msgid "Vulnerability database ready"
+msgstr "Güvenlik açığı veritabanı hazır"
+
+#: modules/web/additional.py:95
+#, fuzzy, python-brace-format
+msgid "Additional web checks used {used}/{total} HTTP probes."
+msgstr "Ek web kontrolleri {used}/{total} HTTP probu kullandı."
+
+#: modules/web/boolean_sqli.py:67
+#, fuzzy, python-brace-format
+msgid "Boolean SQLi skipped: unstable or error baseline on {url}."
+msgstr "Boolean SQLi atlandı: {url} üzerinde kararsız veya hatalı temel çizgi (baseline)."
+
+#: modules/web/content.py:18 modules/web/runtime.py:162
+#, fuzzy
+msgid "Response size limit reached; content coverage is limited."
+msgstr "Yanıt boyutu sınırına ulaşıldı; içerik kapsamı sınırlı."
+
+#: modules/web/crawler.py:24
+#, fuzzy, python-brace-format
+msgid "Crawling web application at {url} ..."
+msgstr "{url} adresindeki web uygulaması taranıyor (crawl) ..."
+
+#: modules/web/crawler.py:81
+#, fuzzy, python-brace-format
+msgid "Unable to crawl {url}: HTTP {status}; coverage is incomplete."
+msgstr "{url} taranamadı (crawl): HTTP {status}; kapsam eksik."
+
+#: modules/web/http.py:35
+#, fuzzy
+msgid ""
+"A web request failed certificate verification; coverage is incomplete. Use --"
+"insecure-tls (or the dashboard's \"Accept untrusted certificates\" control) "
+"only for targets you trust, such as lab systems with self-signed "
+"certificates."
+msgstr ""
+"Bir web isteği sertifika doğrulamasında başarısız oldu; kapsam eksik. --"
+"insecure-tls seçeneğini (veya kontrol panelindeki \"Güvenilmeyen "
+"sertifikaları kabul et\" seçeneğini) yalnızca kendinden imzalı "
+"sertifikalara sahip laboratuvar sistemleri gibi güvendiğiniz hedefler için "
+"kullanın."
+
+#: modules/web/http.py:41
+#, fuzzy
+msgid "A web request failed; coverage is incomplete."
+msgstr "Bir web isteği başarısız oldu; kapsam eksik."
+
+#: modules/web/query.py:34
+#, fuzzy
+msgid "Query parameter limit reached; coverage is limited."
+msgstr "Sorgu parametresi sınırına ulaşıldı; kapsam sınırlı."
+
+#: modules/web/runtime.py:104
+#, fuzzy
+msgid "Request budget reached; coverage is limited."
+msgstr "İstek bütçesine ulaşıldı; kapsam sınırlı."
+
+#: modules/web/webvuln.py:78
+#, fuzzy
+msgid "Invalid target for web vulnerability checks."
+msgstr "Web güvenlik açığı kontrolleri için geçersiz hedef."
+
+#: modules/web/webvuln.py:100
+#, fuzzy, python-brace-format
+msgid ""
+"{target} presented a certificate that could not be verified, so web checks "
+"were skipped. Re-run with --insecure-tls only if you trust this target (for "
+"example a lab system with a self-signed certificate)."
+msgstr ""
+"{target} doğrulanamayan bir sertifika sundu, bu nedenle web kontrolleri "
+"atlandı. Yalnızca bu hedefe güveniyorsanız (örneğin kendinden imzalı "
+"sertifikaya sahip bir laboratuvar sistemi) --insecure-tls ile yeniden "
+"çalıştırın."
+
+#: modules/web/webvuln.py:151
+#, fuzzy, python-brace-format
+msgid "Found {count} testable urls."
+msgstr "{count} test edilebilir URL bulundu."
+
+#: modules/web/webvuln.py:172
+#, fuzzy, python-brace-format
+msgid ""
+"Web checks completed: {count} findings (candidates, advisories and "
+"observations)."
+msgstr "Web kontrolleri tamamlandı: {count} bulgu (adaylar, tavsiyeler ve gözlemler)."
+
+#: modules/web/webvuln.py:201
+#, fuzzy
+msgid "Web checks failed; coverage is incomplete."
+msgstr "Web kontrolleri başarısız oldu; kapsam eksik."

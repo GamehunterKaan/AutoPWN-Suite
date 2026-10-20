@@ -75,7 +75,7 @@ def _execute_webvuln(target, log, console):
     try:
         candidates = target_urls(target)
     except ValueError:
-        log.logger("error", "Invalid target for web vulnerability checks.")
+        log.logger("error", _("Invalid target for web vulnerability checks."))
         return []
     headers = {"User-Agent": next(random_user_agent(log))}
     response = None
@@ -97,8 +97,8 @@ def _execute_webvuln(target, log, console):
         current.discovery = False
     if response is None:
         if untrusted and options()["verify_tls"]:
-            log.logger("warning", f"{target} presented a certificate that could not be verified, so web checks were skipped. "
-                                  "Re-run with --insecure-tls only if you trust this target (for example a lab system with a self-signed certificate).")
+            log.logger("warning", _("{target} presented a certificate that could not be verified, so web checks were skipped. "
+                                    "Re-run with --insecure-tls only if you trust this target (for example a lab system with a self-signed certificate).").format(target=target))
         else:
             log.logger("warning", f"No reachable in-scope web endpoint on {target}.")
         return []
@@ -148,7 +148,7 @@ def _execute_webvuln(target, log, console):
                      on_discovered=on_discovered) if current else crawl(target_url, log)
     testable_urls = prioritize_urls(url for url in urls if same_origin(target_url, url) and query_parts(url)[1]
                                    and (url == target_url or not skip_discovered_url(url)))
-    log.logger("info", f"Found {len(testable_urls)} testable urls.")
+    log.logger("info", _("Found {count} testable urls.").format(count=len(testable_urls)))
     remaining = [url for url in testable_urls if any(enabled(name) and not task_done(name, url)
                  for name in ("lfi", "sqli", "boolean_sqli", "xss"))]
     if len(set(remaining) | selected) > controls["max_endpoints"]:
@@ -169,7 +169,7 @@ def _execute_webvuln(target, log, console):
     results.extend(additional_checks(target_url, urls, response, log, console, headers, include_boolean=False))
     if enabled("headers"):
         results.extend(run_task("headers", target_url, lambda: inspect_response(target_url, response, console)))
-    log.logger("info", f"Web checks completed: {len(results)} findings (candidates, advisories and observations).")
+    log.logger("info", _("Web checks completed: {count} findings (candidates, advisories and observations).").format(count=len(results)))
     return results
 
 
@@ -198,7 +198,7 @@ def webvuln(target, log, console, *, controls=None, should_stop=None, progress=N
     except ScanCancelled:
         raise
     except Exception:
-        context.issue("Web checks failed; coverage is incomplete.")
+        context.issue(_("Web checks failed; coverage is incomplete."))
         raise
     finally:
         context.state["requests"] = context.state.get("requests", 0) + context.requests

@@ -64,7 +64,7 @@ class BooleanSQLIScanner:
             return []
         baseline_text = _shape(baseline, url)
         if _similar(baseline_text, _shape(repeated, url)) < .98 or self.errors._errors(baseline.text):
-            self.client.log.logger("info", f"Boolean SQLi skipped: unstable or error baseline on {url}.")
+            self.client.log.logger("info", _("Boolean SQLi skipped: unstable or error baseline on {url}.").format(url=url))
             return []
         found = []
         for index in indexes[:self.max_parameters]:

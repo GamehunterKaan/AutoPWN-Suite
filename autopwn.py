@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
+import sys
 from datetime import datetime
 from time import sleep
 
 from rich.console import Console
 
+from modules import i18n
 from modules.banners import print_banner
 from modules.daemon.daemon_installer import CreateConfig, InstallDaemon, UninstallDaemon
 from modules.getexploits import GetExploitsFromArray
@@ -117,6 +119,7 @@ def StartScanning(
 def main() -> None:
     __version__ = "2.6.1"
 
+    i18n.install(i18n.peek_lang_flag(sys.argv[1:]))
     args = cli()
     if args.no_color:
         console = Console(record=True, color_system=None)

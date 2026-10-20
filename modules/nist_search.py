@@ -83,7 +83,7 @@ class VulnerabilityLookup:
 
     def __init__(self, source="auto", database=None, *, lazy=False):
         if source not in ("auto", "online", "offline"):
-            raise ValueError("Vulnerability source must be auto, online, or offline")
+            raise ValueError(_("Vulnerability source must be auto, online, or offline"))
         self.source = source
         self.database = database
         self.local = None
@@ -100,8 +100,12 @@ class VulnerabilityLookup:
         if self.source == "offline":
             if self.local is None:
                 self._open_local()
-                log.logger("info", f"Using local NVD database: {self.local.metadata['count']} CVEs; "
-                           f"updated {self.local.metadata['updated_at']}.")
+                log.logger(
+                    "info",
+                    _("Using local NVD database: {count} CVEs; updated {updated_at}.").format(
+                        count=self.local.metadata["count"], updated_at=self.local.metadata["updated_at"]
+                    ),
+                )
             return self.local.search(keyword)
         try:
             return searchCVE(keyword, log, api_key, strict=True)
@@ -109,8 +113,12 @@ class VulnerabilityLookup:
             if self.source != "auto":
                 raise
             self._open_local()
-            log.logger("warning", "NVD unavailable; using the local vulnerability database "
-                       f"updated {self.local.metadata['updated_at']} for this scan.")
+            log.logger(
+                "warning",
+                _(
+                    "NVD unavailable; using the local vulnerability database updated {updated_at} for this scan."
+                ).format(updated_at=self.local.metadata["updated_at"]),
+            )
             return self.local.search(keyword)
 
     def close(self):
@@ -165,8 +173,7 @@ def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=Fal
                 if response is not None and response.status_code in (403, 429):
                     log.logger(
                         "error",
-                        "Requests are being rate limited by NIST API,"
-                        + " please get a NIST API key to prevent this.",
+                        _("Requests are being rate limited by NIST API, please get a NIST API key to prevent this."),
                     )
                 if tries < 2:
                     sleep(sleep_time)
@@ -174,8 +181,11 @@ def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=Fal
                 break
         if page is None:
             if strict:
-                raise RuntimeError(f"NVD lookup failed for {keyword}") from last_error
-            log.logger("warning", f"NVD lookup failed for {keyword}; vulnerability coverage is incomplete.")
+                raise RuntimeError(_("NVD lookup failed for {keyword}").format(keyword=keyword)) from last_error
+            log.logger(
+                "warning",
+                _("NVD lookup failed for {keyword}; vulnerability coverage is incomplete.").format(keyword=keyword),
+            )
             return []
         Vulnerabilities.extend(page)
         start_index += len(page)

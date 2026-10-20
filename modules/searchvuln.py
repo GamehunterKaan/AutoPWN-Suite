@@ -62,7 +62,7 @@ def SearchKeyword(keyword: str, log, apiKey=None, *, lookup=None) -> list:
         ApiResponseCVE = (lookup.search(keyword, log, apiKey) if lookup is not None
                           else searchCVE(keyword, log, apiKey, strict=True))
     except KeyboardInterrupt:
-        log.logger("warning", f"Skipped vulnerability detection for {keyword}")
+        log.logger("warning", _("Skipped vulnerability detection for {keyword}").format(keyword=keyword))
     except Exception as e:
         log.logger("error", e)
         if lookup is not None:
@@ -86,22 +86,24 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
     keywords = GenerateKeywords(HostArray)
 
     if len(keywords) == 0:
-        log.logger("warning", f"Insufficient information for {target}")
+        log.logger("warning", _("Insufficient information for {target}").format(target=target))
         return []
 
     log.logger(
-        "info", f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
+        "info",
+        _("Searching vulnerability database for {count} keyword(s) ...").format(count=len(keywords)),
     )
 
     printed_banner = False
     with console2.status(
-        "[white]Searching vulnerabilities ...[/white]", spinner="bouncingBar"
+        _("[white]Searching vulnerabilities ...[/white]"), spinner="bouncingBar"
     ) as status:
         for keyword in keywords:
             status.start()
             status.update(
-                "[white]Searching vulnerability database for[/white] "
-                + f"[red]{keyword}[/red] [white]...[/white]"
+                _("[white]Searching vulnerability database for[/white] [red]{keyword}[/red] [white]...[/white]").format(
+                    keyword=keyword
+                )
             )
             ApiResponseCVE = (SearchKeyword(keyword, log, apiKey, lookup=lookup) if lookup is not None
                               else SearchKeyword(keyword, log, apiKey))
@@ -110,10 +112,10 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
                 continue
 
             if not printed_banner:
-                banner(f"Possible vulnerabilities for {target}", "red", console)
+                banner(_("Possible vulnerabilities for {target}").format(target=target), "red", console)
                 printed_banner = True
 
-            console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
+            console.print(_("┌─ [yellow][ {keyword} ][/yellow]").format(keyword=keyword))
 
             CVEs = []
             for CVE in ApiResponseCVE:
@@ -121,13 +123,20 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
                 console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
 
                 wrapped_description = wrap(CVE.description, max(1, term_width - 50))
-                console.print("│\t\t[cyan]Description: [/cyan]")
+                console.print(_("│\t\t[cyan]Description: [/cyan]"))
                 for line in wrapped_description:
                     console.print(f"│\t\t\t{line}")
                 console.print(
-                    f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
-                    + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
-                    + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
+                    _(
+                        "│\t\t[cyan]Severity: [/cyan]{severity} - {severity_score}\n"
+                        "│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
+                        "│\t\t[cyan]Details: [/cyan] {details_url}"
+                    ).format(
+                        severity=CVE.severity,
+                        severity_score=CVE.severity_score,
+                        exploitability=CVE.exploitability,
+                        details_url=CVE.details_url,
+                    )
                 )
 
             VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)

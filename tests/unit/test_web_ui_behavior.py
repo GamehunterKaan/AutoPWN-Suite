@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 APP_JS = Path(__file__).resolve().parents[2] / "modules" / "web_ui_static" / "app.js"
+I18N_JS = Path(__file__).resolve().parents[2] / "modules" / "web_ui_static" / "i18n.js"
 NODE = shutil.which("node")
 pytestmark = [pytest.mark.unit, pytest.mark.skipif(not NODE, reason="Node.js is unavailable")]
 
@@ -26,16 +27,27 @@ function node() {
 }
 const document = {getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)},
   createElement(){return node()}, querySelectorAll(){return []}, querySelector(){return node()},
-  addEventListener(){}, body:node()};
-const context = vm.createContext({assert, nodes, document, window:{location:{origin:'http://localhost'}},
+  addEventListener(){}, body:node(), documentElement:{lang:''}};
+const localStorage = {store:new Map(),
+  getItem(key){return this.store.has(key) ? this.store.get(key) : null;},
+  setItem(key, value){this.store.set(key, String(value));},
+  removeItem(key){this.store.delete(key);}};
+const navigator = {language:'en-US'};
+const context = vm.createContext({assert, nodes, document, localStorage, navigator,
+  window:{location:{origin:'http://localhost'}},
   setTimeout(){}, clearTimeout(){}, Blob, URL, console});
-const source = fs.readFileSync(process.argv[1], 'utf8');
+context.window.localStorage = localStorage;
+context.window.navigator = navigator;
+context.window.document = document;
+const i18nSource = fs.readFileSync(process.argv[1], 'utf8');
+vm.runInContext(i18nSource, context);
+const source = fs.readFileSync(process.argv[2], 'utf8');
 vm.runInContext(source.slice(0, source.lastIndexOf('\n(async()=>{')), context);
 (async()=>{
-  await vm.runInContext('(async()=>{' + process.argv[2] + '})()', context);
+  await vm.runInContext('(async()=>{' + process.argv[3] + '})()', context);
 })().catch(error=>{console.error(error);process.exitCode=1});
 """
-    result = subprocess.run([NODE, "-e", harness, str(APP_JS), script], text=True, capture_output=True, timeout=10)
+    result = subprocess.run([NODE, "-e", harness, str(I18N_JS), str(APP_JS), script], text=True, capture_output=True, timeout=10)
     assert result.returncode == 0, result.stderr
 
 
@@ -52,7 +64,7 @@ assert.match(html,/Office &amp; lab/);
 profiles={two:{id:'two',name:'Normal',description:'Quotes " and <text>',config:{mode:'normal',speed:3}}};
 renderProfiles();
 assert.match(nodes.get('profiles-list').innerHTML,/Quotes &quot; and &lt;text&gt;/);
-assert.match(nodes.get('profiles-list').innerHTML,/Mode: normal · Speed: 3/);
+assert.match(nodes.get('profiles-list').innerHTML,/Mode: Normal · Speed: 3/);
 """)
 
 

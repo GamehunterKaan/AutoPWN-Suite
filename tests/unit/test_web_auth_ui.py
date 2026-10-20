@@ -19,23 +19,28 @@ def run_js(file, test, setup=""):
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),assert=require('node:assert/strict');
 const nodes=new Map(),handlers={},calls=[],redirects=[];
 const document={getElementById(id){if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',disabled:false,
-  addEventListener(name,fn){handlers[id+':'+name]=fn}});return nodes.get(id)}};
+  addEventListener(name,fn){handlers[id+':'+name]=fn}});return nodes.get(id)},
+  querySelectorAll(){return []},addEventListener(){},documentElement:{lang:''}};
+const localStorage={store:new Map(),getItem(key){return this.store.has(key)?this.store.get(key):null;},
+  setItem(key,value){this.store.set(key,String(value));},removeItem(key){this.store.delete(key);}};
+const navigator={language:'en-US'};
 const html=fs.readFileSync(path.join(path.dirname(process.argv[1]),process.argv[1].endsWith('login.js')?'login.html':'index.html'),'utf8');
 for(const match of html.matchAll(/\bid="([^"]+)"/g))document.getElementById(match[1]);
 function reply(status,data){return {status,ok:status>=200&&status<300,json:async()=>data}};
 let responseHandler=async()=>reply(200,{username:'admin',csrf_token:'a'.repeat(43)});
 const nativeFetch=async(input,options={})=>{calls.push([input,options]);return responseHandler(input,options)};
-const context=vm.createContext({document,URL,Headers,Request,console,assert,fetch:nativeFetch,nodes,handlers,calls,redirects,reply,
+const context=vm.createContext({document,localStorage,navigator,URL,Headers,Request,console,assert,fetch:nativeFetch,nodes,handlers,calls,redirects,reply,
  location:{href:'http://localhost/',origin:'http://localhost',replace:path=>redirects.push(path)},
  setTimeout,clearTimeout});context.window=context;
 context.setResponse=handler=>{responseHandler=handler};
 context.flush=async()=>{for(let i=0;i<12;i++)await new Promise(resolve=>setImmediate(resolve))};
+vm.runInContext(fs.readFileSync(process.argv[4],'utf8'),context);
 vm.runInContext(process.argv[2],context);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),context);
 (async()=>{await context.flush();await vm.runInContext('(async()=>{'+process.argv[3]+'})()',context)})()
  .catch(error=>{console.error(error);process.exitCode=1});
 """
-    result = subprocess.run([NODE, "-e", harness, str(ROOT / file), setup, test], text=True, capture_output=True, timeout=10)
+    result = subprocess.run([NODE, "-e", harness, str(ROOT / file), setup, test, str(ROOT / "i18n.js")], text=True, capture_output=True, timeout=10)
     assert result.returncode == 0, result.stderr
 
 

@@ -305,7 +305,8 @@ def test_resume_validation_does_not_serialize_exceptions_or_change_job(dashboard
     assert response.status_code == 400
     expected = ("Keep the original check selection when resuming; start a new scan to change it."
                 if failure == "check_selection" else "Invalid web scan configuration")
-    assert response.get_json() == {"error": expected}
+    expected_code = "resume_checks_changed" if failure == "check_selection" else "invalid_web_config"
+    assert response.get_json() == {"error": expected, "code": expected_code}
     assert job.to_dict() == before and job.should_stop()
     thread.assert_not_called()
 

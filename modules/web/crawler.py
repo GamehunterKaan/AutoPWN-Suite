@@ -21,7 +21,7 @@ def crawl(target_url, log, *, max_pages=LIMITS["max_pages"][0], max_urls=LIMITS[
     target_url = urlunsplit(parts._replace(path=parts.path or "/"))
     if not same_origin(target_url, target_url) or max_pages <= 0 or max_urls <= 0:
         return set()
-    log.logger("info", f"Crawling web application at {target_url} ...")
+    log.logger("info", _("Crawling web application at {url} ...").format(url=target_url))
     current = ACTIVE.get()
     graph = current.state.setdefault("crawl", {}) if current else {}
     urls, visited = {target_url}, set()
@@ -78,7 +78,9 @@ def link_finder(target_url, log) -> set[str]:
     page_url = response.url if isinstance(response.url, str) else target_url
     if isinstance(response.status_code, int) and response.status_code >= 400:
         if response.status_code not in (404, 410):
-            message = f"Unable to crawl {target_url}: HTTP {response.status_code}; coverage is incomplete."
+            message = _("Unable to crawl {url}: HTTP {status}; coverage is incomplete.").format(
+                url=target_url, status=response.status_code
+            )
             current = ACTIVE.get()
             if current:
                 current.issue(message)

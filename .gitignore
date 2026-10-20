@@ -21,6 +21,7 @@ vulnerabilities.sqlite3
 vulnerabilities.sqlite3.update-lock
 .nvd-*.sqlite3*
 modules/update_channel.txt
+modules/language.txt
 
 # Testing
 .pytest_cache/
