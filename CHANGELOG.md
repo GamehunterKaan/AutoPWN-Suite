@@ -35,6 +35,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   (or `--vuln-source offline`). An explicit `--update-channel` is remembered in `update_channel.txt`
   in the data directory. The repository must be written `OWNER/REPO` and the branch must be a plain git
   branch name.
+- The release workflows `publish-docker.yml` and `backfill-release-signatures.yml` now retry the image
+  `cosign verify` for about two minutes before failing. Docker Hub can list a just-pushed signature late, and
+  cosign v3 then reports "no signatures found" (this failed the `sign` job of the v2.7.0 release run once; re-running
+  the failed jobs recovered it). `cosign sign` still runs once, and the workflow paths and check names are unchanged.
+  The first real run of the retry is the next release.
 
 ### Security changes
 
@@ -60,6 +65,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   The language comes from an allowlist (`--lang` choices, `AUTOPWN_LANG`, the dashboard
   `language` setting), the `X-App-Language` header is not acted on, and the sanitizers for
   scanned text and credentials wrap the values inside translated messages.
+- Release signing: no security impact. The image signature is still verified against the same identity, issuer and
+  digest, and a verification that never succeeds still fails the step. The retry adds no permission, secret or
+  network destination.
 
 ## [2.7.0] - 2026-10-19
 

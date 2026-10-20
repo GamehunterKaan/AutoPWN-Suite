@@ -430,6 +430,59 @@ def test_verification_docs_name_every_signer_identity_the_workflows_can_produce(
     assert "v2.6.1 was recovered this way, with the workflow as it was then" in docs
 
 
+SIGNING_WORKFLOWS = ["publish-docker.yml", "backfill-release-signatures.yml"]
+VERIFY_LINE = ('cosign verify --certificate-identity "$identity" '
+               '--certificate-oidc-issuer https://token.actions.githubusercontent.com "$IMAGE@$DIGEST"')
+
+
+def workflow_text(workflow):
+    return (Path(__file__).resolve().parents[2] / ".github/workflows" / workflow).read_text(encoding="utf-8")
+
+
+def image_signature_snippet(workflow):
+    """The lines from the one image signing to the next signing command: the sign and its verify loop."""
+    text = workflow_text(workflow)
+    start = text.index("cosign sign --yes")
+    return text[start:text.index("cosign sign-blob", start)]
+
+
+@pytest.mark.parametrize("workflow", SIGNING_WORKFLOWS)
+def test_image_signature_check_is_retried_and_the_signing_is_not(workflow):
+    """Docker Hub can list a new referrer late, so cosign v3 exits 10 ("no signatures found") right after a good sign."""
+    snippet = image_signature_snippet(workflow)
+    assert snippet.count("cosign sign --yes") == 1 and snippet.count("cosign verify ") == 1
+    loop_start = snippet.index("for delay in ")
+    loop = snippet[loop_start:snippet.index("\n          done\n", loop_start)]
+    assert "cosign sign" not in loop and VERIFY_LINE in loop and "break" in loop
+    # The signing runs once, ahead of the loop, and a verification that never succeeds still fails the step.
+    assert snippet.index("cosign sign --yes") < loop_start
+    assert snippet.rstrip().endswith('[ "$verified" = true ]')
+    assert 'identity="https://github.com/$GITHUB_WORKFLOW_REF"' in workflow_text(workflow)
+
+
+@pytest.mark.skipif(sys.platform == "win32" or shutil.which("bash") is None, reason="needs a POSIX bash")
+@pytest.mark.parametrize("workflow", SIGNING_WORKFLOWS)
+@pytest.mark.parametrize(("failures", "succeeds"), [(2, True), (0, True), (99, False)])
+def test_image_signature_loop_retries_a_late_signature_and_still_fails(tmp_path, workflow, failures, succeeds):
+    snippet = image_signature_snippet(workflow)
+    script = tmp_path / "loop.sh"
+    script.write_text(
+        "set -euo pipefail\n"
+        'sleep() { echo "$1" >> "$LOG_DIR/sleeps"; }\n'
+        "calls=0\n"
+        'cosign() { echo "$*" >> "$LOG_DIR/cosign"; calls=$((calls + 1)); [ "$calls" -gt "$FAILURES" ]; }\n'
+        "identity=https://example.test/workflow IMAGE=docker.io/example/image DIGEST=sha256:00\n"
+        + snippet[snippet.index("# Docker Hub can list"):], encoding="utf-8", newline="\n")
+    env = {"PATH": "/usr/bin:/bin", "LOG_DIR": str(tmp_path), "FAILURES": str(failures)}
+    result = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, check=False)
+    calls = (tmp_path / "cosign").read_text().splitlines()
+    sleeps = [int(n) for n in (tmp_path / "sleeps").read_text().split()]
+    assert (result.returncode == 0) is succeeds, result.stderr
+    assert all(call.startswith("verify ") and call.endswith("example/image@sha256:00") for call in calls)
+    assert len(calls) == (failures + 1 if succeeds else 7)
+    assert sleeps == [0, 5, 10, 15, 20, 30, 30][:len(calls)] and sum(sleeps) <= 120
+
+
 @pytest.mark.parametrize("workflow", ["publish-docker.yml", "publish-pypi.yml"])
 def test_dispatch_example_tag_has_the_layout_the_policy_scans(workflow):
     """Tags before v2.7.0 lack packaging/requirements-*.txt, so the dispatch input must not suggest one."""
