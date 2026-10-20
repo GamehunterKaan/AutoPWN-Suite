@@ -104,6 +104,11 @@ def test_the_update_harness_drives_each_check_with_real_input(harness):
 def test_the_workflow_and_build_script_cover_the_harnesses():
     build = (ROOT / ".clusterfuzzlite/build.sh").read_text(encoding="utf-8")
     assert "scripts/fuzz/fuzz_*.py" in build and "compile_python_fuzzer" in build and "--require-hashes" in build
+    # Every install is from a hash-pinned file (Scorecard's pinned-dependencies check), so the package itself is used
+    # from the checkout on the import path, as in the container image, and not installed from a directory.
+    installs = [line for line in build.splitlines() if "pip3 install" in line]
+    assert installs and all("--require-hashes" in line and " -r " in line for line in installs)
+    assert 'export PYTHONPATH="$PWD' in build
     workflow = (ROOT / ".github/workflows/cflite_pr.yml").read_text(encoding="utf-8")
     assert "build_fuzzers@" in workflow and "run_fuzzers@" in workflow and "mode: code-change" in workflow
 

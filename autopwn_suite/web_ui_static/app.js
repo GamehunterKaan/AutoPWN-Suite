@@ -92,6 +92,7 @@ function cvssText(c){ return c ? esc(c) : '—'; }
 // A finding saved before categories existed has none, so it appears only under "All".
 const VULN_CATEGORIES = ['rce','privilege_escalation','injection','xss','auth_bypass','info_disclosure','dos','memory_corruption','other'];
 let vulnCategoryFilter = '';
+let vulnTally = {shown: 0, total: 0};
 function vulnCategories(v){ return Array.isArray(v.categories) ? VULN_CATEGORIES.filter(c => v.categories.includes(c)) : []; }
 function categoryLabel(c){ return window.i18n.t('vuln.cat_' + c); }
 function categoryBadges(v){ return vulnCategories(v).map(c => `<span class="cat">${esc(categoryLabel(c))}</span>`).join(' '); }
@@ -119,6 +120,10 @@ function pickVulnCategory(event){
   renderVulnTable();
   const again = document.querySelector(`#vuln-cats [data-cat="${cat}"]`);
   if(again) again.focus();
+  // A screen reader hears what the press did to the table, which it cannot see change.
+  document.getElementById('vuln-cat-status').textContent = vulnCategoryFilter
+    ? window.i18n.t('vuln.cat_status', {category: categoryLabel(vulnCategoryFilter), shown: vulnTally.shown, total: vulnTally.total})
+    : window.i18n.t('vuln.cat_status_all', {total: vulnTally.total});
 }
 function openReportWindow(){
   const win = window.open('', '_blank');
@@ -942,6 +947,7 @@ function renderVulnTable(){
   const base = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || sevClass(v.severity) === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
   renderCategoryBar(base);
   const filtered = vulnCategoryFilter ? base.filter(v => vulnCategories(v).includes(vulnCategoryFilter)) : base;
+  vulnTally = {shown: filtered.length, total: base.length};
 
   filtered.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
   const tb=document.getElementById('vtb');

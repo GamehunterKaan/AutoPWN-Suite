@@ -182,6 +182,8 @@
       'vuln.cat_memory_corruption': 'Memory corruption',
       'vuln.cat_other': 'Other / uncategorized',
       'vuln.cat_note': 'A CVE can belong to more than one category, so the counts can add up to more than the total.',
+      'vuln.cat_status': '{category}: showing {shown} of {total} vulnerabilities',
+      'vuln.cat_status_all': 'Showing all {total} vulnerabilities',
       'vuln.empty': 'No vulnerabilities found yet.',
       'vuln.no_match': 'No vulnerabilities matched.',
 
@@ -728,6 +730,8 @@
       'vuln.cat_memory_corruption': 'Bellek bozulması',
       'vuln.cat_other': 'Diğer / kategorisiz',
       'vuln.cat_note': 'Bir CVE birden fazla kategoriye girebilir; bu yüzden sayıların toplamı genel toplamı aşabilir.',
+      'vuln.cat_status': '{category}: {total} güvenlik açığından {shown} tanesi gösteriliyor',
+      'vuln.cat_status_all': 'Tüm {total} güvenlik açığı gösteriliyor',
       'vuln.empty': 'Henüz güvenlik açığı bulunamadı.',
       'vuln.no_match': 'Eşleşen güvenlik açığı yok.',
 

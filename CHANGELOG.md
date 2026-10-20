@@ -38,7 +38,8 @@ existing release summaries; they do not retroactively claim artifact signing.
 - The dashboard's Vulnerabilities tab sorts CVEs into categories: remote code execution, privilege escalation,
   injection, cross-site scripting, authentication / access control bypass, information disclosure, denial of
   service, memory corruption and other. A strip of chips above the table counts them ("All (13)", "Denial of
-  service (4)" and so on) and filters the table to one category; a Category column and the PDF export show them.
+  service (4)" and so on) and filters the table to one category; a Category column and the PDF export show them,
+  and a polite live region tells a screen reader what pressing a chip did to the table.
   A CVE can have several categories, so the counts can add up to more than the total. The category comes from the
   CWE of the NVD record (online or from the local database) and, when no CWE maps, from phrases in the description;
   the rules are in `autopwn_suite/data/vulnerability_categories.json`. New findings carry a `categories` list;
@@ -53,6 +54,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   integration stays in `.clusterfuzzlite/`, which ClusterFuzzLite requires at the repository root. The
   `cflite_pr.yml` path filter and `.clusterfuzzlite/build.sh` follow the move, and the harnesses stay out of the
   product image through `.dockerignore`.
+- The ClusterFuzzLite build (`.clusterfuzzlite/build.sh`) no longer runs `pip3 install --no-deps .`: it installs only
+  the hash-pinned `requirements-locked.txt`, and the fuzzers use the package from the checkout on the import path,
+  as the container image does. The fuzzers cover the same code.
 
 ### Security changes
 
@@ -82,6 +86,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   the NVD or from a copied database, so they are untrusted: a CWE ID must match `CWE-` and up to five digits, the
   description is only searched for fixed phrases (no regular expression), and the page ignores any category ID that
   is not in its fixed list.
+- Every install in the fuzz build now comes from a hash-pinned file (no pip install of an unhashed directory),
+  which clears the OpenSSF Scorecard "Pinned-Dependencies" finding for `.clusterfuzzlite/build.sh`. No security
+  impact otherwise.
 - Release signing: no security impact. The image signature is still verified against the same identity, issuer and
   digest, and a verification that never succeeds still fails the step. The retry adds no permission, secret or
   network destination.

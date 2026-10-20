@@ -1270,6 +1270,7 @@ document.querySelector=selector=>({focus(){focused.push(selector)}});
 const click=cat=>pickVulnCategory({target:{closest:()=>({dataset:{cat}})}});
 click('dos');                                           // one category at a time
 assert.equal(shown(),'CVE-2,CVE-3');
+assert.equal(sel('vuln-cat-status').textContent,'Denial of service: showing 2 of 5 vulnerabilities');   // announced politely
 assert.match(chips(),/dos\|\*Denial of service \(2\)/);
 assert.deepEqual(focused,['#vuln-cats [data-cat="dos"]']);   // the clicked chip keeps the keyboard focus
 assert.match(table.innerHTML,/<span class="cat">Denial of service<\/span>/);
@@ -1285,6 +1286,7 @@ assert.equal(shown(),'CVE-1');
 sel('vuln-sev').value='';
 click('xss'); click('xss');                              // the same chip again clears it
 assert.equal(shown(),'CVE-1,CVE-5,CVE-2,CVE-3,CVE-4');
+assert.equal(sel('vuln-cat-status').textContent,'Showing all 5 vulnerabilities');
 click('rce'); click('');                                 // and so does All
 assert.equal(shown().split(',').length,5);
 
