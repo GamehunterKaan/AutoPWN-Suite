@@ -1,0 +1,2143 @@
+# Turkish translations for AutoPWN package.
+# Copyright (C) 2026 Kaan Gültekin
+# This file is distributed under the same license as the AutoPWN Suite package.
+# Automatically generated, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: AutoPWN Suite\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-20 19:51+0300\n"
+"PO-Revision-Date: 2026-10-20 03:52+0300\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: autopwn_suite/cli.py:136
+#, fuzzy, python-brace-format
+msgid "AutoPWN Suite v{version}"
+msgstr "AutoPWN Suite v{version}"
+
+#: autopwn_suite/cli.py:155
+#, fuzzy
+msgid "Dashboard account could not be reset. Check access to AUTOPWN_DATA_DIR."
+msgstr "Panel hesabı sıfırlanamadı. AUTOPWN_DATA_DIR erişimini kontrol edin."
+
+#: autopwn_suite/cli.py:163
+#, fuzzy
+msgid ""
+"Database downloads require internet. Run --update-vuln-db without --offline."
+msgstr ""
+"Veritabanı indirmeleri internet gerektirir. --update-vuln-db komutunu "
+"--offline olmadan çalıştırın."
+
+#: autopwn_suite/cli.py:167
+#, fuzzy, python-brace-format
+msgid "Database update failed; previous database preserved: {error}"
+msgstr ""
+"Veritabanı güncellemesi başarısız oldu; önceki veritabanı korundu: {error}"
+
+#: autopwn_suite/cli.py:169
+#, fuzzy, python-brace-format
+msgid "Stored {count} CVEs at {path}; updated {updated_at}."
+msgstr "{path} konumunda {count} CVE saklandı; güncelleme: {updated_at}."
+
+#: autopwn_suite/cli.py:178
+#, fuzzy
+msgid ""
+"Updates require internet. Run --check-update or --apply-update without "
+"--offline."
+msgstr ""
+"Güncellemeler internet gerektirir. --check-update veya --apply-update "
+"komutunu --offline olmadan çalıştırın."
+
+#: autopwn_suite/cli.py:197
+#, fuzzy
+msgid ""
+"[red]Flask not found. Install it with: pip install flask flask-cors[/red]"
+msgstr ""
+"[red]Flask bulunamadı. Şununla kurun: pip install flask flask-cors[/red]"
+
+#: autopwn_suite/cli.py:206
+#, fuzzy
+msgid ""
+"\n"
+"Web UI closed."
+msgstr ""
+"\n"
+"Web arayüzü kapatıldı."
+
+#: autopwn_suite/cli.py:214
+#, fuzzy
+msgid ""
+"Specify --target or --host-file in offline mode; use IP addresses for "
+"airgapped scans."
+msgstr ""
+"Çevrimdışı modda --target veya --host-file belirtin; ağdan yalıtılmış "
+"taramalar için IP adresleri kullanın."
+
+#: autopwn_suite/cli.py:233
+#, fuzzy, python-brace-format
+msgid ""
+"Local NVD database: {count} CVEs; updated {updated_at}. Findings are possible"
+" vulnerabilities."
+msgstr ""
+"Yerel NVD veritabanı: {count} CVE; güncelleme: {updated_at}. Bulgular olası "
+"zafiyetlerdir."
+
+#: autopwn_suite/cli.py:245
+#, fuzzy
+msgid "The scan did not finish; saving the output recorded so far."
+msgstr "Tarama tamamlanmadı; şu ana kadar kaydedilen çıktı saklanıyor."
+
+#: autopwn_suite/cli.py:249
+#, fuzzy
+msgid "The recorded output could not be saved."
+msgstr "Kaydedilen çıktı saklanamadı."
+
+#: autopwn_suite/cli.py:264
+#, fuzzy, python-brace-format
+msgid "Sleeping for {seconds} seconds..."
+msgstr "{seconds} saniye bekleniyor..."
+
+#: autopwn_suite/cli.py:283 autopwn_suite/utils.py:598
+#, fuzzy
+msgid "Ctrl+C pressed. Exiting."
+msgstr "Ctrl+C algılandı. Çıkılıyor."
+
+#: autopwn_suite/daemon/daemon_installer.py:42
+#, fuzzy, python-brace-format
+msgid "  [cyan]{key}[/cyan]. {value}"
+msgstr "  [cyan]{key}[/cyan]. {value}"
+
+#: autopwn_suite/daemon/daemon_installer.py:43
+#, fuzzy, python-brace-format
+msgid "Enter your choice ({choices}): "
+msgstr "Seçiminizi girin ({choices}): "
+
+#: autopwn_suite/daemon/daemon_installer.py:48
+#, fuzzy, python-brace-format
+msgid "[red]Invalid choice. Please enter one of {choices}.[/red]"
+msgstr "[red]Geçersiz seçim. Lütfen {choices} içinden birini girin.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:60
+#, fuzzy
+msgid "[red]Invalid input. Please enter a whole number.[/red]"
+msgstr "[red]Geçersiz giriş. Lütfen bir tam sayı girin.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:65
+#, fuzzy, python-brace-format
+msgid ""
+"[red]Out of range. Please enter a whole number that is at least {minimum} and"
+" at most {maximum}.[/red]"
+msgstr ""
+"[red]Aralık dışında. Lütfen en az {minimum} ve en çok {maximum} olan bir tam "
+"sayı girin.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:67
+#, fuzzy, python-brace-format
+msgid ""
+"[red]Out of range. Please enter a whole number that is at least "
+"{minimum}.[/red]"
+msgstr ""
+"[red]Aralık dışında. Lütfen en az {minimum} olan bir tam sayı girin.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:69
+#, fuzzy, python-brace-format
+msgid ""
+"[red]Out of range. Please enter a whole number that is at most "
+"{maximum}.[/red]"
+msgstr ""
+"[red]Aralık dışında. Lütfen en çok {maximum} olan bir tam sayı girin.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:82
+#, fuzzy
+msgid "[red]Invalid email format. Please enter a valid email address.[/red]"
+msgstr ""
+"[red]Geçersiz e-posta biçimi. Lütfen geçerli bir e-posta adresi girin.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:90
+#, fuzzy
+msgid "[red]This field cannot be empty.[/red]"
+msgstr "[red]Bu alan boş bırakılamaz.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:118
+#, fuzzy
+msgid "Welcome to AutoPWN Suite Config Creator!"
+msgstr "AutoPWN Suite Yapılandırma Oluşturucusuna hoş geldiniz!"
+
+#: autopwn_suite/daemon/daemon_installer.py:120
+#, fuzzy
+msgid ""
+"Enter the scan interval in [cyan]seconds[/cyan] (Set to 0 for no interval - "
+"if not using as daemon): "
+msgstr ""
+"Tarama aralığını [cyan]saniye[/cyan] cinsinden girin (daemon olarak "
+"kullanmıyorsanız aralık olmaması için 0 girin): "
+
+#: autopwn_suite/daemon/daemon_installer.py:124
+#, fuzzy
+msgid "Would you like to enable email or webhook notifications?"
+msgstr "E-posta veya webhook bildirimlerini etkinleştirmek ister misiniz?"
+
+#: autopwn_suite/daemon/daemon_installer.py:125
+#, fuzzy
+msgid "Email"
+msgstr "E-posta"
+
+#: autopwn_suite/daemon/daemon_installer.py:125
+#, fuzzy
+msgid "Webhook"
+msgstr "Webhook"
+
+#: autopwn_suite/daemon/daemon_installer.py:125
+#, fuzzy
+msgid "None"
+msgstr "Hiçbiri"
+
+#: autopwn_suite/daemon/daemon_installer.py:130
+#, fuzzy
+msgid "Enter your [cyan]email address[/cyan]: "
+msgstr "[cyan]E-posta adresinizi[/cyan] girin: "
+
+#: autopwn_suite/daemon/daemon_installer.py:131
+#, fuzzy
+msgid "Enter your [cyan]email password[/cyan]: "
+msgstr "[cyan]E-posta şifrenizi[/cyan] girin: "
+
+#: autopwn_suite/daemon/daemon_installer.py:132
+#, fuzzy
+msgid "Enter the email address to [cyan]send the report to[/cyan]: "
+msgstr "Raporun [cyan]gönderileceği[/cyan] e-posta adresini girin: "
+
+#: autopwn_suite/daemon/daemon_installer.py:133
+#, fuzzy
+msgid ""
+"Enter the email address to [cyan]send from[/cyan] (leave empty to use login "
+"email): "
+msgstr ""
+"[cyan]Gönderen[/cyan] e-posta adresini girin (oturum açma e-postasını "
+"kullanmak için boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:134
+#, fuzzy
+msgid "Enter the [cyan]email server[/cyan] to send the report from: "
+msgstr "Raporun gönderileceği [cyan]e-posta sunucusunu[/cyan] girin: "
+
+#: autopwn_suite/daemon/daemon_installer.py:135
+#, fuzzy
+msgid "Enter the [cyan]email port[/cyan] to send the report from: "
+msgstr "Raporun gönderileceği [cyan]e-posta portunu[/cyan] girin: "
+
+#: autopwn_suite/daemon/daemon_installer.py:136
+#, fuzzy
+msgid "[green]Email notifications enabled.[/green]"
+msgstr "[green]E-posta bildirimleri etkinleştirildi.[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:139
+#, fuzzy
+msgid "Enter your [cyan]webhook URL[/cyan]: "
+msgstr "[cyan]Webhook URL'nizi[/cyan] girin: "
+
+#: autopwn_suite/daemon/daemon_installer.py:140
+#, fuzzy
+msgid "[green]Webhook notifications enabled.[/green]"
+msgstr "[green]Webhook bildirimleri etkinleştirildi.[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:143
+#, fuzzy
+msgid "[yellow]No notifications enabled.[/yellow]"
+msgstr "[yellow]Hiçbir bildirim etkinleştirilmedi.[/yellow]"
+
+#: autopwn_suite/daemon/daemon_installer.py:145
+#, fuzzy
+msgid "Enter your [cyan]target[/cyan] (Leave empty for auto detection): "
+msgstr "[cyan]Hedefinizi[/cyan] girin (otomatik algılama için boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:146
+#, fuzzy
+msgid ""
+"Enter [cyan]host file[/cyan] (Leave empty for none - will override target): "
+msgstr ""
+"[cyan]Host dosyasını[/cyan] girin (yoksa boş bırakın - hedefi geçersiz "
+"kılar): "
+
+#: autopwn_suite/daemon/daemon_installer.py:151
+#, fuzzy
+msgid "Would you like to [cyan]skip discovery[/cyan]? (y/n) "
+msgstr "[cyan]Keşfi atlamak[/cyan] ister misiniz? (y/n) "
+
+#: autopwn_suite/daemon/daemon_installer.py:154
+#, fuzzy
+msgid "Enter [cyan]API key[/cyan] (Leave empty for none): "
+msgstr "[cyan]API anahtarını[/cyan] girin (yoksa boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:155
+#, fuzzy
+msgid "Enter [cyan]nmap flags[/cyan] (Leave empty for none): "
+msgstr "[cyan]nmap bayraklarını[/cyan] girin (yoksa boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:156
+#, fuzzy
+msgid "Enter [cyan]speed[/cyan] (0-5, Leave empty for default): "
+msgstr "[cyan]Hızı[/cyan] girin (0-5, varsayılan için boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:161
+#, fuzzy
+msgid "Pick [cyan]scan type[/cyan] for host discovery (Leave empty for ARP): "
+msgstr ""
+"Host keşfi için [cyan]tarama türünü[/cyan] seçin (ARP için boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:162
+#, fuzzy
+msgid "ARP"
+msgstr "ARP"
+
+#: autopwn_suite/daemon/daemon_installer.py:162
+#, fuzzy
+msgid "Ping"
+msgstr "Ping"
+
+#: autopwn_suite/daemon/daemon_installer.py:167
+#, fuzzy
+msgid "Enter [cyan]host timeout[/cyan] (Leave empty for default): "
+msgstr "[cyan]Host zaman aşımını[/cyan] girin (varsayılan için boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:171
+#, fuzzy
+msgid "Enter [cyan]Scan Method[/cyan] (Leave empty for Normal): "
+msgstr "[cyan]Tarama Yöntemini[/cyan] girin (Normal için boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:172
+#, fuzzy
+msgid "Normal"
+msgstr "Normal"
+
+#: autopwn_suite/daemon/daemon_installer.py:172
+#, fuzzy
+msgid "Evade"
+msgstr "Kaçınma"
+
+#: autopwn_suite/daemon/daemon_installer.py:177
+#, fuzzy
+msgid "Enter [cyan]output folder[/cyan] (Leave empty for default): "
+msgstr "[cyan]Çıktı klasörünü[/cyan] girin (varsayılan için boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:182
+#, fuzzy
+msgid "Enter [cyan]output type[/cyan] (Leave empty for html): "
+msgstr "[cyan]Çıktı türünü[/cyan] girin (html için boş bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:183
+#, fuzzy
+msgid "HTML report"
+msgstr "HTML raporu"
+
+#: autopwn_suite/daemon/daemon_installer.py:183
+#, fuzzy
+msgid "Plain text"
+msgstr "Düz metin"
+
+#: autopwn_suite/daemon/daemon_installer.py:183
+#, fuzzy
+msgid "SVG image"
+msgstr "SVG görseli"
+
+#: autopwn_suite/daemon/daemon_installer.py:187
+#, fuzzy
+msgid "Creating config file..."
+msgstr "Yapılandırma dosyası oluşturuluyor..."
+
+#: autopwn_suite/daemon/daemon_installer.py:224
+#, fuzzy
+msgid "Enter [cyan]config file name[/cyan] (Leave empty for autopwn.conf): "
+msgstr ""
+"[cyan]Yapılandırma dosyası adını[/cyan] girin (autopwn.conf için boş "
+"bırakın): "
+
+#: autopwn_suite/daemon/daemon_installer.py:232
+#, fuzzy, python-brace-format
+msgid ""
+"[yellow]Config file '{config_file}' already exists. Would you like to "
+"overwrite it?[/yellow] (y/n): "
+msgstr ""
+"[yellow]'{config_file}' yapılandırma dosyası zaten mevcut. Üzerine yazmak "
+"ister misiniz?[/yellow] (y/n): "
+
+#: autopwn_suite/daemon/daemon_installer.py:234
+#, fuzzy, python-brace-format
+msgid "[red]Config file '{config_file}' not overwritten.[/red]"
+msgstr "[red]'{config_file}' yapılandırma dosyasının üzerine yazılmadı.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:243
+#, fuzzy, python-brace-format
+msgid "[green]Config file '{config_file}' created successfully![/green]"
+msgstr ""
+"[green]'{config_file}' yapılandırma dosyası başarıyla oluşturuldu![/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:298
+#, fuzzy, python-brace-format
+msgid "Creating install directory: {path}"
+msgstr "Kurulum dizini oluşturuluyor: {path}"
+
+#: autopwn_suite/daemon/daemon_installer.py:302
+#, fuzzy, python-brace-format
+msgid "[red]Failed to create install directory {path}: {error}[/red]"
+msgstr "[red]{path} kurulum dizini oluşturulamadı: {error}[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:307
+#, fuzzy, python-brace-format
+msgid ""
+"[red]Refusing to install the daemon: it runs as root, but the interpreter, "
+"the package or {install_path} can be modified by another user.[/red]"
+msgstr ""
+"[red]Daemon kurulumu reddedildi: root olarak çalışır, ancak yorumlayıcı, "
+"paket veya {install_path} başka bir kullanıcı tarafından "
+"değiştirilebilir.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:309
+#, fuzzy
+msgid ""
+"[yellow]Install AutoPWN Suite as root (for example with 'sudo bash "
+"install.sh' or a standalone binary kept in a root-owned directory) and run "
+"--daemon-install from that installation.[/yellow]"
+msgstr ""
+"[yellow]AutoPWN Suite'i root olarak kurun (örneğin 'sudo bash install.sh' ile"
+" veya root'a ait bir dizinde tutulan bağımsız bir ikili dosyayla) ve "
+"--daemon-install komutunu bu kurulumdan çalıştırın.[/yellow]"
+
+#: autopwn_suite/daemon/daemon_installer.py:316
+#, fuzzy, python-brace-format
+msgid ""
+"[red]Refusing to install the daemon: the service would run '{command}' from "
+"{install_path}, but this interpreter cannot import autopwn_suite from "
+"there.[/red]"
+msgstr ""
+"[red]Daemon kurulumu reddedildi: servis '{command}' komutunu {install_path} "
+"konumundan çalıştırırdı, ancak bu yorumlayıcı autopwn_suite'i oradan içe "
+"aktaramıyor.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:320
+#, fuzzy
+msgid ""
+"[yellow]A source checkout started with 'python autopwn.py' is not enough. "
+"Install AutoPWN Suite as root (for example with 'sudo bash install.sh' or a "
+"standalone binary kept in a root-owned directory) and run --daemon-install "
+"from that installation.[/yellow]"
+msgstr ""
+"[yellow]'python autopwn.py' ile başlatılan bir kaynak kopyası yeterli "
+"değildir. AutoPWN Suite'i root olarak kurun (örneğin 'sudo bash install.sh' "
+"ile veya root'a ait bir dizinde tutulan bağımsız bir ikili dosyayla) ve "
+"--daemon-install komutunu bu kurulumdan çalıştırın.[/yellow]"
+
+#: autopwn_suite/daemon/daemon_installer.py:349
+#, fuzzy, python-brace-format
+msgid "[red]Configuration file {src} does not exist.[/red]"
+msgstr "[red]{src} yapılandırma dosyası mevcut değil.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:356
+#, fuzzy, python-brace-format
+msgid "[green]Configuration available at {dst}[/green]"
+msgstr "[green]Yapılandırma şurada: {dst}[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:358
+#, fuzzy, python-brace-format
+msgid "[red]Error copying {src} -> {dst}: {error}[/red]"
+msgstr "[red]{src} -> {dst} kopyalanırken hata: {error}[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:367
+#, fuzzy, python-brace-format
+msgid "[green]Created log file: {path}[/green]"
+msgstr "[green]Günlük dosyası oluşturuldu: {path}[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:369
+#, fuzzy, python-brace-format
+msgid "[yellow]Warning: could not create log file {path}: {error}[/yellow]"
+msgstr "[yellow]Uyarı: {path} günlük dosyası oluşturulamadı: {error}[/yellow]"
+
+#: autopwn_suite/daemon/daemon_installer.py:397
+#, fuzzy, python-brace-format
+msgid "Writing systemd service file to {path} ..."
+msgstr "systemd servis dosyası {path} konumuna yazılıyor ..."
+
+#: autopwn_suite/daemon/daemon_installer.py:400
+#, fuzzy, python-brace-format
+msgid "[green]Service file written to {path}[/green]"
+msgstr "[green]Servis dosyası {path} konumuna yazıldı[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:402
+#, fuzzy, python-brace-format
+msgid ""
+"[red]Permission denied writing {path}. Run this script as root or use "
+"sudo.[/red]"
+msgstr ""
+"[red]{path} konumuna yazma izni reddedildi. Bu betiği root olarak çalıştırın "
+"veya sudo kullanın.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:403
+#, fuzzy
+msgid "[yellow]Here’s the unit content to save manually:[/yellow]"
+msgstr "[yellow]Manuel olarak kaydedilecek birim (unit) içeriği:[/yellow]"
+
+#: autopwn_suite/daemon/daemon_installer.py:410
+#, fuzzy
+msgid "Reloading systemd daemon ..."
+msgstr "systemd daemon yeniden yükleniyor ..."
+
+#: autopwn_suite/daemon/daemon_installer.py:412
+#, fuzzy
+msgid "Enabling and starting service ..."
+msgstr "Servis etkinleştiriliyor ve başlatılıyor ..."
+
+#: autopwn_suite/daemon/daemon_installer.py:415
+#, fuzzy
+msgid "[green]Service enabled and started successfully.[/green]"
+msgstr "[green]Servis başarıyla etkinleştirildi ve başlatıldı.[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:416
+#, fuzzy
+msgid ""
+"[blue]Check status with: sudo systemctl status autopwn-daemon.service[/blue]"
+msgstr ""
+"[blue]Durumu kontrol etmek için: sudo systemctl status autopwn-"
+"daemon.service[/blue]"
+
+#: autopwn_suite/daemon/daemon_installer.py:418
+#, fuzzy, python-brace-format
+msgid "[red]Systemctl command failed: {error}[/red]"
+msgstr "[red]Systemctl komutu başarısız oldu: {error}[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:419
+#, fuzzy
+msgid ""
+"[yellow]You may need to run manually: sudo systemctl daemon-reload && sudo "
+"systemctl enable autopwn-daemon.service && sudo systemctl restart autopwn-"
+"daemon.service[/yellow]"
+msgstr ""
+"[yellow]Şunu elle çalıştırmanız gerekebilir: sudo systemctl daemon-reload && "
+"sudo systemctl enable autopwn-daemon.service && sudo systemctl restart "
+"autopwn-daemon.service[/yellow]"
+
+#: autopwn_suite/daemon/daemon_installer.py:422
+#, fuzzy
+msgid "[green]AutoPWN daemon installation complete.[/green]"
+msgstr "[green]AutoPWN daemon kurulumu tamamlandı.[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:429
+#, fuzzy
+msgid ""
+"Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"
+msgstr ""
+"Daemon yalnızca [cyan]Linux[/cyan] üzerinde ve [cyan]root[/cyan] olarak "
+"kurulabilir!"
+
+#: autopwn_suite/daemon/daemon_installer.py:445
+#, fuzzy
+msgid "[yellow]systemctl could not be run.[/yellow]"
+msgstr "[yellow]systemctl çalıştırılamadı.[/yellow]"
+
+#: autopwn_suite/daemon/daemon_installer.py:454
+#, fuzzy
+msgid ""
+"Daemon can only be removed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"
+msgstr ""
+"Daemon yalnızca [cyan]Linux[/cyan] üzerinde ve [cyan]root[/cyan] olarak "
+"kaldırılabilir!"
+
+#: autopwn_suite/daemon/daemon_installer.py:460
+#, fuzzy
+msgid "Stopping and disabling the service ..."
+msgstr "Servis durduruluyor ve devre dışı bırakılıyor ..."
+
+#: autopwn_suite/daemon/daemon_installer.py:462
+#, fuzzy
+msgid ""
+"[yellow]The service could not be stopped and disabled; it may not be "
+"installed. Continuing.[/yellow]"
+msgstr ""
+"[yellow]Servis durdurulup devre dışı bırakılamadı; kurulu olmayabilir. Devam "
+"ediliyor.[/yellow]"
+
+#: autopwn_suite/daemon/daemon_installer.py:469
+#, fuzzy, python-brace-format
+msgid "[red]Could not remove {service_path}: {error}[/red]"
+msgstr "[red]{service_path} kaldırılamadı: {error}[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:472
+#, fuzzy, python-brace-format
+msgid "[green]Removed {service_path}[/green]"
+msgstr "[green]{service_path} kaldırıldı[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:474
+#, fuzzy
+msgid ""
+"[yellow]systemd was not told about the removal; run: sudo systemctl daemon-"
+"reload[/yellow]"
+msgstr ""
+"[yellow]systemd kaldırmadan haberdar edilmedi; şunu çalıştırın: sudo "
+"systemctl daemon-reload[/yellow]"
+
+#: autopwn_suite/daemon/daemon_installer.py:476
+#, fuzzy, python-brace-format
+msgid "No service file at {service_path}."
+msgstr "{service_path} konumunda servis dosyası yok."
+
+#: autopwn_suite/daemon/daemon_installer.py:482
+#, fuzzy, python-brace-format
+msgid "[red]Could not remove {config_path}: {error}[/red]"
+msgstr "[red]{config_path} kaldırılamadı: {error}[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:485
+#, fuzzy, python-brace-format
+msgid "[green]Removed {config_path}[/green]"
+msgstr "[green]{config_path} kaldırıldı[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:487
+#, fuzzy
+msgid "[green]AutoPWN daemon removed.[/green]"
+msgstr "[green]AutoPWN daemon kaldırıldı.[/green]"
+
+#: autopwn_suite/daemon/daemon_installer.py:488
+#, fuzzy, python-brace-format
+msgid ""
+"[blue]Left in place: the program, the log file /var/log/autopwn-daemon.log "
+"and the files in {install_dir}. Remove the program with 'sudo bash "
+"uninstall.sh', 'pipx uninstall autopwn-suite' or by deleting the "
+"binary.[/blue]"
+msgstr ""
+"[blue]Yerinde bırakılanlar: program, /var/log/autopwn-daemon.log günlük "
+"dosyası ve {install_dir} içindeki dosyalar. Programı 'sudo bash "
+"uninstall.sh', 'pipx uninstall autopwn-suite' ile veya ikili dosyayı silerek "
+"kaldırın.[/blue]"
+
+#: autopwn_suite/getexploits.py:49
+#, fuzzy, python-brace-format
+msgid ""
+"Connection error raised while trying to fetch information about: {cve_id}"
+msgstr "{cve_id} hakkında bilgi alınmaya çalışılırken bağlantı hatası oluştu"
+
+#: autopwn_suite/getexploits.py:55
+#, fuzzy
+msgid "An error occurred while parsing API response."
+msgstr "API yanıtı ayrıştırılırken bir hata oluştu."
+
+#: autopwn_suite/getexploits.py:75
+#, fuzzy
+msgid "Skipping a malformed exploit record."
+msgstr "Hatalı biçimlendirilmiş bir exploit kaydı atlanıyor."
+
+#: autopwn_suite/getexploits.py:106
+#, fuzzy, python-brace-format
+msgid "Connection error raised while trying to fetch: {link}"
+msgstr "{link} alınmaya çalışılırken bağlantı hatası oluştu"
+
+#: autopwn_suite/getexploits.py:110
+#, fuzzy, python-brace-format
+msgid "Unable to download {link}: {error}"
+msgstr "{link} indirilemedi: {error}"
+
+#: autopwn_suite/getexploits.py:115
+#, fuzzy, python-brace-format
+msgid "Unable to retrieve contents of {link} {user_agent}"
+msgstr "{link} {user_agent} içeriği alınamadı"
+
+#: autopwn_suite/getexploits.py:150
+#, fuzzy, python-brace-format
+msgid ""
+"┌─[yellow]{name}[/yellow]\n"
+"│"
+msgstr ""
+"┌─[yellow]{name}[/yellow]\n"
+"│"
+
+#: autopwn_suite/getexploits.py:153
+#, fuzzy, python-brace-format
+msgid ""
+"│\n"
+"├─────┤ [red]{cve}[/red]\n"
+"│"
+msgstr ""
+"│\n"
+"├─────┤ [red]{cve}[/red]\n"
+"│"
+
+#: autopwn_suite/getexploits.py:171
+#, fuzzy, python-brace-format
+msgid ""
+"├──────────# [white]exploits/{path}[/white]\n"
+"│\t\t [cyan]Platform: [/cyan] {platform}\n"
+"│\t\t [cyan]Type: [/cyan] {type}\n"
+"│\t\t [cyan]Author: [/cyan] {author}\n"
+"│\t\t [cyan]Date: [/cyan] [bright_cyan]{date}[/bright_cyan]\n"
+"│\t\t [cyan]Metasploit: [/cyan] {metasploit}\n"
+"│\t\t [cyan]Verified: [/cyan]{verified}\n"
+"│\t\t [cyan]Link: [/cyan] {link}\n"
+"│"
+msgstr ""
+"├──────────# [white]exploits/{path}[/white]\n"
+"│\t\t [cyan]Platform: [/cyan] {platform}\n"
+"│\t\t [cyan]Tür: [/cyan] {type}\n"
+"│\t\t [cyan]Yazar: [/cyan] {author}\n"
+"│\t\t [cyan]Tarih: [/cyan] [bright_cyan]{date}[/bright_cyan]\n"
+"│\t\t [cyan]Metasploit: [/cyan] {metasploit}\n"
+"│\t\t [cyan]Doğrulandı: [/cyan]{verified}\n"
+"│\t\t [cyan]Bağlantı: [/cyan] {link}\n"
+"│"
+
+#: autopwn_suite/getexploits.py:198
+#, fuzzy, python-brace-format
+msgid "Downloading exploits for {target}..."
+msgstr "{target} için exploitler indiriliyor..."
+
+#: autopwn_suite/getexploits.py:200
+#, fuzzy
+msgid "Downloading exploits..."
+msgstr "Exploitler indiriliyor..."
+
+#: autopwn_suite/getexploits.py:203
+#, fuzzy
+msgid "[red]Downloading exploits ...[/red]"
+msgstr "[red]Exploitler indiriliyor ...[/red]"
+
+#: autopwn_suite/getexploits.py:208
+#, fuzzy, python-brace-format
+msgid ""
+"[white]Downloading exploits for[/white] [red]{title}[/red] [white]...[/white]"
+msgstr ""
+"[white]Şunun için exploitler indiriliyor:[/white] [red]{title}[/red] "
+"[white]...[/white]"
+
+#: autopwn_suite/getexploits.py:215
+#, fuzzy, python-brace-format
+msgid "Skipping exploits for {title}"
+msgstr "{title} için exploitler atlanıyor"
+
+#: autopwn_suite/nist_search.py:129
+#, fuzzy
+msgid "Vulnerability source must be auto, online, or offline"
+msgstr "Güvenlik açığı kaynağı auto, online veya offline olmalıdır"
+
+#: autopwn_suite/nist_search.py:148
+#, fuzzy, python-brace-format
+msgid "Using local NVD database: {count} CVEs; updated {updated_at}."
+msgstr ""
+"Yerel NVD veritabanı kullanılıyor: {count} CVE; güncellendi: {updated_at}."
+
+#: autopwn_suite/nist_search.py:163
+#, fuzzy
+msgid ""
+"NVD lookup failed and no local vulnerability database is available. Retry "
+"later, use an NVD API key to avoid rate limits, or download the database with"
+" --update-vuln-db while connected."
+msgstr ""
+"NVD sorgusu başarısız oldu ve yerel zafiyet veritabanı yok. Daha sonra "
+"yeniden deneyin, hız sınırlarından kaçınmak için bir NVD API anahtarı "
+"kullanın veya bağlıyken veritabanını --update-vuln-db ile indirin."
+
+#: autopwn_suite/nist_search.py:167
+#, fuzzy, python-brace-format
+msgid ""
+"NVD unavailable; using the local vulnerability database updated {updated_at} "
+"for this scan."
+msgstr ""
+"NVD kullanılamıyor; bu tarama için {updated_at} tarihinde güncellenen yerel "
+"güvenlik açığı veritabanı kullanılıyor."
+
+#: autopwn_suite/nist_search.py:225
+#, fuzzy
+msgid ""
+"Requests are being rate limited by NIST API, please get a NIST API key to "
+"prevent this."
+msgstr ""
+"İstekler NIST API tarafından hız sınırlamasına tabi tutuluyor, bunu önlemek "
+"için bir NIST API anahtarı edinin."
+
+#: autopwn_suite/nist_search.py:233
+#, fuzzy, python-brace-format
+msgid "NVD lookup failed for {keyword}"
+msgstr "{keyword} için NVD sorgusu başarısız oldu"
+
+#: autopwn_suite/nist_search.py:236
+#, fuzzy, python-brace-format
+msgid "NVD lookup failed for {keyword}; vulnerability coverage is incomplete."
+msgstr ""
+"{keyword} için NVD sorgusu başarısız oldu; güvenlik açığı kapsamı eksik."
+
+#: autopwn_suite/random_user_agent.py:29
+#, fuzzy
+msgid "User agent database not found."
+msgstr "Kullanıcı aracısı veritabanı bulunamadı."
+
+#: autopwn_suite/random_user_agent.py:33
+#, fuzzy
+msgid "User agent database is empty."
+msgstr "Kullanıcı aracısı veritabanı boş."
+
+#: autopwn_suite/report.py:55
+#, fuzzy
+msgid "Sending email report..."
+msgstr "E-posta raporu gönderiliyor..."
+
+#: autopwn_suite/report.py:70 autopwn_suite/report.py:72
+#, fuzzy
+msgid "AutoPWN Report"
+msgstr "AutoPWN Raporu"
+
+#: autopwn_suite/report.py:92
+#, fuzzy
+msgid "An error occurred while trying to send email report."
+msgstr "E-posta raporu gönderilmeye çalışılırken bir hata oluştu."
+
+#: autopwn_suite/report.py:94
+#, fuzzy
+msgid "Email report sent successfully."
+msgstr "E-posta raporu başarıyla gönderildi."
+
+#: autopwn_suite/report.py:110
+#, fuzzy
+msgid "Sending webhook report..."
+msgstr "Webhook raporu gönderiliyor..."
+
+#: autopwn_suite/report.py:129
+#, fuzzy
+msgid "Webhook report sent successfully."
+msgstr "Webhook raporu başarıyla gönderildi."
+
+#: autopwn_suite/report.py:132
+#, fuzzy, python-brace-format
+msgid "Webhook delivery failed: HTTP {status}"
+msgstr "Webhook teslimi başarısız oldu: HTTP {status}"
+
+#: autopwn_suite/report.py:133 autopwn_suite/report.py:136
+#, fuzzy
+msgid "Webhook report failed to send."
+msgstr "Webhook raporu gönderilemedi."
+
+#: autopwn_suite/report.py:135
+#, fuzzy, python-brace-format
+msgid "Webhook delivery failed: {reason}"
+msgstr "Webhook teslimi başarısız oldu: {reason}"
+
+#: autopwn_suite/scanner.py:93
+#, fuzzy, python-brace-format
+msgid "Scanning {target} for open ports ..."
+msgstr "{target} açık portlar için taranıyor ..."
+
+#: autopwn_suite/scanner.py:121
+#, fuzzy, python-brace-format
+msgid ""
+"Not running as root; dropping {flags}, which need raw-socket privileges."
+msgstr ""
+"root olarak çalışılmıyor; ham soket ayrıcalığı gerektiren {flags} "
+"kaldırılıyor."
+
+#: autopwn_suite/scanner.py:141
+#, fuzzy, python-brace-format
+msgid "Error: {error}"
+msgstr "Hata: {error}"
+
+#: autopwn_suite/scanner.py:159
+#, fuzzy
+msgid "Ctr+C, aborting."
+msgstr "Ctrl+C, iptal ediliyor."
+
+#: autopwn_suite/scanner.py:170
+#, fuzzy
+msgid "Creating noise..."
+msgstr "Gürültü oluşturuluyor..."
+
+#: autopwn_suite/scanner.py:178
+#, fuzzy
+msgid "No hosts found for noise scan."
+msgstr "Gürültü taraması için host bulunamadı."
+
+#: autopwn_suite/scanner.py:182
+#, fuzzy, python-brace-format
+msgid "Creating noise on the first {limit} of {count} hosts."
+msgstr "Gürültü, {count} hostun ilk {limit} tanesinde oluşturuluyor."
+
+#: autopwn_suite/scanner.py:188
+#, fuzzy
+msgid "Creating noise ..."
+msgstr "Gürültü oluşturuluyor ..."
+
+#: autopwn_suite/scanner.py:190
+#, fuzzy, python-brace-format
+msgid "Started creating noise on {host}..."
+msgstr "{host} üzerinde gürültü oluşturulmaya başlandı..."
+
+#: autopwn_suite/scanner.py:201
+#, fuzzy
+msgid "Noise scan complete!"
+msgstr "Gürültü taraması tamamlandı!"
+
+#: autopwn_suite/scanner.py:204
+#, fuzzy
+msgid "Noise scan interrupted!"
+msgstr "Gürültü taraması kesintiye uğradı!"
+
+#: autopwn_suite/scanner.py:221
+#, fuzzy, python-brace-format
+msgid "Scanning {count} target(s) using {scantype} scan ..."
+msgstr "{scantype} taraması kullanılarak {count} hedef taranıyor ..."
+
+#: autopwn_suite/scanner.py:229
+#, fuzzy, python-brace-format
+msgid "Scanning {target} using {scantype} scan ..."
+msgstr "{target}, {scantype} taraması kullanılarak taranıyor ..."
+
+#: autopwn_suite/scanner.py:315
+#, fuzzy, python-brace-format
+msgid "Target {target} seems to be offline."
+msgstr "{target} hedefi çevrimdışı görünüyor."
+
+#: autopwn_suite/scanner.py:330 autopwn_suite/scanner.py:334
+#, fuzzy, python-brace-format
+msgid "Target {target} seems to be us."
+msgstr "{target} hedefi bizim gibi görünüyor."
+
+#: autopwn_suite/scanner.py:349
+#, fuzzy, python-brace-format
+msgid "Nmap timed out on {target}; port coverage is incomplete."
+msgstr "Nmap {target} üzerinde zaman aşımına uğradı; port kapsamı eksik."
+
+#: autopwn_suite/scanner.py:353
+#, fuzzy, python-brace-format
+msgid "Target {target} seems to have no open ports."
+msgstr "{target} hedefinin açık portu yok gibi görünüyor."
+
+#: autopwn_suite/scanner.py:356
+#, fuzzy, python-brace-format
+msgid "Portscan results for {target}"
+msgstr "{target} için port tarama sonuçları"
+
+#: autopwn_suite/scanner.py:363 autopwn_suite/web_ui.py:967
+#, fuzzy
+msgid "Port"
+msgstr "Port"
+
+#: autopwn_suite/scanner.py:364
+#, fuzzy
+msgid "State"
+msgstr "Durum"
+
+#: autopwn_suite/scanner.py:365 autopwn_suite/web_ui.py:971
+#, fuzzy
+msgid "Service"
+msgstr "Servis"
+
+#: autopwn_suite/scanner.py:366 autopwn_suite/web_ui.py:968
+#, fuzzy
+msgid "Product"
+msgstr "Ürün"
+
+#: autopwn_suite/scanner.py:367 autopwn_suite/web_ui.py:977
+#, fuzzy
+msgid "Version"
+msgstr "Sürüm"
+
+#: autopwn_suite/searchvuln.py:65
+#, fuzzy, python-brace-format
+msgid "Skipped vulnerability detection for {keyword}"
+msgstr "{keyword} için güvenlik açığı tespiti atlandı"
+
+#: autopwn_suite/searchvuln.py:89
+#, fuzzy, python-brace-format
+msgid "Insufficient information for {target}"
+msgstr "{target} için yetersiz bilgi"
+
+#: autopwn_suite/searchvuln.py:94
+#, fuzzy, python-brace-format
+msgid "Searching vulnerability database for {count} keyword(s) ..."
+msgstr ""
+"{count} anahtar kelime için güvenlik açığı veritabanında arama yapılıyor ..."
+
+#: autopwn_suite/searchvuln.py:99
+#, fuzzy
+msgid "[white]Searching vulnerabilities ...[/white]"
+msgstr "[white]Güvenlik açıkları aranıyor ...[/white]"
+
+#: autopwn_suite/searchvuln.py:104
+#, fuzzy, python-brace-format
+msgid ""
+"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] "
+"[white]...[/white]"
+msgstr ""
+"[white]Güvenlik açığı veritabanında aranıyor:[/white] [red]{keyword}[/red] "
+"[white]...[/white]"
+
+#: autopwn_suite/searchvuln.py:115
+#, fuzzy, python-brace-format
+msgid "Possible vulnerabilities for {target}"
+msgstr "{target} için olası güvenlik açıkları"
+
+#: autopwn_suite/searchvuln.py:118
+#, fuzzy, python-brace-format
+msgid "┌─ [yellow]{label}[/yellow]"
+msgstr "┌─ [yellow]{label}[/yellow]"
+
+#: autopwn_suite/searchvuln.py:126
+#, fuzzy
+msgid "│\t\t[cyan]Description: [/cyan]"
+msgstr "│\t\t[cyan]Açıklama: [/cyan]"
+
+#: autopwn_suite/searchvuln.py:131
+#, fuzzy, python-brace-format
+msgid ""
+"│\t\t[cyan]Severity: [/cyan]{severity} - {severity_score}\n"
+"│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
+"│\t\t[cyan]Details: [/cyan] {details_url}"
+msgstr ""
+"│\t\t[cyan]Önem Derecesi: [/cyan]{severity} - {severity_score}\n"
+"│\t\t[cyan]İstismar Edilebilirlik: [/cyan] {exploitability}\n"
+"│\t\t[cyan]Detaylar: [/cyan] {details_url}"
+
+#: autopwn_suite/update_checker.py:77
+#, fuzzy
+msgid ""
+"The repository (--update-repo or AUTOPWN_UPDATE_REPO) must be written "
+"OWNER/REPO, using letters, digits, '.', '_' and '-'."
+msgstr ""
+"Depo (--update-repo veya AUTOPWN_UPDATE_REPO) SAHİP/DEPO biçiminde, harf, "
+"rakam, '.', '_' ve '-' kullanılarak yazılmalıdır."
+
+#: autopwn_suite/update_checker.py:97
+#, fuzzy
+msgid "The release tag name is not a plain git name."
+msgstr "Sürüm etiketi adı düz bir git adı değil."
+
+#: autopwn_suite/update_checker.py:99
+#, fuzzy
+msgid "The branch name is not a plain git name."
+msgstr "Dal adı düz bir git adı değil."
+
+#: autopwn_suite/update_checker.py:116
+#, fuzzy, python-brace-format
+msgid "Could not reach GitHub ({error_type})."
+msgstr "GitHub'a ulaşılamadı ({error_type})."
+
+#: autopwn_suite/update_checker.py:118
+#, fuzzy, python-brace-format
+msgid "Nothing found at {url}."
+msgstr "{url} adresinde hiçbir şey bulunamadı."
+
+#: autopwn_suite/update_checker.py:120
+#, fuzzy
+msgid "GitHub API rate limit exceeded; try again later."
+msgstr "GitHub API hız sınırı aşıldı; lütfen daha sonra tekrar deneyin."
+
+#: autopwn_suite/update_checker.py:122
+#, fuzzy, python-brace-format
+msgid "GitHub API returned HTTP {status}."
+msgstr "GitHub API HTTP {status} döndürdü."
+
+#: autopwn_suite/update_checker.py:126 autopwn_suite/update_checker.py:128
+#, fuzzy
+msgid "GitHub API returned an unexpected response."
+msgstr "GitHub API beklenmeyen bir yanıt döndürdü."
+
+#: autopwn_suite/update_checker.py:183
+#, fuzzy
+msgid ""
+"Commit-based update checks require a git checkout of AutoPWN Suite; use "
+"--update-channel release instead."
+msgstr ""
+"Commit tabanlı güncelleme kontrolleri, AutoPWN Suite'in bir git checkout'unu "
+"gerektirir; bunun yerine --update-channel release kullanın."
+
+#: autopwn_suite/update_checker.py:209
+#, fuzzy, python-brace-format
+msgid ""
+"Update available ({mode}): {current} -> {latest}\n"
+"{url}"
+msgstr ""
+"Güncelleme mevcut ({mode}): {current} -> {latest}\n"
+"{url}"
+
+#: autopwn_suite/update_checker.py:212
+#, fuzzy, python-brace-format
+msgid "Up to date ({mode}): {current} (latest: {latest})."
+msgstr "Güncel ({mode}): {current} (en son: {latest})."
+
+#: autopwn_suite/update_checker.py:236
+#, fuzzy, python-brace-format
+msgid "git {command} could not run ({error_type})."
+msgstr "git {command} çalıştırılamadı ({error_type})."
+
+#: autopwn_suite/update_checker.py:243
+#, fuzzy
+msgid ""
+"Working tree has uncommitted changes; commit or stash them before applying an"
+" update."
+msgstr ""
+"Çalışma ağacında commit edilmemiş değişiklikler var; bir güncelleme "
+"uygulamadan önce bunları commit edin veya stash'leyin."
+
+#: autopwn_suite/update_checker.py:259
+#, fuzzy, python-brace-format
+msgid "git fetch from {repo} failed (exit status {status})."
+msgstr "{repo} deposundan git fetch başarısız oldu (çıkış durumu {status})."
+
+#: autopwn_suite/update_checker.py:267
+#, fuzzy, python-brace-format
+msgid ""
+"Cannot fast-forward to {onto}: the local branch has diverged. Resolve "
+"manually (e.g. git rebase, or git reset --hard after backing up changes)."
+msgstr ""
+"{onto} üzerine fast-forward yapılamıyor: yerel dal (branch) farklılaştı. Elle"
+" çözün (örn. git rebase veya değişiklikleri yedekledikten sonra git reset "
+"--hard)."
+
+#: autopwn_suite/update_checker.py:278 autopwn_suite/update_checker.py:293
+#, fuzzy
+msgid "Applying an update requires a git checkout of AutoPWN Suite."
+msgstr ""
+"Bir güncelleme uygulamak, AutoPWN Suite'in bir git checkout'unu gerektirir."
+
+#: autopwn_suite/update_checker.py:280
+#, fuzzy
+msgid ""
+"HEAD is detached; checkout a branch before applying a commit-based update."
+msgstr ""
+"HEAD ayrık (detached) durumda; commit tabanlı bir güncelleme uygulamadan önce"
+" bir dala (branch) geçiş yapın."
+
+#: autopwn_suite/update_checker.py:298
+#, fuzzy
+msgid "Latest release has no tag name."
+msgstr "En son sürümün (release) bir etiket (tag) adı yok."
+
+#: autopwn_suite/update_checker.py:305
+#, fuzzy, python-brace-format
+msgid "git checkout {tag} failed (exit status {status})."
+msgstr "git checkout {tag} başarısız oldu (çıkış durumu {status})."
+
+#: autopwn_suite/update_checker.py:321
+#, fuzzy, python-brace-format
+msgid ""
+"Updated ({mode}) {previous} -> {new} ({ref}). Restart AutoPWN Suite to use "
+"the updated code."
+msgstr ""
+"Güncellendi ({mode}) {previous} -> {new} ({ref}). Güncellenen kodu kullanmak "
+"için AutoPWN Suite'i yeniden başlatın."
+
+#: autopwn_suite/utils.py:64
+#, fuzzy
+msgid ""
+"AutoPWN Suite | A project for scanning vulnerabilities and exploiting systems"
+" automatically."
+msgstr ""
+"AutoPWN Suite | Güvenlik açıklarını tarayan ve sistemleri otomatik olarak "
+"istismar eden bir proje."
+
+#: autopwn_suite/utils.py:69
+#, fuzzy
+msgid "Print version and exit."
+msgstr "Sürümü yazdır ve çık."
+
+#: autopwn_suite/utils.py:74
+#, fuzzy
+msgid "Don't ask for anything. (Full automatic mode)"
+msgstr "Hiçbir şey sorma. (Tam otomatik mod)"
+
+#: autopwn_suite/utils.py:82
+#, fuzzy
+msgid "Specify a config file to use. (Default : None)"
+msgstr "Kullanılacak yapılandırma dosyasını belirtin. (Varsayılan: Yok)"
+
+#: autopwn_suite/utils.py:91
+#, fuzzy
+msgid "Disable colors."
+msgstr "Renkleri devre dışı bırak."
+
+#: autopwn_suite/utils.py:103
+#, fuzzy
+msgid ""
+"Interface language. Setting this explicitly remembers it as the default for "
+"future runs. (Default: the AUTOPWN_LANG environment variable, your last "
+"explicit choice, the system locale, or English.)"
+msgstr ""
+"Arayüz dili. Bunu açıkça ayarlamak, gelecekteki çalıştırmalar için varsayılan"
+" olarak hatırlanmasını sağlar. (Varsayılan: AUTOPWN_LANG ortam değişkeni, son"
+" açık seçiminiz, sistem yereli veya İngilizce.)"
+
+#: autopwn_suite/utils.py:111
+#, fuzzy
+msgid "Install the AutoPWN Suite daemon."
+msgstr "AutoPWN Suite daemon'unu kur."
+
+#: autopwn_suite/utils.py:118
+#, fuzzy
+msgid "Uninstall the AutoPWN Suite daemon."
+msgstr "AutoPWN Suite daemon'unu kaldır."
+
+#: autopwn_suite/utils.py:125
+#, fuzzy
+msgid "Create a config file."
+msgstr "Bir yapılandırma dosyası oluştur."
+
+#: autopwn_suite/utils.py:130
+#, fuzzy
+msgid "Scanning"
+msgstr "Tarama"
+
+#: autopwn_suite/utils.py:130
+#, fuzzy
+msgid "Options for scanning"
+msgstr "Tarama seçenekleri"
+
+#: autopwn_suite/utils.py:132
+#, fuzzy
+msgid ""
+"Use only the local vulnerability database; disable internet integrations."
+msgstr ""
+"Yalnızca yerel güvenlik açığı veritabanını kullan; internet entegrasyonlarını"
+" devre dışı bırak."
+
+#: autopwn_suite/utils.py:135
+#, fuzzy
+msgid "CVE lookup source (auto falls back to the local database on failure)."
+msgstr ""
+"CVE sorgu kaynağı (auto, hata durumunda yerel veritabanına geri döner)."
+
+#: autopwn_suite/utils.py:137
+#, fuzzy
+msgid "Path to a portable vulnerabilities.sqlite3 database."
+msgstr "Taşınabilir bir vulnerabilities.sqlite3 veritabanının yolu."
+
+#: autopwn_suite/utils.py:138
+#, fuzzy
+msgid "Vulnerability database"
+msgstr "Güvenlik açığı veritabanı"
+
+#: autopwn_suite/utils.py:140
+#, fuzzy
+msgid ""
+"Download/update the complete NVD database, then exit. Requires internet."
+msgstr ""
+"Tam NVD veritabanını indir/güncelle, ardından çık. İnternet gerektirir."
+
+#: autopwn_suite/utils.py:142
+#, fuzzy
+msgid "Show local vulnerability database status, then exit."
+msgstr "Yerel güvenlik açığı veritabanı durumunu göster, ardından çık."
+
+#: autopwn_suite/utils.py:143
+#, fuzzy
+msgid "Self-update"
+msgstr "Kendini güncelleme"
+
+#: autopwn_suite/utils.py:143
+#, fuzzy
+msgid "Check for or apply a newer AutoPWN Suite"
+msgstr "Daha yeni bir AutoPWN Suite'i kontrol et veya uygula"
+
+#: autopwn_suite/utils.py:145
+#, fuzzy
+msgid "Check GitHub for a newer AutoPWN Suite, then exit. Requires internet."
+msgstr ""
+"GitHub'da daha yeni bir AutoPWN Suite olup olmadığını kontrol et, ardından "
+"çık. İnternet gerektirir."
+
+#: autopwn_suite/utils.py:148
+#, fuzzy
+msgid ""
+"Fast-forward this git checkout to the latest release/commit (see --update-"
+"channel), then exit. Requires internet, a git checkout and a clean working "
+"tree."
+msgstr ""
+"Bu git checkout'unu en son sürüme/commit'e fast-forward yap (bkz. --update-"
+"channel), ardından çık. İnternet, bir git checkout ve temiz bir çalışma ağacı"
+" gerektirir."
+
+#: autopwn_suite/utils.py:155
+#, fuzzy
+msgid ""
+"Compare/update against the latest GitHub release tag or the latest commit on "
+"--update-branch. Setting this explicitly remembers it as the default for "
+"future runs. (Default: release, or your last explicit choice.)"
+msgstr ""
+"En son GitHub sürüm etiketine (release tag) veya --update-branch üzerindeki "
+"en son commit'e göre karşılaştır/güncelle. Bunu açıkça ayarlamak, gelecekteki"
+" çalıştırmalar için varsayılan olarak hatırlanmasını sağlar. (Varsayılan: "
+"release veya son açık seçiminiz.)"
+
+#: autopwn_suite/utils.py:161
+#, fuzzy
+msgid "Branch to compare against in commit mode. (Default: main)"
+msgstr "Commit modunda karşılaştırılacak dal (branch). (Varsayılan: main)"
+
+#: autopwn_suite/utils.py:163
+#, fuzzy, python-brace-format
+msgid "GitHub repo to check for updates. (Default: {repo})"
+msgstr ""
+"Güncellemelerin kontrol edileceği GitHub deposu (repo). (Varsayılan: {repo})"
+
+#: autopwn_suite/utils.py:170
+#, fuzzy
+msgid ""
+"Target range to scan. This argument overwrites the hostfile argument. "
+"(192.168.0.1 or 192.168.0.0/24)"
+msgstr ""
+"Taranacak hedef aralığı. Bu argüman, hostfile argümanının üzerine yazar. "
+"(192.168.0.1 veya 192.168.0.0/24)"
+
+#: autopwn_suite/utils.py:180
+#, fuzzy
+msgid "File containing a list of hosts to scan."
+msgstr "Taranacak host listesini içeren dosya."
+
+#: autopwn_suite/utils.py:188
+#, fuzzy
+msgid "Skips the host discovery phase."
+msgstr "Host keşif aşamasını atlar."
+
+#: autopwn_suite/utils.py:196
+#, fuzzy
+msgid "Scan type."
+msgstr "Tarama türü."
+
+#: autopwn_suite/utils.py:206
+#, fuzzy
+msgid ""
+"Custom nmap flags to use for portscan. (Has to be specified like : "
+"-nf=\"-O\")"
+msgstr ""
+"Port taraması için kullanılacak özel nmap bayrakları. (Şu şekilde "
+"belirtilmelidir: -nf=\"-O\")"
+
+#: autopwn_suite/utils.py:216
+#, fuzzy
+msgid "Scan speed. (Default : 3)"
+msgstr "Tarama hızı. (Varsayılan: 3)"
+
+#: autopwn_suite/utils.py:225
+#, fuzzy
+msgid "Timeout for every host. (Default :240)"
+msgstr "Her host için zaman aşımı. (Varsayılan: 240)"
+
+#: autopwn_suite/utils.py:234
+#, fuzzy
+msgid ""
+"Specify API key for vulnerability detection for faster scanning. (Default : "
+"None)"
+msgstr ""
+"Daha hızlı tarama için güvenlik açığı tespitinde kullanılacak API anahtarını "
+"belirtin. (Varsayılan: Yok)"
+
+#: autopwn_suite/utils.py:244
+#, fuzzy
+msgid "Scan mode."
+msgstr "Tarama modu."
+
+#: autopwn_suite/utils.py:253
+#, fuzzy
+msgid "Noise mode timeout."
+msgstr "Gürültü modu zaman aşımı."
+
+#: autopwn_suite/utils.py:262
+#, fuzzy
+msgid "Skip downloading exploits."
+msgstr "Exploit indirmeyi atla."
+
+#: autopwn_suite/utils.py:268
+#, fuzzy
+msgid "Reporting"
+msgstr "Raporlama"
+
+#: autopwn_suite/utils.py:268
+#, fuzzy
+msgid "Options for reporting"
+msgstr "Raporlama seçenekleri"
+
+#: autopwn_suite/utils.py:272
+#, fuzzy
+msgid "Output file name. Overrides output-folder."
+msgstr "Çıktı dosyası adı. output-folder'ın üzerine yazar."
+
+#: autopwn_suite/utils.py:280
+#, fuzzy
+msgid "Output file type. (Default : html)"
+msgstr "Çıktı dosyası türü. (Varsayılan: html)"
+
+#: autopwn_suite/utils.py:289
+#, fuzzy
+msgid "Output file folder. (Default : outputs/)"
+msgstr "Çıktı dosyası klasörü. (Varsayılan: outputs/)"
+
+#: autopwn_suite/utils.py:297
+#, fuzzy
+msgid "Report sending method."
+msgstr "Rapor gönderme yöntemi."
+
+#: autopwn_suite/utils.py:306
+#, fuzzy
+msgid "Email address to use for sending report."
+msgstr "Rapor göndermek için kullanılacak e-posta adresi."
+
+#: autopwn_suite/utils.py:315
+#, fuzzy
+msgid "Password of the email report is going to be sent from."
+msgstr "Raporun gönderileceği e-postanın şifresi."
+
+#: autopwn_suite/utils.py:324
+#, fuzzy
+msgid "Email address to send report to."
+msgstr "Raporun gönderileceği e-posta adresi."
+
+#: autopwn_suite/utils.py:333
+#, fuzzy
+msgid "Email to send from."
+msgstr "Gönderen e-posta."
+
+#: autopwn_suite/utils.py:342
+#, fuzzy
+msgid "Email server to use for sending report."
+msgstr "Rapor göndermek için kullanılacak e-posta sunucusu."
+
+#: autopwn_suite/utils.py:351
+#, fuzzy
+msgid "Port of the email server."
+msgstr "E-posta sunucusunun portu."
+
+#: autopwn_suite/utils.py:360
+#, fuzzy
+msgid "Webhook to use for sending report."
+msgstr "Rapor göndermek için kullanılacak webhook."
+
+#: autopwn_suite/utils.py:370
+#, fuzzy
+msgid ""
+"Do not verify TLS certificates of scanned websites. Use only for targets you "
+"trust, such as lab systems with self-signed certificates. (Default: verify "
+"certificates)"
+msgstr ""
+"Taranan web sitelerinin TLS sertifikalarını doğrulama. Yalnızca kendinden "
+"imzalı sertifikalara sahip laboratuvar sistemleri gibi güvendiğiniz hedefler "
+"için kullanın. (Varsayılan: sertifikaları doğrula)"
+
+#: autopwn_suite/utils.py:378
+#, fuzzy
+msgid "Web UI"
+msgstr "Web Arayüzü"
+
+#: autopwn_suite/utils.py:378
+#, fuzzy
+msgid "Browser-based dashboard for controlling scans"
+msgstr "Taramaları kontrol etmek için tarayıcı tabanlı kontrol paneli"
+
+#: autopwn_suite/utils.py:380
+#, fuzzy
+msgid ""
+"Reset the dashboard account to admin with a new random password, print it, "
+"then exit."
+msgstr ""
+"Kontrol paneli hesabını yeni rastgele bir şifreyle admin olarak sıfırla, "
+"şifreyi yazdır, ardından çık."
+
+#: autopwn_suite/utils.py:383
+#, fuzzy
+msgid "Start the web UI dashboard (scans are launched from the browser)."
+msgstr ""
+"Web arayüzü kontrol panelini başlat (taramalar tarayıcıdan başlatılır)."
+
+#: autopwn_suite/utils.py:391
+#, fuzzy
+msgid ""
+"Web UI bind address. Use 0.0.0.0 to listen on all interfaces; remote clients "
+"then require HTTPS. (Default: 127.0.0.1, env: AUTOPWN_WEB_HOST)"
+msgstr ""
+"Web arayüzü bağlanma adresi. Tüm arayüzlerde dinlemek için 0.0.0.0 kullanın; "
+"bu durumda uzak istemciler HTTPS gerektirir. (Varsayılan: 127.0.0.1, ortam "
+"değişkeni: AUTOPWN_WEB_HOST)"
+
+#: autopwn_suite/utils.py:401
+#, fuzzy
+msgid "Web UI port. (Default: 8080, env: AUTOPWN_WEB_PORT)"
+msgstr ""
+"Web arayüzü portu. (Varsayılan: 8080, ortam değişkeni: AUTOPWN_WEB_PORT)"
+
+#: autopwn_suite/utils.py:528
+#, fuzzy
+msgid ""
+"No API key specified and no api.txt file found. Vulnerability detection is "
+"going to be slower! You can get your own NIST API key from "
+"https://nvd.nist.gov/developers/request-an-api-key"
+msgstr ""
+"API anahtarı belirtilmedi ve api.txt dosyası bulunamadı. Güvenlik açığı "
+"tespiti daha yavaş olacak! Kendi NIST API anahtarınızı "
+"https://nvd.nist.gov/developers/request-an-api-key adresinden edinebilirsiniz"
+
+#: autopwn_suite/utils.py:535
+#, fuzzy
+msgid "Permission denied while trying to read api.txt!"
+msgstr "api.txt okunmaya çalışılırken izin reddedildi!"
+
+#: autopwn_suite/utils.py:537
+#, fuzzy, python-brace-format
+msgid "Error reading api.txt: {error}"
+msgstr "api.txt okunurken hata: {error}"
+
+#: autopwn_suite/utils.py:551
+#, fuzzy
+msgid ""
+"You need to be root in order to run arp scan.\n"
+"Changed scan mode to Ping Scan."
+msgstr ""
+"ARP taraması çalıştırmak için root olmanız gerekir.\n"
+"Tarama modu Ping Taramasına değiştirildi."
+
+#: autopwn_suite/utils.py:573
+#, fuzzy
+msgid "Host file not found!"
+msgstr "Host dosyası bulunamadı!"
+
+#: autopwn_suite/utils.py:575
+#, fuzzy
+msgid "Permission denied while trying to read host file!"
+msgstr "Host dosyası okunmaya çalışılırken izin reddedildi!"
+
+#: autopwn_suite/utils.py:577
+#, fuzzy
+msgid "Unknown error while trying to read host file!"
+msgstr "Host dosyası okunmaya çalışılırken bilinmeyen hata!"
+
+#: autopwn_suite/utils.py:580
+#, fuzzy
+msgid "Host file contains no targets!"
+msgstr "Host dosyası hiçbir hedef içermiyor!"
+
+#: autopwn_suite/utils.py:593 autopwn_suite/utils.py:596
+#, fuzzy
+msgid "Enter target range to scan : "
+msgstr "Taranacak hedef aralığını girin: "
+
+#: autopwn_suite/utils.py:609
+#, fuzzy
+msgid "Evasion mode enabled!"
+msgstr "Kaçınma modu etkinleştirildi!"
+
+#: autopwn_suite/utils.py:614
+#, fuzzy
+msgid "You must be root to use evasion mode! Switching back to normal mode ..."
+msgstr ""
+"Kaçınma modunu kullanmak için root olmanız gerekir! Normal moda geri "
+"dönülüyor ..."
+
+#: autopwn_suite/utils.py:620
+#, fuzzy
+msgid "Noise mode enabled!"
+msgstr "Gürültü modu etkinleştirildi!"
+
+#: autopwn_suite/utils.py:634
+#, fuzzy
+msgid "Enter your email address : "
+msgstr "E-posta adresinizi girin: "
+
+#: autopwn_suite/utils.py:639
+#, fuzzy
+msgid "Enter your email password : "
+msgstr "E-posta şifrenizi girin: "
+
+#: autopwn_suite/utils.py:644
+#, fuzzy
+msgid "Enter the email address to send the report to : "
+msgstr "Raporun gönderileceği e-posta adresini girin: "
+
+#: autopwn_suite/utils.py:655
+#, fuzzy
+msgid "Enter the email server to send the report from : "
+msgstr "Raporun gönderileceği e-posta sunucusunu girin: "
+
+#: autopwn_suite/utils.py:659
+#, fuzzy
+msgid "Google no longer supports sending mails via SMTP."
+msgstr "Google artık SMTP üzerinden e-posta göndermeyi desteklemiyor."
+
+#: autopwn_suite/utils.py:668
+#, fuzzy
+msgid "Enter the email port to send the report from : "
+msgstr "Raporun gönderileceği e-posta portunu girin: "
+
+#: autopwn_suite/utils.py:674
+#, fuzzy
+msgid "Invalid port number!"
+msgstr "Geçersiz port numarası!"
+
+#: autopwn_suite/utils.py:692
+#, fuzzy
+msgid "Enter your webhook URL : "
+msgstr "Webhook URL'nizi girin: "
+
+#: autopwn_suite/utils.py:707
+#, fuzzy
+msgid "Please answer y or n."
+msgstr "Lütfen y veya n yanıtını verin."
+
+#: autopwn_suite/utils.py:711
+#, fuzzy
+msgid "Do you want to scan ports? [Y/n] : "
+msgstr "Portları taramak ister misiniz? [Y/n] : "
+
+#: autopwn_suite/utils.py:715
+#, fuzzy
+msgid "Do you want to scan for vulnerabilities? [Y/n] : "
+msgstr "Güvenlik açıklarını taramak ister misiniz? [Y/n] : "
+
+#: autopwn_suite/utils.py:722
+#, fuzzy
+msgid "Do you want to download exploits? [Y/n] : "
+msgstr "Exploitleri indirmek ister misiniz? [Y/n] : "
+
+#: autopwn_suite/utils.py:728
+#, fuzzy
+msgid "Do you want to scan for web vulnerabilities? [Y/n] : "
+msgstr "Web güvenlik açıklarını taramak ister misiniz? [Y/n] : "
+
+#: autopwn_suite/utils.py:739
+#, fuzzy, python-brace-format
+msgid "No hosts found! {time} - Scan completed."
+msgstr "Hiçbir host bulunamadı! {time} - Tarama tamamlandı."
+
+#: autopwn_suite/utils.py:761
+#, fuzzy
+msgid ""
+"Enter the index number of the host you would like to enumurate further.\n"
+"Enter 'all' to enumurate all hosts.\n"
+"Enter 'exit' to exit "
+msgstr ""
+"Daha fazla numaralandırmak (enumerate) istediğiniz hostun indeks numarasını girin.\n"
+"Tüm hostları numaralandırmak için 'all' girin.\n"
+"Çıkmak için 'exit' girin "
+
+#: autopwn_suite/utils.py:768
+#, fuzzy
+msgid "Please enter a valid host number or 'all' or 'exit'"
+msgstr "Lütfen geçerli bir host numarası veya 'all' ya da 'exit' girin"
+
+#: autopwn_suite/utils.py:782
+#, fuzzy, python-brace-format
+msgid "{time} - Scan completed."
+msgstr "{time} - Tarama tamamlandı."
+
+#: autopwn_suite/utils.py:867
+#, fuzzy
+msgid "speed must be between 0 and 5"
+msgstr "speed 0 ile 5 arasında olmalıdır"
+
+#: autopwn_suite/utils.py:869
+#, fuzzy, python-brace-format
+msgid "{option} must not be negative"
+msgstr "{option} negatif olamaz"
+
+#: autopwn_suite/utils.py:871
+#, fuzzy, python-brace-format
+msgid "{option} must be between 1 and 65535"
+msgstr "{option} 1 ile 65535 arasında olmalıdır"
+
+#: autopwn_suite/utils.py:880
+#, fuzzy, python-brace-format
+msgid "Invalid value for {section}.{option}"
+msgstr "{section}.{option} için geçersiz değer"
+
+#: autopwn_suite/utils.py:886
+#, fuzzy
+msgid "Config file not found!"
+msgstr "Yapılandırma dosyası bulunamadı!"
+
+#: autopwn_suite/utils.py:889
+#, fuzzy
+msgid "Permission denied while trying to read config file!"
+msgstr "Yapılandırma dosyası okunmaya çalışılırken izin reddedildi!"
+
+#: autopwn_suite/utils.py:892
+#, fuzzy, python-brace-format
+msgid "Invalid config file: {error}"
+msgstr "Geçersiz yapılandırma dosyası: {error}"
+
+#: autopwn_suite/utils.py:940
+#, fuzzy
+msgid "Couldn't install nmap (Linux): /usr/bin/sudo was not found."
+msgstr "Nmap kurulamadı (Linux): /usr/bin/sudo bulunamadı."
+
+#: autopwn_suite/utils.py:944 autopwn_suite/utils.py:968
+#: autopwn_suite/utils.py:971
+#, fuzzy
+msgid "Couldn't install nmap (Linux)"
+msgstr "nmap kurulamadı (Linux)"
+
+#: autopwn_suite/utils.py:948
+#, fuzzy, python-brace-format
+msgid ""
+"Cannot recognize the needed package manager for your system that seems to be running in: {distro} and {sys_platform}, {platform}, kindly select the correct package manager below to proceed to the installation, else, select, n.\n"
+"\t0 Abort installation\n"
+"\t1 apt-get\n"
+"\t2 dnf\n"
+"\t3 yum\n"
+"\t4 pacman\n"
+"\t5 zypper.\n"
+"Select option [0-5] >"
+msgstr ""
+"Sisteminiz için gerekli paket yöneticisi tanınamadı; şu şekilde çalışıyor gibi görünüyor: {distro} ve {sys_platform}, {platform}. Kuruluma devam etmek için aşağıdan doğru paket yöneticisini seçin, aksi takdirde n seçin.\n"
+"\t0 Kurulumu iptal et\n"
+"\t1 apt-get\n"
+"\t2 dnf\n"
+"\t3 yum\n"
+"\t4 pacman\n"
+"\t5 zypper.\n"
+"Seçenek seçin [0-5] >"
+
+#: autopwn_suite/utils.py:987
+#, fuzzy
+msgid "Nmap is installed but shell restart is required."
+msgstr "Nmap kuruldu ancak kabuğun (shell) yeniden başlatılması gerekiyor."
+
+#: autopwn_suite/utils.py:990
+#, fuzzy
+msgid "Couldn't install nmap! (Windows)"
+msgstr "nmap kurulamadı! (Windows)"
+
+#: autopwn_suite/utils.py:999
+#, fuzzy
+msgid "Couldn't install nmap! (Mac)"
+msgstr "nmap kurulamadı! (Mac)"
+
+#: autopwn_suite/utils.py:1007
+#, fuzzy
+msgid "Nmap is not installed."
+msgstr "Nmap kurulu değil."
+
+#: autopwn_suite/utils.py:1009
+#, fuzzy
+msgid "Nmap must be installed before using offline mode."
+msgstr "Çevrimdışı modu kullanmadan önce Nmap kurulmalıdır."
+
+#: autopwn_suite/utils.py:1010
+#, fuzzy, python-brace-format
+msgid "Install Nmap on your system ({system})? [Y/n] : "
+msgstr "Nmap sisteminize ({system}) kurulsun mu? [Y/n] : "
+
+#: autopwn_suite/utils.py:1019
+#, fuzzy
+msgid "Unknown OS! Auto installation not supported!"
+msgstr "Bilinmeyen işletim sistemi! Otomatik kurulum desteklenmiyor!"
+
+#: autopwn_suite/utils.py:1021
+#, fuzzy
+msgid "Denied permission to install Nmap."
+msgstr "Nmap kurma izni reddedildi."
+
+#: autopwn_suite/utils.py:1039
+#, fuzzy
+msgid ""
+"It is recommended to run this script as root since it is more silent and "
+"accurate."
+msgstr ""
+"Daha sessiz ve doğru sonuçlar için bu betiği root olarak çalıştırmanız "
+"önerilir."
+
+#: autopwn_suite/utils.py:1046
+#, fuzzy
+msgid "Output file"
+msgstr "Çıktı dosyası"
+
+#: autopwn_suite/utils.py:1046
+#, fuzzy
+msgid "Output folder"
+msgstr "Çıktı klasörü"
+
+#: autopwn_suite/utils.py:1049
+#, fuzzy
+msgid "Scanning with the following parameters"
+msgstr "Aşağıdaki parametrelerle taranıyor"
+
+#: autopwn_suite/utils.py:1053
+#, fuzzy, python-brace-format
+msgid "│\tTarget : {target}\n"
+msgstr "│\tHedef : {target}\n"
+
+#: autopwn_suite/utils.py:1058
+#, fuzzy, python-brace-format
+msgid "│\tAPI Key : {has_key}\n"
+msgstr "│\tAPI Anahtarı : {has_key}\n"
+
+#: autopwn_suite/utils.py:1059
+#, fuzzy, python-brace-format
+msgid "│\tAutomatic : {automatic}\n"
+msgstr "│\tOtomatik : {automatic}\n"
+
+#: autopwn_suite/utils.py:1063
+#, fuzzy
+msgid "│\tSkip discovery: True\n"
+msgstr "│\tKeşfi atla: True\n"
+
+#: autopwn_suite/utils.py:1066
+#, fuzzy, python-brace-format
+msgid "│\tHostfile: {host_file}\n"
+msgstr "│\tHost dosyası: {host_file}\n"
+
+#: autopwn_suite/utils.py:1069
+#, fuzzy, python-brace-format
+msgid "│\tHost timeout: {host_timeout}\n"
+msgstr "│\tHost zaman aşımı: {host_timeout}\n"
+
+#: autopwn_suite/utils.py:1073 autopwn_suite/utils.py:1079
+#, fuzzy, python-brace-format
+msgid "│\tScan type : [red]{scan_type}[/red]\n"
+msgstr "│\tTarama türü : [red]{scan_type}[/red]\n"
+
+#: autopwn_suite/utils.py:1074 autopwn_suite/utils.py:1080
+#, fuzzy, python-brace-format
+msgid "│\tScan speed : {speed}\n"
+msgstr "│\tTarama hızı : {speed}\n"
+
+#: autopwn_suite/utils.py:1078 autopwn_suite/utils.py:1083
+#, fuzzy, python-brace-format
+msgid "│\tScan mode : {scan_mode}\n"
+msgstr "│\tTarama modu : {scan_mode}\n"
+
+#: autopwn_suite/utils.py:1086
+#, fuzzy, python-brace-format
+msgid "│\tNmap flags : [blue]{nmap_flags}[/blue]\n"
+msgstr "│\tNmap bayrakları : [blue]{nmap_flags}[/blue]\n"
+
+#: autopwn_suite/utils.py:1089
+#, fuzzy, python-brace-format
+msgid "│\tReporting method : {report}\n"
+msgstr "│\tRaporlama yöntemi : {report}\n"
+
+#: autopwn_suite/utils.py:1100
+#, fuzzy
+msgid "Connection failed."
+msgstr "Bağlantı başarısız oldu."
+
+#: autopwn_suite/utils.py:1141
+#, fuzzy, python-brace-format
+msgid "Report saved to [cyan]{path}[/cyan]"
+msgstr "Rapor şuraya kaydedildi: [cyan]{path}[/cyan]"
+
+#: autopwn_suite/vulnerability_db.py:75
+#, fuzzy
+msgid "Unsupported vulnerability database; download it again."
+msgstr "Desteklenmeyen güvenlik açığı veritabanı; tekrar indirin."
+
+#: autopwn_suite/vulnerability_db.py:78
+#, fuzzy
+msgid "Vulnerability database is incomplete; finish its download first."
+msgstr "Güvenlik açığı veritabanı eksik; önce indirmeyi tamamlayın."
+
+#: autopwn_suite/vulnerability_db.py:81
+#, fuzzy
+msgid "Vulnerability database has no usable CVEs."
+msgstr "Güvenlik açığı veritabanında kullanılabilir CVE yok."
+
+#: autopwn_suite/vulnerability_db.py:83
+#, fuzzy
+msgid "Vulnerability database has invalid metadata."
+msgstr "Güvenlik açığı veritabanı geçersiz meta veriye sahip."
+
+#: autopwn_suite/vulnerability_db.py:101
+#, fuzzy
+msgid ""
+"Local vulnerability database is unreadable or incomplete. Download it again."
+msgstr "Yerel güvenlik açığı veritabanı okunamıyor veya eksik. Tekrar indirin."
+
+#: autopwn_suite/vulnerability_db.py:132
+#, fuzzy
+msgid ""
+"Offline vulnerability database unavailable. Download it while connected, or "
+"copy vulnerabilities.sqlite3 from a connected system."
+msgstr ""
+"Çevrimdışı güvenlik açığı veritabanı kullanılamıyor. Bağlıyken indirin veya "
+"vulnerabilities.sqlite3 dosyasını bağlı bir sistemden kopyalayın."
+
+#: autopwn_suite/vulnerability_db.py:165
+#, fuzzy
+msgid "Local vulnerability lookup failed; database coverage is incomplete."
+msgstr "Yerel güvenlik açığı sorgusu başarısız oldu; veritabanı kapsamı eksik."
+
+#: autopwn_suite/vulnerability_db.py:197
+#, fuzzy
+msgid "Invalid NVD JSON feed"
+msgstr "Geçersiz NVD JSON beslemesi"
+
+#: autopwn_suite/vulnerability_db.py:213
+#, fuzzy
+msgid "Truncated or invalid NVD JSON feed"
+msgstr "Kesilmiş veya geçersiz NVD JSON beslemesi"
+
+#: autopwn_suite/vulnerability_db.py:226
+#, fuzzy
+msgid "Invalid NVD feed field"
+msgstr "Geçersiz NVD besleme alanı"
+
+#: autopwn_suite/vulnerability_db.py:230
+#, fuzzy
+msgid "Duplicate NVD vulnerabilities array"
+msgstr "Tekrarlanan NVD güvenlik açıkları dizisi"
+
+#: autopwn_suite/vulnerability_db.py:240 autopwn_suite/vulnerability_db.py:250
+#, fuzzy
+msgid "Invalid trailing comma"
+msgstr "Geçersiz sondaki virgül"
+
+#: autopwn_suite/vulnerability_db.py:253
+#, fuzzy
+msgid "Incomplete NVD feed"
+msgstr "Eksik NVD beslemesi"
+
+#: autopwn_suite/vulnerability_db.py:259
+#, fuzzy
+msgid "NVD feed metadata has no valid checksum"
+msgstr "NVD besleme meta verisinde geçerli bir sağlama toplamı (checksum) yok"
+
+#: autopwn_suite/vulnerability_db.py:262
+#, fuzzy
+msgid "NVD feed metadata has an invalid size"
+msgstr "NVD besleme meta verisi geçersiz bir boyuta sahip"
+
+#: autopwn_suite/vulnerability_db.py:301
+#, fuzzy
+msgid "NVD feed exceeds its advertised size"
+msgstr "NVD beslemesi belirtilen boyutu aşıyor"
+
+#: autopwn_suite/vulnerability_db.py:305
+#, fuzzy
+msgid "NVD feed checksum or size mismatch"
+msgstr "NVD besleme sağlama toplamı veya boyut uyuşmazlığı"
+
+#: autopwn_suite/vulnerability_db.py:333
+#, fuzzy
+msgid "A vulnerability database update is already running."
+msgstr "Bir güvenlik açığı veritabanı güncellemesi zaten çalışıyor."
+
+#: autopwn_suite/vulnerability_db.py:363
+#, fuzzy, python-brace-format
+msgid "Checking NVD {year}"
+msgstr "NVD {year} kontrol ediliyor"
+
+#: autopwn_suite/vulnerability_db.py:379
+#, fuzzy, python-brace-format
+msgid "Downloading and indexing NVD {year}"
+msgstr "NVD {year} indiriliyor ve indeksleniyor"
+
+#: autopwn_suite/vulnerability_db.py:387
+#, fuzzy
+msgid "NVD feed contains an invalid CVE ID"
+msgstr "NVD beslemesi geçersiz bir CVE ID içeriyor"
+
+#: autopwn_suite/vulnerability_db.py:397
+#, fuzzy
+msgid "NVD mirror contains no CVEs"
+msgstr "NVD yansısı (mirror) hiçbir CVE içermiyor"
+
+#: autopwn_suite/vulnerability_db.py:408
+#, fuzzy, python-brace-format
+msgid ""
+"Vulnerability database ready, without NVD {unpublished}, which is not "
+"published yet"
+msgstr "Zafiyet veritabanı hazır, henüz yayımlanmamış NVD {unpublished} hariç"
+
+#: autopwn_suite/vulnerability_db.py:409
+#, fuzzy
+msgid "Vulnerability database ready"
+msgstr "Güvenlik açığı veritabanı hazır"
+
+#: autopwn_suite/web/additional.py:95
+#, fuzzy, python-brace-format
+msgid "Additional web checks used {used}/{total} HTTP probes."
+msgstr "Ek web kontrolleri {used}/{total} HTTP probu kullandı."
+
+#: autopwn_suite/web/boolean_sqli.py:63
+#, fuzzy, python-brace-format
+msgid "Boolean SQLi skipped: unstable or error baseline on {url}."
+msgstr ""
+"Boolean SQLi atlandı: {url} üzerinde kararsız veya hatalı temel çizgi "
+"(baseline)."
+
+#: autopwn_suite/web/crawler.py:81
+#, fuzzy, python-brace-format
+msgid "Crawling web application at {url} ..."
+msgstr "{url} adresindeki web uygulaması taranıyor (crawl) ..."
+
+#: autopwn_suite/web/crawler.py:151
+#, fuzzy, python-brace-format
+msgid "Unable to crawl {url}: HTTP {status}; coverage is incomplete."
+msgstr "{url} taranamadı (crawl): HTTP {status}; kapsam eksik."
+
+#: autopwn_suite/web/http.py:35
+#, fuzzy
+msgid ""
+"A web request failed certificate verification; coverage is incomplete. Use "
+"--insecure-tls (or the dashboard's \"Accept untrusted certificates\" control)"
+" only for targets you trust, such as lab systems with self-signed "
+"certificates."
+msgstr ""
+"Bir web isteği sertifika doğrulamasında başarısız oldu; kapsam eksik. "
+"--insecure-tls seçeneğini (veya kontrol panelindeki \"Güvenilmeyen "
+"sertifikaları kabul et\" seçeneğini) yalnızca kendinden imzalı sertifikalara "
+"sahip laboratuvar sistemleri gibi güvendiğiniz hedefler için kullanın."
+
+#: autopwn_suite/web/http.py:41
+#, fuzzy
+msgid "A web request failed; coverage is incomplete."
+msgstr "Bir web isteği başarısız oldu; kapsam eksik."
+
+#: autopwn_suite/web/runtime.py:240
+#, fuzzy
+msgid "Request budget reached; coverage is limited."
+msgstr "İstek bütçesine ulaşıldı; kapsam sınırlı."
+
+#: autopwn_suite/web/webvuln.py:79
+#, fuzzy
+msgid "Invalid target for web vulnerability checks."
+msgstr "Web güvenlik açığı kontrolleri için geçersiz hedef."
+
+#: autopwn_suite/web/webvuln.py:101
+#, fuzzy, python-brace-format
+msgid ""
+"{target} presented a certificate that could not be verified, so web checks "
+"were skipped. Re-run with --insecure-tls only if you trust this target (for "
+"example a lab system with a self-signed certificate)."
+msgstr ""
+"{target} doğrulanamayan bir sertifika sundu, bu nedenle web kontrolleri "
+"atlandı. Yalnızca bu hedefe güveniyorsanız (örneğin kendinden imzalı "
+"sertifikaya sahip bir laboratuvar sistemi) --insecure-tls ile yeniden "
+"çalıştırın."
+
+#: autopwn_suite/web/webvuln.py:154
+#, fuzzy, python-brace-format
+msgid "Found {count} testable urls."
+msgstr "{count} test edilebilir URL bulundu."
+
+#: autopwn_suite/web/webvuln.py:180
+#, fuzzy, python-brace-format
+msgid ""
+"Web checks completed: {count} findings (candidates, advisories and "
+"observations)."
+msgstr ""
+"Web kontrolleri tamamlandı: {count} bulgu (adaylar, tavsiyeler ve gözlemler)."
+
+#: autopwn_suite/web/webvuln.py:211
+#, fuzzy
+msgid "Web checks failed; coverage is incomplete."
+msgstr "Web kontrolleri başarısız oldu; kapsam eksik."
+
+#: autopwn_suite/web_ui.py:954
+#, fuzzy
+msgid "CVE"
+msgstr "CVE"
+
+#: autopwn_suite/web_ui.py:955
+#, fuzzy
+msgid "CVSS"
+msgstr "CVSS"
+
+#: autopwn_suite/web_ui.py:956
+#, fuzzy
+msgid "Command:"
+msgstr "Komut:"
+
+#: autopwn_suite/web_ui.py:957
+#, fuzzy
+msgid "Description"
+msgstr "Açıklama"
+
+#: autopwn_suite/web_ui.py:958
+#, fuzzy
+msgid "Error:"
+msgstr "Hata:"
+
+#: autopwn_suite/web_ui.py:959
+#, fuzzy
+msgid "Finished:"
+msgstr "Bitiş:"
+
+#: autopwn_suite/web_ui.py:960
+#, fuzzy, python-brace-format
+msgid "Host: {ip}"
+msgstr "Host: {ip}"
+
+#: autopwn_suite/web_ui.py:961
+#, fuzzy, python-brace-format
+msgid "Hosts Discovered ({count})"
+msgstr "Keşfedilen Hostlar ({count})"
+
+#: autopwn_suite/web_ui.py:962
+#, fuzzy
+msgid "MAC:"
+msgstr "MAC:"
+
+#: autopwn_suite/web_ui.py:963
+#, fuzzy
+msgid "No hosts were found during this scan."
+msgstr "Bu taramada host bulunamadı."
+
+#: autopwn_suite/web_ui.py:964
+#, fuzzy
+msgid "No open ports found."
+msgstr "Açık port bulunamadı."
+
+#: autopwn_suite/web_ui.py:965
+#, fuzzy
+msgid "OS:"
+msgstr "İşletim sistemi:"
+
+#: autopwn_suite/web_ui.py:966
+#, fuzzy
+msgid "Open Ports"
+msgstr "Açık Portlar"
+
+#: autopwn_suite/web_ui.py:969
+#, fuzzy
+msgid "Scan ID:"
+msgstr "Tarama Kimliği:"
+
+#: autopwn_suite/web_ui.py:970
+#, fuzzy
+msgid "Scan Report"
+msgstr "Tarama Raporu"
+
+#: autopwn_suite/web_ui.py:972
+#, fuzzy
+msgid "Severity"
+msgstr "Önem derecesi"
+
+#: autopwn_suite/web_ui.py:973
+#, fuzzy
+msgid "Started:"
+msgstr "Başlangıç:"
+
+#: autopwn_suite/web_ui.py:974
+#, fuzzy
+msgid "Status:"
+msgstr "Durum:"
+
+#: autopwn_suite/web_ui.py:975
+#, fuzzy
+msgid "Target:"
+msgstr "Hedef:"
+
+#: autopwn_suite/web_ui.py:976
+#, fuzzy
+msgid "Vendor:"
+msgstr "Üretici:"
+
+#: autopwn_suite/web_ui.py:978
+#, fuzzy
+msgid "Vulnerabilities"
+msgstr "Zafiyetler"
+
+#: autopwn_suite/web_ui.py:979
+#, fuzzy, python-brace-format
+msgid "[*] Email notification failed: {error}"
+msgstr "[*] E-posta bildirimi başarısız oldu: {error}"
+
+#: autopwn_suite/web_ui.py:980
+#, fuzzy, python-brace-format
+msgid "[*] Webhook delivery failed: {error}"
+msgstr "[*] Webhook teslimi başarısız oldu: {error}"

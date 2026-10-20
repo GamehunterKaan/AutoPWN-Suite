@@ -32,13 +32,13 @@ def bounded_request(call, *args, max_bytes=1_048_576, **kwargs):
         raise ScanCancelled("Web scan stopped") from None
     except SSLError:
         if current and verifying and not current.discovery:
-            current.issue("A web request failed certificate verification; coverage is incomplete. "
-                          "Use --insecure-tls (or the dashboard's \"Accept untrusted certificates\" control) "
-                          "only for targets you trust, such as lab systems with self-signed certificates.")
+            current.issue(_("A web request failed certificate verification; coverage is incomplete. "
+                            "Use --insecure-tls (or the dashboard's \"Accept untrusted certificates\" control) "
+                            "only for targets you trust, such as lab systems with self-signed certificates."))
         raise
     except RequestException:
         if current and not current.discovery:
-            current.issue("A web request failed; coverage is incomplete.")
+            current.issue(_("A web request failed; coverage is incomplete."))
         raise
     if current:
         method, url = (args[0], args[1]) if len(args) > 1 else ("GET", args[0])

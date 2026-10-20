@@ -51,10 +51,13 @@ jobs:
         npx --yes eslint@10.12.0 --config eslint.config.mjs autopwn_suite/web_ui_static
         poetry run python scripts/export_locked_requirements.py --check
 
-    - name: Install system Nmap for loopback integration tests
+    - name: Install system Nmap and gettext
       run: |
         sudo apt-get update
-        sudo apt-get install --no-install-recommends -y nmap
+        sudo apt-get install --no-install-recommends -y nmap gettext
+
+    - name: Check translation catalogs are up to date
+      run: poetry run python scripts/i18n_messages.py check --lang tr
 
     - name: Run tests
       run: poetry run pytest

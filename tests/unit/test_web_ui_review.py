@@ -85,7 +85,8 @@ def test_validation_errors_do_not_expose_exception_details(
     response = client_review.open(path, method=method, json=body)
     assert response.status_code == 400
     expected = "Invalid schedule configuration" if is_schedule else "Invalid scan configuration"
-    assert response.get_json() == {"error": expected}
+    expected_code = "invalid_schedule_config" if is_schedule else "invalid_scan_config"
+    assert response.get_json() == {"error": expected, "code": expected_code}
     assert wu_review._profiles == profiles_before
     assert wu_review._schedules == schedules_before
     wu_review._launch_scan.assert_not_called()

@@ -31,6 +31,6 @@ def parameter_indexes(params, *, names=None):
     if current and current.task_name in ("lfi", "sqli", "xss", "boolean_sqli", "redirects"):
         indexes = [index for index in indexes if not parameter_done(current.task_name, current.task_url, index)]
     if current and len(indexes) > current.options["max_parameters"]:
-        current.issue("Query parameter limit reached; coverage is limited.")
+        current.issue("Query parameter limit reached; coverage is limited.")  # matched by web_ui._resume_web_options: keep English
         indexes = indexes[:current.options["max_parameters"]]
     return iter(indexes)

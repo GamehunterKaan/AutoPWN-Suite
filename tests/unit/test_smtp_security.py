@@ -65,7 +65,7 @@ def test_cli_certificate_failure_skips_login_and_report_and_cleans_up():
         server.login.assert_not_called()
         server.sendmail.assert_not_called()
         server.quit.assert_called_once()
-        log.logger.assert_called_with("error", "An error occured while trying to send email report.")
+        log.logger.assert_called_with("error", "An error occurred while trying to send email report.")
 
 
 @pytest.mark.parametrize("port", [465, 587])

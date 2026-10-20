@@ -2,6 +2,58 @@
 // Copyright 2022-2026 Kaan Gültekin
 'use strict';
 (() => {
+  // The sign-in page is public, so it carries its own small table instead of the dashboard dictionary (i18n.js,
+  // which stays behind sign-in). The keys and texts match that dictionary; a test checks it.
+  const STORAGE_KEY = 'apwn_lang';
+  const TEXT = {
+    en: {
+      'login.heading': 'Sign in',
+      'login.subtitle': 'Use your dashboard account to manage scans.',
+      'login.password_label': 'Password',
+      'login.submit': 'Sign in',
+      'login.hint': 'First launch? Your account details are shown in the server terminal.',
+      'login.title': 'Sign in · AutoPWN Suite',
+      'settings.username': 'Username',
+      'settings.language': 'Language',
+      'lang.english': 'English',
+      'lang.turkish': 'Türkçe',
+    },
+    tr: {
+      'login.heading': 'Giriş yap',
+      'login.subtitle': 'Taramaları yönetmek için panel hesabınızı kullanın.',
+      'login.password_label': 'Şifre',
+      'login.submit': 'Giriş yap',
+      'login.hint': 'İlk kez mi başlatıyorsunuz? Hesap bilgileriniz sunucu terminalinde gösterilir.',
+      'login.title': 'Giriş yap · AutoPWN Suite',
+      'settings.username': 'Kullanıcı adı',
+      'settings.language': 'Dil',
+      'lang.english': 'English',
+      'lang.turkish': 'Türkçe',
+    },
+  };
+  function detectLang() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === 'en' || stored === 'tr') return stored;
+    } catch (_) { /* localStorage may be unavailable */ }
+    return (navigator.language || '').toLowerCase().startsWith('tr') ? 'tr' : 'en';
+  }
+  function applyLang(lang) {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const text = TEXT[lang][el.getAttribute('data-i18n')];
+      if (text) el.textContent = text;
+    });
+  }
+  const langSelect = document.getElementById('login-lang');
+  const lang = detectLang();
+  langSelect.value = lang;
+  applyLang(lang);
+  langSelect.addEventListener('change', () => {
+    const chosen = langSelect.value === 'tr' ? 'tr' : 'en';
+    try { localStorage.setItem(STORAGE_KEY, chosen); } catch (_) { /* localStorage may be unavailable */ }
+    applyLang(chosen);
+  });
   const form = document.getElementById('login-form');
   const message = document.getElementById('login-message');
   const button = document.getElementById('login-submit');

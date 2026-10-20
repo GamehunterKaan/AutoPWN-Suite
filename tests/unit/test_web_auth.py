@@ -87,6 +87,8 @@ def test_every_existing_route_requires_login_including_static_sse_and_downloads(
     assert checked > 50
     for asset in ("/login", "/login.js", "/login.css", "/favicon.ico"):
         assert client.get(asset).status_code == 200
+    # The dashboard dictionary is not public: the sign-in page carries its own small table.
+    assert client.get("/i18n.js").status_code == 302
 
 
 def test_login_requires_bound_challenge_and_cannot_reuse_it(dashboard_login):

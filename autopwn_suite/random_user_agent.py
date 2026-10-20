@@ -26,11 +26,11 @@ def random_user_agent(log) -> str:
 
                     user_agents.append(user_agent_)
         except FileNotFoundError:
-            log.logger("error", "User agent database not found.")
+            log.logger("error", _("User agent database not found."))
             raise SystemExit from None
         else:
             if not user_agents:
-                log.logger("error", "User agent database is empty.")
+                log.logger("error", _("User agent database is empty."))
                 raise SystemExit
 
             floor_: int = randint(0, max(0, len(user_agents) - 2))

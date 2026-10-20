@@ -62,7 +62,7 @@ def check_redirects(client, url, console, *, max_parameters=5):
         for prefix in ("https://", "//"):
             successful = []
             try:
-                for _ in range(2):
+                for _attempt in range(2):
                     host = f"autopwn-{token_hex(12)}.invalid"
                     test_url = probe_url(base, params, index, f"{prefix}{host}/redirect-check")
                     response = client.send(test_url)
@@ -125,7 +125,7 @@ def check_host_headers(client, url, console):
     for header in ("Host", "X-Forwarded-Host"):
         matched = []
         try:
-            for _ in range(2):
+            for _attempt in range(2):
                 marker = f"autopwn-{token_hex(12)}.invalid"
                 parts = urlsplit(url)
                 query = parts.query + ("&" if parts.query else "") + "__autopwn_probe=" + token_hex(12)

@@ -1780,7 +1780,8 @@ class TestAPITestEmail:
         reply = b"5.7.8 Authentication failed for u at mx7.internal.example SECRETDETAIL"
         with patch("smtplib.SMTP", side_effect=smtplib.SMTPAuthenticationError(535, reply)):
             resp = client.post("/api/settings/test_email")
-        assert resp.status_code == 500 and resp.get_json() == {"error": "Failed to send test email"}
+        assert resp.status_code == 500
+        assert resp.get_json() == {"error": "Failed to send test email", "code": "test_email_failed"}
         assert "Failed to send test email: SMTPAuthenticationError" in caplog.text
         assert "SECRETDETAIL" not in caplog.text and "internal.example" not in caplog.text
 
@@ -2729,3 +2730,50 @@ class TestEmailNoAuth:
             wu._send_email(job)
             mock_srv.sendmail.assert_called_once()
             mock_srv.login.assert_not_called()
+
+
+def test_notification_text_follows_the_language_setting_and_ignores_an_unsupported_one(wu, monkeypatch):
+    monkeypatch.setenv("AUTOPWN_LANG", "en")
+    wu._settings["language"] = "tr"
+    assert wu._notification_gettext()("Scan Report") == "Tarama Raporu"
+    for unsupported in ("xx", ["tr"], None):
+        wu._settings["language"] = unsupported
+        assert wu._notification_gettext()("Scan Report") == "Scan Report"
+
+
+def test_every_notification_message_is_listed_for_extraction_and_has_a_turkish_entry(wu):
+    import ast
+    import gettext
+
+    tree = ast.parse(Path(wu.__file__).read_text(encoding="utf-8"))
+    used = {node.args[0].value for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "tr"
+            and node.args and isinstance(node.args[0], ast.Constant)}
+    catalog = gettext.translation(wu.i18n.DOMAIN, localedir=str(wu.i18n.LOCALE_DIR), languages=["tr"])._catalog
+    assert used and used <= set(wu._NOTIFICATION_MESSAGES)
+    assert used <= set(catalog), sorted(used - set(catalog))
+
+
+def test_web_coverage_messages_that_resume_matches_by_text_stay_untranslated():
+    import gettext
+
+    from autopwn_suite import i18n
+
+    catalog = gettext.translation(i18n.DOMAIN, localedir=str(i18n.LOCALE_DIR), languages=["tr"])._catalog
+    for message in ("Query parameter limit reached; coverage is limited.",
+                    "Response size limit reached; content coverage is limited."):
+        assert message not in catalog
+
+
+@pytest.mark.parametrize("value", ["", "en", "tr"])
+def test_settings_accept_only_a_supported_language(client, wu, value):
+    assert client.put("/api/settings", json={"language": value}).status_code == 200
+    assert wu._settings["language"] == value
+
+
+@pytest.mark.parametrize("value", ["xx", "TR", None, 5, ["tr"], {"a": 1}, pytest.param("t" * 5000, id="long")])
+def test_settings_reject_an_unsupported_language(client, wu, value):
+    response = client.put("/api/settings", json={"language": value})
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "language must be empty or a supported language", "code": "invalid_language"}
+    assert wu._settings["language"] != value

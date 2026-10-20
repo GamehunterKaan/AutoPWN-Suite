@@ -237,7 +237,7 @@ class ScanContext:
     def before(self):
         self.checkpoint()
         if self.requests >= self.options["request_budget"]:
-            self.issue("Request budget reached; coverage is limited.")
+            self.issue(_("Request budget reached; coverage is limited."))
             raise WebBudgetExceeded("Web request budget reached")
         # Speed controls pacing, independently of the port scanner's timing.
         delay = max((5000, 2000, 500, 100, 25, 0)[self.options["speed"]],
@@ -296,7 +296,7 @@ class ScanContext:
                     "duration_ms": round(1000 * (time.monotonic() - started), 1)}}
         self.records.append(captured)
         if response.autopwn_truncated:
-            self.issue("Response size limit reached; content coverage is limited.")
+            self.issue("Response size limit reached; content coverage is limited.")  # matched by web_ui._resume_web_options: keep English
         return captured
 
     def annotate(self, result, reproduction=None):

@@ -14,6 +14,8 @@ package = root / "autopwn_suite"
 datas = [
     (str(package / "data"), "autopwn_suite/data"),
     (str(package / "web_ui_static"), "autopwn_suite/web_ui_static"),
+    # The compiled message catalogs; without them gettext falls back to English silently.
+    (str(package / "locales"), "autopwn_suite/locales"),
     # The proof-of-concept generator reads these two files as text and embeds them in the scripts it
     # produces, so they must exist next to the frozen module as source.
     (str(package / "web" / "poc_runtime.py"), "autopwn_suite/web"),

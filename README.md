@@ -439,6 +439,16 @@ that manually, e.g. with `git rebase` or by committing/stashing first). It does 
 trusts the repository named by `--update-repo`, so keep the default unless you trust another. Restart
 AutoPWN Suite after it reports success so the updated code takes effect.
 
+## Interface language
+
+AutoPWN Suite speaks English and Turkish. `--lang tr` (or `--language tr`) selects the language of the CLI,
+the daemon installer and the reports, and is remembered in `language.txt` in the data directory. Without
+it the language follows the `AUTOPWN_LANG` environment variable, then the last explicit choice, then your
+system locale, then English. The dashboard has a language selector on the sign-in page and in Settings.
+The Turkish text is machine-translated and not yet reviewed by a native speaker, and scanned data (CVE
+descriptions, banners, exploit titles) is never translated. See the
+[internationalization notes](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/INTERNATIONALIZATION.md).
+
 ## Demo
 
 AutoPWN Suite has a very user friendly easy to read output.

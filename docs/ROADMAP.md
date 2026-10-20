@@ -66,9 +66,11 @@ below before starting large work.
 
 ### Q2 2027 (April-June): maintainability and internationalization groundwork
 
-- Move user-facing dashboard strings and CLI messages toward single, reviewable
-  locations per the [internationalization plan](INTERNATIONALIZATION.md), without
-  shipping translations yet.
+- English and a machine-translated Turkish interface are shipped. Have a native
+  Turkish speaker review the fuzzy-marked catalog and the dashboard dictionary,
+  starting with security-meaning strings, per the
+  [internationalization plan](INTERNATIONALIZATION.md), and keep new messages
+  translatable.
 - Decide whether to continue supporting Python 3.10, whose upstream end-of-life is
   scheduled for October 2026, and update `pyproject.toml`, CI, documentation and
   [SUPPORT.md](../SUPPORT.md) together if support is dropped. Evaluate adding the
@@ -117,7 +119,7 @@ need not propose them:
 - **Guaranteed vulnerability-free output or safety clearance.** CVE matching is
   keyword and version based; a clean result does not prove a target is secure.
 - **Native desktop or mobile applications, and a proprietary or paid tier.**
-- **Shipping translations before the internationalization groundwork is reviewed**
+- **Adding a language without a named reviewer who reads it**
   ([plan](INTERNATIONALIZATION.md)), and **guaranteeing full WCAG conformance
   within this period** ([accessibility](ACCESSIBILITY.md) lists a prioritized
   improvement plan, not a conformance claim).

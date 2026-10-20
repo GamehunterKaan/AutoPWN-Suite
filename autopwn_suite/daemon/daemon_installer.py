@@ -13,6 +13,7 @@ from pathlib import Path
 from platform import system
 
 from autopwn_suite.banners import print_banner
+from autopwn_suite.i18n import resolve_language
 from autopwn_suite.subprocess_env import child_environment
 from autopwn_suite.utils import is_root
 
@@ -38,13 +39,13 @@ def _get_menu_choice(console, prompt: str, options: dict, default: str = None) -
     while True:
         console.print(prompt)
         for key, value in options.items():
-            console.print(f"  [cyan]{key}[/cyan]. {value}")
-        choice = console.input(f"Enter your choice ({'-'.join(options.keys())}): ").strip()
+            console.print(_("  [cyan]{key}[/cyan]. {value}").format(key=key, value=value))
+        choice = console.input(_("Enter your choice ({choices}): ").format(choices='-'.join(options.keys()))).strip()
         if default and choice == "":
             return default
         if choice.lower() in options:  # the keys are digits or lowercase words, and InitArgsConf lowercases the type too
             return choice.lower()
-        console.print(f"[red]Invalid choice. Please enter one of {list(options.keys())}.[/red]")
+        console.print(_("[red]Invalid choice. Please enter one of {choices}.[/red]").format(choices=list(options.keys())))
 
 def _get_validated_int(console, prompt: str, default: int = None, minimum: int = None, maximum: int = None) -> int:
     """Gets and validates an integer input from the user. The bounds are the ones InitArgsConf enforces
@@ -56,12 +57,17 @@ def _get_validated_int(console, prompt: str, default: int = None, minimum: int =
         try:
             value = int(user_input)
         except ValueError:
-            console.print("[red]Invalid input. Please enter a whole number.[/red]")
+            console.print(_("[red]Invalid input. Please enter a whole number.[/red]"))
             continue
         if (minimum is None or value >= minimum) and (maximum is None or value <= maximum):
             return value
-        limits = ([f"at least {minimum}"] if minimum is not None else []) + ([f"at most {maximum}"] if maximum is not None else [])
-        console.print(f"[red]Out of range. Please enter a whole number that is {' and '.join(limits)}.[/red]")
+        if minimum is not None and maximum is not None:
+            message = _("[red]Out of range. Please enter a whole number that is at least {minimum} and at most {maximum}.[/red]")
+        elif minimum is not None:
+            message = _("[red]Out of range. Please enter a whole number that is at least {minimum}.[/red]")
+        else:
+            message = _("[red]Out of range. Please enter a whole number that is at most {maximum}.[/red]")
+        console.print(message.format(minimum=minimum, maximum=maximum))
 
 def _get_validated_email(console, prompt: str, allow_empty: bool = False) -> str:
     """Gets and validates an email address from the user."""
@@ -73,7 +79,7 @@ def _get_validated_email(console, prompt: str, allow_empty: bool = False) -> str
             return ""
         if email and re.match(email_regex, email):
             return email
-        console.print("[red]Invalid email format. Please enter a valid email address.[/red]")
+        console.print(_("[red]Invalid email format. Please enter a valid email address.[/red]"))
 
 def _get_non_empty_input(console, prompt: str) -> str:
     """Gets a non-empty string input from the user."""
@@ -81,7 +87,7 @@ def _get_non_empty_input(console, prompt: str) -> str:
         user_input = console.input(prompt).strip()
         if user_input:
             return user_input
-        console.print("[red]This field cannot be empty.[/red]")
+        console.print(_("[red]This field cannot be empty.[/red]"))
 
 @contextmanager
 def _private_file(path, **options):
@@ -109,76 +115,76 @@ def _write_config(config, config_file):
         config.write(configfile)
 
 def CreateConfig(console, config_filename=""):
-    console.print("Welcome to AutoPWN Suite Config Creator!")
+    console.print(_("Welcome to AutoPWN Suite Config Creator!"))
 
-    scan_interval = _get_validated_int(console, "Enter the scan interval in [cyan]seconds[/cyan] (Set to 0 for no interval - if not using as daemon): ", minimum=0)
+    scan_interval = _get_validated_int(console, _("Enter the scan interval in [cyan]seconds[/cyan] (Set to 0 for no interval - if not using as daemon): "), minimum=0)
 
     report_choice = _get_menu_choice(
         console,
-        "Would you like to enable email or webhook notifications?",
-        {"1": "Email", "2": "Webhook", "3": "None"}
+        _("Would you like to enable email or webhook notifications?"),
+        {"1": _("Email"), "2": _("Webhook"), "3": _("None")}
     )
 
     if report_choice == "1":
         report_method = 'email'
-        report_email = _get_validated_email(console, "Enter your [cyan]email address[/cyan]: ")
-        report_email_password = _get_non_empty_input(console, "Enter your [cyan]email password[/cyan]: ")
-        report_email_to = _get_validated_email(console, "Enter the email address to [cyan]send the report to[/cyan]: ")
-        report_email_from = _get_validated_email(console, "Enter the email address to [cyan]send from[/cyan] (leave empty to use login email): ", allow_empty=True)
-        report_email_server = _get_non_empty_input(console, "Enter the [cyan]email server[/cyan] to send the report from: ")
-        report_email_server_port = _get_validated_int(console, "Enter the [cyan]email port[/cyan] to send the report from: ", minimum=1, maximum=65535)
-        console.print("[green]Email notifications enabled.[/green]")
+        report_email = _get_validated_email(console, _("Enter your [cyan]email address[/cyan]: "))
+        report_email_password = _get_non_empty_input(console, _("Enter your [cyan]email password[/cyan]: "))
+        report_email_to = _get_validated_email(console, _("Enter the email address to [cyan]send the report to[/cyan]: "))
+        report_email_from = _get_validated_email(console, _("Enter the email address to [cyan]send from[/cyan] (leave empty to use login email): "), allow_empty=True)
+        report_email_server = _get_non_empty_input(console, _("Enter the [cyan]email server[/cyan] to send the report from: "))
+        report_email_server_port = _get_validated_int(console, _("Enter the [cyan]email port[/cyan] to send the report from: "), minimum=1, maximum=65535)
+        console.print(_("[green]Email notifications enabled.[/green]"))
     elif report_choice == "2":
         report_method = 'webhook'
-        report_webhook = _get_non_empty_input(console, "Enter your [cyan]webhook URL[/cyan]: ")
-        console.print("[green]Webhook notifications enabled.[/green]")
+        report_webhook = _get_non_empty_input(console, _("Enter your [cyan]webhook URL[/cyan]: "))
+        console.print(_("[green]Webhook notifications enabled.[/green]"))
     else: # choice == "3"
         report_method = 'none'
-        console.print("[yellow]No notifications enabled.[/yellow]")
+        console.print(_("[yellow]No notifications enabled.[/yellow]"))
 
-    target = console.input("Enter your [cyan]target[/cyan] (Leave empty for auto detection): ")
-    host_file = console.input("Enter [cyan]host file[/cyan] (Leave empty for none - will override target): ")
+    target = console.input(_("Enter your [cyan]target[/cyan] (Leave empty for auto detection): "))
+    host_file = console.input(_("Enter [cyan]host file[/cyan] (Leave empty for none - will override target): "))
 
     if target == "" and host_file == "":
         skip_discovery = False
     else:
-        skip_discovery_input = console.input("Would you like to [cyan]skip discovery[/cyan]? (y/n) ")
+        skip_discovery_input = console.input(_("Would you like to [cyan]skip discovery[/cyan]? (y/n) "))
         skip_discovery = skip_discovery_input.lower() == "y"
 
-    api_key = console.input("Enter [cyan]API key[/cyan] (Leave empty for none): ")
-    nmap_flags = console.input("Enter [cyan]nmap flags[/cyan] (Leave empty for none): ")
-    speed = _get_validated_int(console, "Enter [cyan]speed[/cyan] (0-5, Leave empty for default): ", default=3, minimum=0, maximum=5)
+    api_key = console.input(_("Enter [cyan]API key[/cyan] (Leave empty for none): "))
+    nmap_flags = console.input(_("Enter [cyan]nmap flags[/cyan] (Leave empty for none): "))
+    speed = _get_validated_int(console, _("Enter [cyan]speed[/cyan] (0-5, Leave empty for default): "), default=3, minimum=0, maximum=5)
 
 
     scan_type_choice = _get_menu_choice(
         console,
-        "Pick [cyan]scan type[/cyan] for host discovery (Leave empty for ARP): ",
-        {"1": "ARP", "2": "Ping"},
+        _("Pick [cyan]scan type[/cyan] for host discovery (Leave empty for ARP): "),
+        {"1": _("ARP"), "2": _("Ping")},
         default="1"
     )
     scan_type = "arp" if scan_type_choice == "1" else "ping"
 
-    host_timeout = _get_validated_int(console, "Enter [cyan]host timeout[/cyan] (Leave empty for default): ", default=240, minimum=0)
+    host_timeout = _get_validated_int(console, _("Enter [cyan]host timeout[/cyan] (Leave empty for default): "), default=240, minimum=0)
 
     scan_method_choice = _get_menu_choice(
         console,
-        "Enter [cyan]Scan Method[/cyan] (Leave empty for Normal): ",
-        {"1": "Normal", "2": "Evade"},
+        _("Enter [cyan]Scan Method[/cyan] (Leave empty for Normal): "),
+        {"1": _("Normal"), "2": _("Evade")},
         default="1"
     )
     scan_method = "normal" if scan_method_choice == "1" else "evade"
 
-    output_folder = console.input("Enter [cyan]output folder[/cyan] (Leave empty for default): ")
+    output_folder = console.input(_("Enter [cyan]output folder[/cyan] (Leave empty for default): "))
     if output_folder == "":
         output_folder = "outputs"
     output_type = _get_menu_choice(
         console,
-        "Enter [cyan]output type[/cyan] (Leave empty for html): ",
-        {"html": "HTML report", "txt": "Plain text", "svg": "SVG image"},
+        _("Enter [cyan]output type[/cyan] (Leave empty for html): "),
+        {"html": _("HTML report"), "txt": _("Plain text"), "svg": _("SVG image")},
         default="html"
     )
 
-    console.print("Creating config file...")
+    console.print(_("Creating config file..."))
     # InitArgsConf reads with interpolation disabled, so a '%' in a secret or URL must be written the same way.
     config = ConfigParser(interpolation=None)
     config['AUTOPWN'] = {
@@ -215,7 +221,7 @@ def CreateConfig(console, config_filename=""):
 
 
     if not config_filename:
-        config_file = console.input("Enter [cyan]config file name[/cyan] (Leave empty for autopwn.conf): ")
+        config_file = console.input(_("Enter [cyan]config file name[/cyan] (Leave empty for autopwn.conf): "))
         if config_file == "":
             config_file = "autopwn.conf"
     else:
@@ -223,9 +229,9 @@ def CreateConfig(console, config_filename=""):
 
     try:
         open(config_file, 'r', encoding='utf-8').close()
-        overwrite_config = console.input(f"[yellow]Config file '{config_file}' already exists. Would you like to overwrite it?[/yellow] (y/n): ")
+        overwrite_config = console.input(_("[yellow]Config file '{config_file}' already exists. Would you like to overwrite it?[/yellow] (y/n): ").format(config_file=config_file))
         if overwrite_config.lower() != 'y':
-            console.print(f"[red]Config file '{config_file}' not overwritten.[/red]")
+            console.print(_("[red]Config file '{config_file}' not overwritten.[/red]").format(config_file=config_file))
             return False
         else:
             _write_config(config, config_file)
@@ -234,7 +240,7 @@ def CreateConfig(console, config_filename=""):
         _write_config(config, config_file)
 
 
-    console.print(f"[green]Config file '{config_file}' created successfully![/green]")
+    console.print(_("[green]Config file '{config_file}' created successfully![/green]").format(config_file=config_file))
     return True
 
 def _root_controlled(path, lstat=os.lstat):
@@ -289,32 +295,31 @@ def _check_installable(console, install_path):
     leaves its secret-bearing configuration behind."""
     try:
         if not install_path.exists():
-            console.print(f"Creating install directory: {install_path}")
+            console.print(_("Creating install directory: {path}").format(path=install_path))
         # 0755 less what the umask removes, never 0777: the root-ownership check below refuses a directory others can write.
         install_path.mkdir(mode=0o755, parents=True, exist_ok=True)
     except Exception as e:
-        console.print(f"[red]Failed to create install directory {install_path}: {e}[/red]")
+        console.print(_("[red]Failed to create install directory {path}: {error}[/red]").format(path=install_path, error=e))
         return False
 
     if not _service_files_are_root_controlled(install_path):
         console.print(
-            "[red]Refusing to install the daemon: it runs as root, but the interpreter, the package or "
-            f"{install_path} can be modified by another user.[/red]"
+            _("[red]Refusing to install the daemon: it runs as root, but the interpreter, the package or {install_path} can be modified by another user.[/red]").format(install_path=install_path)
         )
-        console.print("[yellow]Install AutoPWN Suite as root (for example with 'sudo bash install.sh' or a "
+        console.print(_("[yellow]Install AutoPWN Suite as root (for example with 'sudo bash install.sh' or a "
                       "standalone binary kept in a root-owned directory) and run --daemon-install from that "
-                      "installation.[/yellow]")
+                      "installation.[/yellow]"))
         return False
 
     if not _service_can_import_package(install_path):
         console.print(
-            "[red]Refusing to install the daemon: the service would run "
-            f"'{_exec_start(install_path)}' from {install_path}, but this interpreter cannot import "
-            "autopwn_suite from there.[/red]"
+            _("[red]Refusing to install the daemon: the service would run '{command}' from {install_path}, but "
+              "this interpreter cannot import autopwn_suite from there.[/red]").format(
+                command=_exec_start(install_path), install_path=install_path)
         )
-        console.print("[yellow]A source checkout started with 'python autopwn.py' is not enough. Install "
+        console.print(_("[yellow]A source checkout started with 'python autopwn.py' is not enough. Install "
                       "AutoPWN Suite as root (for example with 'sudo bash install.sh' or a standalone binary "
-                      "kept in a root-owned directory) and run --daemon-install from that installation.[/yellow]")
+                      "kept in a root-owned directory) and run --daemon-install from that installation.[/yellow]"))
         return False
     return True
 
@@ -341,16 +346,16 @@ def CopyFiles(console):
     dst = DAEMON_INSTALL_PATH / "autopwn-daemon.conf"
     try:
         if not src.exists():
-            console.print(f"[red]Configuration file {src} does not exist.[/red]")
+            console.print(_("[red]Configuration file {src} does not exist.[/red]").format(src=src))
             return
         # The configuration can hold the SMTP password, NVD key and webhook URL; the unit runs as root, so only root reads it.
         if src.resolve() != dst.resolve():
             _install_config(src, dst)
         else:
             dst.chmod(0o600)  # it is already in place (the wizard ran here): the wizard created it owner-only
-        console.print(f"[green]Configuration available at {dst}[/green]")
+        console.print(_("[green]Configuration available at {dst}[/green]").format(dst=dst))
     except Exception as e:
-        console.print(f"[red]Error copying {src} -> {dst}: {e}[/red]")
+        console.print(_("[red]Error copying {src} -> {dst}: {error}[/red]").format(src=src, dst=dst, error=e))
         return
 
     # Create log file
@@ -359,9 +364,9 @@ def CopyFiles(console):
             LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
             LOG_PATH.touch()
             LOG_PATH.chmod(0o664)
-            console.print(f"[green]Created log file: {LOG_PATH}[/green]")
+            console.print(_("[green]Created log file: {path}[/green]").format(path=LOG_PATH))
     except Exception as e:
-        console.print(f"[yellow]Warning: could not create log file {LOG_PATH}: {e}[/yellow]")
+        console.print(_("[yellow]Warning: could not create log file {path}: {error}[/yellow]").format(path=LOG_PATH, error=e))
 
     # Write systemd service file — runs the installed program, restarts automatically
     service_content = f"""
@@ -382,45 +387,46 @@ LimitNOFILE=65536
 StandardOutput=append:{LOG_PATH}
 StandardError=append:{LOG_PATH}
 Environment=PYTHONUNBUFFERED=1
+Environment=AUTOPWN_LANG={resolve_language()}
 
 [Install]
 WantedBy=multi-user.target
 """
 
     try:
-        console.print(f"Writing systemd service file to {SERVICE_PATH} ...")
+        console.print(_("Writing systemd service file to {path} ...").format(path=SERVICE_PATH))
         with open(SERVICE_PATH, "w", newline="\n") as fh:
             fh.write(service_content)
-        console.print(f"[green]Service file written to {SERVICE_PATH}[/green]")
+        console.print(_("[green]Service file written to {path}[/green]").format(path=SERVICE_PATH))
     except PermissionError:
-        console.print(f"[red]Permission denied writing {SERVICE_PATH}. Run this script as root or use sudo.[/red]")
-        console.print("[yellow]Here’s the unit content to save manually:[/yellow]")
+        console.print(_("[red]Permission denied writing {path}. Run this script as root or use sudo.[/red]").format(path=SERVICE_PATH))
+        console.print(_("[yellow]Here’s the unit content to save manually:[/yellow]"))
         console.print(service_content)
         return
 
     # Reload, enable and (re)start the service. `enable --now` leaves a running service alone, so installing
     # again would keep the old program and configuration running; restart starts a stopped one as well.
     try:
-        console.print("Reloading systemd daemon ...")
+        console.print(_("Reloading systemd daemon ..."))
         subprocess.check_call(["systemctl", "daemon-reload"], env=child_environment())
-        console.print("Enabling and starting service ...")
+        console.print(_("Enabling and starting service ..."))
         subprocess.check_call(["systemctl", "enable", "autopwn-daemon.service"], env=child_environment())
         subprocess.check_call(["systemctl", "restart", "autopwn-daemon.service"], env=child_environment())
-        console.print("[green]Service enabled and started successfully.[/green]")
-        console.print("[blue]Check status with: sudo systemctl status autopwn-daemon.service[/blue]")
+        console.print(_("[green]Service enabled and started successfully.[/green]"))
+        console.print(_("[blue]Check status with: sudo systemctl status autopwn-daemon.service[/blue]"))
     except subprocess.CalledProcessError as e:
-        console.print(f"[red]Systemctl command failed: {e}[/red]")
-        console.print("[yellow]You may need to run manually: sudo systemctl daemon-reload && sudo systemctl enable autopwn-daemon.service && sudo systemctl restart autopwn-daemon.service[/yellow]")
+        console.print(_("[red]Systemctl command failed: {error}[/red]").format(error=e))
+        console.print(_("[yellow]You may need to run manually: sudo systemctl daemon-reload && sudo systemctl enable autopwn-daemon.service && sudo systemctl restart autopwn-daemon.service[/yellow]"))
         return
 
-    console.print("[green]AutoPWN daemon installation complete.[/green]")
+    console.print(_("[green]AutoPWN daemon installation complete.[/green]"))
 
 
 
 
 def InstallDaemon(console):
     if not is_root() or not system().lower() == "linux":
-        console.print("Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!")
+        console.print(_("Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"))
         return
     print_banner(console)
     # Refuse an unusable installation first: the wizard below writes a configuration that can hold secrets.
@@ -436,7 +442,7 @@ def _systemctl(console, *arguments):
     try:
         result = subprocess.run(["systemctl", *arguments], env=child_environment(), stdin=subprocess.DEVNULL, timeout=120)
     except (OSError, subprocess.SubprocessError):
-        console.print("[yellow]systemctl could not be run.[/yellow]")
+        console.print(_("[yellow]systemctl could not be run.[/yellow]"))
         return False
     return result.returncode == 0
 
@@ -445,39 +451,40 @@ def UninstallDaemon(console):
     """Remove what InstallDaemon created: the service and its configuration, which can hold secrets. The
     program (install.sh, pipx, a binary), the log file and the scan outputs in /opt/autopwn-suite stay."""
     if not is_root() or not system().lower() == "linux":
-        console.print("Daemon can only be removed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!")
+        console.print(_("Daemon can only be removed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"))
         raise SystemExit(1)
     print_banner(console)
     service_path = Path(SERVICE_FILE)
     config_path = Path(INSTALL_DIR) / "autopwn-daemon.conf"
 
-    console.print("Stopping and disabling the service ...")
+    console.print(_("Stopping and disabling the service ..."))
     if not _systemctl(console, "disable", "--now", "autopwn-daemon.service"):
-        console.print("[yellow]The service could not be stopped and disabled; it may not be installed. Continuing.[/yellow]")
+        console.print(_("[yellow]The service could not be stopped and disabled; it may not be installed. Continuing.[/yellow]"))
 
     try:
         removed_unit = service_path.exists()
         service_path.unlink(missing_ok=True)
     except OSError as e:
         # Keep the configuration: a unit that is still there would start without it and restart forever.
-        console.print(f"[red]Could not remove {service_path}: {e}[/red]")
+        console.print(_("[red]Could not remove {service_path}: {error}[/red]").format(service_path=service_path, error=e))
         raise SystemExit(1) from e
     if removed_unit:
-        console.print(f"[green]Removed {service_path}[/green]")
+        console.print(_("[green]Removed {service_path}[/green]").format(service_path=service_path))
         if not _systemctl(console, "daemon-reload"):
-            console.print("[yellow]systemd was not told about the removal; run: sudo systemctl daemon-reload[/yellow]")
+            console.print(_("[yellow]systemd was not told about the removal; run: sudo systemctl daemon-reload[/yellow]"))
     else:
-        console.print(f"No service file at {service_path}.")
+        console.print(_("No service file at {service_path}.").format(service_path=service_path))
 
     try:
         removed_config = config_path.exists()
         config_path.unlink(missing_ok=True)
     except OSError as e:
-        console.print(f"[red]Could not remove {config_path}: {e}[/red]")
+        console.print(_("[red]Could not remove {config_path}: {error}[/red]").format(config_path=config_path, error=e))
         raise SystemExit(1) from e
     if removed_config:
-        console.print(f"[green]Removed {config_path}[/green]")
+        console.print(_("[green]Removed {config_path}[/green]").format(config_path=config_path))
 
-    console.print("[green]AutoPWN daemon removed.[/green]")
-    console.print(f"[blue]Left in place: the program, the log file /var/log/autopwn-daemon.log and the files in {INSTALL_DIR}. "
-                  "Remove the program with 'sudo bash uninstall.sh', 'pipx uninstall autopwn-suite' or by deleting the binary.[/blue]")
+    console.print(_("[green]AutoPWN daemon removed.[/green]"))
+    console.print(_("[blue]Left in place: the program, the log file /var/log/autopwn-daemon.log and the files in "
+                    "{install_dir}. Remove the program with 'sudo bash uninstall.sh', 'pipx uninstall autopwn-suite' "
+                    "or by deleting the binary.[/blue]").format(install_dir=INSTALL_DIR))

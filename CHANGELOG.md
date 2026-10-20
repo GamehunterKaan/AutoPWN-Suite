@@ -9,6 +9,16 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Functional changes
 
+- Add localization support (English source, Turkish as the first translated language)
+  to both the CLI and the web dashboard: `--lang {en,tr}` (or `--language`) selects the
+  CLI/daemon/report language, remembered for later runs; otherwise it follows
+  `AUTOPWN_LANG`, then the last explicit choice, then the system locale, then English.
+  The dashboard gets its own language selector (including on the sign-in page), backed
+  by `localStorage` and a stable `X-App-Language` request header. See
+  [docs/INTERNATIONALIZATION.md](docs/INTERNATIONALIZATION.md) for scope, the
+  machine-translated/fuzzy-flagged Turkish catalog, and known limitations. Many dashboard
+  error and status responses also carry a stable `code` field next to their unchanged English
+  text, and CI now checks that the compiled Turkish catalog matches its source.
 - CodeQL now runs from workflows (`codeql.yml` and `codeql-upload.yml`) instead of GitHub's default setup,
   which never scans a pull request from a fork, so the required `Analyze (...)` and `CodeQL` checks
   could not report on one. The job names and categories are unchanged. See
@@ -45,6 +55,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   read a tag that starts with `-` as an option), and a GitHub response of an unexpected shape, such as
   a tag name of thousands of digits, is an error instead of a crash. Updates are not signature-verified,
   so point `--update-repo` or `AUTOPWN_UPDATE_REPO` only at a repository you trust.
+- Localization adds no network access or new dependency: catalogs are package data and
+  `language.txt` (`en` or `tr`) lives in the data directory, where an unknown value is ignored.
+  The language comes from an allowlist (`--lang` choices, `AUTOPWN_LANG`, the dashboard
+  `language` setting), the `X-App-Language` header is not acted on, and the sanitizers for
+  scanned text and credentials wrap the values inside translated messages.
 
 ## [2.7.0] - 2026-10-19
 

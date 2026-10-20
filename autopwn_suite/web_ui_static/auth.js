@@ -11,9 +11,9 @@
   }
   const ready = (async () => {
     const response = await nativeFetch('/api/auth/session', {credentials:'same-origin', cache:'no-store'});
-    if(response.status === 401) { expired(); throw new Error('Sign in to continue.'); }
+    if(response.status === 401) { expired(); throw new Error(window.i18n.t('auth.sign_in_to_continue')); }
     const result = await response.json();
-    if(!response.ok) throw new Error(result.error || 'Account is unavailable.');
+    if(!response.ok) throw new Error(result.error || window.i18n.t('auth.account_unavailable'));
     csrf = result.csrf_token;
     displayAccount(result.username);
   })();
@@ -24,6 +24,7 @@
     await ready;
     const headers = new Headers(options.headers || (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined));
     const method = (options.method || input.method || 'GET').toUpperCase();
+    headers.set('X-App-Language', window.i18n.getLang());
     if(!['GET','HEAD','OPTIONS'].includes(method)) headers.set('X-CSRF-Token', csrf);
     const response = await nativeFetch(input, {...options, headers, credentials:'same-origin'});
     if(response.status === 401) expired();
@@ -43,18 +44,18 @@
     const password = document.getElementById('account-password');
     const confirm = document.getElementById('account-confirm-password');
     message.textContent = '';
-    if(password.value !== confirm.value) { message.textContent = 'New passwords do not match.'; return; }
+    if(password.value !== confirm.value) { message.textContent = window.i18n.t('auth.passwords_mismatch'); return; }
     button.disabled = true;
     try {
       const response = await fetch('/api/auth/account', {method:'PUT', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({username:document.getElementById('account-username').value,
           current_password:current.value, new_password:password.value})});
       const result = await response.json();
-      if(!response.ok) throw new Error(result.error || 'Account could not be updated.');
+      if(!response.ok) throw new Error(result.error || window.i18n.t('auth.account_update_failed'));
       csrf = result.csrf_token;
       displayAccount(result.username);
       current.value = ''; password.value = ''; confirm.value = '';
-      message.textContent = 'Account updated. Other sessions have been signed out.';
+      message.textContent = window.i18n.t('auth.account_updated');
     } catch(error) { message.textContent = error.message; }
     finally { button.disabled = false; }
   });

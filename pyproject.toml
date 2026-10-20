@@ -125,6 +125,8 @@ target-version = "py310"
 force-exclude = true
 # PEP 8 with a 200-column limit; see docs/CODING_STANDARDS.md for the rationale.
 line-length = 200
+# `_` and `ngettext` are installed into builtins by autopwn_suite.i18n (gettext), so they are not undefined names.
+builtins = ["_", "ngettext"]
 
 [tool.ruff.lint]
 # E/W: PEP 8 (pycodestyle), F: Pyflakes, B: flake8-bugbear, I: sorted imports.

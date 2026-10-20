@@ -35,6 +35,7 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `-rpet/--report-email-to`, `-rpef/--report-email-from` | Report recipient and From address. |
 | `-rpes/--report-email-server`, `-rpesp/--report-email-server-port` | SMTP host and port; 465 selects implicit TLS, other ports use STARTTLS. Both validate the certificate chain and hostname before authentication; invalid certificates fail delivery. |
 | `--insecure-tls` | Since v2.6.1. Do not verify TLS certificates of scanned websites (INI `insecure_tls`). By default web scan requests verify target certificates, so scans of self-signed targets need this option; use it only for targets you trust. TLS diagnostics are unaffected. |
+| `--lang {en,tr}`, `--language` | Language of CLI, daemon-installer and report text. An explicit choice is remembered in `language.txt` in the data directory; without it the language follows `AUTOPWN_LANG`, then the remembered choice, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`), then English. A message without a translation is shown in English, and scanned data (CVE text, banners, exploit titles) is never translated. |
 | `--web`, `--web-host`, `--web-port` | Start the dashboard; default listener `127.0.0.1:8080` (since v2.6.1; v2.6.0 defaulted to `0.0.0.0`). `--web-host 0.0.0.0` listens on all interfaces, and non-loopback clients then require HTTPS. On POSIX the dashboard first restricts to mode `0600` any existing settings, profiles, schedules or account file in the data directory that group or others can read, and removes old temporary files of an interrupted save; it logs one fixed line when it changed something, or when it could not, and starts either way. |
 | `--web-reset-account` | Since v2.6.1. Reset the dashboard account to `admin` with a new random password, print it once, invalidate existing sessions and exit. Run it on the server with the same `AUTOPWN_DATA_DIR`. |
 
@@ -112,7 +113,9 @@ are JSON except static files, SSE and downloads. Errors normally use
 (CSRF/origin/HTTPS/credential refusal), 404 (missing resource), 409
 (state/offline conflict), 429 (too many sign-in attempts) or 500 (operation
 failure). POST creation returns 201 where noted; asynchronous verification/database
-updates return 202.
+updates return 202. Responses the dashboard can localize also carry a stable
+machine-readable `"code"` (for example `{"error":"...","code":"invalid_scan_config"}`);
+the English `"error"` or `"message"` text is unchanged.
 
 | Method and path | Input | Output / effect |
 | --- | --- | --- |
@@ -240,7 +243,8 @@ log as a fixed-text warning with the schedule ID (no exception text).
 - Environment: `AUTOPWN_WEB_HOST` (default `127.0.0.1`), `AUTOPWN_WEB_PORT` (default 8080;
   like `--web-port`, a number from 1 to 65535, otherwise the command exits with a usage error),
   `AUTOPWN_DATA_DIR`, `AUTOPWN_UPDATE_REPO` (the GitHub repository for `--check-update` and
-  `--apply-update`; default `GamehunterKaan/AutoPWN-Suite`), and (since v2.6.1)
+  `--apply-update`; default `GamehunterKaan/AutoPWN-Suite`), `AUTOPWN_LANG` (`en` or `tr`, the interface
+  language when `--lang` is not given), and (since v2.6.1)
   `AUTOPWN_WEB_SECURE_COOKIE=1` for a
   TLS-terminating proxy plus `AUTOPWN_NIST_API_KEY_FILE`,
   `AUTOPWN_SMTP_PASSWORD_FILE` and `AUTOPWN_WEBHOOK_URL_FILE`, each naming a
@@ -270,6 +274,11 @@ log as a fixed-text warning with the schedule ID (no exception text).
   `git fetch` from `https://github.com/OWNER/REPO.git` and a fast-forward-only `git merge` (or `git checkout`
   of the release tag on a detached HEAD) in the checkout, as argument lists without a shell. The only state
   they keep is `update_channel.txt` (one word, `release` or `commit`) in the data directory.
+- Localization is local and fetches nothing. `--lang` writes `language.txt` (`en` or `tr`) in the data
+  directory; any other content is ignored. The dashboard keeps its language in the browser's
+  `localStorage` (`apwn_lang`) and sends it as the `X-App-Language` request header, which the server does
+  not act on. Notification e-mails and webhook texts use the `language` key of the dashboard settings
+  (`en` or `tr`; empty or any other value means the language the server resolved at start).
 - Web checks send bounded HTTP probes and TLS diagnostic handshakes to selected
   targets. Releases since v2.6.1 verify target certificates for the HTTP probes and
   replay unless `verify_tls` is false; diagnostic handshakes deliberately inspect

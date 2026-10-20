@@ -21,7 +21,8 @@ interface and are usable from a terminal or screen reader as text.
 
 Only features that exist in the source are listed.
 
-- Both HTML pages declare `lang="en"`, a document `<title>` and a responsive viewport.
+- Both HTML pages declare `lang="en"` (`i18n.js` updates it to the active language), a document `<title>` and a
+  responsive viewport.
 - The dashboard uses landmark elements (`<header>`, `<aside>`, `<main>`) and a
   single `<h1>` for the Web Security page; the sign-in page uses `<main>` and `<h1>`.
 - The sign-in form associates `<label for>` with both inputs, sets `autocomplete`
@@ -97,7 +98,7 @@ Every dashboard change should meet these requirements, and reviewers check them
       and honors `prefers-reduced-motion` for new animations.
 - [ ] Images and icons have text alternatives or are hidden from assistive technology
       when decorative.
-- [ ] User-facing strings remain plain, concise English that follows the
+- [ ] User-facing strings remain plain and concise, go through the dashboard dictionary or `_()`, and follow the
       [internationalization guidance](INTERNATIONALIZATION.md).
 
 Fixing a gap listed above is a good first contribution. Reference this document in the

@@ -90,7 +90,7 @@ def PortScan(
     *, progress=None, should_stop=None,
 ) -> PortScanner:
 
-    log.logger("info", f"Scanning {target} for open ports ...")
+    log.logger("info", _("Scanning {target} for open ports ...").format(target=target))
 
     nm = PortScanner()
     # If customflags already specifies a scan technique (-sS, -sU, -sT, etc.),
@@ -118,7 +118,7 @@ def PortScan(
             raw_socket_flag = _re.compile(r'(?<!\S)(?:-O|-s[SAWMNFX])(?!\S)')
             dropped = raw_socket_flag.findall(customflags)
             if dropped:
-                log.logger("warning", f"Not running as root; dropping {', '.join(dropped)}, which need raw-socket privileges.")
+                log.logger("warning", _("Not running as root; dropping {flags}, which need raw-socket privileges.").format(flags=', '.join(dropped)))
                 customflags = raw_socket_flag.sub("", customflags)
             arguments = " ".join(
                 [
@@ -138,7 +138,7 @@ def PortScan(
     except ScanCancelled:
         raise
     except Exception as e:
-        raise SystemExit(f"Error: {printable(str(e), multiline=True)}") from e
+        raise SystemExit(_("Error: {error}").format(error=printable(str(e), multiline=True))) from e
     else:
         return nm
 
@@ -156,7 +156,7 @@ def CreateNoise(target, offline=False, stop=None) -> None:
         except ScanCancelled:
             return
         except KeyboardInterrupt:
-            raise SystemExit("Ctr+C, aborting.") from None
+            raise SystemExit(_("Ctr+C, aborting.")) from None
         else:
             break
 
@@ -167,7 +167,7 @@ NOISE_STOP_GRACE = 5
 
 
 def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *, offline=False) -> None:
-    banner("Creating noise...", "green", console)
+    banner(_("Creating noise..."), "green", console)
 
     Uphosts = TestPing(target, offline=True) if offline else TestPing(target)
     if scantype == ScanType.ARP:
@@ -175,19 +175,19 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *,
             Uphosts = TestArp(target, offline=True) if offline else TestArp(target)
 
     if not Uphosts:
-        log.logger("warning", "No hosts found for noise scan.")
+        log.logger("warning", _("No hosts found for noise scan."))
         raise SystemExit(1)
 
     if len(Uphosts) > MAX_NOISE_HOSTS:
-        log.logger("warning", f"Creating noise on the first {MAX_NOISE_HOSTS} of {len(Uphosts)} hosts.")
+        log.logger("warning", _("Creating noise on the first {limit} of {count} hosts.").format(limit=MAX_NOISE_HOSTS, count=len(Uphosts)))
         Uphosts = Uphosts[:MAX_NOISE_HOSTS]
 
     stop = Event()
     NoisyProcesses = []
     try:
-        with console.status("Creating noise ...", spinner="line"):
+        with console.status(_("Creating noise ..."), spinner="line"):
             for host in Uphosts:
-                log.logger("info", f"Started creating noise on {host}...")
+                log.logger("info", _("Started creating noise on {host}...").format(host=host))
                 P = Process(target=CreateNoise, args=(host, offline, stop))
                 P.start()
                 NoisyProcesses.append(P)
@@ -198,10 +198,10 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *,
                 while True:
                     sleep(1)
 
-        log.logger("info", "Noise scan complete!")
+        log.logger("info", _("Noise scan complete!"))
         raise SystemExit
     except KeyboardInterrupt:
-        log.logger("error", "Noise scan interrupted!")
+        log.logger("error", _("Noise scan interrupted!"))
         raise SystemExit from None
     finally:
         # Terminating a child would leave its Nmap running, so ask the children to end their own Nmap first.
@@ -218,12 +218,20 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *,
 def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal, *, offline=False, progress=None, should_stop=None) -> list:
     if isinstance(target, list):
         banner(
-            f"Scanning {len(target)} target(s) using {scantype.name} scan ...",
+            _("Scanning {count} target(s) using {scantype} scan ...").format(
+                count=len(target), scantype=scantype.name
+            ),
             "green",
             console,
         )
     else:
-        banner(f"Scanning {target} using {scantype.name} scan ...", "green", console)
+        banner(
+            _("Scanning {target} using {scantype} scan ...").format(
+                target=target, scantype=scantype.name
+            ),
+            "green",
+            console,
+        )
 
     if progress is not None:
         scan = TestArp if scantype == ScanType.ARP else TestPing
@@ -303,7 +311,8 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
     HostArray = []
     hosts = ResolveScanHosts(nm, target)
     if not hosts:
-        log.logger("warning", f"Target {target or 'scan'} seems to be offline.")
+        target_label = target or "scan"
+        log.logger("warning", _("Target {target} seems to be offline.").format(target=target_label))
         return []
     if target is None or hosts != [target]:
         for host in hosts:
@@ -318,11 +327,11 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
         except (KeyError, TypeError):
             reason = ""
         if reason in ["localhost-response", "user-set"]:
-            log.logger("info", f"Target {target} seems to be us.")
+            log.logger("info", _("Target {target} seems to be us.").format(target=target))
     else:
         try:
             if GetIpAdress() == target:
-                log.logger("info", f"Target {target} seems to be us.")
+                log.logger("info", _("Target {target} seems to be us.").format(target=target))
         except OSError:
             pass
 
@@ -337,25 +346,25 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
 
     timed_out = HostTimedOut(nm[target])
     if timed_out:
-        log.logger("warning", f"Nmap timed out on {target}; port coverage is incomplete.")
+        log.logger("warning", _("Nmap timed out on {target}; port coverage is incomplete.").format(target=target))
 
     if len(tcp_ports) == 0 and len(udp_ports) == 0:
         if not timed_out:
-            log.logger("warning", f"Target {target} seems to have no open ports.")
+            log.logger("warning", _("Target {target} seems to have no open ports.").format(target=target))
         return HostArray
 
-    banner(f"Portscan results for {target}", "green", console)
+    banner(_("Portscan results for {target}").format(target=target), "green", console)
 
     if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
         console.print(CurrentTargetInfo.colored(), justify="center")
 
     table = Table(box=box.MINIMAL)
 
-    table.add_column("Port", style="cyan")
-    table.add_column("State", style="white")
-    table.add_column("Service", style="blue")
-    table.add_column("Product", style="red")
-    table.add_column("Version", style="purple")
+    table.add_column(_("Port"), style="cyan")
+    table.add_column(_("State"), style="white")
+    table.add_column(_("Service"), style="blue")
+    table.add_column(_("Product"), style="red")
+    table.add_column(_("Version"), style="purple")
 
     for port, data in tcp_ports.items():
         state, service, product, version = InitPortInfo(data)

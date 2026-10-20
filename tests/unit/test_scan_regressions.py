@@ -103,7 +103,7 @@ def test_config_can_select_web_mode_before_scan_initialization(tmp_path):
     config = tmp_path / "web.ini"
     config.write_text("[WEBUI]\nenabled = yes\nhost = 127.0.0.1\nport = 9090\n", encoding="utf-8")
     args = Namespace(version=False, no_color=True, daemon_install=False,
-                     daemon_uninstall=False, create_config=False, config=str(config), web=False)
+                     daemon_uninstall=False, create_config=False, config=str(config), web=False, language=None)
     with patch("autopwn_suite.cli.cli", return_value=args), patch("autopwn_suite.cli.start_server") as server, \
          patch("autopwn_suite.cli.FLASK_AVAILABLE", True), patch("autopwn_suite.cli.print_banner"), \
          patch("autopwn_suite.cli.CheckConnection") as check:

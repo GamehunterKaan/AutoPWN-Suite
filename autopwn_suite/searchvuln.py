@@ -62,7 +62,7 @@ def SearchKeyword(keyword: str, log, apiKey=None, *, lookup=None) -> list:
         ApiResponseCVE = (lookup.search(keyword, log, apiKey) if lookup is not None
                           else searchCVE(keyword, log, apiKey, strict=True))
     except KeyboardInterrupt:
-        log.logger("warning", f"Skipped vulnerability detection for {keyword}")
+        log.logger("warning", _("Skipped vulnerability detection for {keyword}").format(keyword=keyword))
     except Exception as e:
         log.logger("error", e)
         if lookup is not None:
@@ -86,22 +86,24 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
     keywords = GenerateKeywords(HostArray)
 
     if len(keywords) == 0:
-        log.logger("warning", f"Insufficient information for {target}")
+        log.logger("warning", _("Insufficient information for {target}").format(target=target))
         return []
 
     log.logger(
-        "info", f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
+        "info",
+        _("Searching vulnerability database for {count} keyword(s) ...").format(count=len(keywords)),
     )
 
     printed_banner = False
     with console2.status(
-        "[white]Searching vulnerabilities ...[/white]", spinner="bouncingBar"
+        _("[white]Searching vulnerabilities ...[/white]"), spinner="bouncingBar"
     ) as status:
         for keyword in keywords:
             status.start()
             status.update(
-                "[white]Searching vulnerability database for[/white] "
-                + f"[red]{console_safe(keyword)}[/red] [white]...[/white]"
+                _("[white]Searching vulnerability database for[/white] [red]{keyword}[/red] [white]...[/white]").format(
+                    keyword=console_safe(keyword)
+                )
             )
             ApiResponseCVE = (SearchKeyword(keyword, log, apiKey, lookup=lookup) if lookup is not None
                               else SearchKeyword(keyword, log, apiKey))
@@ -110,10 +112,10 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
                 continue
 
             if not printed_banner:
-                banner(f"Possible vulnerabilities for {target}", "red", console)
+                banner(_("Possible vulnerabilities for {target}").format(target=target), "red", console)
                 printed_banner = True
 
-            console.print(f"┌─ [yellow]{console_safe(f'[ {keyword} ]')}[/yellow]")
+            console.print(_("┌─ [yellow]{label}[/yellow]").format(label=console_safe(f"[ {keyword} ]")))
 
             CVEs = []
             for CVE in ApiResponseCVE:
@@ -121,13 +123,20 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
                 console.print(f"│\n├─────┤ [red]{console_safe(CVE.CVEID)}[/red]\n│")
 
                 wrapped_description = wrap(CVE.description, max(1, term_width - 50))
-                console.print("│\t\t[cyan]Description: [/cyan]")
+                console.print(_("│\t\t[cyan]Description: [/cyan]"))
                 for line in wrapped_description:
                     console.print(f"│\t\t\t{console_safe(line)}")
                 console.print(
-                    f"│\t\t[cyan]Severity: [/cyan]{console_safe(CVE.severity)} - {console_safe(CVE.severity_score)}\n"
-                    + f"│\t\t[cyan]Exploitability: [/cyan] {console_safe(CVE.exploitability)}\n"
-                    + f"│\t\t[cyan]Details: [/cyan] {console_safe(CVE.details_url)}"
+                    _(
+                        "│\t\t[cyan]Severity: [/cyan]{severity} - {severity_score}\n"
+                        "│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
+                        "│\t\t[cyan]Details: [/cyan] {details_url}"
+                    ).format(
+                        severity=console_safe(CVE.severity),
+                        severity_score=console_safe(CVE.severity_score),
+                        exploitability=console_safe(CVE.exploitability),
+                        details_url=console_safe(CVE.details_url),
+                    )
                 )
 
             VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)

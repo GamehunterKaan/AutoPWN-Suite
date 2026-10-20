@@ -90,12 +90,12 @@ function sevClass(s){ const k = String(s ?? '').toLowerCase(); return SEVERITIES
 function cvssText(c){ return c ? esc(c) : '—'; }
 function openReportWindow(){
   const win = window.open('', '_blank');
-  if(!win) toast('Allow popups to export a PDF report.', false);
+  if(!win) toast(window.i18n.t('toast.popup_blocked'), false);
   return win;
 }
 async function fetchJson(url){
   const response = await fetch(url);
-  if(!response.ok) throw new Error(`Request failed (${response.status}).`);
+  if(!response.ok) throw new Error(window.i18n.t('toast.request_failed', {status: response.status}));
   return response.json();
 }
 function latestHostObservations(rows){
@@ -108,15 +108,25 @@ function latestHostObservations(rows){
   });
   return latest;
 }
+function isHostDone(h){
+  if(h.latest_attempt) return false;
+  if(h.scan_status === 'scanning') return false;
+  if(h.scan_status === 'failed' || h.scan_status === 'error') return false;
+  if(h.scan_status === 'stopped') return false;
+  if(h.scan_status === 'not_observed') return false;
+  if(h.scan_status === 'partial' || h.lookup_status === 'partial') return false;
+  if(h.lookup_status === 'skipped' || h.lookup_status === 'not_run') return false;
+  return h.scan_status === 'completed';
+}
 function hostScanLabel(h){
-  if(h.latest_attempt) return 'Latest scan: ' + hostScanLabel({...h.latest_attempt, latest_attempt:null});
-  if(h.scan_status === 'scanning') return 'Scanning…';
-  if(h.scan_status === 'failed' || h.scan_status === 'error') return 'Scan failed';
-  if(h.scan_status === 'stopped') return 'Stopped';
-  if(h.scan_status === 'not_observed') return 'Host not observed';
-  if(h.scan_status === 'partial' || h.lookup_status === 'partial') return 'Incomplete';
-  if(h.lookup_status === 'skipped' || h.lookup_status === 'not_run') return 'CVEs not checked';
-  return h.scan_status === 'completed' ? 'Done' : 'Status unknown';
+  if(h.latest_attempt) return window.i18n.t('host.latest_scan', {status: hostScanLabel({...h.latest_attempt, latest_attempt:null})});
+  if(h.scan_status === 'scanning') return window.i18n.t('host.scanning');
+  if(h.scan_status === 'failed' || h.scan_status === 'error') return window.i18n.t('host.scan_failed');
+  if(h.scan_status === 'stopped') return window.i18n.t('host.stopped');
+  if(h.scan_status === 'not_observed') return window.i18n.t('host.not_observed');
+  if(h.scan_status === 'partial' || h.lookup_status === 'partial') return window.i18n.t('host.incomplete');
+  if(h.lookup_status === 'skipped' || h.lookup_status === 'not_run') return window.i18n.t('host.cves_not_checked');
+  return h.scan_status === 'completed' ? window.i18n.t('host.done') : window.i18n.t('host.status_unknown');
 }
 async function printScan(scanId) {
   const job = scans[scanId];
@@ -129,7 +139,7 @@ async function printScan(scanId) {
     saved = await fetchJson(`/api/scans/${encodeURIComponent(scanId)}/download`);
   } catch(e){
     win.close();
-    toast('Could not load the scan report: ' + e.message, false);
+    toast(window.i18n.t('toast.could_not_load_scan_report', {detail: e.message}), false);
     return;
   }
   if(win.closed) return;
@@ -281,7 +291,7 @@ function printAllVulns() {
   filtered.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
 
   if(!filtered.length) {
-    toast('No vulnerabilities to export.', false);
+    toast(window.i18n.t('toast.no_vulns_to_export'), false);
     return;
   }
 
@@ -336,7 +346,7 @@ function printAllVulns() {
 function printAllHosts() {
   const list = Object.values(hosts);
   if(!list.length) {
-    toast('No hosts to export.', false);
+    toast(window.i18n.t('toast.no_hosts_to_export'), false);
     return;
   }
   let html = `<!DOCTYPE html><html><head><title>All Hosts Report</title>
@@ -431,14 +441,14 @@ function timeAgo(iso){
   const ms = Date.now() - new Date(iso).getTime();
   if(isNaN(ms) || ms < 0) return '';
   const s = Math.floor(ms / 1000);
-  if(s<60) return 'just now';
+  if(s<60) return window.i18n.t('time.just_now');
   const m = Math.floor(s/60);
-  if(m<60) return `${m}m ago`;
+  if(m<60) return window.i18n.t('time.minutes_ago', {m});
   const h = Math.floor(m/60);
   const rm = m % 60;
-  if(h<24) return rm ? `${h}h ${rm}m ago` : `${h}h ago`;
+  if(h<24) return rm ? window.i18n.t('time.hours_minutes_ago', {h, m:rm}) : window.i18n.t('time.hours_ago', {h});
   const d = Math.floor(h/24);
-  return `${d}d ago`;
+  return window.i18n.t('time.days_ago', {d});
 }
 function cvssColor(s){ if(!s) return 'var(--text2)'; if(s>=9)return'var(--red)'; if(s>=7)return'var(--orange)'; if(s>=4)return'var(--yellow)'; return'var(--accent)'; }
 
@@ -483,7 +493,7 @@ function portsError(ports){
     && /^[1-9][0-9]{0,4}(-[1-9][0-9]{0,4})?(,[1-9][0-9]{0,4}(-[1-9][0-9]{0,4})?)*$/.test(ports)
     && ports.match(/[0-9]+/g).every(number => Number(number) <= 65535)
     && ranges.every(range => Number(range.split('-')[0]) <= Number(range.split('-')[1]));
-  return valid ? '' : 'Ports must be port numbers from 1 to 65535, ranges and commas, such as 22,80,1-1000.';
+  return valid ? '' : window.i18n.t('profile.ports_invalid');
 }
 function loadProfile(){
   const pid = document.getElementById('f-profile').value;
@@ -502,11 +512,11 @@ function loadProfile(){
   document.getElementById('f-vuln-source').value = offlineServer ? 'offline' : (c.vulnerability_source || 'auto');
   window.webSecurity?.setControls('f', c);
   updateNmapPreview();
-  if(hasLegacyOptions(c)) toast('This profile holds Nmap options from an earlier release. They are not applied.', false);
+  if(hasLegacyOptions(c)) toast(window.i18n.t('profile.legacy_loaded'), false);
 }
 
 function refreshProfileSelects(){
-  const opts = `<option value="">— No profile —</option>` +
+  const opts = `<option value="">${esc(window.i18n.t('settings.no_profile_placeholder'))}</option>` +
     Object.values(profiles).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
   document.getElementById('f-profile').innerHTML = opts;
   document.getElementById('sf-profile').innerHTML = opts;
@@ -515,13 +525,13 @@ function refreshProfileSelects(){
 // ── Start scan ────────────────────────────────────────────────────────────────
 // The Terminal tab is rarely the one in view, so a failed start or stop is toasted as well as logged.
 function reportScanError(message){ addLog(null,message,'error'); toast(message,false); }
-function reportUnreachable(e){ reportScanError(`Cannot reach server: ${e.message}`); }
+function reportUnreachable(e){ reportScanError(window.i18n.t('toast.cannot_reach_server',{detail:e.message})); }
 
 let startingScan = false;
 async function startScan(){
   if(startingScan) return;  // the form is only cleared once the server answers, so a second click would start a second scan
   const target = document.getElementById('f-target').value.trim();
-  if(!target){ reportScanError('Please enter a target.'); return; }
+  if(!target){ reportScanError(window.i18n.t('toast.please_enter_target')); return; }
   const webError = window.webSecurity?.validateControls('f');
   if(webError){ toast(webError, false); return; }
   const portsProblem = portsError(document.getElementById('f-ports').value.trim());
@@ -550,7 +560,7 @@ async function startScan(){
     const r = await fetch('/api/scan/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     // A proxy or crash can answer with an HTML page; that is a server answer, not an unreachable server.
     const d = await r.json().catch(()=>null);
-    if(!r.ok || !d){ reportScanError(d ? (d.error||'Failed to start scan.') : `Failed to start scan (HTTP ${r.status}).`); return; }
+    if(!r.ok || !d){ reportScanError(d ? window.i18n.tErrorCode(d.code, d.error||window.i18n.t('toast.failed_to_start_scan')) : `Failed to start scan (HTTP ${r.status}).`); return; }
     document.getElementById('f-target').value='';
     addTermFilterOption(d.scan_id, target);
     if(body.scan_web && body.scan_ports === false) switchTab('web', document.getElementById('web-tab-button'));
@@ -570,7 +580,7 @@ async function stopScan(scanId){
     const r = await fetch('/api/scan/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scan_id:scanId})});
     if(!r.ok){
       const d = await r.json().catch(()=>({}));
-      reportScanError(d.error||d.message||'Failed to stop scan.');
+      reportScanError(d.code ? window.i18n.tErrorCode(d.code, d.error||d.message) : (d.error||d.message||window.i18n.t('toast.stop_failed')));
     }
   }catch(e){ reportUnreachable(e); }
 }
@@ -672,27 +682,40 @@ async function poll(){
 }
 
 // ── Render: Active Scans ──────────────────────────────────────────────────────
+// The server words its progress details in English; the fixed ones and the keyword ones are shown in the active language.
+function progressDetail(detail){
+  const fixed = {'Preparing scan':'progress.preparing', 'Discovering hosts':'progress.discovering', 'Port and service scan':'progress.port_scan',
+    'Searching service vulnerabilities':'progress.searching', 'No searchable service versions':'progress.nothing_searchable',
+    'Resuming unfinished work':'progress.resuming', 'Scan completed':'progress.completed', 'Scan failed':'progress.failed'};
+  if(fixed[detail]) return window.i18n.t(fixed[detail]);
+  const keyword = {Querying:'progress.querying', Checked:'progress.checked'};
+  const match = /^(Querying|Checked) (.+)$/.exec(detail || '');
+  if(match) return window.i18n.t(keyword[match[1]], {keyword: match[2]});
+  const failed = /^Lookup failed: (.+)$/.exec(detail || '');
+  return failed ? window.i18n.t('progress.lookup_failed', {keyword: failed[1]}) : detail;
+}
 function scanProgressMarkup(job){
   const progress = job.progress || {};
   const active = job.status === 'running' || job.status === 'stopping';
   let percent = typeof progress.percent === 'number' && Number.isFinite(progress.percent)
     ? Math.max(0, Math.min(100, progress.percent)) : null;
   if(job.status === 'completed') percent = 100;
-  const labels = {preparing:'Preparing scan', discovery:'Host discovery', port_scan:'Port and service scan',
-    vulnerabilities:'CVE lookups', web_checks:'Web checks', completed:'Scan completed', partial:'Incomplete coverage',
-    stopped:'Scan stopped', error:'Scan failed'};
+  const labelKeys = {preparing:'status.preparing', discovery:'status.discovery', port_scan:'status.port_scan',
+    vulnerabilities:'status.vulnerabilities', web_checks:'status.web_checks', completed:'status.completed', partial:'status.partial',
+    stopped:'status.stopped', error:'status.error'};
   const phase = progress.phase || job.status;
-  let label = labels[phase] || (active ? 'Scanning' : 'Scan finished');
+  let label = labelKeys[phase] ? window.i18n.t(labelKeys[phase]) : window.i18n.t(active ? 'status.scanning_generic' : 'status.finished_generic');
   if(phase === 'vulnerabilities' && progress.total != null) label += ` ${progress.completed || 0}/${progress.total}`;
-  if(progress.detail && progress.detail !== label && active) label += ' · ' + progress.detail;
-  if(job.status === 'stopping') label = 'Stopping · ' + label;
+  const detail = progressDetail(progress.detail);
+  if(detail && detail !== label && active) label += ' · ' + detail;
+  if(job.status === 'stopping') label = window.i18n.t('status.stopping_prefix', {label});
   const indeterminate = active && percent === null;
-  const percentText = percent === null ? (active ? 'Working…' : '') : `${Math.floor(percent)}%`;
+  const percentText = percent === null ? (active ? window.i18n.t('status.working') : '') : `${Math.floor(percent)}%`;
   const targetText = progress.targets_total != null
-    ? `${progress.targets_completed || 0}/${progress.targets_total} targets finished${progress.host ? ' · ' + progress.host : ''}`
+    ? window.i18n.t('scans.targets_finished', {completed: progress.targets_completed || 0, total: progress.targets_total}) + (progress.host ? ' · ' + progress.host : '')
     : (progress.host || '');
   return `<div class="sc-progress-label"><span>${esc(label)}</span><span>${esc(percentText)}</span></div>
-    <div class="sc-bar" role="progressbar" aria-label="Current scan stage" aria-valuemin="0" aria-valuemax="100"
+    <div class="sc-bar" role="progressbar" aria-label="${esc(window.i18n.t('scans.current_stage_aria'))}" aria-valuemin="0" aria-valuemax="100"
       ${percent === null ? '' : `aria-valuenow="${percent}"`} aria-valuetext="${esc(label + (percentText ? ' · ' + percentText : ''))}">
       <div class="sc-bar-fill ${indeterminate ? 'indeterminate' : esc(job.status)}" style="width:${indeterminate ? 30 : percent || 0}%"></div>
     </div>${targetText ? `<div class="sc-time">${esc(targetText)}</div>` : ''}`;
@@ -736,7 +759,7 @@ function renderScans(){
     let base = _buildNmapBase(job.target, c.mode||'normal', c.speed??3, c.host_timeout||240, c.scan_technique||'');
     if(c.ports) base += ' -p ' + c.ports;
     if(c.version_intensity != null && c.version_intensity !== '') base += ' --version-intensity ' + c.version_intensity;
-    if(c.scan_ports === false && c.scan_web) base = 'Website scan · ' + Object.values(c.web_options?.checks || {}).filter(Boolean).length + ' checks enabled';
+    if(c.scan_ports === false && c.scan_web) base = window.i18n.t('scan.website_scan_summary', {count: Object.values(c.web_options?.checks || {}).filter(Boolean).length});
     const part = scanCardFor(job);
     listed.add(job.id);
     part.card.className = `scan-card ${job.status}`;
@@ -744,27 +767,27 @@ function renderScans(){
       <div class="sc-header">
         <div class="sc-target">${esc(job.target)}</div>
         <div class="sc-id">#${shortId(job.id)}</div>
-        <div class="sc-pill ${job.status}">${job.status}</div>
+        <div class="sc-pill ${job.status}">${esc(window.i18n.t('scan_status.'+job.status))}</div>
       </div>
       <div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:-4px;margin-bottom:2px">${esc(base)}</div>
       <div class="sc-stats">
-        <div class="sc-stat"><div class="sv">${job.host_count}</div><div class="sl">Hosts</div></div>
-        <div class="sc-stat"><div class="sv">${job.port_count}</div><div class="sl">Ports</div></div>
-        <div class="sc-stat"><div class="sv" style="color:${job.vuln_count?'var(--red)':'var(--accent)'}">${job.vuln_count}</div><div class="sl">CVEs</div></div>
-        ${c.scan_web ? `<div class="sc-stat"><div class="sv">${job.web_finding_count || 0}</div><div class="sl">Web findings</div></div>` : ''}
+        <div class="sc-stat"><div class="sv">${job.host_count}</div><div class="sl">${esc(window.i18n.t('scans.hosts'))}</div></div>
+        <div class="sc-stat"><div class="sv">${job.port_count}</div><div class="sl">${esc(window.i18n.t('scans.ports'))}</div></div>
+        <div class="sc-stat"><div class="sv" style="color:${job.vuln_count?'var(--red)':'var(--accent)'}">${job.vuln_count}</div><div class="sl">${esc(window.i18n.t('scans.cves'))}</div></div>
+        ${c.scan_web ? `<div class="sc-stat"><div class="sv">${job.web_finding_count || 0}</div><div class="sl">${esc(window.i18n.t('scans.web_findings'))}</div></div>` : ''}
       </div>
       ${scanProgressMarkup(job)}
     `);
-    setPartHtml(part, 'time', esc(job.finished_at?`Finished ${timeAgo(job.finished_at)}`:`Started ${timeAgo(job.started_at)}`));
+    setPartHtml(part, 'time', esc(job.finished_at?window.i18n.t('scans.finished_ago',{time:timeAgo(job.finished_at)}):window.i18n.t('scans.started_ago',{time:timeAgo(job.started_at)})));
     setPartHtml(part, 'actions', `
-          ${running?`<button class="btn btn-danger btn-sm" data-action="stop-scan" data-id="${esc(job.id)}">Stop</button>`:''}
-          ${job.can_resume?`<button class="btn btn-primary btn-sm" data-action="resume-scan" data-id="${esc(job.id)}">Resume</button>`:''}
-          ${!running?`<button class="btn btn-ghost btn-sm" data-action="print-scan" data-id="${esc(job.id)}">Export PDF</button>`:''}
-          ${!running?`<a class="btn btn-ghost btn-sm" href="/api/scans/${encodeURIComponent(job.id)}/download" download style="text-decoration:none">Export JSON</a>`:''}
+          ${running?`<button class="btn btn-danger btn-sm" data-action="stop-scan" data-id="${esc(job.id)}">${esc(window.i18n.t('scans.stop'))}</button>`:''}
+          ${job.can_resume?`<button class="btn btn-primary btn-sm" data-action="resume-scan" data-id="${esc(job.id)}">${esc(window.i18n.t('scans.resume'))}</button>`:''}
+          ${!running?`<button class="btn btn-ghost btn-sm" data-action="print-scan" data-id="${esc(job.id)}">${esc(window.i18n.t('scans.export_pdf'))}</button>`:''}
+          ${!running?`<a class="btn btn-ghost btn-sm" href="/api/scans/${encodeURIComponent(job.id)}/download" download style="text-decoration:none">${esc(window.i18n.t('scans.export_json'))}</a>`:''}
     `);
     setPartHtml(part, 'bottom', `
       ${job.error?`<div style="font-family:var(--mono);font-size:11px;color:var(--red)">${esc(job.error)}</div>`:''}
-      <div class="sc-time">Vulnerability data: ${esc(c.vulnerability_source_used || c.vulnerability_source || 'online')}${c.vulnerability_database_updated_at ? ' · Updated ' + esc(c.vulnerability_database_updated_at) : ''}</div>
+      <div class="sc-time">${esc(window.i18n.t('scans.vuln_data_line',{source:c.vulnerability_source_used || c.vulnerability_source || 'online'}))}${c.vulnerability_database_updated_at ? esc(window.i18n.t('scans.updated_suffix',{time:c.vulnerability_database_updated_at})) : ''}</div>
     `);
     if(previous.nextSibling !== part.card) container.insertBefore(part.card, previous.nextSibling);
     previous = part.card;
@@ -788,11 +811,12 @@ function renderHosts(){
     const vc=h.vulns?.length||0, scanning=h.scan_status==='scanning';
     const hasCrit=(h.vulns||[]).some(v=>sevClass(v.severity)==='critical');
     let bc,bt;
-    if(scanning){bc='scanning';bt='scanning…';}
-    else if(hostScanLabel(h) !== 'Done'){bc='warn';bt=hostScanLabel(h);}
-    else if(vc===0){bc='clean';bt='clean';}
-    else if(hasCrit){bc='vulns';bt=vc+' CVE'+(vc>1?'s':'');}
-    else{bc='warn';bt=vc+' CVE'+(vc>1?'s':'');}
+    if(scanning){bc='scanning';bt=window.i18n.t('host.scanning_badge');}
+    else if(!isHostDone(h)){bc='warn';bt=hostScanLabel(h);}
+    else if(vc===0){bc='clean';bt=window.i18n.t('host.clean');}
+    else if(hasCrit){bc='vulns';bt=window.i18n.t(vc===1?'host.cve_count_one':'host.cve_count_other',{count:vc});}
+    else{bc='warn';bt=window.i18n.t(vc===1?'host.cve_count_one':'host.cve_count_other',{count:vc});}
+    const portCount=(h.ports||[]).length;
     const card=document.createElement('div');
     card.className='host-card'+(h.ip===selIp?' selected':'');
     card.dataset.ip=h.ip;
@@ -801,7 +825,7 @@ function renderHosts(){
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
         ${esc(h.ip)}<span class="hc-badge ${bc}">${bt}</span>
       </div>
-      <div class="hc-meta">${esc(h.os||h.vendor||'—')} &nbsp; ${(h.ports||[]).length} port(s)</div>
+      <div class="hc-meta">${esc(h.os||h.vendor||'—')} &nbsp; ${esc(window.i18n.t(portCount===1?'host.port_count_one':'host.port_count_other',{count:portCount}))}</div>
     `;
     card.onclick=()=>selectHost(h.ip);
     grid.appendChild(card);
@@ -821,21 +845,21 @@ function renderDetail(h){
   document.getElementById('no-sel').style.display='none';
   const el=document.getElementById('det-content'); el.style.display='block';
   const ports=h.ports||[], vulns=h.vulns||[];
-  const info=[['IP',h.ip],['OS',h.os||'Unknown'],['MAC',h.mac||'—'],['Vendor',h.vendor||'—'],
-              ['Status',hostScanLabel(h)],['Observed',h.observed_at||'—'],['Ports',ports.length],['CVEs',vulns.length]];
-  const kvs=info.map(([k,v])=>`<div class="kv"><span class="kk">${k}</span><span class="kv2">${esc(String(v))}</span></div>`).join('');
+  const info=[[window.i18n.t('host.ip'),h.ip],[window.i18n.t('host.os'),h.os||window.i18n.t('vuln.unknown')],[window.i18n.t('host.mac'),h.mac||'—'],[window.i18n.t('host.vendor'),h.vendor||'—'],
+              [window.i18n.t('host.status'),hostScanLabel(h)],[window.i18n.t('host.observed'),h.observed_at||'—'],[window.i18n.t('host.ports'),ports.length],[window.i18n.t('host.cves'),vulns.length]];
+  const kvs=info.map(([k,v])=>`<div class="kv"><span class="kk">${esc(k)}</span><span class="kv2">${esc(String(v))}</span></div>`).join('');
   const prs=ports.length
     ?ports.map(p=>`<div class="pr"><span class="pn">${esc(p.protocol||'tcp')}/${esc(p.port)}</span><span class="ps">${esc(p.service||'')}</span><span style="color:var(--text2);font-size:11px">${esc(p.product||'')} ${esc(p.version||'')}</span></div>`).join('')
-    :'<div style="color:var(--text3);font-family:var(--mono);font-size:11px;padding:4px 0">No open ports found.</div>';
+    :`<div style="color:var(--text3);font-family:var(--mono);font-size:11px;padding:4px 0">${esc(window.i18n.t('host.no_open_ports'))}</div>`;
   const vrs=vulns.length
     ?vulns.map(v=>{const sev=sevClass(v.severity);return `<div class="vr ${sev}"><div class="vc"><span class="sev ${sev}">${sev.toUpperCase()}</span>${esc(v.cve)}${v.cvss?`<span class="cvb ${sev}">${esc(v.cvss)}</span>`:''}</div><div class="vdesc">${esc(v.description)}</div></div>`;}).join('')
     :h.scan_status==='scanning'
-      ?'<div style="color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 0">Scanning in progress…</div>'
-      :hostScanLabel(h) !== 'Done'
-        ?`<div style="color:var(--orange);font-family:var(--mono);font-size:11px;padding:4px 0">${esc(hostScanLabel(h))}. Vulnerability results are unavailable or incomplete.</div>`
-      :'<div style="color:var(--green2);font-family:var(--mono);font-size:11px;padding:4px 0">No vulnerabilities found.</div>';
+      ?`<div style="color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 0">${esc(window.i18n.t('host.scan_in_progress'))}</div>`
+      :!isHostDone(h)
+        ?`<div style="color:var(--orange);font-family:var(--mono);font-size:11px;padding:4px 0">${esc(window.i18n.t('host.vulns_unavailable',{status:hostScanLabel(h)}))}</div>`
+      :`<div style="color:var(--green2);font-family:var(--mono);font-size:11px;padding:4px 0">${esc(window.i18n.t('host.no_vulns_found'))}</div>`;
   el.innerHTML=`
-    <div><div class="ds">Host Info</div>${kvs}</div><div><div class="ds">Open Ports (${ports.length})</div>${prs}</div><div><div class="ds">Vulnerabilities (${vulns.length})</div>${vrs}</div>
+    <div><div class="ds">${esc(window.i18n.t('host.detail_title'))}</div>${kvs}</div><div><div class="ds">${esc(window.i18n.t('host.open_ports_title',{count:ports.length}))}</div>${prs}</div><div><div class="ds">${esc(window.i18n.t('host.vulnerabilities_title',{count:vulns.length}))}</div>${vrs}</div>
     ${h.scan_status === 'completed' ? `
     <div style="margin-top:14px; display:flex; gap:8px;">
       <button class="btn btn-ghost btn-sm" style="flex:1" data-action="download-host" data-id="${esc(h.ip)}">
@@ -860,14 +884,14 @@ function renderVulnTable(){
   const hostSet = new Set(), scanSet = new Set();
   all.forEach(v => { hostSet.add(v.hostBase); if(v.scan_id) scanSet.add(v.scan_id); });
 
-  let hHtml = '<option value="">All Hosts</option>';
+  let hHtml = `<option value="">${esc(window.i18n.t('vuln.all_hosts'))}</option>`;
   Array.from(hostSet).sort().forEach(ip => hHtml += `<option value="${esc(ip)}">${esc(ip)}</option>`);
   if(document.getElementById('vuln-host').innerHTML !== hHtml) {
     document.getElementById('vuln-host').innerHTML = hHtml;
     document.getElementById('vuln-host').value = hostSet.has(hVal) ? hVal : '';
   }
 
-  let sHtml = '<option value="">All Scans</option>';
+  let sHtml = `<option value="">${esc(window.i18n.t('vuln.all_scans'))}</option>`;
   Array.from(scanSet).forEach(id => sHtml += `<option value="${esc(id)}">#${esc(shortId(id))} ${scans[id]?('— '+esc(scans[id].target)):''}</option>`);
   if(document.getElementById('vuln-scanid').innerHTML !== sHtml) {
     document.getElementById('vuln-scanid').innerHTML = sHtml;
@@ -883,7 +907,7 @@ function renderVulnTable(){
 
   filtered.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
   const tb=document.getElementById('vtb');
-  if(!filtered.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px;font-family:var(--mono);font-size:12px">No vulnerabilities matched.</td></tr>';return;}
+  if(!filtered.length){tb.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px;font-family:var(--mono);font-size:12px">${esc(window.i18n.t('vuln.no_matches'))}</td></tr>`;return;}
   tb.innerHTML=filtered.map(v=>{const sev=sevClass(v.severity);return `<tr><td style="font-family:var(--mono)">${esc(v.cve)}</td><td><span class="sev ${sev}">${sev.toUpperCase()}</span></td><td style="font-family:var(--mono);color:${cvssColor(v.cvss)}">${cvssText(v.cvss)}</td><td style="font-family:var(--mono)">${esc(v.host)}</td><td style="font-family:var(--mono);color:var(--text2)">${esc(v.keyword||'')}</td><td style="color:var(--text2)">${esc(v.description)}</td></tr>`;}).join('');
 }
 
@@ -901,7 +925,7 @@ function addLog(scanId,msg,level='info',ts=null){
   const term=document.getElementById('term');
   const atEnd=term.scrollHeight-term.scrollTop-term.clientHeight<40;
   const time=ts||new Date().toTimeString().slice(0,8);
-  const sid=scanId?`#${shortId(scanId)}`:'system';
+  const sid=scanId?`#${shortId(scanId)}`:window.i18n.t('term.system');
   const line=document.createElement('div');
   line.className='ll '+level; line.dataset.scanId=scanId||'';
   line.style.display=(f&&scanId&&f!==scanId)?'none':'';
@@ -944,18 +968,18 @@ async function loadDatabaseStatus(){
   const toggle = document.getElementById('s-offline-mode');
   if(!savingOfflineMode) toggle.checked = offlineServer;
   toggle.disabled = savingOfflineMode || !!status.offline_locked;
-  toggle.title = status.offline_locked ? 'Restart without --offline to change this setting.' : '';
+  toggle.title = status.offline_locked ? window.i18n.t('settings.offline_locked_hint') : '';
   const update = status.update || {};
   let message = status.ready
-    ? `${status.count.toLocaleString()} CVEs · Updated ${new Date(status.updated_at).toLocaleString()} · ${(status.size_bytes / 1048576).toFixed(1)} MB`
-    : (status.error || 'No local database. Download it while connected or copy vulnerabilities.sqlite3 from another system.');
-  if(update.running) message += ` · ${update.message} (${update.current}/${update.total || '?'})`;
+    ? window.i18n.t('settings.db_status_ready', {count: status.count.toLocaleString(), time: new Date(status.updated_at).toLocaleString(), size: (status.size_bytes / 1048576).toFixed(1)})
+    : (status.error || window.i18n.t('settings.db_status_no_local'));
+  if(update.running) message += window.i18n.t('settings.db_status_update_progress', {message: update.message, current: update.current, total: update.total || '?'});
   if(update.error) message += ` · ${update.error}`;
-  if(offlineServer) message += ' · Server is in offline mode.';
+  if(offlineServer) message += window.i18n.t('settings.db_status_server_offline');
   document.getElementById('database-status').textContent = message;
   const button = document.getElementById('database-update');
   button.disabled = !!update.running || offlineServer;
-  button.textContent = update.running ? 'Updating…' : status.ready ? 'Update database' : 'Download database';
+  button.textContent = update.running ? window.i18n.t('settings.updating') : status.ready ? window.i18n.t('settings.update_database') : window.i18n.t('settings.download_db');
   document.getElementById('database-export').hidden = !status.ready;
   if(offlineServer){
     document.getElementById('f-vuln-source').value = 'offline';
@@ -971,8 +995,8 @@ async function saveOfflineMode(){
     const response = await fetch('/api/settings', {method:'PUT', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({offline_mode:enabled})});
     const result = await response.json();
-    if(!response.ok) throw new Error(result.error || 'Could not save offline mode.');
-    toast(enabled ? 'Offline mode enabled for the whole dashboard.' : 'Offline mode disabled.');
+    if(!response.ok) throw new Error(window.i18n.tErrorCode(result.code, result.error || window.i18n.t('toast.could_not_save_offline_mode')));
+    toast(enabled ? window.i18n.t('toast.offline_mode_enabled') : window.i18n.t('toast.offline_mode_disabled'));
   }catch(error){
     toggle.checked = offlineServer;
     toast(error.message, false);
@@ -987,8 +1011,8 @@ async function updateVulnerabilityDatabase(){
   try{
     const response = await fetch('/api/vulnerability-database/update', {method:'POST'});
     const result = await response.json();
-    if(!response.ok) throw new Error(result.error || 'Could not start download.');
-    toast('Database download started. Progress appears here.');
+    if(!response.ok) throw new Error(window.i18n.tErrorCode(result.code, result.error || window.i18n.t('toast.could_not_start_download')));
+    toast(window.i18n.t('toast.database_download_started'));
   }catch(error){ toast(error.message, false); }
   await loadDatabaseStatus().catch(()=>{ button.disabled = false; });
 }
@@ -1003,14 +1027,14 @@ function setSettingsLoaded(loaded){
 }
 function settingsNotLoaded(){
   if(settingsLoaded) return false;
-  toast('Settings have not loaded, so they cannot be saved. Refresh the page to retry.',false);
+  toast(window.i18n.t('toast.settings_not_loaded'),false);
   return true;
 }
 async function saveNistKey(){
   if(settingsNotLoaded()) return;
   const key=document.getElementById('s-nist-key').value.trim();
   const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({nist_api_key:key})});
-  toast(r.ok?'NIST API key saved.':'Failed to save.',r.ok);
+  toast(r.ok?window.i18n.t('toast.nist_key_saved'):window.i18n.t('toast.failed_to_save'),r.ok);
 }
 
 // ── Settings: Email ───────────────────────────────────────────────────────────
@@ -1033,12 +1057,12 @@ async function saveEmailSettings(){
     on_vuln_found: document.getElementById('s-email-onvuln').checked,
   }};
   const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  toast(r.ok?'Email settings saved.':'Failed to save.',r.ok);
+  toast(r.ok?window.i18n.t('toast.email_settings_saved'):window.i18n.t('toast.failed_to_save'),r.ok);
 }
 async function testEmail(){
   const r=await fetch('/api/settings/test_email',{method:'POST'});
   const d=await r.json();
-  toast(r.ok?'Test email sent!':d.error||'Failed.',r.ok);
+  toast(r.ok?window.i18n.t('toast.test_email_sent'):window.i18n.tErrorCode(d.code, d.error||window.i18n.t('toast.failed_generic')),r.ok);
 }
 
 // ── Settings: Webhook ─────────────────────────────────────────────────────────
@@ -1061,14 +1085,14 @@ async function persistWebhookSettings(update,message){
       body:JSON.stringify({webhook:update})});
     if(!r.ok){
       const data=await r.json().catch(()=>({}));
-      throw new Error(data.error||'Failed to save webhook settings.');
+      throw new Error(window.i18n.tErrorCode(data.code, data.error||window.i18n.t('toast.failed_generic')));
     }
     persistedWebhookEnabled=update.enabled;
     checkbox.checked=update.enabled;
     toast(message);
   }catch(error){
     checkbox.checked=persistedWebhookEnabled;
-    toast(`Webhook setting was not saved: ${error.message}`,false);
+    toast(window.i18n.t('toast.webhook_not_saved',{detail:error.message}),false);
   }finally{
     webhookPersisting=false;
     checkbox.disabled=false;
@@ -1077,7 +1101,7 @@ async function persistWebhookSettings(update,message){
 }
 async function changeWebhookEnabled(){
   const enabled=document.getElementById('s-webhook-enabled').checked;
-  await persistWebhookSettings({enabled},enabled?'Webhook notifications enabled.':'Webhook notifications disabled.');
+  await persistWebhookSettings({enabled},enabled?window.i18n.t('toast.webhook_enabled'):window.i18n.t('toast.webhook_disabled'));
 }
 async function saveWebhookSettings(){
   if(settingsNotLoaded()) return;
@@ -1088,12 +1112,12 @@ async function saveWebhookSettings(){
     on_error:      document.getElementById('s-wh-onerror').checked,
     on_vuln_found: document.getElementById('s-wh-onvuln').checked,
   };
-  await persistWebhookSettings(update,'Webhook settings saved.');
+  await persistWebhookSettings(update,window.i18n.t('toast.webhook_settings_saved'));
 }
 async function testWebhook(){
   const r=await fetch('/api/settings/test_webhook',{method:'POST'});
   const d=await r.json();
-  toast(r.ok?`Webhook ping sent (HTTP ${d.status_code})`:d.error||'Failed.',r.ok);
+  toast(r.ok?window.i18n.t('toast.webhook_ping_sent',{status:d.status_code}):window.i18n.tErrorCode(d.code, d.error||window.i18n.t('toast.failed_generic')),r.ok);
 }
 
 // ── Profiles ──────────────────────────────────────────────────────────────────
@@ -1105,23 +1129,23 @@ async function loadProfilesFromServer(){
 function renderProfiles(){
   const el=document.getElementById('profiles-list');
   const list=Object.values(profiles);
-  if(!list.length){el.innerHTML='<div class="empty-list">No profiles yet.</div>';return;}
+  if(!list.length){el.innerHTML=`<div class="empty-list">${esc(window.i18n.t('settings.profiles_empty'))}</div>`;return;}
   el.innerHTML=list.map(p=>`
     <div class="item-card">
       <div class="item-card-info">
         <div class="item-card-name">${esc(p.name)}</div>
-        <div class="item-card-meta">Mode: ${esc(p.config?.mode||'normal')} · Speed: ${esc(p.config?.speed??3)} · ${esc(p.description||'No description')}${hasLegacyOptions(p.config||{})?' · Nmap options no longer accepted: edit and save to remove them':''}</div>
+        <div class="item-card-meta">${esc(window.i18n.t('profile.meta',{mode:window.i18n.t('scan.mode_'+(p.config?.mode||'normal')),speed:p.config?.speed??3,description:p.description||window.i18n.t('profile.no_description')}))}${hasLegacyOptions(p.config||{})?esc(window.i18n.t('profile.legacy_note')):''}</div>
       </div>
       <div class="item-card-actions">
-        <button class="btn btn-ghost btn-sm" data-action="edit-profile" data-id="${esc(p.id)}">Edit</button>
-        <button class="btn btn-danger btn-sm" data-action="delete-profile" data-id="${esc(p.id)}">Delete</button>
+        <button class="btn btn-ghost btn-sm" data-action="edit-profile" data-id="${esc(p.id)}">${esc(window.i18n.t('settings.edit'))}</button>
+        <button class="btn btn-danger btn-sm" data-action="delete-profile" data-id="${esc(p.id)}">${esc(window.i18n.t('settings.delete'))}</button>
       </div>
     </div>`).join('');
 }
 function showProfileForm(){
   document.getElementById('profile-form').style.display='flex';
   document.getElementById('pf-id').value='';
-  document.getElementById('profile-form-title').textContent='New Profile';
+  document.getElementById('profile-form-title').textContent=window.i18n.t('settings.new_profile');
   document.getElementById('pf-name').value='';
   document.getElementById('pf-desc').value='';
   document.getElementById('pf-mode').value='normal';
@@ -1142,7 +1166,7 @@ function hideProfileForm(){ document.getElementById('profile-form').style.displa
 function editProfile(pid){
   const p=profiles[pid]; if(!p) return;
   document.getElementById('profile-form').style.display='flex';
-  document.getElementById('profile-form-title').textContent='Edit Profile';
+  document.getElementById('profile-form-title').textContent=window.i18n.t('settings.edit_profile');
   document.getElementById('pf-id').value=pid;
   document.getElementById('pf-name').value=p.name;
   document.getElementById('pf-desc').value=p.description||'';
@@ -1160,12 +1184,12 @@ function editProfile(pid){
   document.getElementById('pf-vuln-source').value=c.vulnerability_source||'auto';
   window.webSecurity?.setControls('pf', c);
   updateProfilePreview();
-  if(hasLegacyOptions(c)) toast('This profile holds Nmap options from an earlier release. Saving it removes them and turns off the scheduled scans that use it.', false);
+  if(hasLegacyOptions(c)) toast(window.i18n.t('profile.legacy_saving'), false);
 }
 async function saveProfile(){
   const pid=document.getElementById('pf-id').value;
   const name=document.getElementById('pf-name').value.trim();
-  if(!name){ toast('Profile name is required',false); return; }
+  if(!name){ toast(window.i18n.t('toast.profile_name_required'),false); return; }
   const webError = window.webSecurity?.validateControls('pf');
   if(webError){ toast(webError, false); return; }
   const portsProblem = portsError(document.getElementById('pf-ports').value.trim());
@@ -1188,13 +1212,13 @@ async function saveProfile(){
   const url=pid?`/api/profiles/${pid}`:'/api/profiles';
   const method=pid?'PUT':'POST';
   const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(r.ok){ hideProfileForm(); await loadProfilesFromServer(); if(pid) await loadSchedulesFromServer(); toast('Profile saved.'); }
-  else{ const d=await r.json(); toast(d.error||'Failed.',false); }
+  if(r.ok){ hideProfileForm(); await loadProfilesFromServer(); if(pid) await loadSchedulesFromServer(); toast(window.i18n.t('toast.profile_saved')); }
+  else{ const d=await r.json(); toast(window.i18n.tErrorCode(d.code, d.error||window.i18n.t('toast.failed_generic')),false); }
 }
 async function deleteProfile(pid){
-  if(!confirm('Delete this profile?')) return;
+  if(!confirm(window.i18n.t('toast.delete_profile_confirm'))) return;
   const r=await fetch(`/api/profiles/${pid}`,{method:'DELETE'});
-  if(r.ok){ await loadProfilesFromServer(); await loadSchedulesFromServer(); toast('Profile deleted.'); }
+  if(r.ok){ await loadProfilesFromServer(); await loadSchedulesFromServer(); toast(window.i18n.t('toast.profile_deleted')); }
 }
 
 // ── Schedules ─────────────────────────────────────────────────────────────────
@@ -1206,23 +1230,23 @@ async function loadSchedulesFromServer(){
 function renderSchedules(){
   const el=document.getElementById('schedules-list');
   const list=Object.values(schedules);
-  if(!list.length){el.innerHTML='<div class="empty-list">No schedules yet.</div>';return;}
-  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  if(!list.length){el.innerHTML=`<div class="empty-list">${esc(window.i18n.t('settings.schedules_empty'))}</div>`;return;}
+  const dayKeys=['settings.monday','settings.tuesday','settings.wednesday','settings.thursday','settings.friday','settings.saturday','settings.sunday'];
   el.innerHTML=list.map(s=>{
     let when='';
-    if(s.type==='interval') when=`Every ${s.interval_value} ${s.interval_unit}`;
-    else if(s.type==='daily') when=`Daily at ${s.time_utc} UTC`;
-    else if(s.type==='weekly') when=`${days[s.weekday||0]} at ${s.time_utc} UTC`;
+    if(s.type==='interval') when=window.i18n.t('schedule.every',{value:s.interval_value,unit:window.i18n.t('settings.'+s.interval_unit)});
+    else if(s.type==='daily') when=window.i18n.t('schedule.daily_at',{time:s.time_utc});
+    else if(s.type==='weekly') when=window.i18n.t('schedule.weekly_at',{day:window.i18n.t(dayKeys[s.weekday||0]),time:s.time_utc});
     return `
     <div class="item-card">
       <div class="schedule-enabled-dot ${s.enabled?'on':'off'}"></div>
       <div class="item-card-info">
         <div class="item-card-name">${esc(s.name)}</div>
-        <div class="item-card-meta">${esc(s.target)} · ${when}${(()=>{const a=timeAgo(s.last_run);return a?` · Last: ${a}`:'';})()}</div>
+        <div class="item-card-meta">${esc(s.target)} · ${esc(when)}${(()=>{const a=timeAgo(s.last_run);return a?esc(window.i18n.t('schedule.last_run',{time:a})):'';})()}</div>
       </div>
       <div class="item-card-actions">
-        <button class="btn btn-ghost btn-sm" data-action="edit-schedule" data-id="${esc(s.id)}">Edit</button>
-        <button class="btn btn-danger btn-sm" data-action="delete-schedule" data-id="${esc(s.id)}">Delete</button>
+        <button class="btn btn-ghost btn-sm" data-action="edit-schedule" data-id="${esc(s.id)}">${esc(window.i18n.t('settings.edit'))}</button>
+        <button class="btn btn-danger btn-sm" data-action="delete-schedule" data-id="${esc(s.id)}">${esc(window.i18n.t('settings.delete'))}</button>
       </div>
     </div>`}).join('');
 }
@@ -1232,12 +1256,12 @@ function updateScheduleTypeUI(){
   document.getElementById('sf-time-wrap').style.display     = t!=='interval'?'':'none';
   document.getElementById('sf-weekday-wrap').style.display  = t==='weekly'?'':'none';
 }
-function showScheduleForm(){ document.getElementById('schedule-form').style.display='flex'; document.getElementById('sf-id').value=''; document.getElementById('schedule-form-title').textContent='New Schedule'; updateScheduleTypeUI(); }
+function showScheduleForm(){ document.getElementById('schedule-form').style.display='flex'; document.getElementById('sf-id').value=''; document.getElementById('schedule-form-title').textContent=window.i18n.t('settings.new_schedule'); updateScheduleTypeUI(); }
 function hideScheduleForm(){ document.getElementById('schedule-form').style.display='none'; }
 function editSchedule(sid){
   const s=schedules[sid]; if(!s) return;
   document.getElementById('schedule-form').style.display='flex';
-  document.getElementById('schedule-form-title').textContent='Edit Schedule';
+  document.getElementById('schedule-form-title').textContent=window.i18n.t('settings.edit_schedule');
   document.getElementById('sf-id').value=sid;
   document.getElementById('sf-name').value=s.name;
   document.getElementById('sf-target').value=s.target;
@@ -1253,8 +1277,8 @@ function editSchedule(sid){
 async function saveSchedule(){
   const sid=document.getElementById('sf-id').value;
   const target=document.getElementById('sf-target').value.trim();
-  if(!target){ toast('Target is required.',false); return; }
-  if(!document.getElementById('sf-profile').value){ toast('Please select a profile for scan settings.',false); return; }
+  if(!target){ toast(window.i18n.t('toast.schedule_target_required'),false); return; }
+  if(!document.getElementById('sf-profile').value){ toast(window.i18n.t('toast.schedule_profile_required'),false); return; }
   const body={
     name:            document.getElementById('sf-name').value,
     target,
@@ -1269,13 +1293,13 @@ async function saveSchedule(){
   const url=sid?`/api/schedules/${sid}`:'/api/schedules';
   const method=sid?'PUT':'POST';
   const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(r.ok){ hideScheduleForm(); await loadSchedulesFromServer(); toast('Schedule saved.'); }
-  else{ const d=await r.json(); toast(d.error||'Failed.',false); }
+  if(r.ok){ hideScheduleForm(); await loadSchedulesFromServer(); toast(window.i18n.t('toast.schedule_saved')); }
+  else{ const d=await r.json(); toast(window.i18n.tErrorCode(d.code, d.error||window.i18n.t('toast.failed_generic')),false); }
 }
 async function deleteSchedule(sid){
-  if(!confirm('Delete this schedule?')) return;
+  if(!confirm(window.i18n.t('toast.delete_schedule_confirm'))) return;
   const r=await fetch(`/api/schedules/${sid}`,{method:'DELETE'});
-  if(r.ok){ await loadSchedulesFromServer(); toast('Schedule deleted.'); }
+  if(r.ok){ await loadSchedulesFromServer(); toast(window.i18n.t('toast.schedule_deleted')); }
 }
 
 // ── Load settings into form ───────────────────────────────────────────────────
@@ -1349,13 +1373,13 @@ async function initDashboard(){
   logR.filter(e=>!e.level?.startsWith('__')).forEach(e=>addLog(e.scan_id,e.msg,e.level,e.ts));
   if(logR.length) lastLogId = logR[logR.length-1].id;
   renderScans(); renderHosts(); renderVulnTable(); updateBadges();
-  if(failed) addLog(null,'Some dashboard data could not be loaded. Refresh to retry.','error');
+  if(failed) addLog(null,window.i18n.t('log.data_load_failed'),'error');
 }
 
 // A render that throws on an unexpected field must not leave the page without its event stream and polling.
 async function startDashboard(){
   try{ await initDashboard(); }
-  catch(_){ addLog(null,'Some dashboard data could not be loaded. Refresh to retry.','error'); }
+  catch(_){ addLog(null,window.i18n.t('log.data_load_failed'),'error'); }
   connectSSE();
   schedulePoll();
   setInterval(()=>loadDatabaseStatus().catch(()=>{}), 5000);

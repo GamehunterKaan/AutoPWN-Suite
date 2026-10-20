@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
+import gettext
 import os
 import shutil
 import sys
@@ -162,6 +163,15 @@ def web_response():
         return response
 
     return create
+
+
+@pytest.fixture(autouse=True)
+def _default_english_locale(monkeypatch):
+    """Pin _()/ngettext() to identity for every test, regardless of the
+    runner's own locale or a previous test's explicit language choice."""
+    monkeypatch.delenv("AUTOPWN_LANG", raising=False)
+    gettext.NullTranslations().install(names=("ngettext",))
+    yield
 
 
 @pytest.fixture(autouse=True)

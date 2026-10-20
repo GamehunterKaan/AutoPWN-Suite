@@ -9,8 +9,10 @@
   const confidence = value => ['candidate','advisory','observation'].includes(value) ? value : 'observation';
   const pending = {};
   const renderedPanels = new WeakMap();
-  const limitLabels = {speed:'Web speed',request_delay_ms:'Minimum request delay (ms)',request_budget:'Request budget / attempt',timeout:'Timeout (seconds)',max_pages:'Crawl pages / attempt',max_urls:'Crawl URLs',max_depth:'Crawl depth',max_endpoints:'Probe endpoints / attempt',max_parameters:'Parameters / URL / attempt',max_response_kb:'Response cap (KB)'};
-  const speeds = ['0 · Very slow (5 s)', '1 · Slow (2 s)', '2 · Gentle (500 ms)', '3 · Normal (100 ms)', '4 · Fast (25 ms)', '5 · No added delay'];
+  const limitLabel = key => window.i18n.t('web.limit.' + key);
+  // The check names come from the server catalog in English; the dictionary has the translation of each known one.
+  const checkLabel = (key, label) => { const id = 'web.check.' + key; const text = window.i18n.t(id); return text === id ? label : text; };
+  const speedLabel = index => window.i18n.t('web.speed.' + index);
   let resumeJob = null, resumeBusy = false;
   let catalog = null, offline = false, rows = [], jobs = [], busy = false;
   let selected = null, detailRevision = 0, pocRevision = 0, detailBusy = false, displayedPoc = '';
@@ -19,7 +21,7 @@
     const response = await fetch(url, options);
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.error || `Request failed (${response.status}).`);
+      throw new Error((body.code ? window.i18n.tErrorCode(body.code, body.error) : body.error) || window.i18n.t('toast.request_failed', {status: response.status}));
     }
     return response;
   }
@@ -55,25 +57,26 @@
   const findingScope = row => `${detailRevision}:${endpoint(row)}`;
 
   function limitFields(prefix) {
-    return Object.entries(catalog.limits).map(([key,bounds]) => `<label>${escape(limitLabels[key] || key)}${key === 'speed'
-      ? `<select id="${prefix}-web-limit-speed">${speeds.map((label,index) => `<option value="${index}">${escape(label)}</option>`).join('')}</select>`
+    return Object.entries(catalog.limits).map(([key,bounds]) => `<label>${escape(limitLabel(key))}${key === 'speed'
+      ? `<select id="${prefix}-web-limit-speed">${[0,1,2,3,4,5].map(index => `<option value="${index}">${escape(speedLabel(index))}</option>`).join('')}</select>`
       : `<input id="${prefix}-web-limit-${escape(key)}" type="number" step="1" min="${bounds[1]}" max="${bounds[2]}">`}</label>`).join('');
   }
 
   function mount(prefix) {
     const root = $(`${prefix}-web-controls`);
     if (!root || !catalog) return;
+    const t = window.i18n.t;
     root.innerHTML = `<div class="web-control-card">
-      <div class="web-control-head"><div><div class="web-control-title">Web checks</div><div class="web-control-subtitle" id="${prefix}-web-count"></div></div>
-        <label><span class="sr-only">Enable web checks</span><input type="checkbox" id="${prefix}-web-enabled"></label></div>
+      <div class="web-control-head"><div><div class="web-control-title">${t('web.checks_title')}</div><div class="web-control-subtitle" id="${prefix}-web-count"></div></div>
+        <label><span class="sr-only">${t('web.enable_checks')}</span><input type="checkbox" id="${prefix}-web-enabled"></label></div>
       <div class="web-control-options">
-        <label><span class="sr-only">Scan scope</span><select id="${prefix}-web-scope"><option value="network">Network + selected web checks</option><option value="web">Website only · no port scan</option></select></label>
+        <label><span class="sr-only">${t('web.scan_scope_label')}</span><select id="${prefix}-web-scope"><option value="network">${t('web.scope_network')}</option><option value="web">${t('web.scope_web_only')}</option></select></label>
         <div class="web-control-warning" id="${prefix}-web-warning" hidden></div>
-        <details><summary>Select checks</summary><div class="web-preset-actions"><button data-web-action="preset" data-prefix="${prefix}" data-preset="all">All</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="light">Light</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="none">None</button></div>
-          <div class="web-check-grid">${Object.entries(catalog.checks).map(([key,label]) => `<label><input type="checkbox" id="${prefix}-web-check-${escape(key)}">${escape(label)}</label>`).join('')}</div></details>
-        <details><summary>Speed, limits &amp; crawl</summary><div class="web-limit-grid">${limitFields(prefix)}</div><p class="web-small-note">Web speed sets the delay between requests; minimum request delay can slow it further.</p>
-          <label class="web-insecure-tls"><input type="checkbox" id="${prefix}-web-insecure-tls"> Accept untrusted certificates</label>
-          <p class="web-small-note">Certificates are verified by default. Enable this only for targets you trust, such as lab systems with self-signed certificates.</p></details>
+        <details><summary>${t('web.select_checks')}</summary><div class="web-preset-actions"><button data-web-action="preset" data-prefix="${prefix}" data-preset="all">${t('web.preset_all')}</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="light">${t('web.preset_light')}</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="none">${t('web.preset_none')}</button></div>
+          <div class="web-check-grid">${Object.entries(catalog.checks).map(([key,label]) => `<label><input type="checkbox" id="${prefix}-web-check-${escape(key)}">${escape(checkLabel(key, label))}</label>`).join('')}</div></details>
+        <details><summary>${t('web.speed_limits_crawl')}</summary><div class="web-limit-grid">${limitFields(prefix)}</div><p class="web-small-note">${t('web.speed_note')}</p>
+          <label class="web-insecure-tls"><input type="checkbox" id="${prefix}-web-insecure-tls"> ${t('web.insecure_tls')}</label>
+          <p class="web-small-note">${t('web.insecure_tls_note')}</p></details>
       </div></div>`;
     setControls(prefix, pending[prefix] || {});
   }
@@ -97,12 +100,12 @@
     if ($(`${prefix}-network-controls`)) $(`${prefix}-network-controls`).hidden = webOnly;
     enabled.disabled = blocked;
     const count = Object.keys(catalog.checks).filter(key => $(`${prefix}-web-check-${key}`).checked).length;
-    $(`${prefix}-web-count`).textContent = `${count} of ${Object.keys(catalog.checks).length} checks selected`;
+    $(`${prefix}-web-count`).textContent = window.i18n.t('web.checks_selected', {count, total: Object.keys(catalog.checks).length});
     const warning = $(`${prefix}-web-warning`);
     warning.hidden = !blocked;
-    warning.textContent = 'Offline source disables web requests. Choose an online source to scan a website.';
+    warning.textContent = window.i18n.t('web.offline_warning');
     $(`${prefix}-web-controls`).querySelectorAll('details input, details select, details button').forEach(node => { node.disabled = blocked || !enabled.checked; });
-    if (prefix === 'f') $('f-target').placeholder = webOnly ? 'https://app.example.com/path' : '192.168.1.0/24 or hostname';
+    if (prefix === 'f') $('f-target').placeholder = webOnly ? window.i18n.t('scan.target_placeholder_web') : window.i18n.t('scan.target_placeholder_network');
   }
   function readControls(prefix) {
     if (!catalog || !$(`${prefix}-web-enabled`)) return {};
@@ -114,15 +117,15 @@
       scan_ports: !webOnly, web_options:options, ...(webOnly ? {scan_vulns:false,skip_discovery:true} : {})};
   }
   function validateControls(prefix) {
-    if (!catalog) return pending[prefix]?.scan_web ? 'Web controls have not loaded. Refresh the dashboard to retry.' : '';
+    if (!catalog) return pending[prefix]?.scan_web ? window.i18n.t('toast.web_controls_not_loaded') : '';
     const controls = readControls(prefix);
-    if (prefix === 'f' && controls.scan_ports === false && sourceOffline(prefix)) return 'Web-only scans require an online source.';
-    if (!controls.scan_ports && !controls.scan_web) return 'Enable web checks for a website-only scan.';
+    if (prefix === 'f' && controls.scan_ports === false && sourceOffline(prefix)) return window.i18n.t('toast.web_only_requires_online');
+    if (!controls.scan_ports && !controls.scan_web) return window.i18n.t('toast.enable_web_for_website_scan');
     if (!controls.scan_web) return '';
-    if (!Object.values(controls.web_options.checks).some(Boolean)) return 'Select at least one web check.';
+    if (!Object.values(controls.web_options.checks).some(Boolean)) return window.i18n.t('toast.select_at_least_one_check');
     for (const [key, bounds] of Object.entries(catalog.limits)) {
       const raw = controls.web_options[key];
-      if (!/^\d+$/.test(raw) || Number(raw) < bounds[1] || Number(raw) > bounds[2]) return `${limitLabels[key]} must be ${bounds[1]}–${bounds[2]}.`;
+      if (!/^\d+$/.test(raw) || Number(raw) < bounds[1] || Number(raw) > bounds[2]) return window.i18n.t('toast.limit_out_of_range', {label: limitLabel(key), min: bounds[1], max: bounds[2]});
     }
     return '';
   }
@@ -136,19 +139,19 @@
   async function resume(scanId) {
     try {
       resumeJob = await json(`/api/scans/${encodeURIComponent(scanId)}`);
-      if (!resumeJob.can_resume) throw new Error('This scan is already running or completed.');
-      if (offline && resumeJob.config?.scan_web) throw new Error('Web checks are disabled in offline mode.');
+      if (!resumeJob.can_resume) throw new Error(window.i18n.t('toast.scan_already_running_or_completed'));
+      if (offline && resumeJob.config?.scan_web) throw new Error(window.i18n.t('toast.web_checks_disabled_offline'));
       $('scan-resume-target').textContent = resumeJob.target;
       $('scan-resume-limits').hidden = !resumeJob.config?.scan_web;
       if (resumeJob.config?.scan_web) {
-        if (!catalog) throw new Error('Web controls have not loaded.');
+        if (!catalog) throw new Error(window.i18n.t('toast.web_controls_not_loaded_short'));
         $('scan-resume-limits').innerHTML = limitFields('rs');
         const controls = resumeJob.resume_web_options || resumeJob.config.web_options || {};
         Object.keys(catalog.limits).forEach(key => { $(`rs-web-limit-${key}`).value = controls[key] ?? catalog.defaults[key]; });
       }
       $('scan-resume-submit').disabled = false;
       $('scan-resume-dialog').showModal();
-    } catch (error) { notify(`Could not resume scan: ${error.message}`,false); }
+    } catch (error) { notify(window.i18n.t('toast.could_not_resume_scan', {detail: error.message}),false); }
   }
   async function submitResume() {
     if (!resumeJob || resumeBusy) return;
@@ -158,7 +161,7 @@
       for (const [key,bounds] of Object.entries(catalog.limits)) {
         const raw = String($(`rs-web-limit-${key}`).value);
         if (!/^\d+$/.test(raw) || Number(raw) < bounds[1] || Number(raw) > bounds[2]) {
-          notify(`${limitLabels[key]} must be ${bounds[1]}–${bounds[2]}.`,false); return;
+          notify(window.i18n.t('toast.limit_out_of_range', {label: limitLabel(key), min: bounds[1], max: bounds[2]}),false); return;
         }
         body.web_options[key] = Number(raw);
       }
@@ -166,9 +169,9 @@
     resumeBusy = true; $('scan-resume-submit').disabled = true;
     try {
       await json(`/api/scans/${encodeURIComponent(resumeJob.id)}/resume`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      $('scan-resume-dialog').close(); notify('Scan resumed. Continuing unfinished work.');
+      $('scan-resume-dialog').close(); notify(window.i18n.t('toast.scan_resumed'));
       await refresh(); if (typeof poll === 'function') await poll();
-    } catch (error) { notify(`Could not resume scan: ${error.message}`,false); }
+    } catch (error) { notify(window.i18n.t('toast.could_not_resume_scan', {detail: error.message}),false); }
     finally { resumeBusy = false; $('scan-resume-submit').disabled = false; }
   }
 
@@ -188,25 +191,26 @@
     const scopedJobs = jobs.filter(job => job.config?.scan_web && (!scanFilter || job.id === scanFilter));
     $('badge-web').textContent = rows.length;
     $('badge-web').classList.toggle('show', rows.length > 0);
-    const stats = [[scoped.length,'Total findings',''],[scoped.filter(row => severity(row.severity) === 'high').length,'High severity','priority'],
-      [scoped.filter(row => row.verification?.status === 'reproduced').length,'Evidence reproduced','verified'],[scopedJobs.filter(job => ['running','stopping'].includes(job.status)).length,'Active web scans','']];
+    const t = window.i18n.t;
+    const stats = [[scoped.length,t('web.total_findings'),''],[scoped.filter(row => severity(row.severity) === 'high').length,t('web.high_severity'),'priority'],
+      [scoped.filter(row => row.verification?.status === 'reproduced').length,t('web.evidence_reproduced'),'verified'],[scopedJobs.filter(job => ['running','stopping'].includes(job.status)).length,t('web.active_web_scans'),'']];
     $('web-summary').innerHTML = stats.map(([value,label,style]) => `<div class="web-stat ${style}"><strong>${value}</strong><span>${label}</span></div>`).join('');
-    $('web-result-count').textContent = `${visible.length} of ${rows.length} findings`;
+    $('web-result-count').textContent = t('web.result_count', {shown: visible.length, total: rows.length});
     $('web-empty').hidden = !!visible.length;
-    $('web-empty').querySelector('h2').textContent = rows.length ? 'No matching findings.' : scopedJobs.length ? 'No findings reported yet.' : 'Start with a website.';
-    $('web-empty').querySelector('p').textContent = rows.length ? 'Adjust the filters to see more results.' : scopedJobs.length ? 'Review scan coverage below; incomplete checks cannot rule out vulnerabilities.' : 'Enable web checks and scan an application to see its findings here.';
+    $('web-empty').querySelector('h2').textContent = rows.length ? t('web.empty_no_match_title') : scopedJobs.length ? t('web.empty_no_findings_title') : t('web.empty_title');
+    $('web-empty').querySelector('p').textContent = rows.length ? t('web.empty_no_match_hint') : scopedJobs.length ? t('web.empty_no_findings_hint') : t('web.empty_hint');
     $('web-findings-list').innerHTML = visible.map(row => `<button class="web-finding-row ${severity(row.severity)}" data-web-action="open" data-scan="${escape(row.scan_id)}" data-id="${escape(row.id)}">
-      <span class="web-severity-bar"></span><span><span class="web-finding-title">${escape(row.title || row.type)}${row.verification?.status === 'reproduced' ? pill('Evidence reproduced','reproduced') : ''}</span><span class="web-finding-url">${escape(row.url)}${row.parameter ? ` · ${escape(row.parameter)}` : ''}</span></span>
+      <span class="web-severity-bar"></span><span><span class="web-finding-title">${escape(row.title || row.type)}${row.verification?.status === 'reproduced' ? pill(t('web.evidence_reproduced'),'reproduced') : ''}</span><span class="web-finding-url">${escape(row.url)}${row.parameter ? ` · ${escape(row.parameter)}` : ''}</span></span>
       <span class="web-finding-side">${pill(confidence(row.confidence),confidence(row.confidence))}${pill(severity(row.severity),severity(row.severity))}<span aria-hidden="true">↗</span></span></button>`).join('');
     renderDisclosurePanel($('web-coverage'), scopedJobs.map(job => {
       const coverage = job.web_coverage || [];
-      if (!coverage.length) return `<div class="web-coverage-item">${escape(job.target)} · ${escape(job.status)}${job.status === 'completed' ? ' · web coverage not recorded' : ''}</div>`;
-      const resumeButton = job.can_resume ? `<button class="btn btn-primary btn-sm" data-web-action="resume" data-scan="${escape(job.id)}" ${offline ? 'disabled' : ''}>Resume scan</button>` : '';
+      if (!coverage.length) return `<div class="web-coverage-item">${escape(job.target)} · ${escape(job.status)}${job.status === 'completed' ? escape(t('web.coverage_not_recorded')) : ''}</div>`;
+      const resumeButton = job.can_resume ? `<button class="btn btn-primary btn-sm" data-web-action="resume" data-scan="${escape(job.id)}" ${offline ? 'disabled' : ''}>${t('web.resume_scan')}</button>` : '';
       return resumeButton + coverage.map(item => {
         const incomplete = item.status !== 'completed';
         const checks = Object.entries(item.controls?.checks || {}).filter(([,enabled]) => enabled).map(([key]) => catalog?.checks[key] || key);
         const issues = item.issues || [];
-        return `<div class="web-coverage-item ${incomplete ? 'partial' : ''}"><details data-web-disclosure="${escape(JSON.stringify([job.id,item.host,item.endpoint || item.target]))}"><summary>${escape(item.endpoint || item.target)} · ${incomplete ? escape(item.status) : 'Checked'} · ${escape(item.total_requests ?? item.requests ?? 0)} requests${item.attempts > 1 ? ` over ${escape(item.attempts)} attempts` : ''}</summary><ul>${checks.length ? `<li>Enabled checks: ${escape(checks.join(', '))}</li>` : ''}${issues.map(issue => `<li>${escape(issue)}</li>`).join('')}${!issues.length ? '<li>Selected checks completed within the configured limits. Unreported vulnerabilities may still exist.</li>' : ''}</ul></details></div>`;
+        return `<div class="web-coverage-item ${incomplete ? 'partial' : ''}"><details data-web-disclosure="${escape(JSON.stringify([job.id,item.host,item.endpoint || item.target]))}"><summary>${escape(item.endpoint || item.target)} · ${incomplete ? escape(item.status) : t('web.checked')} · ${escape(t('web.requests_count', {count: item.total_requests ?? item.requests ?? 0}))}${item.attempts > 1 ? escape(t('web.over_attempts', {count: item.attempts})) : ''}</summary><ul>${checks.length ? `<li>${escape(t('web.enabled_checks', {checks: checks.join(', ')}))}</li>` : ''}${issues.map(issue => `<li>${escape(issue)}</li>`).join('')}${!issues.length ? `<li>${escape(t('web.coverage_complete'))}</li>` : ''}</ul></details></div>`;
       }).join('');
     }).join(''), 'coverage');
   }
@@ -216,51 +220,51 @@
     try {
       [rows,jobs] = await Promise.all([json('/api/web/findings'),json('/api/scans')]);
       const filter = $('web-scan-filter'), previous = filter.value;
-      filter.innerHTML = '<option value="">All scans</option>' + jobs.filter(job => job.config?.scan_web || job.web_finding_count).map(job => `<option value="${escape(job.id)}">${escape(job.target)} · ${escape(job.id.slice(0,8))}</option>`).join('');
+      filter.innerHTML = `<option value="">${escape(window.i18n.t('web.all_scans'))}</option>` + jobs.filter(job => job.config?.scan_web || job.web_finding_count).map(job => `<option value="${escape(job.id)}">${escape(job.target)} · ${escape(job.id.slice(0,8))}</option>`).join('');
       filter.value = jobs.some(job => job.id === previous) ? previous : '';
       render();
       const updated = selected && rows.find(row => row.id === selected.id && row.scan_id === selected.scan_id);
       if (selected && $('web-finding-dialog').open && !detailBusy
           && (selected.verification?.status === 'running' || pretty(updated?.verification) !== pretty(selected.verification))) await refreshDetail();
     } catch (error) {
-      $('web-result-count').textContent = `Could not refresh findings: ${error.message}`;
+      $('web-result-count').textContent = window.i18n.t('toast.could_not_refresh_findings', {detail: error.message});
     } finally { busy = false; }
   }
-  function card(title, value) { return `<div class="web-detail-card"><h3>${escape(title)}</h3><p>${escape(value || 'Not recorded.')}</p></div>`; }
+  function card(title, value) { return `<div class="web-detail-card"><h3>${escape(title)}</h3><p>${escape(value || window.i18n.t('web.not_recorded'))}</p></div>`; }
   function renderDetail(row) {
     const info = row.details || {};
     $('web-detail-title').textContent = info.title || row.type;
     $('web-detail-kind').textContent = `${row.type}${info.cwe ? ' · ' + info.cwe : ''}`;
-    $('web-detail-url').textContent = `${row.url}${row.parameter ? ' · parameter: ' + row.parameter : ''}`;
-    $('web-detail-badges').innerHTML = pill(severity(row.severity),severity(row.severity)) + pill(confidence(row.confidence),confidence(row.confidence)) + pill(`Scan ${row.scan_id.slice(0,8)}`) + (row.verification?.status === 'reproduced' ? pill('Evidence reproduced','reproduced') : '');
-    $('web-panel-overview').innerHTML = card('Observed evidence',row.evidence) + `<div class="web-detail-grid"><div>${card('How this was detected',info.detection)}${card('Potential impact',info.impact)}</div><div>${card('Remediation',info.remediation)}${card('What still needs verification',info.limitations)}</div></div><div class="web-detail-card"><h3>Verification steps</h3><ol>${(info.verification_steps || []).map(step => `<li>${escape(step)}</li>`).join('')}</ol></div><div class="web-detail-card"><h3>References</h3>${(info.references || []).map(safeReference).join('')}<p class="web-small-note">Observed ${escape(row.observed_at || 'time not recorded')} · Host ${escape(row.host)}</p></div>`;
+    $('web-detail-url').textContent = `${row.url}${row.parameter ? window.i18n.t('web.detail_parameter', {parameter: row.parameter}) : ''}`;
+    $('web-detail-badges').innerHTML = pill(severity(row.severity),severity(row.severity)) + pill(confidence(row.confidence),confidence(row.confidence)) + pill(window.i18n.t('web.scan_pill', {id: row.scan_id.slice(0,8)})) + (row.verification?.status === 'reproduced' ? pill(window.i18n.t('web.evidence_reproduced'),'reproduced') : '');
+    $('web-panel-overview').innerHTML = card(window.i18n.t('web.observed_evidence'),row.evidence) + `<div class="web-detail-grid"><div>${card(window.i18n.t('web.detection'),info.detection)}${card(window.i18n.t('web.impact'),info.impact)}</div><div>${card(window.i18n.t('web.remediation'),info.remediation)}${card(window.i18n.t('web.limitations'),info.limitations)}</div></div><div class="web-detail-card"><h3>${window.i18n.t('web.verification_steps')}</h3><ol>${(info.verification_steps || []).map(step => `<li>${escape(step)}</li>`).join('')}</ol></div><div class="web-detail-card"><h3>${window.i18n.t('web.references')}</h3>${(info.references || []).map(safeReference).join('')}<p class="web-small-note">${escape(window.i18n.t('web.observed_host', {time: row.observed_at || window.i18n.t('web.time_not_recorded'), host: row.host}))}</p></div>`;
     const observations = row.observations || [];
-    renderDisclosurePanel($('web-panel-evidence'), `<p class="web-small-note">Recorded HTTP exchanges, including baseline comparisons. Sensitive query values are redacted. Response bodies and cookie values are omitted.</p>`
+    renderDisclosurePanel($('web-panel-evidence'), `<p class="web-small-note">${window.i18n.t('web.evidence_note')}</p>`
       + observations.map((record,index) => {
         const req = record.request || {}, res = record.response || {};
-        return `<details class="web-request" data-web-disclosure="observation-${index}"${index === 0 ? ' open' : ''}><summary>${escape(req.role || 'probe')} · ${escape(req.method)} <span class="web-request-uri">${escape(req.url)}</span>${pill(`HTTP ${res.status}`)}</summary><pre>${escape(pretty({request:req,response:res,phase:record.phase}))}</pre></details>`;
-      }).join('') + (!observations.length ? '<p class="web-small-note">No HTTP exchanges were attached to this finding. Review the recorded plan and available certificate metadata.</p>' : '')
-      + (row.reproduction?.certificate ? `<details class="web-request" data-web-disclosure="certificate" open><summary>Certificate metadata</summary><pre>${escape(pretty(row.reproduction.certificate))}</pre></details>` : '')
-      + `<details class="web-request" data-web-disclosure="complete-finding"><summary>Complete finding · plan and verification history</summary><pre>${escape(pretty(row))}</pre></details>`, findingScope(row));
+        return `<details class="web-request" data-web-disclosure="observation-${index}"${index === 0 ? ' open' : ''}><summary>${escape(req.role || window.i18n.t('web.probe_role'))} · ${escape(req.method)} <span class="web-request-uri">${escape(req.url)}</span>${pill(`HTTP ${res.status}`)}</summary><pre>${escape(pretty({request:req,response:res,phase:record.phase}))}</pre></details>`;
+      }).join('') + (!observations.length ? `<p class="web-small-note">${window.i18n.t('web.no_exchanges')}</p>` : '')
+      + (row.reproduction?.certificate ? `<details class="web-request" data-web-disclosure="certificate" open><summary>${window.i18n.t('web.certificate_metadata')}</summary><pre>${escape(pretty(row.reproduction.certificate))}</pre></details>` : '')
+      + `<details class="web-request" data-web-disclosure="complete-finding"><summary>${window.i18n.t('web.complete_finding')}</summary><pre>${escape(pretty(row))}</pre></details>`, findingScope(row));
     renderVerification(row);
   }
   function replayBlocked(row) {
-    if (offline) return 'Verification is disabled in server offline mode.';
+    if (offline) return window.i18n.t('web.replay_blocked_offline_server');
     const job = jobs.find(item => item.id === row.scan_id);
-    if (job?.config?.vulnerability_source === 'offline') return 'This scan uses an offline source. Download the PoC to review it locally.';
-    if (!row.type.startsWith('TLS_') && pretty(row.reproduction || {}).includes('REDACTED')) return 'A query value was redacted. Restore it locally in the downloaded Python PoC to verify.';
+    if (job?.config?.vulnerability_source === 'offline') return window.i18n.t('web.replay_blocked_offline_source');
+    if (!row.type.startsWith('TLS_') && pretty(row.reproduction || {}).includes('REDACTED')) return window.i18n.t('web.replay_blocked_redacted');
     return '';
   }
   function renderVerification(row) {
     const result = row.verification || {}, blocked = replayBlocked(row);
     const button = $('web-verify-button');
     button.disabled = !!blocked || result.status === 'running';
-    button.textContent = result.status === 'running' ? 'Verifying…' : 'Verify evidence';
-    button.title = blocked || 'Send the recorded requests to the scanned endpoint';
-    const labels = {running:'Verification running',reproduced:'Evidence reproduced',not_reproduced:'Evidence not reproduced',inconclusive:'Inconclusive',needs_input:'Local input required'};
+    button.textContent = result.status === 'running' ? window.i18n.t('web.verifying') : window.i18n.t('web.verify_button');
+    button.title = blocked || window.i18n.t('web.verify_title_hint');
+    const labels = {running:window.i18n.t('web.verification_running'),reproduced:window.i18n.t('web.verification_reproduced'),not_reproduced:window.i18n.t('web.verification_not_reproduced'),inconclusive:window.i18n.t('web.verification_inconclusive'),needs_input:window.i18n.t('web.verification_needs_input')};
     const node = $('web-verification-result');
     node.className = `web-verification-result ${result.status === 'reproduced' ? 'reproduced' : ''}`;
-    renderDisclosurePanel(node, `${blocked ? `<p>${escape(blocked)}</p>` : ''}${result.status ? `<strong>${escape(labels[result.status] || result.status)}</strong> · ${escape(result.summary)}${result.checked_at ? `<p class="web-small-note">${escape(result.checked_at)}</p>` : ''}` : '<p>No verification run yet.</p>'}<p class="web-small-note">Reproducing evidence does not establish full exploit impact. Review application context and the limitations above.</p>${result.observations?.length ? `<details class="web-request" data-web-disclosure="verification-exchanges"><summary>Verification exchanges · ${result.observations.length} requests</summary><pre>${escape(pretty(result.observations))}</pre></details>` : ''}`, findingScope(row), true);
+    renderDisclosurePanel(node, `${blocked ? `<p>${escape(blocked)}</p>` : ''}${result.status ? `<strong>${escape(labels[result.status] || result.status)}</strong> · ${escape(result.summary)}${result.checked_at ? `<p class="web-small-note">${escape(result.checked_at)}</p>` : ''}` : `<p>${window.i18n.t('web.no_verification_yet')}</p>`}<p class="web-small-note">${window.i18n.t('web.verification_disclaimer')}</p>${result.observations?.length ? `<details class="web-request" data-web-disclosure="verification-exchanges"><summary>${escape(window.i18n.t('web.verification_exchanges', {count: result.observations.length}))}</summary><pre>${escape(pretty(result.observations))}</pre></details>` : ''}`, findingScope(row), true);
   }
   async function refreshDetail() {
     if (!selected) return;
@@ -278,11 +282,11 @@
     ++pocRevision;
     selected = null;
     displayedPoc = '';
-    $('web-detail-title').textContent = 'Loading finding…';
-    $('web-detail-kind').textContent = 'Finding';
+    $('web-detail-title').textContent = window.i18n.t('web.loading_finding');
+    $('web-detail-kind').textContent = window.i18n.t('web.dialog_eyebrow');
     $('web-detail-url').textContent = '';
     $('web-detail-badges').innerHTML = '';
-    $('web-panel-overview').innerHTML = '<p class="web-small-note">Loading recorded evidence…</p>';
+    $('web-panel-overview').innerHTML = `<p class="web-small-note">${window.i18n.t('web.loading_evidence')}</p>`;
     $('web-panel-evidence').innerHTML = '';
     $('web-poc-code').textContent = '';
     $('web-verification-result').textContent = '';
@@ -315,7 +319,7 @@
     if (!selected) return;
     const revision = ++pocRevision, row = selected, format = $('web-poc-format').value;
     displayedPoc = '';
-    $('web-poc-code').textContent = 'Loading PoC…';
+    $('web-poc-code').textContent = window.i18n.t('web.loading_poc');
     $('web-poc-download').removeAttribute('href');
     try {
       const url = endpoint(row) + '/poc?format=' + encodeURIComponent(format);
@@ -324,7 +328,7 @@
       displayedPoc = code;
       $('web-poc-code').textContent = code;
       $('web-poc-download').href = url;
-      const notes = {python:'Install requests and cryptography, then run the downloaded file with Python. The result compares baseline and probe evidence; response bodies are not printed.',curl:'Commands use POSIX shell quoting. curl shows response headers and discards bodies; use the Python PoC for automatic comparisons and TLS checks.',html:'Download and review the browser PoC. Run its explicit test button from a controlled origin; use an authenticated browser session when assessing CORS. JavaScript execution and browser cookie rules still need manual review.',json:'Recorded reproduction plan. Baselines, probes and expected conditions are included in the Python PoC.'};
+      const notes = {python:window.i18n.t('web.poc_note_python'),curl:window.i18n.t('web.poc_note_curl'),html:window.i18n.t('web.poc_note_html'),json:window.i18n.t('web.poc_note_json')};
       $('web-poc-help').textContent = notes[format];
     } catch (error) { if (revision === pocRevision) $('web-poc-code').textContent = error.message; }
   }
@@ -334,13 +338,13 @@
     $('web-verify-button').disabled = true;
     try {
       await json(endpoint(row) + '/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-      if (revision === detailRevision) { selected.verification = {status:'running',summary:'Replaying recorded requests.'}; renderVerification(selected); }
+      if (revision === detailRevision) { selected.verification = {status:'running',summary:window.i18n.t('web.replaying')}; renderVerification(selected); }
       refresh();
     } catch (error) { notify(error.message,false); if (revision === detailRevision) renderVerification(selected); }
   }
   async function exportReport() {
     const visible = filteredRows();
-    if (!visible.length) { notify('There are no matching findings to export.',false); return; }
+    if (!visible.length) { notify(window.i18n.t('toast.no_matching_findings_to_export'),false); return; }
     try {
       const full = [];
       // Keep the inspector responsive and avoid flooding the dashboard server.
@@ -350,8 +354,8 @@
       const url = URL.createObjectURL(new Blob([pretty(report)],{type:'application/json'}));
       const anchor = document.createElement('a'); anchor.href = url; anchor.download = `autopwn-web-report-${new Date().toISOString().slice(0,10)}.json`;
       document.body.appendChild(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url),1000);
-      notify(`Exported ${full.length} findings with evidence.`);
-    } catch (error) { notify(`Could not export report: ${error.message}`,false); }
+      notify(window.i18n.t('toast.exported_findings', {count: full.length}));
+    } catch (error) { notify(window.i18n.t('toast.could_not_export_report', {detail: error.message}),false); }
   }
 
   document.addEventListener('click', async event => {
@@ -367,8 +371,8 @@
     else if (action === 'resume-close') $('scan-resume-dialog').close();
     else if (action === 'resume-submit') submitResume();
     else if (action === 'copy-poc' && displayedPoc) {
-      try { await navigator.clipboard.writeText(displayedPoc); notify('PoC copied.'); }
-      catch (_) { notify('Clipboard unavailable. Download the PoC or select its code.',false); }
+      try { await navigator.clipboard.writeText(displayedPoc); notify(window.i18n.t('toast.poc_copied')); }
+      catch (_) { notify(window.i18n.t('toast.clipboard_unavailable'),false); }
     } else if (action === 'preset' && catalog) {
       Object.keys(catalog.checks).forEach(key => { $(`${node.dataset.prefix}-web-check-${key}`).checked = node.dataset.preset === 'all' || (node.dataset.preset === 'light' && ['headers','tls'].includes(key)); });
       syncControls(node.dataset.prefix);
@@ -394,7 +398,7 @@
     try {
       catalog = await json('/api/web/catalog');
       ['f','pf'].forEach(mount); setOffline(catalog.offline); await refresh();
-    } catch (error) { $('web-result-count').textContent = `Could not load web controls: ${error.message}`; }
+    } catch (error) { $('web-result-count').textContent = window.i18n.t('toast.could_not_load_web_controls', {detail: error.message}); }
     setInterval(refresh,5000);
   });
   window.webSecurity = {setControls,readControls,validateControls,setOffline,refresh,resume};

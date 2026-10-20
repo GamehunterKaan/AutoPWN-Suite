@@ -46,6 +46,7 @@ API:
 from __future__ import annotations
 
 import errno
+import gettext
 import html as _html
 import io
 import json
@@ -69,6 +70,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Optional
 
+from autopwn_suite import i18n
 from autopwn_suite.credential_files import (
     NIST_API_KEY,
     SMTP_PASSWORD,
@@ -220,6 +222,7 @@ def _update_vulnerability_database():
 _DEFAULT_SETTINGS = {
     "nist_api_key": "",
     "offline_mode": False,
+    "language": "",
     "email": {
         "enabled":  False,
         "smtp_host": "",
@@ -425,7 +428,7 @@ def _online_notification_route(handler):
     def guarded(*args, **kwargs):
         with _notification_operation() as allowed:
             if not allowed:
-                return jsonify({"error": "Notifications are disabled in offline mode."}), 409
+                return jsonify({"error": "Notifications are disabled in offline mode.", "code": "notifications_offline"}), 409
             return handler(*args, **kwargs)
     return guarded
 
@@ -922,6 +925,62 @@ class NullConsole:
 
 # ── Notifications ─────────────────────────────────────────────────────────────
 
+def _notification_gettext():
+    """Translator for notification bodies, independent of any request's language.
+
+    These are built minutes later on a background thread, so they use the
+    operator's configured notification language (falling back to the server's
+    resolved language) instead of a per-request choice. A fresh translation
+    object is used rather than autopwn_suite.i18n.install() so this never mutates
+    the process-wide builtins._ that concurrent requests rely on.
+    """
+    lang = _get_setting("language")
+    if not isinstance(lang, str) or lang not in i18n.SUPPORTED_LANGUAGES:
+        lang = i18n.resolve_language()
+    translation = gettext.translation(
+        i18n.DOMAIN, localedir=str(i18n.LOCALE_DIR), languages=[lang], fallback=True
+    )
+    return translation.gettext
+
+
+def N_(message):
+    """Mark a message for extraction and return it unchanged; the notification code translates it later with tr()."""
+    return message
+
+
+# xgettext cannot read calls inside f-strings, so the notification texts that tr() translates there are listed here.
+# test_i18n.py checks that every tr("...") message of this module is listed and present in the Turkish catalog.
+_NOTIFICATION_MESSAGES = (
+    N_('CVE'),
+    N_('CVSS'),
+    N_('Command:'),
+    N_('Description'),
+    N_('Error:'),
+    N_('Finished:'),
+    N_('Host: {ip}'),
+    N_('Hosts Discovered ({count})'),
+    N_('MAC:'),
+    N_('No hosts were found during this scan.'),
+    N_('No open ports found.'),
+    N_('OS:'),
+    N_('Open Ports'),
+    N_('Port'),
+    N_('Product'),
+    N_('Scan ID:'),
+    N_('Scan Report'),
+    N_('Service'),
+    N_('Severity'),
+    N_('Started:'),
+    N_('Status:'),
+    N_('Target:'),
+    N_('Vendor:'),
+    N_('Version'),
+    N_('Vulnerabilities'),
+    N_('[*] Email notification failed: {error}'),
+    N_('[*] Webhook delivery failed: {error}'),
+)
+
+
 def _post_webhook(url, payload):
     """POST a JSON event; a redirect is a failed delivery, since a 307/308 would re-send it to whatever host the Location names."""
     response = _requests.post(url, json=payload, timeout=10, allow_redirects=False)
@@ -972,10 +1031,11 @@ def _deliver_webhook(job: ScanJob) -> None:
     try:
         _post_webhook(cfg["url"], payload)
     except Exception as e:
+        tr = _notification_gettext()
         _broadcast({
             "scan_id": job.id, "level": "warning",
             "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
-            "msg": f"[*] Webhook delivery failed: {delivery_error_summary(e)}",
+            "msg": tr("[*] Webhook delivery failed: {error}").format(error=delivery_error_summary(e)),
         })
 
 
@@ -1023,6 +1083,7 @@ def _deliver_email(job: ScanJob) -> None:
         return
 
     _e = _html.escape
+    tr = _notification_gettext()
     target = job.public_target
     subject = f"[AutoPWN] Scan {job.status.upper()} — {target}"
 
@@ -1048,7 +1109,7 @@ def _deliver_email(job: ScanJob) -> None:
         except Exception:
             pass
 
-    html = f"""<!DOCTYPE html><html><head><title>Scan Report - {_e(target)}</title>
+    html = f"""<!DOCTYPE html><html><head><title>{tr("Scan Report")} - {_e(target)}</title>
     <style>
       body{{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}}
       h1, h2, h3, h4{{color: #111; margin-bottom: 8px;}}
@@ -1070,41 +1131,44 @@ def _deliver_email(job: ScanJob) -> None:
           {logo_html}
         </td>
         <td valign="middle">
-          <h1 style="margin: 0; color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">AutoPWN Suite <span style="color: #777; font-weight: normal;">— Scan Report</span></h1>
+          <h1 style="margin: 0; color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">AutoPWN Suite
+            <span style="color: #777; font-weight: normal;">— {tr("Scan Report")}</span></h1>
         </td>
       </tr>
     </table>
     <div class="meta">
-      <p><strong>Target:</strong> {_e(target)}</p>
-      <p><strong>Scan ID:</strong> {_e(job.id)}</p>
-      <p><strong>Status:</strong> {_e(job.status)}</p>
-      <p><strong>Command:</strong> {_e(cmd_base.strip())}</p>
-      <p><strong>Started:</strong> {_e(job.started_at)}</p>
-      <p><strong>Finished:</strong> {_e(job.finished_at or 'N/A')}</p>
+      <p><strong>{tr("Target:")}</strong> {_e(target)}</p>
+      <p><strong>{tr("Scan ID:")}</strong> {_e(job.id)}</p>
+      <p><strong>{tr("Status:")}</strong> {_e(job.status)}</p>
+      <p><strong>{tr("Command:")}</strong> {_e(cmd_base.strip())}</p>
+      <p><strong>{tr("Started:")}</strong> {_e(job.started_at)}</p>
+      <p><strong>{tr("Finished:")}</strong> {_e(job.finished_at or 'N/A')}</p>
     </div>
     """
     if job.error:
-        html += f'<div class="meta" style="border-color:#ff3f4f;"><p style="color:#ff3f4f;"><strong>Error:</strong> {_e(job.error)}</p></div>'
+        html += f'<div class="meta" style="border-color:#ff3f4f;"><p style="color:#ff3f4f;"><strong>{tr("Error:")}</strong> {_e(job.error)}</p></div>'
 
-    html += f"<h2>Hosts Discovered ({len(hosts)})</h2>\n"
+    html += f'<h2>{tr("Hosts Discovered ({count})").format(count=len(hosts))}</h2>\n'
 
     if hosts:
         for h in hosts:
-            html += f"<h3>Host: {_e(h.get('ip', ''))}</h3>\n"
-            html += (f'<div class="meta"><p><strong>MAC:</strong> {_e(h.get("mac") or "—")} &nbsp;|&nbsp; '
-                     f'<strong>OS:</strong> {_e(h.get("os") or "—")} &nbsp;|&nbsp; '
-                     f'<strong>Vendor:</strong> {_e(h.get("vendor") or "—")}</p></div>\n')
+            html += f'<h3>{tr("Host: {ip}").format(ip=_e(h.get("ip", "")))}</h3>\n'
+            html += (f'<div class="meta"><p><strong>{tr("MAC:")}</strong> {_e(h.get("mac") or "—")} &nbsp;|&nbsp; '
+                     f'<strong>{tr("OS:")}</strong> {_e(h.get("os") or "—")} &nbsp;|&nbsp; '
+                     f'<strong>{tr("Vendor:")}</strong> {_e(h.get("vendor") or "—")}</p></div>\n')
             if h.get("ports"):
-                html += "<h4>Open Ports</h4><table><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th></tr>\n"
+                html += (f'<h4>{tr("Open Ports")}</h4><table><tr><th>{tr("Port")}</th><th>{tr("Service")}</th>'
+                         f'<th>{tr("Product")}</th><th>{tr("Version")}</th></tr>\n')
                 for p in h.get("ports", []):
                     html += f"<tr><td>{_e(str(p.get('port','')))}</td><td>{_e(p.get('service',''))}</td><td>{_e(p.get('product',''))}</td><td>{_e(p.get('version',''))}</td></tr>\n"
                 html += "</table>\n"
             else:
-                html += "<p>No open ports found.</p>\n"
+                html += f'<p>{tr("No open ports found.")}</p>\n'
 
             vulns = h.get("vulns", [])
             if vulns:
-                html += "<h4>Vulnerabilities</h4><table><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Description</th></tr>\n"
+                html += (f'<h4>{tr("Vulnerabilities")}</h4><table><tr><th>{tr("CVE")}</th><th>{tr("Severity")}</th>'
+                         f'<th>{tr("CVSS")}</th><th>{tr("Description")}</th></tr>\n')
                 for v in vulns:
                     sev = _e(v.get("severity", "unknown").lower())
                     html += (f"<tr><td>{_e(v.get('cve',''))}</td><td class=\"sev-{sev}\">{_e(v.get('severity', '').upper())}</td>"
@@ -1112,7 +1176,7 @@ def _deliver_email(job: ScanJob) -> None:
                 html += "</table>\n"
             html += '<hr style="border:0; border-top:2px dashed #eee; margin:30px 0;">\n'
     else:
-        html += "<p>No hosts were found during this scan.</p>\n"
+        html += f'<p>{tr("No hosts were found during this scan.")}</p>\n'
 
     html += "</body></html>"
 
@@ -1135,7 +1199,7 @@ def _deliver_email(job: ScanJob) -> None:
         _broadcast({
             "scan_id": job.id, "level": "warning",
             "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
-            "msg": f"[*] Email notification failed: {delivery_error_summary(e)}",
+            "msg": tr("[*] Email notification failed: {error}").format(error=delivery_error_summary(e)),
         })
 
 
@@ -1553,6 +1617,13 @@ def _refusal(error: ValueError, generic: str) -> str:
     return _NMAP_OPTIONS_REFUSED if isinstance(error, _OptionsRefused) else generic
 
 
+def _refusal_body(error: ValueError, generic: str, code: str) -> dict:
+    """JSON body for a refused configuration. The stable `code` goes with the generic text only: the dashboard shows
+    its own localized text for a code, which would hide the specific Nmap-options refusal."""
+    message = _refusal(error, generic)
+    return {"error": message, "code": code} if message == generic else {"error": message}
+
+
 def _profile_config(body, existing=None):
     """Apply the same profile rules when creating, editing, or scheduling."""
     defaults = {"mode": "normal", "speed": 3, "scan_type": None,
@@ -1867,7 +1938,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         if request.method in ("POST", "PUT"):
             body = request.get_json(silent=True)
             if body is not None and not isinstance(body, dict):
-                return jsonify({"error": "JSON body must be an object"}), 400
+                return jsonify({"error": "JSON body must be an object", "code": "invalid_json_body"}), 400
 
     # ── Static ──
 
@@ -1893,14 +1964,14 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     def api_scan_detail(scan_id):
         job = _get_scan(scan_id)
         if not job:
-            return jsonify({"error": "Scan not found"}), 404
+            return jsonify({"error": "Scan not found", "code": "scan_not_found"}), 404
         return jsonify(job.to_dict())
 
     @app.route("/api/scans/<scan_id>/download")
     def api_scan_download(scan_id):
         job = _get_scan(scan_id)
         if not job:
-            return jsonify({"error": "Scan not found"}), 404
+            return jsonify({"error": "Scan not found", "code": "scan_not_found"}), 404
         return Response(
             json.dumps(job.to_full_dict(), indent=2),
             mimetype="application/json",
@@ -1911,25 +1982,25 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     def api_scan_resume(scan_id):
         job = _get_scan(scan_id)
         if not job:
-            return jsonify({"error": "Scan not found"}), 404
+            return jsonify({"error": "Scan not found", "code": "scan_not_found"}), 404
         body = request.get_json(silent=True) or {}
         if set(body) - {"web_options"}:
-            return jsonify({"error": "Only web limits and speed may be changed when resuming."}), 400
+            return jsonify({"error": "Only web limits and speed may be changed when resuming.", "code": "resume_fields_restricted"}), 400
         # Reserve the existing job before launching to prevent double resumes.
         with _mode_lock, job._lock:
             if job.status not in ("partial", "stopped", "error"):
-                return jsonify({"error": "Only incomplete or stopped scans can be resumed."}), 409
+                return jsonify({"error": "Only incomplete or stopped scans can be resumed.", "code": "resume_invalid_status"}), 409
             if job.config.get("scan_web") and (_offline_enabled() or job.config.get("vulnerability_source") == "offline"):
-                return jsonify({"error": "Web checks are disabled in offline mode."}), 409
+                return jsonify({"error": "Web checks are disabled in offline mode.", "code": "web_checks_offline"}), 409
             if job.config.get("scan_vulns") and (_offline_enabled() or job.config.get("vulnerability_source") == "offline") and not database_status(_VULNERABILITY_DB)["ready"]:
-                return jsonify({"error": "Offline database unavailable."}), 409
+                return jsonify({"error": "Offline database unavailable.", "code": "offline_db_unavailable"}), 409
             try:
                 controls = normalize_options(body.get("web_options", {}), _resume_web_options(job))
                 original_checks = normalize_options(job.config.get("web_options"))["checks"]
             except ValueError:
-                return jsonify({"error": "Invalid web scan configuration"}), 400
+                return jsonify({"error": "Invalid web scan configuration", "code": "invalid_web_config"}), 400
             if controls["checks"] != original_checks:
-                return jsonify({"error": "Keep the original check selection when resuming; start a new scan to change it."}), 400
+                return jsonify({"error": "Keep the original check selection when resuming; start a new scan to change it.", "code": "resume_checks_changed"}), 400
             job.config["web_options"] = controls
             job.resume_count += 1
             job._stop_flag.clear()
@@ -1947,31 +2018,32 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     def api_scan_start():
         body   = request.get_json(force=True, silent=True) or {}
         if not isinstance(body, dict):
-            return jsonify({"error": "Scan configuration must be an object"}), 400
+            return jsonify({"error": "Scan configuration must be an object", "code": "invalid_scan_config_type"}), 400
         target = body.get("target", "")
 
         try:
             config = _profile_config(body)
         except ValueError as error:
-            return jsonify({"error": _refusal(error, "Invalid scan configuration")}), 400
+            return jsonify(_refusal_body(error, "Invalid scan configuration", "invalid_scan_config")), 400
         target_err = _validate_job_target(target, config)
         if target_err:
-            return jsonify({"error": target_err}), 400
+            return jsonify({"error": target_err, "code": "invalid_target"}), 400
         target = target.strip()
         api_key = body.get("api_key", "")
         if api_key is not None and not isinstance(api_key, str):
-            return jsonify({"error": "api_key must be a string"}), 400
+            return jsonify({"error": "api_key must be a string", "code": "invalid_api_key_type"}), 400
         config.update(target=target, api_key=api_key,
                       nmap_flags=_build_nmap_flags(config))
         if _offline_enabled():
             config["vulnerability_source"] = "offline"
         if config["scan_web"] and config["vulnerability_source"] == "offline":
-            return jsonify({"error": "Web checks are disabled in offline mode."}), 409
+            return jsonify({"error": "Web checks are disabled in offline mode.", "code": "web_checks_offline"}), 409
         if config["scan_vulns"] and config["vulnerability_source"] == "offline" and not database_status(_VULNERABILITY_DB)["ready"]:
             return jsonify({"error": "Offline database unavailable. Download it in Settings while connected, "
-                            "or copy vulnerabilities.sqlite3 from a connected system."}), 409
+                            "or copy vulnerabilities.sqlite3 from a connected system.",
+                            "code": "offline_db_unavailable"}), 409
         job = _launch_scan(config)
-        return jsonify({"ok": True, "scan_id": job.id, "message": f"Scan started for {redact_target(target)}"})
+        return jsonify({"ok": True, "scan_id": job.id, "message": f"Scan started for {redact_target(target)}", "code": "scan_started", "target": redact_target(target)})
 
     @app.route("/api/web/catalog")
     def api_web_catalog():
@@ -1988,7 +2060,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         job = _get_scan(scan_id)
         result = job.web_finding(finding_id) if job else None
         if not result:
-            return jsonify({"error": "Web finding not found"}), 404
+            return jsonify({"error": "Web finding not found", "code": "web_finding_not_found"}), 404
         return jsonify(result)
 
     @app.route("/api/web/findings/<scan_id>/<finding_id>/poc")
@@ -1997,16 +2069,16 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         job = _get_scan(scan_id)
         result = job.web_finding(finding_id) if job else None
         if not result:
-            return jsonify({"error": "Web finding not found"}), 404
+            return jsonify({"error": "Web finding not found", "code": "web_finding_not_found"}), 404
         form = request.args.get("format", "python")
         formats = {"python": (python_poc, "py"), "curl": (curl_poc, "sh"), "html": (browser_poc, "html"),
                    "json": (lambda row: json.dumps(build_plan(row), indent=2), "json")}
         if form not in formats:
-            return jsonify({"error": "Unknown PoC format"}), 400
+            return jsonify({"error": "Unknown PoC format", "code": "unknown_poc_format"}), 400
         generate, extension = formats[form]
         code = generate(result)
         if code is None:
-            return jsonify({"error": "Browser PoCs are available for XSS and CORS findings."}), 400
+            return jsonify({"error": "Browser PoCs are available for XSS and CORS findings.", "code": "poc_unsupported_type"}), 400
         safe_id = _re.sub(r"[^A-Za-z0-9_-]", "", finding_id)[:40]
         response = Response(code, mimetype="application/octet-stream")
         response.headers["Content-Disposition"] = f'attachment; filename="autopwn-poc-{safe_id}.{extension}"'
@@ -2021,25 +2093,25 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         job = _get_scan(scan_id)
         result = job.web_finding(finding_id) if job else None
         if not result:
-            return jsonify({"error": "Web finding not found"}), 404
+            return jsonify({"error": "Web finding not found", "code": "web_finding_not_found"}), 404
         body = request.get_json(silent=True)
         if body is None:
             body = {}
         if not isinstance(body, dict) or body:
-            return jsonify({"error": "Verification uses the stored request plan; custom requests are not accepted."}), 400
+            return jsonify({"error": "Verification uses the stored request plan; custom requests are not accepted.", "code": "verification_no_custom_body"}), 400
         plan = build_plan(result)
         try:
             validate_plan(plan)
         except (ValueError, KeyError):
-            return jsonify({"error": "This finding needs local inputs or cannot be replayed automatically. Download its PoC to review."}), 409
+            return jsonify({"error": "This finding needs local inputs or cannot be replayed automatically. Download its PoC to review.", "code": "verification_unsupported"}), 409
         with _mode_lock:
             if _notifications_offline(job):
-                return jsonify({"error": "Verification is disabled in offline mode."}), 409
+                return jsonify({"error": "Verification is disabled in offline mode.", "code": "verification_offline"}), 409
             with job._lock:
                 if job._web_findings[finding_id].get("verification", {}).get("status") == "running":
-                    return jsonify({"error": "Verification is already running."}), 409
+                    return jsonify({"error": "Verification is already running.", "code": "verification_already_running"}), 409
                 if _web_verifications_running >= 4:
-                    return jsonify({"error": "Four verifications are already running. Wait for one to finish."}), 409
+                    return jsonify({"error": "Four verifications are already running. Wait for one to finish.", "code": "verification_limit_reached"}), 409
                 _web_verifications_running += 1
                 job.set_web_verification(finding_id, {"status": "running", "summary": "Replaying recorded evidence"})
             def run():
@@ -2058,7 +2130,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             except Exception:
                 _web_verifications_running -= 1
                 job.set_web_verification(finding_id, {"status": "inconclusive", "summary": "Could not start verification."})
-                return jsonify({"error": "Could not start verification."}), 500
+                return jsonify({"error": "Could not start verification.", "code": "verification_start_failed"}), 500
         return jsonify({"ok": True, "status": "running"}), 202
 
     @app.route("/api/scan/stop", methods=["POST"])
@@ -2066,13 +2138,13 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         body    = request.get_json(force=True, silent=True) or {}
         scan_id = body.get("scan_id", "")
         if not isinstance(scan_id, str):
-            return jsonify({"error": "scan_id must be a string"}), 400
+            return jsonify({"error": "scan_id must be a string", "code": "invalid_scan_id_type"}), 400
         scan_id = scan_id.strip()
         job     = _get_scan(scan_id)
         if not job:
-            return jsonify({"error": "Scan not found"}), 404
+            return jsonify({"error": "Scan not found", "code": "scan_not_found"}), 404
         if job.status not in ("running", "stopping"):
-            return jsonify({"ok": False, "message": "Scan is not running"}), 400
+            return jsonify({"ok": False, "message": "Scan is not running", "code": "scan_not_running"}), 400
         job.request_stop()
         return jsonify({"ok": True})
 
@@ -2093,10 +2165,10 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             if _offline_enabled():
                 message = ("Restart without --offline to download updates." if _OFFLINE_ONLY
                            else "Turn off Offline mode in Settings to download updates.")
-                return jsonify({"error": "This server is in offline mode. " + message}), 409
+                return jsonify({"error": "This server is in offline mode. " + message, "code": "db_update_offline"}), 409
             with _database_update_lock:
                 if _database_update["running"]:
-                    return jsonify({"error": "A database update is already running."}), 409
+                    return jsonify({"error": "A database update is already running.", "code": "db_update_already_running"}), 409
                 _database_update.update(running=True, message="Starting download", current=0, total=0, error=None)
             try:
                 threading.Thread(target=_update_vulnerability_database, daemon=True).start()
@@ -2104,13 +2176,13 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                 with _database_update_lock:
                     _database_update["running"] = False
                 logging.exception("Could not start vulnerability database update")
-                return jsonify({"error": "Could not start database update."}), 500
+                return jsonify({"error": "Could not start database update.", "code": "db_update_start_failed"}), 500
         return jsonify({"ok": True}), 202
 
     @app.route("/api/vulnerability-database/download")
     def api_download_vulnerability_database():
         if not database_status(_VULNERABILITY_DB)["ready"]:
-            return jsonify({"error": "Download the vulnerability database first."}), 409
+            return jsonify({"error": "Download the vulnerability database first.", "code": "offline_db_missing"}), 409
         path = database_path(_VULNERABILITY_DB)
         return send_from_directory(path.parent, path.name, as_attachment=True,
                                    download_name="vulnerabilities.sqlite3")
@@ -2211,25 +2283,27 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     def api_settings_put():
         body = request.get_json(force=True, silent=True) or {}
         if not isinstance(body, dict):
-            return jsonify({"error": "Settings must be an object"}), 400
+            return jsonify({"error": "Settings must be an object", "code": "invalid_settings_type"}), 400
         if set(body) & {"auth", "account", "username", "password", "password_hash", "revision", "session_secret"}:
-            return jsonify({"error": "Use the account settings to change dashboard credentials."}), 400
+            return jsonify({"error": "Use the account settings to change dashboard credentials.", "code": "settings_account_fields_forbidden"}), 400
         if any(k in body and not isinstance(body[k], dict) for k in ("email", "webhook")):
-            return jsonify({"error": "email and webhook must be objects"}), 400
+            return jsonify({"error": "email and webhook must be objects", "code": "invalid_notification_config_type"}), 400
+        if "language" in body and body["language"] not in ("", *i18n.SUPPORTED_LANGUAGES):
+            return jsonify({"error": "language must be empty or a supported language", "code": "invalid_language"}), 400
         if "offline_mode" in body and not isinstance(body["offline_mode"], bool):
-            return jsonify({"error": "offline_mode must be a boolean"}), 400
+            return jsonify({"error": "offline_mode must be a boolean", "code": "invalid_offline_mode_type"}), 400
         with _mode_lock:
             if body.get("offline_mode") is True and not _offline_enabled():
                 if _web_verifications_running:
-                    return jsonify({"error": "Wait for active web verifications to finish before enabling offline mode."}), 409
+                    return jsonify({"error": "Wait for active web verifications to finish before enabling offline mode.", "code": "offline_blocked_verifications"}), 409
                 if _notification_operations:
-                    return jsonify({"error": "Wait for active notifications to finish before enabling offline mode."}), 409
+                    return jsonify({"error": "Wait for active notifications to finish before enabling offline mode.", "code": "offline_blocked_notifications"}), 409
                 with _database_update_lock:
                     if _database_update["running"]:
-                        return jsonify({"error": "Wait for the database update to finish before enabling offline mode."}), 409
+                        return jsonify({"error": "Wait for the database update to finish before enabling offline mode.", "code": "offline_blocked_db_update"}), 409
                 if any(job.status in ("running", "stopping") and job.config.get("vulnerability_source") != "offline"
                        for job in _all_scans()):
-                    return jsonify({"error": "Stop or finish active online scans before enabling offline mode."}), 409
+                    return jsonify({"error": "Stop or finish active online scans before enabling offline mode.", "code": "offline_blocked_scans"}), 409
             with _settings_lock:
                 # Persist before publishing the new setting to running requests.
                 if body.get("email", {}).get("password") == "••••••••":
@@ -2245,10 +2319,10 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     def api_test_email():
         """Send a test email using current settings."""
         if _offline_enabled():
-            return jsonify({"error": "Notifications are disabled in offline mode."}), 409
+            return jsonify({"error": "Notifications are disabled in offline mode.", "code": "notifications_offline"}), 409
         cfg = _get_setting("email")
         if not cfg or not cfg.get("enabled"):
-            return jsonify({"error": "Email notifications are disabled"}), 400
+            return jsonify({"error": "Email notifications are disabled", "code": "email_notifications_disabled"}), 400
         try:
             msg = MIMEMultipart()
             msg["From"]    = cfg.get("from_addr") or cfg.get("username", "")
@@ -2260,19 +2334,19 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             return jsonify({"ok": True})
         except Exception as error:
             logging.error("Failed to send test email: %s", delivery_error_summary(error))
-            return jsonify({"error": "Failed to send test email"}), 500
+            return jsonify({"error": "Failed to send test email", "code": "test_email_failed"}), 500
 
     @app.route("/api/settings/test_webhook", methods=["POST"])
     @_online_notification_route
     def api_test_webhook():
         """Send a test webhook ping."""
         if _offline_enabled():
-            return jsonify({"error": "Notifications are disabled in offline mode."}), 409
+            return jsonify({"error": "Notifications are disabled in offline mode.", "code": "notifications_offline"}), 409
         cfg = _get_setting("webhook")
         if not cfg or not cfg.get("enabled") or not cfg.get("url"):
-            return jsonify({"error": "Webhook is disabled or URL not set"}), 400
+            return jsonify({"error": "Webhook is disabled or URL not set", "code": "webhook_not_configured"}), 400
         if not REQUESTS_AVAILABLE:
-            return jsonify({"error": "requests library not installed"}), 500
+            return jsonify({"error": "requests library not installed", "code": "requests_not_installed"}), 500
         try:
             r = _post_webhook(cfg["url"], {
                 "event": "test", "message": "AutoPWN Suite webhook test",
@@ -2281,7 +2355,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             return jsonify({"ok": True, "status_code": r.status_code})
         except Exception as error:
             logging.error("Failed to send test webhook: %s", delivery_error_summary(error))
-            return jsonify({"error": "Failed to send test webhook"}), 500
+            return jsonify({"error": "Failed to send test webhook", "code": "test_webhook_failed"}), 500
 
     # ── Profiles ──
 
@@ -2294,17 +2368,17 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     def api_profiles_post():
         body = request.get_json(force=True, silent=True)
         if not isinstance(body, dict):
-            return jsonify({"error": "Profile must be an object"}), 400
+            return jsonify({"error": "Profile must be an object", "code": "invalid_profile_type"}), 400
         name = body.get("name", "")
         if not isinstance(name, str) or not name.strip():
-            return jsonify({"error": "'name' is required"}), 400
+            return jsonify({"error": "'name' is required", "code": "name_required"}), 400
         description = body.get("description", "")
         if not isinstance(description, str):
-            return jsonify({"error": "'description' must be a string"}), 400
+            return jsonify({"error": "'description' must be a string", "code": "invalid_description_type"}), 400
         try:
             config = _profile_config(body)
         except ValueError as error:
-            return jsonify({"error": _refusal(error, "Invalid scan configuration")}), 400
+            return jsonify(_refusal_body(error, "Invalid scan configuration", "invalid_scan_config")), 400
         pid = str(uuid.uuid4())
         profile = {
             "id":         pid,
@@ -2323,17 +2397,17 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         body = request.get_json(force=True, silent=True)
         with _profiles_lock:
             if pid not in _profiles:
-                return jsonify({"error": "Profile not found"}), 404
+                return jsonify({"error": "Profile not found", "code": "profile_not_found"}), 404
             if not isinstance(body, dict):
-                return jsonify({"error": "Profile must be an object"}), 400
+                return jsonify({"error": "Profile must be an object", "code": "invalid_profile_type"}), 400
             p = dict(_profiles[pid])
             if "name" in body:
                 if not isinstance(body["name"], str) or not body["name"].strip():
-                    return jsonify({"error": "'name' is required"}), 400
+                    return jsonify({"error": "'name' is required", "code": "name_required"}), 400
                 p["name"] = body["name"].strip()
             if "description" in body:
                 if not isinstance(body["description"], str):
-                    return jsonify({"error": "'description' must be a string"}), 400
+                    return jsonify({"error": "'description' must be a string", "code": "invalid_description_type"}), 400
                 p["description"] = body["description"]
             stored = p.get("config", {})
             dropped = isinstance(stored, dict) and _holds_options(stored)
@@ -2342,7 +2416,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             try:
                 p["config"] = _profile_config(body, stored)
             except ValueError as error:
-                return jsonify({"error": _refusal(error, "Invalid scan configuration")}), 400
+                return jsonify(_refusal_body(error, "Invalid scan configuration", "invalid_scan_config")), 400
             _profiles[pid] = p
             # A schedule that no longer validates against the edited profile (a CIDR target on a
             # web-only profile, say) would fail every minute; turn it off now, as a delete does. So is
@@ -2375,7 +2449,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         disabled = False
         with _profiles_lock:
             if pid not in _profiles:
-                return jsonify({"error": "Profile not found"}), 404
+                return jsonify({"error": "Profile not found", "code": "profile_not_found"}), 404
             del _profiles[pid]
             with _schedules_lock:
                 for schedule in _schedules.values():
@@ -2400,7 +2474,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         try:
             schedule = _schedule_data(body)
         except ValueError as error:
-            return jsonify({"error": _refusal(error, "Invalid schedule configuration")}), 400
+            return jsonify(_refusal_body(error, "Invalid schedule configuration", "invalid_schedule_config")), 400
         sid = str(uuid.uuid4())
         schedule.update({
             "id": sid, "name": body.get("name", f"Schedule {sid[:8]}"),
@@ -2409,7 +2483,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         })
         with _profiles_lock:
             if schedule["profile_id"] not in _profiles:
-                return jsonify({"error": "Profile not found"}), 400
+                return jsonify({"error": "Profile not found", "code": "profile_not_found"}), 400
             with _schedules_lock:
                 _schedules[sid] = schedule
         _save_schedules()
@@ -2421,7 +2495,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         with _profiles_lock:
             with _schedules_lock:
                 if sid not in _schedules:
-                    return jsonify({"error": "Schedule not found"}), 404
+                    return jsonify({"error": "Schedule not found", "code": "schedule_not_found"}), 404
                 if isinstance(body, dict) and body.keys() == {"enabled"} and body["enabled"] is False:
                     s = dict(_schedules[sid], enabled=False)  # turning a schedule off needs no valid record
                 else:
@@ -2429,9 +2503,9 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                     try:
                         s = _schedule_data(body, stored)
                     except ValueError as error:
-                        return jsonify({"error": _refusal(error, "Invalid schedule configuration")}), 400
+                        return jsonify(_refusal_body(error, "Invalid schedule configuration", "invalid_schedule_config")), 400
                     if s["profile_id"] not in _profiles:
-                        return jsonify({"error": "Profile not found"}), 400
+                        return jsonify({"error": "Profile not found", "code": "profile_not_found"}), 400
                 old = _schedules[sid]
                 if s["enabled"] is True and (old.get("enabled", True) is not True or any(
                         old.get(key) != s.get(key) for key in ("type", "time_utc", "weekday"))):
@@ -2445,7 +2519,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     def api_schedules_delete(sid):
         with _schedules_lock:
             if sid not in _schedules:
-                return jsonify({"error": "Schedule not found"}), 404
+                return jsonify({"error": "Schedule not found", "code": "schedule_not_found"}), 404
             del _schedules[sid]
         with _schedule_last_run_lock:
             _schedule_last_run.pop(sid, None)

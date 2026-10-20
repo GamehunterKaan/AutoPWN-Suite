@@ -56,7 +56,7 @@ class TestSendMail:
         mock_log = MagicMock()
 
         SendEmail(report_obj.email, report_obj.password, report_obj.email_to, report_obj.email_from, report_obj.server, 587, mock_log)
-        mock_log.logger.assert_called_with("error", "An error occured while trying to send email report.")
+        mock_log.logger.assert_called_with("error", "An error occurred while trying to send email report.")
         mock_server.quit.assert_called_once()
 
     @patch("autopwn_suite.report.SMTP")
@@ -73,7 +73,7 @@ class TestSendMail:
         SendEmail("user", "pass", "to", "from", "server", 587, mock_log)
 
         # Verify the error was logged
-        mock_log.logger.assert_called_with("error", "An error occured while trying to send email report.")
+        mock_log.logger.assert_called_with("error", "An error occurred while trying to send email report.")
 
     @patch("autopwn_suite.report.SMTP_SSL")
     @patch("autopwn_suite.report.open", new_callable=mock_open, read_data="<h1>Test</h1>")
@@ -88,7 +88,7 @@ class TestSendMail:
     def test_smtp_connection_failure_does_not_abort_scan(self, mock_file, mock_smtp):
         log = MagicMock()
         SendEmail("user", "pass", "to", "from", "server", 587, log)
-        log.logger.assert_called_with("error", "An error occured while trying to send email report.")
+        log.logger.assert_called_with("error", "An error occurred while trying to send email report.")
 
 
 @pytest.mark.unit
@@ -111,7 +111,7 @@ class TestSendWebhook:
         # Verify it tried to open the temp report file
         mock_file.assert_called_with("report.log", "r", encoding="utf-8")
         assert "files" in mock_post.call_args.kwargs
-        mock_log.logger.assert_called_with("success", "Webhook report sent succesfully.")
+        mock_log.logger.assert_called_with("success", "Webhook report sent successfully.")
 
     @patch("autopwn_suite.report.post")
     @patch("autopwn_suite.report.open", new_callable=mock_open, read_data="report content")
@@ -227,7 +227,7 @@ class TestSendWebhook:
         SendWebhook("url", log)
         assert mock_post.call_args.kwargs["timeout"] == 30
         assert mock_post.call_args.kwargs["allow_redirects"] is False
-        log.logger.assert_called_with("success", "Webhook report sent succesfully.")
+        log.logger.assert_called_with("success", "Webhook report sent successfully.")
 
 
 @pytest.mark.unit

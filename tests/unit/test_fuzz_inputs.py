@@ -29,7 +29,7 @@ from urllib.parse import urlsplit
 import pytest
 from rich.text import Text
 
-from autopwn_suite import update_checker
+from autopwn_suite import i18n, update_checker
 from autopwn_suite.logger import markup_safe
 from autopwn_suite.nmap_backend import parse_nmap_xml
 from autopwn_suite.utils import _port, _report_name
@@ -809,3 +809,30 @@ def test_a_release_tag_reaches_git_only_as_a_plain_name_in_the_expected_argument
         assert last == (["merge", "--ff-only", tag] if on_branch[-1] else ["checkout", tag])
         assert all(not arg.startswith("-") for args in calls for arg in args[2:] if tag in arg)
     assert reached and refused
+
+
+def test_language_selection_only_yields_a_supported_language_and_leaves_the_saved_one_alone_for_junk(tmp_path, monkeypatch):
+    rng = random.Random(SEED + 70)
+    monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
+    language_file = tmp_path / i18n.LANGUAGE_FILE_NAME
+    words = ["--lang", "--language", "--lang=tr", "--language=", "--language=en", "--lang=\x1b[2J", "-t", "192.0.2.1", "tr", "en", "de", "", "\x00", "\u0130", "-" * 30]
+    saved_values = [b"tr", b"en\n", b"TR", b"de", b" tr "]
+    for _ in range(1500):
+        argv = [rng.choice(words) for _ in range(rng.randint(0, 6))]
+        found = i18n.peek_lang_flag(argv)
+        assert found is None or (isinstance(found, str) and any(found in token for token in argv))
+        for name in ("AUTOPWN_LANG", "LC_ALL", "LC_MESSAGES", "LANG"):
+            monkeypatch.setenv(name, rng.choice(["tr", "tr_TR.UTF-8", "en_US", "", "\u0130stanbul", "de_DE", "x" * 300]))
+        if rng.random() < .3:
+            language_file.unlink(missing_ok=True)
+        elif rng.random() < .5:
+            language_file.write_bytes(bytes(rng.randrange(256) for _ in range(rng.randint(0, 6))))
+        else:
+            language_file.write_bytes(rng.choice(saved_values))
+        before = language_file.read_bytes() if language_file.exists() else None
+        assert i18n.resolve_language(found) in i18n.SUPPORTED_LANGUAGES
+        if found in i18n.SUPPORTED_LANGUAGES:
+            assert language_file.read_text(encoding="utf-8") == found
+        else:
+            assert (language_file.read_bytes() if language_file.exists() else None) == before
+        assert i18n.resolve_language(None) in i18n.SUPPORTED_LANGUAGES

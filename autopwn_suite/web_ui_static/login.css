@@ -9,6 +9,10 @@ body{min-height:100vh;margin:0;display:grid;place-items:center;padding:24px}
 h1{font-size:26px;margin:0 0 10px;font-weight:600}
 p{font-size:14px;color:#7a9db5;line-height:1.6;margin:0 0 24px}
 label{display:block;font-size:13px;margin:18px 0 8px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.login-lang-switch{margin:0 0 24px}
+select{border:1px solid #243a4e;background:#111a22;color:#c8dde8;border-radius:6px;padding:8px 10px;font:inherit}
+select:focus{outline:2px solid #00c8ff;outline-offset:2px}
 input{width:100%;border:1px solid #243a4e;background:#111a22;color:#c8dde8;border-radius:6px;padding:12px;font:inherit}
 input:focus{outline:2px solid #00c8ff;outline-offset:2px}
 /* Keep the field's colours when the browser autofills it: Chromium and Safari repaint it with their own

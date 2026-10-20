@@ -2,57 +2,115 @@
 
 ## Current status
 
-AutoPWN Suite is **English-only**. There is no translation framework, no message
-catalog and no language selection. User-facing text is written directly in the
-source:
+AutoPWN Suite ships a working localization mechanism with **English (source) and
+Turkish** as the first translated language. Localization covers:
 
-- CLI and daemon messages in the Python modules (`autopwn_suite/cli.py`, `autopwn_suite/*.py`),
-  rendered through `rich`.
-- Dashboard text in `autopwn_suite/web_ui_static/index.html`, `login.html`, `app.js`,
-  `auth.js`, `login.js` and `web_security.js`; both HTML pages declare `lang="en"`.
-- Reports, notification e-mails, web-check findings and remediation text generated in
-  Python (for example `autopwn_suite/report.py` and `autopwn_suite/web/`).
-- Documentation, issues and pull-request discussion are in English
+- CLI, daemon and library messages in the Python modules (`autopwn_suite/cli.py`,
+  `autopwn_suite/*.py`), via Python `gettext` (`autopwn_suite/i18n.py`). Every translatable
+  string is wrapped with `_()` (or `ngettext()` for plurals) and extracted into
+  `autopwn_suite/locales/autopwn.pot`; `autopwn_suite/locales/tr/LC_MESSAGES/autopwn.po`
+  holds the Turkish catalog, compiled to `autopwn.mo`. The dashboard's notification texts sit in f-strings
+  that `xgettext` cannot read, so `autopwn_suite/web_ui.py` lists them with `N_()`; a test checks the list.
+- Reports, notification e-mails and web-check findings' static labels in
+  `autopwn_suite/report.py` and `autopwn_suite/web/*.py` are translated the same way.
+  CVE descriptions, exploit titles, PoC bodies and other third-party security
+  data from NVD/Exploit-DB/Nmap/target responses are **not** translated: they
+  are external data, not UI text, and nothing can sensibly machine-translate
+  advisory prose without risking a misleading rewrite.
+- Two internal exceptions, by design. `web_ui._resume_web_options` reads the English text of the
+  web-coverage issues "Query parameter limit reached; coverage is limited." and "Response size
+  limit reached; content coverage is limited." (and of two unwrapped messages) to decide which limits to
+  raise when a scan resumes, so those messages are not translated; a test checks they stay out of the
+  catalog. And `autopwn_suite/web/webvuln.py`'s web-scan
+  coverage tracker matches a few `warning`/`error` log messages against a
+  hardcoded English keyword list to decide whether a scan should report
+  itself as "partial" (see the comment at `ScanLog.logger` in that file).
+  Those specific messages are deliberately left untranslated so that
+  detection keeps working regardless of the active language; every other
+  diagnostic message in the same files is translated normally.
+- The REST API, JSON exports and stored settings remain English-stable (human-readable text that is stored
+  with scan results, such as web-coverage issue text, uses the language the server ran in):
+  `jsonify()` error responses add a machine-readable `"code"` field
+  alongside the existing English `"error"` text (which is unchanged, so
+  existing integrations and tests keep working), and the dashboard looks up
+  `"code"` to render a localized message instead of parsing English prose.
+- Dashboard text in `autopwn_suite/web_ui_static/` is localized via
+  `autopwn_suite/web_ui_static/i18n.js`, a dependency-free `{en, tr}` dictionary
+  with `t(key, vars)`/`tErrorCode(code, fallback)` lookups, `data-i18n*`
+  attributes on static HTML, and a language `<select>` on both the dashboard
+  (Settings) and the pre-auth sign-in page. The sign-in page is public, so it carries its own small
+  `{en, tr}` table in `login.js` (a test keeps it equal to `i18n.js`) and the dictionary stays behind sign-in. Switching reloads the page, so text that the scripts build is
+  rendered again in the new language. The choice persists in
+  `localStorage` and is sent to the backend on every API call via the
+  `X-App-Language` request header (currently informational; responses still
+  carry the stable `"code"` field above for the frontend to localize).
+  `index.html`/`login.html` declare a static `lang="en"` attribute that
+  `i18n.js` updates to the active language at load and on every switch.
+- Documentation, issues and pull-request discussion stay in English
   (OpenSSF criterion `english`).
 
-The project does not claim to be localized and no translation is planned to ship
-before the groundwork below is reviewed ([ROADMAP.md](ROADMAP.md), Q2 2027).
+Language selection: `--lang {en,tr}` (or `--language`) on the command line,
+else the `AUTOPWN_LANG` environment variable, else the last explicit choice (persisted to
+`language.txt` next to `update_channel.txt` in the data directory: `AUTOPWN_DATA_DIR` or the per-user
+default), else the system locale (`LC_ALL`/`LC_MESSAGES`/`LANG`), else English. A language chosen
+via `--lang` is remembered for later invocations.
 
-## Why this is acceptable now
+The initial Turkish catalog is machine-translated and every entry is marked
+`#, fuzzy` in `autopwn.po` — functional (gettext still compiles and serves
+fuzzy entries) but not yet reviewed by a Turkish-speaking maintainer.
+Security-meaning strings in particular (offline-mode warnings, TLS/certificate
+warnings, root/permission warnings, destructive-action confirmations) need a
+native-speaker review pass before being trusted in a live engagement; track
+remaining work with `msgattrib --only-fuzzy autopwn_suite/locales/tr/LC_MESSAGES/autopwn.po`.
 
-- AutoPWN Suite is a specialist, operator-facing security tool. Its output
-  includes protocol names, CVE descriptions, Nmap output, HTTP evidence and exploit
-  titles that originate from English-language external sources (NVD, Exploit-DB,
-  Nmap and target responses) and are not translated by the project.
-- The project is maintained by one volunteer ([GOVERNANCE.md](../GOVERNANCE.md)),
-  who can review English changes but cannot responsibly review translations
-  of security wording in many languages. A partial or machine-translated interface
-  could mislead an operator about risk and scope.
-- Hard-coded text is the main cost of adding localization later, so the practical
-  step today is to keep that cost from growing (see the contributor guidance below)
-  rather than to ship an unreviewed translation layer.
+## Why machine translation, reviewed incrementally
+
+- AutoPWN Suite is a specialist, operator-facing security tool, and a wrong
+  translation of risk-relevant wording is worse than no translation. Shipping
+  the mechanism with fuzzy-marked machine translation makes the feature
+  immediately usable while keeping an explicit, trackable worklist for
+  correctness review, rather than blocking the whole feature on one
+  volunteer reviewing ~300 strings by hand before anything ships.
+- The project is maintained by one volunteer ([GOVERNANCE.md](../GOVERNANCE.md)).
+  Fuzzy markers mean no string silently claims to be reviewed when it isn't.
+- `scripts/i18n_messages.py` wraps `xgettext`/`msgmerge`/`msgfmt` for
+  `extract` (regenerate `autopwn.pot`), `merge --lang tr` (fold new strings
+  into `tr.po`), `compile --lang tr` (regenerate `tr.mo`) and
+  `check --lang tr` (CI drift guard: fails if `tr.mo` doesn't match `tr.po`).
 
 ## Plan
 
-1. **Keep new text localizable** by following the guidance below in every change.
-2. **Inventory (Q2 2027):** list user-facing strings by surface (CLI, dashboard,
-   reports, notifications, web-check findings) and mark text that is protocol data and
-   must not be translated.
-3. **Centralize:** move dashboard strings into one JavaScript module/object and CLI
-   and report strings into one Python module per surface, referenced by key. Keep
-   behavior identical and covered by the existing tests.
-4. **Evaluate a mechanism** (for example Python `gettext` and a JavaScript message
-   map) and document the decision, including how translations are reviewed and
-   which language the machine-readable output (`JSON`, API) keeps. API field names,
-   status codes and JSON keys remain English and stable.
-5. **Accept translations** only when a named reviewer who reads the target language
-   is willing to maintain them. Untranslated strings fall back to English.
-
-This plan depends on contributor capacity and may change. If a reviewer is available
-earlier, open an issue to discuss starting with step 3.
+1. **Keep new text localizable** by following the guidance below in every change
+   — wrap new user-facing Python strings with `_()`/`ngettext()`, run
+   `python scripts/i18n_messages.py extract` and `merge --lang tr`, and add a
+   translation (fuzzy is fine) before merging. For new dashboard strings, add
+   a key to both the `en` and `tr` dictionaries in `i18n.js` and use `t()`/
+   `data-i18n*` instead of a literal string.
+2. ~~**Dashboard JS pass**~~ — done: `autopwn_suite/web_ui_static/i18n.js`,
+   `data-i18n*` attributes on `index.html`/`login.html`, a language selector
+   on each, and the `app.js`/`web_security.js` retrofit.
+3. **Review fuzzy entries:** a named reviewer who reads Turkish works through
+   `msgattrib --only-fuzzy`, starting with security-meaning strings, and clears
+   the fuzzy flag as each is confirmed correct. This also covers the Turkish
+   half of `i18n.js`'s dictionary, which is machine-translated the same way.
+4. **Accept additional languages** only when a named reviewer who reads that
+   language is willing to maintain it; add it to `SUPPORTED_LANGUAGES` in
+   `autopwn_suite/i18n.py` once a reviewed (or explicitly fuzzy-flagged, same policy
+   as above) catalog exists, and add a matching dictionary to `i18n.js`.
+   Untranslated/missing strings fall back to English.
 
 ## Guidance for contributors (applies now)
 
+- **Wrap new Python user-facing strings with `_()`.** Use `_("...")` (installed
+  globally by `autopwn_suite/i18n.py`, no per-file import needed) or `ngettext(singular,
+  plural, n)` for countable messages. `xgettext` cannot extract placeholders from
+  an f-string, so interpolate with `.format()` instead:
+  `_("Target {target} seems to be offline.").format(target=target)`, not an
+  f-string. After adding or changing a string, run
+  `python scripts/i18n_messages.py extract` then
+  `python scripts/i18n_messages.py merge --lang tr` to fold it into the Turkish
+  catalog (a fuzzy/untranslated entry is fine — it falls back to English), then
+  `compile --lang tr`.
 - **Keep strings in one place.** Put a new user-facing message in a clearly named
   constant or a single helper near its feature, not scattered across conditionals
   and not repeated.
@@ -98,12 +156,24 @@ earlier, open an issue to discuss starting with step 3.
 
 ## Known limitations
 
-- Some dashboard messages concatenate fragments and build plurals by hand (for example
-  `'CVE'+(vc>1?'s':'')` and `'Could not load the scan report: ' + e.message` in `app.js`).
+- The Turkish CLI/report catalog (`autopwn.po`) and the Turkish half of
+  `i18n.js`'s dictionary are both machine-translated and pending
+  native-speaker review (see "Current status" above); the CLI side is
+  tracked with `msgattrib --only-fuzzy`, the dashboard side has no equivalent
+  tracked-review tooling yet since `i18n.js` has no fuzzy-marker convention.
+- `autopwn_suite/web/webvuln.py` deliberately leaves a handful of coverage-tracking
+  log messages untranslated so its English-keyword-based "scan is partial"
+  detection keeps working in every language; see the comment on `ScanLog`
+  in that file before translating a message there.
 - Some timestamps are shown using `strftime("%b %d %Y %H:%M:%S")` (for example in
   CLI/report timestamps) and the dashboard formats dates with `toLocaleString()`.
   Stored job and schedule timestamps use ISO 8601 UTC.
-- The generated PoC, remediation and report text is English-only.
+- The generated PoC and remediation text is English-only.
+- The dashboard server's own log lines and its start-up banners (`autopwn_suite/web_ui.py`, `web_auth.py`), the task
+  names that Nmap and the web checks report as scan progress, finding titles and the web-evidence text are shown as
+  the program or the scanned target produced them. The fixed progress phrases, the web-check names and every message of
+  the CLI are translated; `tests/unit/test_i18n_dictionary.py` checks that both dashboard languages have the same keys and
+  that every key a page uses exists.
 - CVE, exploit and Nmap data are shown in the language supplied by their sources.
 
 Reports of internationalization problems (for example mojibake or a crash on a

@@ -172,7 +172,7 @@ required status checks are `test`, `Tests (ubuntu-latest)`, `Tests (macos-latest
 
 | Workflow | Runs on | Permissions beyond read-only contents | What it checks or does |
 | --- | --- | --- | --- |
-| `poetry-tests.yml` | Pull request and push to `main` | None | Check `test`: lockfile check, Ruff, JavaScript syntax and ESLint, the locked-requirements export, then pytest with 80% branch coverage. |
+| `poetry-tests.yml` | Pull request and push to `main` | None | Check `test`: lockfile check, Ruff, JavaScript syntax and ESLint, the locked-requirements export, installation of system Nmap and gettext, the translation-catalog drift check, then pytest with 80% branch coverage. |
 | `tests.yml` | Pull request and push to `main` and `dev` | None | Checks `Tests (ubuntu-latest)` and `Tests (macos-latest)`: Python 3.10 with `requirements.txt`, an import smoke test and a scan of `127.0.0.1` with Nmap. |
 | `codeql.yml` | Pull request and push to `main`, weekly | `security-events: write` in its one job (a pull request run is read-only and does not use it) | Checks `Analyze (actions)`, `Analyze (javascript-typescript)` and `Analyze (python)`: CodeQL with `build-mode: none`, so no code of the pull request runs. A pull request run leaves its SARIF file as an artifact; a push or the weekly run uploads directly. |
 | `codeql-upload.yml` | `workflow_run` of `codeql.yml`, from `main` | `security-events: write` in its one job | Uploads a pull request's CodeQL results to code scanning, which produces the `CodeQL` check, including for a fork; checks out no pull request code (see [below](#codeql-for-pull-requests-from-forks)). |

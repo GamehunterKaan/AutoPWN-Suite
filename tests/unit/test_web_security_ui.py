@@ -40,16 +40,20 @@ function node(id='') {
   return element;
 }
 const document={getElementById(id){if(!nodes.has(id))nodes.set(id,node(id));return nodes.get(id)},
-  querySelectorAll(){return []},createElement(){return node()},body:node(),addEventListener(name,fn){listeners[name]=fn}};
+  querySelectorAll(){return []},createElement(){return node()},body:node(),addEventListener(name,fn){listeners[name]=fn},
+  documentElement:{lang:''}};
+const localStorage={store:new Map(),getItem(key){return this.store.has(key)?this.store.get(key):null;},
+  setItem(key,value){this.store.set(key,String(value));},removeItem(key){this.store.delete(key);}};
 const catalog=JSON.parse(process.argv[2]);
 const row={id:'finding',scan_id:'job',type:'CORS',title:'CORS policy',severity:'high',confidence:'candidate',
   url:'https://example.test/',evidence:'Reflected origin',details:{title:'CORS policy',references:[]},
   reproduction:{target:'https://example.test/',requests:[]},observations:[]};
 let responseRows=[row], responseJobs=[{id:'job',target:'example.test',status:'completed',config:{scan_web:true},web_finding_count:1,web_coverage:[]}];
-const context=vm.createContext({document,window:{},URL,Blob,assert,console,navigator:{clipboard:{writeText:async()=>{}}},
+const context=vm.createContext({document,localStorage,window:{},URL,Blob,assert,console,navigator:{clipboard:{writeText:async()=>{}},language:'en-US'},
   toast:(...args)=>messages.push(args),setInterval:fn=>intervals.push(fn),setTimeout(){},
   fetch:async(url,opts)=>{calls.push([url,opts]);let data=url==='/api/web/catalog'?catalog:url==='/api/web/findings'?responseRows:url==='/api/scans'?responseJobs:row;
     return {ok:true,json:async()=>JSON.parse(JSON.stringify(data)),text:async()=>'<script>POC IS TEXT</script>'};}});
+vm.runInContext(fs.readFileSync(process.argv[4],'utf8'),context);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),context);
 context.nodes=nodes;context.calls=calls;context.row=row;context.catalog=catalog;context.messages=messages;context.responseJobs=responseJobs;context.responseRows=responseRows;
 context.emit=async(name,id,dataset={})=>listeners[name]({target:{id,value:document.getElementById(id).value,closest:()=>({dataset})}});
@@ -58,7 +62,8 @@ context.flush=async()=>{for(let i=0;i<15;i++)await new Promise(resolve=>setImmed
   .catch(error=>{console.error(error);process.exitCode=1});
 """
     catalog = {"checks": CHECKS, "defaults": normalize_options(), "limits": LIMITS, "offline": False}
-    result = subprocess.run([NODE, "-e", harness, str(SCRIPT), json.dumps(catalog), test], capture_output=True, text=True, timeout=10)
+    i18n_js = SCRIPT.parent / "i18n.js"
+    result = subprocess.run([NODE, "-e", harness, str(SCRIPT), json.dumps(catalog), test, str(i18n_js)], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stderr
 
 

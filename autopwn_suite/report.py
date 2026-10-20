@@ -52,7 +52,7 @@ def InitializeEmailReport(EmailObj, log, console) -> None:
     with TemporaryDirectory(prefix="autopwn-report-") as directory:
         report_path = str(Path(directory) / "report.html")
         console.save_html(report_path, clear=False)
-        log.logger("info", "Sending email report...")
+        log.logger("info", _("Sending email report..."))
         SendEmail(email, password, email_to, email_from, server, port, log, report_path)
 
 
@@ -67,9 +67,9 @@ def SendEmail(email, password, email_to, email_from, server, port, log, report_p
     msg = MIMEMultipart()
     msg["From"] = email_from
     msg["To"] = email_to
-    msg["Subject"] = "AutoPWN Report"
+    msg["Subject"] = _("AutoPWN Report")
 
-    body = "AutoPWN Report"
+    body = _("AutoPWN Report")
     msg.attach(MIMEText(body, "plain"))
 
     with open(report_path, "r", encoding="utf-8") as f:
@@ -89,9 +89,9 @@ def SendEmail(email, password, email_to, email_from, server, port, log, report_p
         text = msg.as_string()
         mail.sendmail(email, email_to, text)
     except Exception:
-        log.logger("error", "An error occured while trying to send email report.")
+        log.logger("error", _("An error occurred while trying to send email report."))
     else:
-        log.logger("success", "Email report sent successfully.")
+        log.logger("success", _("Email report sent successfully."))
     finally:
         if mail is not None:
             try:
@@ -107,7 +107,7 @@ def InitializeWebhookReport(Webhook, log, console) -> None:
     """
     Initialize webhook report.
     """
-    log.logger("info", "Sending webhook report...")
+    log.logger("info", _("Sending webhook report..."))
     with TemporaryDirectory(prefix="autopwn-report-") as directory:
         report_path = str(Path(directory) / "report.log")
         console.save_text(report_path, clear=False)
@@ -126,14 +126,14 @@ def SendWebhook(url, log, report_path="report.log") -> None:
             # over plain HTTP, so a redirect is a failed delivery.
             req = post(url, files=payload, timeout=30, allow_redirects=False)
             if 200 <= req.status_code < 300:
-                log.logger("success", "Webhook report sent succesfully.")
+                log.logger("success", _("Webhook report sent successfully."))
             else:
                 # The response body is server controlled and often echoes the request path, which is the secret.
-                log.logger("error", f"Webhook delivery failed: HTTP {req.status_code}")
-                log.logger("error", "Webhook report failed to send.")
+                log.logger("error", _("Webhook delivery failed: HTTP {status}").format(status=req.status_code))
+                log.logger("error", _("Webhook report failed to send."))
         except Exception as e:
-            log.logger("error", f"Webhook delivery failed: {delivery_error_summary(e)}")
-            log.logger("error", "Webhook report failed to send.")
+            log.logger("error", _("Webhook delivery failed: {reason}").format(reason=delivery_error_summary(e)))
+            log.logger("error", _("Webhook report failed to send."))
 
 
 def InitializeReport(Method, ReportObject, log, console) -> None:

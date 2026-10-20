@@ -105,7 +105,7 @@ The full text of the certificate follows.
 ## Accessibility and internationalization requirements
 
 The dashboard has known accessibility gaps listed in
-[ACCESSIBILITY.md](../docs/ACCESSIBILITY.md), and the project is English-only as
+[ACCESSIBILITY.md](../docs/ACCESSIBILITY.md), and the interface is English with a machine-translated Turkish catalog, as
 described in [INTERNATIONALIZATION.md](../docs/INTERNATIONALIZATION.md). Changes to
 `autopwn_suite/web_ui_static/` or other user-facing output must not make either worse:
 
@@ -158,6 +158,7 @@ node --check autopwn_suite/web_ui_static/auth.js
 node --check autopwn_suite/web_ui_static/login.js
 npx --yes eslint@10.12.0 --config eslint.config.mjs autopwn_suite/web_ui_static
 poetry run python scripts/export_locked_requirements.py --check
+poetry run python scripts/i18n_messages.py check --lang tr  # needs GNU gettext (msgfmt)
 ```
 
 Ruff 0.17.1 enforces PEP 8 (`E`, `W`), Pyflakes (`F`), flake8-bugbear (`B`) and

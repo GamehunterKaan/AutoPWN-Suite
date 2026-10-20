@@ -94,14 +94,14 @@ def check_tls(url, log, console):
     port = parts.port or 443
     results, der = [], None
     try:
-        der, _ = _handshake(_context(), hostname, port)
+        der, _negotiated = _handshake(_context(), hostname, port)
     except ssl.SSLCertVerificationError as exc:
         results.append(finding("TLS_TRUST", url, f"Certificate validation failed against the local trust store (code {exc.verify_code}); private CA trust may be required", confidence="advisory"))
     except OSError:
         log.logger("warning", f"Verified TLS handshake incomplete on {url}.")
     if der is None:
         try:
-            der, _ = _handshake(_context(verify=False), hostname, port)
+            der, _negotiated = _handshake(_context(verify=False), hostname, port)
         except OSError:
             log.logger("warning", f"Certificate inspection incomplete on {url}.")
     if der:

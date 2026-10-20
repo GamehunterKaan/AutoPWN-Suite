@@ -2,6 +2,7 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Execute login/account browser logic and shared request protection in Node."""
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -19,23 +20,28 @@ def run_js(file, test, setup=""):
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),assert=require('node:assert/strict');
 const nodes=new Map(),handlers={},calls=[],redirects=[];
 const document={getElementById(id){if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',disabled:false,
-  addEventListener(name,fn){handlers[id+':'+name]=fn}});return nodes.get(id)}};
+  addEventListener(name,fn){handlers[id+':'+name]=fn}});return nodes.get(id)},
+  querySelectorAll(){return []},addEventListener(){},documentElement:{lang:''}};
+const localStorage={store:new Map(),getItem(key){return this.store.has(key)?this.store.get(key):null;},
+  setItem(key,value){this.store.set(key,String(value));},removeItem(key){this.store.delete(key);}};
+const navigator={language:'en-US'};
 const html=fs.readFileSync(path.join(path.dirname(process.argv[1]),process.argv[1].endsWith('login.js')?'login.html':'index.html'),'utf8');
 for(const match of html.matchAll(/\bid="([^"]+)"/g))document.getElementById(match[1]);
 function reply(status,data){return {status,ok:status>=200&&status<300,json:async()=>data}};
 let responseHandler=async()=>reply(200,{username:'admin',csrf_token:'a'.repeat(43)});
 const nativeFetch=async(input,options={})=>{calls.push([input,options]);return responseHandler(input,options)};
-const context=vm.createContext({document,URL,Headers,Request,console,assert,fetch:nativeFetch,nodes,handlers,calls,redirects,reply,
+const context=vm.createContext({document,localStorage,navigator,URL,Headers,Request,console,assert,fetch:nativeFetch,nodes,handlers,calls,redirects,reply,
  location:{href:'http://localhost/',origin:'http://localhost',replace:path=>redirects.push(path)},
  setTimeout,clearTimeout});context.window=context;
 context.setResponse=handler=>{responseHandler=handler};
 context.flush=async()=>{for(let i=0;i<12;i++)await new Promise(resolve=>setImmediate(resolve))};
+vm.runInContext(fs.readFileSync(process.argv[4],'utf8'),context);
 vm.runInContext(process.argv[2],context);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),context);
 (async()=>{await context.flush();await vm.runInContext('(async()=>{'+process.argv[3]+'})()',context)})()
  .catch(error=>{console.error(error);process.exitCode=1});
 """
-    result = subprocess.run([NODE, "-e", harness, str(ROOT / file), setup, test], text=True, capture_output=True, timeout=10)
+    result = subprocess.run([NODE, "-e", harness, str(ROOT / file), setup, test, str(ROOT / "i18n.js")], text=True, capture_output=True, timeout=10)
     assert result.returncode == 0, result.stderr
 
 
@@ -130,3 +136,35 @@ def test_auth_script_loads_before_both_dashboard_clients_and_forms_have_password
     login = BeautifulSoup((ROOT / "login.html").read_text(encoding="utf-8"), "html.parser")
     assert login.select_one("#login-password")["type"] == "password"
     assert login.select_one("#login-password")["autocomplete"] == "current-password"
+
+
+def _string_table(source, start, end):
+    block = source[source.index(start):source.index(end, source.index(start))]
+    return dict(re.findall(r"'([\w.]+)':\s*'((?:[^'\\]|\\.)*)'", block))
+
+
+def test_the_sign_in_table_matches_the_dashboard_dictionary():
+    login = (ROOT / "login.js").read_text(encoding="utf-8")
+    dictionary = (ROOT / "i18n.js").read_text(encoding="utf-8")
+    page = BeautifulSoup((ROOT / "login.html").read_text(encoding="utf-8"), "html.parser")
+    assert not [item for item in page.find_all("script", src=True) if item["src"] == "/i18n.js"]
+    shown = {element["data-i18n"] for element in page.find_all(attrs={"data-i18n": True})}
+    for lang, (login_start, login_end, dict_start, dict_end) in {
+        "en": ("    en: {", "    },\n    tr: {", "    en: {", "\n    },\n    tr: {"),
+        "tr": ("    tr: {", "    },\n  };", "    tr: {", "\n    },\n  };"),
+    }.items():
+        table = _string_table(login, login_start, login_end)
+        reference = _string_table(dictionary, dict_start, dict_end)
+        assert shown <= set(table), sorted(shown - set(table))
+        assert table and all(reference[key] == value for key, value in table.items()), (lang, {
+            key: (value, reference.get(key)) for key, value in table.items() if reference.get(key) != value})
+
+
+def test_sign_in_language_choice_is_remembered_and_applied():
+    run_js("login.js", r"""
+assert.equal(document.documentElement.lang,'en');
+nodes.get('login-lang').value='tr';handlers['login-lang:change']();
+assert.equal(localStorage.getItem('apwn_lang'),'tr');assert.equal(document.documentElement.lang,'tr');
+nodes.get('login-lang').value='<script>';handlers['login-lang:change']();
+assert.equal(localStorage.getItem('apwn_lang'),'en');assert.equal(document.documentElement.lang,'en');
+""")

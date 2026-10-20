@@ -73,8 +73,10 @@ def _checked_repo(repo):
     parts = repo.split("/") if isinstance(repo, str) else []
     if len(parts) != 2 or any(part in (".", "..") or not _REPO_PART.fullmatch(part) for part in parts):
         raise UpdateCheckError(
-            "The repository (--update-repo or AUTOPWN_UPDATE_REPO) must be written OWNER/REPO, "
-            "using letters, digits, '.', '_' and '-'."
+            _(
+                "The repository (--update-repo or AUTOPWN_UPDATE_REPO) must be written OWNER/REPO, "
+                "using letters, digits, '.', '_' and '-'."
+            )
         )
     return repo
 
@@ -91,7 +93,11 @@ def _checked_ref(name, what):
         or ".lock/" in name
         or name.endswith(("/", ".", ".lock"))
     ):
-        raise UpdateCheckError(f"The {what} name is not a plain git name.")
+        raise UpdateCheckError(
+            _("The release tag name is not a plain git name.")
+            if what == "release tag"
+            else _("The branch name is not a plain git name.")
+        )
     return name
 
 
@@ -107,19 +113,19 @@ def _get_json(url):
             url, timeout=REQUEST_TIMEOUT, headers={"Accept": "application/vnd.github+json"}
         )
     except requests.RequestException as exc:
-        raise UpdateCheckError(f"Could not reach GitHub ({type(exc).__name__}).") from exc
+        raise UpdateCheckError(_("Could not reach GitHub ({error_type}).").format(error_type=type(exc).__name__)) from exc
     if response.status_code == 404:
-        raise UpdateCheckError(f"Nothing found at {url}.")
+        raise UpdateCheckError(_("Nothing found at {url}.").format(url=url))
     if response.status_code == 403:
-        raise UpdateCheckError("GitHub API rate limit exceeded; try again later.")
+        raise UpdateCheckError(_("GitHub API rate limit exceeded; try again later."))
     if not response.ok:
-        raise UpdateCheckError(f"GitHub API returned HTTP {response.status_code}.")
+        raise UpdateCheckError(_("GitHub API returned HTTP {status}.").format(status=response.status_code))
     try:
         payload = response.json()
     except (ValueError, RecursionError) as exc:
-        raise UpdateCheckError("GitHub API returned an unexpected response.") from exc
+        raise UpdateCheckError(_("GitHub API returned an unexpected response.")) from exc
     if not isinstance(payload, dict):
-        raise UpdateCheckError("GitHub API returned an unexpected response.")
+        raise UpdateCheckError(_("GitHub API returned an unexpected response."))
     return payload
 
 
@@ -173,8 +179,10 @@ def check_commit(branch="main", repo=None):
     local = _local_commit()
     if not local:
         raise UpdateCheckError(
-            "Commit-based update checks require a git checkout of AutoPWN Suite; "
-            "use --update-channel release instead."
+            _(
+                "Commit-based update checks require a git checkout of AutoPWN Suite; "
+                "use --update-channel release instead."
+            )
         )
     data = _get_json(f"{API_ROOT.format(repo=repo)}/commits/{branch}")
     latest_sha = _text(data, "sha")
@@ -198,11 +206,12 @@ def check_for_updates(current_version, channel="release", branch="main", repo=No
 
 def format_status(status: UpdateStatus) -> str:
     if status.update_available:
-        return (
-            f"Update available ({status.mode}): {status.current} -> {status.latest}\n"
-            f"{status.url}"
+        return _("Update available ({mode}): {current} -> {latest}\n{url}").format(
+            mode=status.mode, current=status.current, latest=status.latest, url=status.url
         )
-    return f"Up to date ({status.mode}): {status.current} (latest: {status.latest})."
+    return _("Up to date ({mode}): {current} (latest: {latest}).").format(
+        mode=status.mode, current=status.current, latest=status.latest
+    )
 
 
 @dataclass
@@ -224,14 +233,14 @@ def _run_git(args, check=True):
             ["git", *args], cwd=_repo_root(), capture_output=True, text=True, timeout=30, check=check
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise UpdateCheckError(f"git {args[0]} could not run ({type(exc).__name__}).") from exc
+        raise UpdateCheckError(_("git {command} could not run ({error_type}).").format(command=args[0], error_type=type(exc).__name__)) from exc
 
 
 def _ensure_clean_worktree():
     status = _run_git(["status", "--porcelain"])
     if status.stdout.strip():
         raise UpdateCheckError(
-            "Working tree has uncommitted changes; commit or stash them before applying an update."
+            _("Working tree has uncommitted changes; commit or stash them before applying an update.")
         )
 
 
@@ -247,15 +256,17 @@ def _remote_url(repo):
 def _fetch(repo, refspec):
     result = _run_git(["fetch", _remote_url(repo), refspec], check=False)
     if result.returncode != 0:
-        raise UpdateCheckError(f"git fetch from {repo} failed (exit status {result.returncode}).")
+        raise UpdateCheckError(_("git fetch from {repo} failed (exit status {status}).").format(repo=repo, status=result.returncode))
 
 
 def _fast_forward_to(ref, onto_description):
     result = _run_git(["merge", "--ff-only", ref], check=False)
     if result.returncode != 0:
         raise UpdateCheckError(
-            f"Cannot fast-forward to {onto_description}: the local branch has diverged. "
-            "Resolve manually (e.g. git rebase, or git reset --hard after backing up changes)."
+            _(
+                "Cannot fast-forward to {onto}: the local branch has diverged. "
+                "Resolve manually (e.g. git rebase, or git reset --hard after backing up changes)."
+            ).format(onto=onto_description)
         )
 
 
@@ -264,9 +275,9 @@ def apply_commit_update(branch="main", repo=None):
     repo = _checked_repo(repo)
     branch = _checked_ref(branch, "branch")
     if not _local_commit():
-        raise UpdateCheckError("Applying an update requires a git checkout of AutoPWN Suite.")
+        raise UpdateCheckError(_("Applying an update requires a git checkout of AutoPWN Suite."))
     if _current_branch() is None:
-        raise UpdateCheckError("HEAD is detached; checkout a branch before applying a commit-based update.")
+        raise UpdateCheckError(_("HEAD is detached; checkout a branch before applying a commit-based update."))
     _ensure_clean_worktree()
     previous = _local_commit()
     _fetch(repo, branch)
@@ -279,19 +290,19 @@ def apply_release_update(repo=None):
     """Fast-forward (or checkout, if detached) to ``repo``'s latest release tag."""
     repo = _checked_repo(repo)
     if not _local_commit():
-        raise UpdateCheckError("Applying an update requires a git checkout of AutoPWN Suite.")
+        raise UpdateCheckError(_("Applying an update requires a git checkout of AutoPWN Suite."))
     _ensure_clean_worktree()
     data = _get_json(f"{API_ROOT.format(repo=repo)}/releases/latest")
     tag = _text(data, "tag_name")
     if not tag:
-        raise UpdateCheckError("Latest release has no tag name.")
+        raise UpdateCheckError(_("Latest release has no tag name."))
     _checked_ref(tag, "release tag")
     previous = _local_commit()
     _fetch(repo, f"refs/tags/{tag}:refs/tags/{tag}")
     if _current_branch() is None:
         result = _run_git(["checkout", tag], check=False)
         if result.returncode != 0:
-            raise UpdateCheckError(f"git checkout {tag} failed (exit status {result.returncode}).")
+            raise UpdateCheckError(_("git checkout {tag} failed (exit status {status}).").format(tag=tag, status=result.returncode))
     else:
         _fast_forward_to(tag, tag)
     new = _local_commit()
@@ -306,7 +317,6 @@ def apply_update(channel="release", branch="main", repo=None):
 
 
 def format_result(result: UpdateResult) -> str:
-    return (
-        f"Updated ({result.mode}) {result.previous} -> {result.new} ({result.ref}). "
-        "Restart AutoPWN Suite to use the updated code."
-    )
+    return _(
+        "Updated ({mode}) {previous} -> {new} ({ref}). Restart AutoPWN Suite to use the updated code."
+    ).format(mode=result.mode, previous=result.previous, new=result.new, ref=result.ref)

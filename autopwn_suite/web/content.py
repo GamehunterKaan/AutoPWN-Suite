@@ -19,7 +19,7 @@ def inspect_content(url, response, console):
     from autopwn_suite.web.runtime import ACTIVE
     current = ACTIVE.get()
     if current and getattr(response, "autopwn_truncated", False):
-        current.issue("Response size limit reached; content coverage is limited.")
+        current.issue("Response size limit reached; content coverage is limited.")  # matched by web_ui._resume_web_options: keep English
     results = []
     text = response.text[:100_000]
     path = unquote(urlsplit(url).path).lower()
