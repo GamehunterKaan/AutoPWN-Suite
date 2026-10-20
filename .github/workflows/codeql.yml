@@ -1,0 +1,75 @@
+name: CodeQL
+
+# Replaces CodeQL's default setup, which never scans pull requests from forks (GitHub documents
+# the exclusion), so the required `Analyze (...)` and `CodeQL` checks could not report on them.
+# The job names and the categories (`/language:<name>`) are the ones default setup used, so the
+# required checks and the alert history stay the same.
+#
+# A pull request run only analyzes: a fork's token is read-only, so it cannot upload. It leaves the
+# SARIF results as an artifact and codeql-upload.yml, from `main`, uploads them. Pushes and the
+# weekly run upload directly. Languages that need no build use `build-mode: none`, so this
+# workflow runs no code of the pull request. It has no `paths:` filter: a skipped required check
+# blocks merging.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      # Uploads the results of a push or the weekly run. Pull request runs do not use it: they hand
+      # their results to codeql-upload.yml, and a fork's token is read-only anyway.
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, javascript-typescript, python]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          category: /language:${{ matrix.language }}
+          upload: ${{ github.event_name == 'pull_request' && 'never' || 'always' }}
+          # The SARIF file as it would be uploaded, with its category and fingerprints.
+          post-processed-sarif-path: sarif
+
+      - name: Record the analyzed commit
+        if: github.event_name == 'pull_request'
+        env:
+          ANALYZED_SHA: ${{ github.sha }}
+        run: printf '{"sha":"%s"}\n' "$ANALYZED_SHA" > sarif/analysis.json
+
+      - name: Hand the results to the upload workflow
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sarif-${{ matrix.language }}
+          path: sarif
+          if-no-files-found: error
+          retention-days: 7

@@ -85,7 +85,9 @@ See [Releasing](RELEASING.md#authenticity-backfill-for-an-existing-release).
 Bandit 1.9.4 inspects every tracked non-test Python file, including release
 scripts, on every change and release. `--ignore-nosec` prevents inline exclusions
 from silently hiding findings. GitHub CodeQL separately analyzes Python,
-JavaScript/TypeScript and Actions; retain its required checks.
+JavaScript/TypeScript and Actions through `codeql.yml`; retain its required checks. CodeQL's
+default setup is not used: it never scans a pull request from a fork, so the required checks
+could not report on one (see [CodeQL for pull requests from forks](#codeql-for-pull-requests-from-forks)).
 
 **Threshold:** Bandit HIGH findings at any confidence block merge/release.
 Medium/low results remain visible in retained reports and require triage within
@@ -164,13 +166,16 @@ to full commit SHAs, every checkout sets `persist-credentials: false`, and each
 workflow declares its permissions at workflow level and a job states its own where it
 needs more or less. The third column lists everything beyond read-only contents. The
 required status checks are `test`, `Tests (ubuntu-latest)`, `Tests (macos-latest)`,
-`Security policy` and `Independent human approval`, plus CodeQL's default setup; the
-workflows behind them have no `paths:` filter.
+`Security policy` and `Independent human approval`, plus the CodeQL checks `Analyze (actions)`,
+`Analyze (javascript-typescript)`, `Analyze (python)` and `CodeQL`; the workflows behind them have no
+`paths:` filter.
 
 | Workflow | Runs on | Permissions beyond read-only contents | What it checks or does |
 | --- | --- | --- | --- |
 | `poetry-tests.yml` | Pull request and push to `main` | None | Check `test`: lockfile check, Ruff, JavaScript syntax and ESLint, the locked-requirements export, installation of system Nmap and gettext, the translation-catalog drift check, then pytest with 80% branch coverage. |
 | `tests.yml` | Pull request and push to `main` and `dev` | None | Checks `Tests (ubuntu-latest)` and `Tests (macos-latest)`: Python 3.10 with `requirements.txt`, an import smoke test and a scan of `127.0.0.1` with Nmap. |
+| `codeql.yml` | Pull request and push to `main`, weekly | `security-events: write` in its one job (a pull request run is read-only and does not use it) | Checks `Analyze (actions)`, `Analyze (javascript-typescript)` and `Analyze (python)`: CodeQL with `build-mode: none`, so no code of the pull request runs. A pull request run leaves its SARIF file as an artifact; a push or the weekly run uploads directly. |
+| `codeql-upload.yml` | `workflow_run` of `codeql.yml`, from `main` | `security-events: write` in its one job | Uploads a pull request's CodeQL results to code scanning, which produces the `CodeQL` check, including for a fork; checks out no pull request code (see [below](#codeql-for-pull-requests-from-forks)). |
 | `install-smoke.yml` | Pull request and push to `main` and `dev` | None | Installs the built wheel into a clean environment and starts it (Ubuntu, macOS and Windows, Python 3.10 and 3.14); archives the commit the way a release does and builds the standalone binaries from that archive through `build-binary.yml`. |
 | `build-binary.yml` | Reusable: called by `install-smoke.yml` and `publish-docker.yml` | None | Builds each standalone binary twice on its own runner (Linux amd64 and arm64, Windows amd64, macOS arm64) from the pinned interpreter and hash-pinned requirements, fails unless both builds are identical, smoke-tests it and writes its SBOM. |
 | `security.yml` | Pull request and push to `main`; reusable with a release commit | None | Check `Security policy`: `scripts/security_policy.py` (OSV-Scanner SCA of the lockfile and the pinned release build tools, Bandit SAST). The release workflows run it on the exact release commit. |
@@ -183,3 +188,26 @@ workflows behind them have no `paths:` filter.
 | `publish-docker.yml` | Published release; manually from `main` to recover one | `id-token: write` (sign job), `contents: write` (publish job), Docker Hub secrets (push and sign jobs) | Validates the tag, runs the security and dynamic-analysis workflows and the binary builds, builds and scans each image architecture, pushes, signs with Sigstore and uploads the release assets. See [Releasing](RELEASING.md). |
 | `publish-pypi.yml` | Published release; manually from `main`, which runs the gates and the build but cannot publish (the `pypi` environment admits only `v*` tags) | `id-token: write` in the publish job, which runs in the `pypi` environment | The same validation and gates, two identical builds of the wheel and source distribution, a clean-install smoke test, then PyPI trusted publishing with attestations. See [Releasing](RELEASING.md). |
 | `backfill-release-signatures.yml` | Manually from `main` | `id-token: write` (sign job), `contents: write` (publish job), Docker Hub secrets (sign job) | Signs an existing release and its original image digest without rebuilding anything. See [Releasing](RELEASING.md#authenticity-backfill-for-an-existing-release). |
+
+### CodeQL for pull requests from forks
+
+GitHub's default setup for code scanning documents that it scans pull requests "excluding pull
+requests from forks", so with it a fork's pull request never gets the required `Analyze (...)` and
+`CodeQL` checks. `codeql.yml` and `codeql-upload.yml` replace it and keep the same job names and
+categories (`/language:<name>`), so the required checks and the alert history are unchanged.
+
+1. `codeql.yml` analyzes the merge of the pull request with `main`. A fork's token is read-only, so
+   the run only analyzes (`upload: never`), writes the post-processed SARIF file and the analyzed commit
+   to an artifact per language and finishes.
+2. `codeql-upload.yml` starts from `main` when that run completes. For each language it downloads the
+   artifact, accepts exactly the two expected files, requires a SARIF 2.1.0 log of the CodeQL tool with
+   that language's category, finds the pull request through the GitHub API (open, targets `main`, same
+   head commit and branch, and a test merge commit equal to the analyzed commit) and uploads the file
+   to `refs/pull/<number>/merge`. The number, the commit and the category come from the API and
+   fixed values, never from the artifact. It checks out no pull request code, and a result for a
+   pull request that has since changed is not uploaded.
+
+The upload job holds `security-events: write`, so it treats the artifact as data and nothing else. A pull
+request can change `codeql.yml` itself and so produce a clean-looking file: as for every other check,
+the independent human review of the change is the control. `tests/unit/test_codeql_workflows.py` runs
+the handler's script with GitHub API responses and checks the names, pins and permissions.
