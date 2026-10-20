@@ -484,8 +484,8 @@ single-file binaries that need no Python installation: `linux-amd64`, `linux-arm
 executable and run it:
 
 ```bash
-chmod +x autopwn-suite-v2.7.0-linux-amd64
-./autopwn-suite-v2.7.0-linux-amd64 --help
+chmod +x autopwn-suite-v2.8.0-linux-amd64
+./autopwn-suite-v2.8.0-linux-amd64 --help
 ```
 
 The binaries are checksum-verified and Sigstore-signed but not code-signed for Windows or

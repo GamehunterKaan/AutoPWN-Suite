@@ -5,7 +5,7 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
-## [Unreleased]
+## [2.8.0] - 2026-10-21
 
 ### Functional changes
 
@@ -57,6 +57,8 @@ existing release summaries; they do not retroactively claim artifact signing.
 - The ClusterFuzzLite build (`.clusterfuzzlite/build.sh`) no longer runs `pip3 install --no-deps .`: it installs only
   the hash-pinned `requirements-locked.txt`, and the fuzzers use the package from the checkout on the import path,
   as the container image does. The fuzzers cover the same code.
+- Update the locked `certifi` from 2025.6.15 to 2026.10.19 (`poetry.lock` and the `requirements-locked.txt` that is
+  exported from it), which the container image and the standalone binaries carry. See the security notes.
 
 ### Security changes
 
@@ -89,6 +91,11 @@ existing release summaries; they do not retroactively claim artifact signing.
 - Every install in the fuzz build now comes from a hash-pinned file (no pip install of an unhashed directory),
   which clears the OpenSSF Scorecard "Pinned-Dependencies" finding for `.clusterfuzzlite/build.sh`. No security
   impact otherwise.
+- `certifi` 2026.10.19 fixes GHSA-6q48-6c7w-9gw2: earlier versions bundle emSign root CAs whose intermediate CA keys
+  are compromised, and `certifi` is the CA bundle that `requests` uses to verify HTTPS certificates (the NVD and
+  GitHub lookups, notification webhooks and the certificate check of web scans). The lock files, the container image
+  and the standalone binaries of this release carry the fixed version. A `pip` or `pipx` install resolves its own
+  `certifi`: upgrade it (`pip install --upgrade certifi`) if your environment kept an older one.
 - Release signing: no security impact. The image signature is still verified against the same identity, issuer and
   digest, and a verification that never succeeds still fails the step. The retry adds no permission, secret or
   network destination.
