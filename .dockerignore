@@ -28,5 +28,5 @@ tests
 **/vulnerabilities.sqlite3*
 **/.nvd-*.sqlite3*
 packaging
-fuzz
+scripts/fuzz
 .clusterfuzzlite

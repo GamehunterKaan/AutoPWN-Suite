@@ -1,13 +1,13 @@
 name: ClusterFuzzLite
 
 # Coverage-guided fuzzing (Atheris) of the parsers and validators that handle untrusted input, limited to the
-# code a pull request changes. The harnesses live in fuzz/; the seeded regression fuzz tests stay in the normal suite.
+# code a pull request changes. The harnesses live in scripts/fuzz/; the seeded regression fuzz tests stay in the normal suite.
 on:
   pull_request:
     branches: [ "main" ]
     paths:
       - "autopwn_suite/**"
-      - "fuzz/**"
+      - "scripts/fuzz/**"
       - ".clusterfuzzlite/**"
       - "requirements-locked.txt"
       - ".github/workflows/cflite_pr.yml"

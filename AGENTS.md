@@ -5,7 +5,7 @@ AutoPWN Suite is an operator-run vulnerability scanner (CLI, Python library, Fla
 ## Orientation
 
 - The code is the `autopwn_suite/` package. At the root, `autopwn.py` (CLI launcher and Docker entrypoint) and `api.py` (compatibility re-export) serve source checkouts.
-- `scripts/` is release, policy and build tooling; `.security/` the policy data (VEX, license overrides, SAST exceptions, bandit requirements); `packaging/` the PyInstaller spec and pinned build tools; `fuzz/` and `.clusterfuzzlite/` the fuzz harnesses and their build.
+- `scripts/` is release, policy and build tooling; `.security/` the policy data (VEX, license overrides, SAST exceptions, bandit requirements); `packaging/` the PyInstaller spec and pinned build tools; `scripts/fuzz/` the fuzz harnesses and their seeds, and `.clusterfuzzlite/` their ClusterFuzzLite build (it must stay at the repository root).
 - Scan only targets you are authorized to test. Tests mock Nmap and HTTP, serve from `127.0.0.1` and use sample targets (`192.0.2.0/24`, `.test` and `.invalid` names); nothing blocks real traffic, so keep new tests off the network.
 
 ## Done means
@@ -51,7 +51,7 @@ Update these in the same change:
 **Security invariants**
 - Bind to loopback by default (the Docker image deliberately binds `0.0.0.0` inside the container; publish its port to loopback only, but a bridge-published port is not loopback to the dashboard, so plain-HTTP sign-in needs `--network host` with `AUTOPWN_WEB_HOST=127.0.0.1` as in `docker-compose.yml`, else a TLS proxy and `AUTOPWN_WEB_SECURE_COOKIE=1`). Require sign-in on every dashboard route and the CSRF token on non-GET routes (tests iterate all routes); never extend the public list in `install_auth`.
 - Verify target TLS certificates by default (`--insecure-tls` opts out; the diagnostics in `autopwn_suite/web/tls.py` deliberately inspect untrusted certificates).
-- Validate untrusted input with explicit allowlist checks that reject through the documented error (`ValueError`-style, or the dashboard's HTTP 400), never `assert`; give each new parser or validator seeded fuzz coverage (`tests/unit/test_fuzz_inputs.py`, `fuzz/`).
+- Validate untrusted input with explicit allowlist checks that reject through the documented error (`ValueError`-style, or the dashboard's HTTP 400), never `assert`; give each new parser or validator seeded fuzz coverage (`tests/unit/test_fuzz_inputs.py`, `scripts/fuzz/`).
 - Send target HTTP only through the helpers in `autopwn_suite/web/http.py` (read-only methods, same origin, bounded); run Nmap from an argv list with `shell=False`; escape untrusted text before it reaches HTML.
 - Offline mode makes no calls to online services (Nmap still scans the chosen targets): gate every new outbound call behind it and extend `tests/unit/test_offline_scans.py`.
 - Keep secrets out of logs, reports, responses and commits: responses and logs carry fixed text, not exception text, and secret-bearing inputs use `*_FILE` credential files (`autopwn_suite/credential_files.py`) and stay out of settings JSON and job output.

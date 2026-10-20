@@ -42,9 +42,9 @@ Retain copyright/license notices, including MPL file-level obligations.
 
 Fuzzing: the normal suite runs seeded mutation fuzz tests of the parsers, validators and login
 endpoints (`tests/unit/test_fuzz_inputs.py`). In addition, ClusterFuzzLite builds the Atheris harnesses
-in `fuzz/` (Nmap XML parser, dashboard option schema, account validation, update checker input) and fuzzes the code a pull
+in `scripts/fuzz/` (Nmap XML parser, dashboard option schema, account validation, update checker input) and fuzzes the code a pull
 request changes for a few minutes (`.github/workflows/cflite_pr.yml`, `.clusterfuzzlite/`). A crash or an
-undocumented exception fails that job. Seed inputs live in `fuzz/seeds/`; harness behavior is also
+undocumented exception fails that job. Seed inputs live in `scripts/fuzz/seeds/`; harness behavior is also
 checked in the normal suite (`tests/unit/test_fuzz_harnesses.py`).
 
 The pinned tools that build the release artifacts (`packaging/requirements-build.txt` for
@@ -180,7 +180,7 @@ required status checks are `test`, `Tests (ubuntu-latest)`, `Tests (macos-latest
 | `build-binary.yml` | Reusable: called by `install-smoke.yml` and `publish-docker.yml` | None | Builds each standalone binary twice on its own runner (Linux amd64 and arm64, Windows amd64, macOS arm64) from the pinned interpreter and hash-pinned requirements, fails unless both builds are identical, smoke-tests it and writes its SBOM. |
 | `security.yml` | Pull request and push to `main`; reusable with a release commit | None | Check `Security policy`: `scripts/security_policy.py` (OSV-Scanner SCA of the lockfile and the pinned release build tools, Bandit SAST). The release workflows run it on the exact release commit. |
 | `dynamic-analysis.yml` | Pull request and push to `main`, manually; reusable with a release commit | None | OWASP ZAP baseline scan of the running dashboard, unauthenticated and signed in (see [Dynamic analysis](#dynamic-analysis-owasp-zap-baseline)). The release workflows need it before they push or publish anything. |
-| `cflite_pr.yml` | Pull requests that change `autopwn_suite/`, `fuzz/`, `.clusterfuzzlite/`, `requirements-locked.txt` or the workflow itself (a path filter; not a required check) | None (the job token is read-only) | ClusterFuzzLite builds the Atheris harnesses in `fuzz/` and fuzzes the changed code for 180 seconds. |
+| `cflite_pr.yml` | Pull requests that change `autopwn_suite/`, `scripts/fuzz/`, `.clusterfuzzlite/`, `requirements-locked.txt` or the workflow itself (a path filter; not a required check) | None (the job token is read-only) | ClusterFuzzLite builds the Atheris harnesses in `scripts/fuzz/` and fuzzes the changed code for 180 seconds. |
 | `scorecard.yml` | Weekly, on push to `main` and on branch-protection changes | `security-events: write` and `id-token: write` in its one job | OpenSSF Scorecard analysis; uploads the SARIF results to code scanning and publishes them to the OpenSSF API for the badge. It gates nothing and stores no secret. |
 | `human-review.yml` | Pull request | `pull-requests: read` | Check `Independent human approval`: a human other than the author must approve the current revision. |
 | `human-review-events.yml` | Pull request review submitted or dismissed | None (`permissions: {}`) | Credential-free notification that a review changed. |

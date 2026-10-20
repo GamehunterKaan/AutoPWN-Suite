@@ -1,5 +1,5 @@
 # Used instead of the repository's .dockerignore for the ClusterFuzzLite image (which must keep
-# .clusterfuzzlite/ and fuzz/ in its build context, while the product image must not).
+# .clusterfuzzlite/ and scripts/fuzz/ in its build context, while the product image must not).
 .git
 .github
 __pycache__
