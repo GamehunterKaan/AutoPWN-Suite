@@ -1,0 +1,1115 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
+try:
+    from os import getuid
+
+    import distro
+except ImportError:
+    from ctypes import windll
+import os
+from argparse import ArgumentParser, ArgumentTypeError
+from configparser import ConfigParser
+from configparser import Error as ConfigError
+from datetime import datetime
+from enum import Enum
+from os import get_terminal_size
+from platform import platform, system
+from re import search, sub
+from socket import AF_INET, SOCK_DGRAM, socket
+from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_call
+from sys import platform as sys_platform
+
+from requests import get
+from rich.text import Text
+
+from autopwn_suite import update_checker
+from autopwn_suite.credential_files import (
+    NIST_API_KEY,
+    SMTP_PASSWORD,
+    WEBHOOK_URL,
+    CredentialFileError,
+    credential_from_environment,
+)
+from autopwn_suite.report import ReportMail, ReportType
+from autopwn_suite.subprocess_env import child_environment
+from autopwn_suite.web.runtime import redact_target
+
+
+class ScanMode(Enum):
+    Normal = 0
+    Noise = 1
+    Evade = 2
+
+
+DontAskForConfirmation = False
+
+class ScanType(Enum):
+    Ping = 0
+    ARP = 1
+
+
+def _port(value) -> int:
+    try:
+        port = int(value)
+    except ValueError:
+        port = 0
+    if not 1 <= port <= 65535:
+        raise ArgumentTypeError(f"invalid port {value!r} (--web-port or AUTOPWN_WEB_PORT): use a number from 1 to 65535")
+    return port
+
+
+def cli():
+    argparser = ArgumentParser(
+        description="AutoPWN Suite | A project for scanning "
+        + "vulnerabilities and exploiting systems automatically."
+    )
+    argparser.add_argument(
+        "-v", "--version", help="Print version and exit.", action="store_true"
+    )
+    argparser.add_argument(
+        "-y",
+        "--yes-please",
+        help="Don't ask for anything. (Full automatic mode)",
+        action="store_true",
+        required=False,
+        default=False,
+    )
+    argparser.add_argument(
+        "-c",
+        "--config",
+        help="Specify a config file to use. (Default : None)",
+        default=None,
+        required=False,
+        metavar="CONFIG",
+        type=str,
+    )
+    argparser.add_argument(
+        "-nc",
+        "--no-color",
+        help="Disable colors.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    argparser.add_argument(
+        "--daemon-install",
+        help="Install the AutoPWN Suite daemon.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    argparser.add_argument(
+        "--daemon-uninstall",
+        help="Uninstall the AutoPWN Suite daemon.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    argparser.add_argument(
+        "--create-config",
+        help="Create a config file.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
+    scanargs.add_argument("--offline", action="store_true",
+                         help="Use only the local vulnerability database; disable internet integrations.")
+    scanargs.add_argument("--vuln-source", dest="vulnerability_source", default="auto",
+                         choices=["auto", "online", "offline"],
+                         help="CVE lookup source (auto falls back to the local database on failure).")
+    scanargs.add_argument("--vuln-db", default=None, metavar="PATH",
+                         help="Path to a portable vulnerabilities.sqlite3 database.")
+    databaseargs = argparser.add_argument_group("Vulnerability database")
+    databaseargs.add_argument("--update-vuln-db", action="store_true",
+                             help="Download/update the complete NVD database, then exit. Requires internet.")
+    databaseargs.add_argument("--vuln-db-status", action="store_true",
+                             help="Show local vulnerability database status, then exit.")
+    updateargs = argparser.add_argument_group("Self-update", "Check for or apply a newer AutoPWN Suite")
+    updateargs.add_argument("--check-update", action="store_true",
+                           help="Check GitHub for a newer AutoPWN Suite, then exit. Requires internet.")
+    updateargs.add_argument("--apply-update", action="store_true",
+                           help="Fast-forward this git checkout to the latest release/commit "
+                                "(see --update-channel), then exit. Requires internet, a git "
+                                "checkout and a clean working tree.")
+    updateargs.add_argument("--update-channel", dest="update_channel", default=None,
+                           choices=["release", "commit"],
+                           help="Compare/update against the latest GitHub release tag or the latest "
+                                "commit on --update-branch. Setting this explicitly remembers it as "
+                                "the default for future runs. (Default: release, or your last "
+                                "explicit choice.)")
+    updateargs.add_argument("--update-branch", dest="update_branch", default="main", metavar="BRANCH",
+                           help="Branch to compare against in commit mode. (Default: main)")
+    updateargs.add_argument("--update-repo", dest="update_repo", default=None, metavar="OWNER/REPO",
+                           help="GitHub repo to check for updates. (Default: "
+                                f"{update_checker.DEFAULT_REPO})")
+    scanargs.add_argument(
+        "-t",
+        "--target",
+        help=(
+            "Target range to scan. This argument overwrites the"
+            + " hostfile argument. (192.168.0.1 or 192.168.0.0/24)"
+        ),
+        type=str,
+        required=False,
+        default=None,
+    )
+    scanargs.add_argument(
+        "-hf",
+        "--host-file",
+        help="File containing a list of hosts to scan.",
+        type=str,
+        required=False,
+        default=None,
+    )
+    scanargs.add_argument(
+        "-sd",
+        "--skip-discovery",
+        help="Skips the host discovery phase.",
+        required=False,
+        default=False,
+        action="store_true",
+    )
+    scanargs.add_argument(
+        "-st",
+        "--scan-type",
+        help="Scan type.",
+        type=str,
+        required=False,
+        default=None,
+        choices=["arp", "ping"],
+    )
+    scanargs.add_argument(
+        "-nf",
+        "--nmap-flags",
+        help=(
+            "Custom nmap flags to use for portscan."
+            + ' (Has to be specified like : -nf="-O")'
+        ),
+        default="",
+        type=str,
+        required=False,
+    )
+    scanargs.add_argument(
+        "-s",
+        "--speed",
+        help="Scan speed. (Default : 3)",
+        default=3,
+        type=int,
+        required=False,
+        choices=range(0, 6),
+    )
+    scanargs.add_argument(
+        "-ht",
+        "--host-timeout",
+        help="Timeout for every host. (Default :240)",
+        default=240,
+        type=int,
+        required=False,
+    )
+    scanargs.add_argument(
+        "-a",
+        "--api",
+        help=(
+            "Specify API key for vulnerability detection "
+            + "for faster scanning. (Default : None)"
+        ),
+        default=None,
+        type=str,
+        required=False,
+    )
+    scanargs.add_argument(
+        "-m",
+        "--mode",
+        help="Scan mode.",
+        default="normal",
+        type=str,
+        required=False,
+        choices=["evade", "noise", "normal"],
+    )
+    scanargs.add_argument(
+        "-nt",
+        "--noise-timeout",
+        help="Noise mode timeout.",
+        default=None,
+        type=int,
+        required=False,
+        metavar="TIMEOUT",
+    )
+    scanargs.add_argument(
+        "-sed",
+        "--skip-exploit-download",
+        help="Skip downloading exploits.",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+
+    reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
+    reportargs.add_argument(
+        "-o",
+        "--output",
+        help="Output file name. Overrides output-folder.",
+        default=None,
+        type=str,
+        required=False,
+    )
+    reportargs.add_argument(
+        "-ot",
+        "--output-type",
+        help="Output file type. (Default : html)",
+        default="html",
+        type=str,
+        required=False,
+        choices=["html", "txt", "svg"],
+    )
+    reportargs.add_argument(
+        "-of",
+        "--output-folder",
+        help="Output file folder. (Default : outputs/)",
+        default="outputs",
+        type=str,
+        required=False,
+    )
+    reportargs.add_argument(
+        "-rp",
+        "--report",
+        help="Report sending method.",
+        type=str,
+        required=False,
+        default=None,
+        choices=["email", "webhook"],
+    )
+    reportargs.add_argument(
+        "-rpe",
+        "--report-email",
+        help="Email address to use for sending report.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="EMAIL",
+    )
+    reportargs.add_argument(
+        "-rpep",
+        "--report-email-password",
+        help="Password of the email report is going to be sent from.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="PASSWORD",
+    )
+    reportargs.add_argument(
+        "-rpet",
+        "--report-email-to",
+        help="Email address to send report to.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="EMAIL",
+    )
+    reportargs.add_argument(
+        "-rpef",
+        "--report-email-from",
+        help="Email to send from.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="EMAIL",
+    )
+    reportargs.add_argument(
+        "-rpes",
+        "--report-email-server",
+        help="Email server to use for sending report.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="SERVER",
+    )
+    reportargs.add_argument(
+        "-rpesp",
+        "--report-email-server-port",
+        help="Port of the email server.",
+        type=int,
+        required=False,
+        default=None,
+        metavar="PORT",
+    )
+    reportargs.add_argument(
+        "-rpw",
+        "--report-webhook",
+        help="Webhook to use for sending report.",
+        type=str,
+        required=False,
+        default=None,
+        metavar="WEBHOOK",
+    )
+
+    argparser.add_argument(
+        "--insecure-tls",
+        help="Do not verify TLS certificates of scanned websites. Use only for targets you trust, "
+             "such as lab systems with self-signed certificates. (Default: verify certificates)",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+
+    webuiargs = argparser.add_argument_group("Web UI", "Browser-based dashboard for controlling scans")
+    webuiargs.add_argument("--web-reset-account", action="store_true",
+                           help="Reset the dashboard account to admin with a new random password, print it, then exit.")
+    webuiargs.add_argument(
+        "--web",
+        help="Start the web UI dashboard (scans are launched from the browser).",
+        default=False,
+        required=False,
+        action="store_true",
+    )
+    webuiargs.add_argument(
+        "--web-host",
+        help="Web UI bind address. Use 0.0.0.0 to listen on all interfaces; remote clients then require HTTPS. (Default: 127.0.0.1, env: AUTOPWN_WEB_HOST)",
+        default=os.environ.get("AUTOPWN_WEB_HOST", "127.0.0.1"),
+        type=str,
+        required=False,
+        metavar="HOST",
+    )
+    webuiargs.add_argument(
+        "--web-port",
+        help="Web UI port. (Default: 8080, env: AUTOPWN_WEB_PORT)",
+        default=os.environ.get("AUTOPWN_WEB_PORT", "8080"),
+        type=_port,
+        required=False,
+        metavar="PORT",
+    )
+
+    return argparser.parse_args()
+
+
+class fake_logger:
+    def logger(self, exception_: str, message: str):
+        pass
+
+
+def is_root() -> bool:
+    try:
+        return getuid() == 0
+    except Exception:
+        return windll.shell32.IsUserAnAdmin() == 1
+
+
+def GetIpAdress() -> str:
+    s = socket(AF_INET, SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    PrivateIPAdress = s.getsockname()[0]
+    return PrivateIPAdress
+
+
+def DetectIPRange() -> str:
+    net_dict = {
+        "255.255.255.255": 32,
+        "255.255.255.254": 31,
+        "255.255.255.252": 30,
+        "255.255.255.248": 29,
+        "255.255.255.240": 28,
+        "255.255.255.224": 27,
+        "255.255.255.192": 26,
+        "255.255.255.128": 25,
+        "255.255.255.0": 24,
+        "255.255.254.0": 23,
+        "255.255.252.0": 22,
+        "255.255.248.0": 21,
+        "255.255.240.0": 20,
+        "255.255.224.0": 19,
+        "255.255.192.0": 18,
+        "255.255.128.0": 17,
+        "255.255.0.0": 16,
+    }
+    ip = GetIpAdress()
+    if system().lower() == "windows":
+        proc = Popen("ipconfig", stdout=PIPE)
+        while True:
+            line = proc.stdout.readline()
+            if ip.encode() in line:
+                break
+        mask = (
+            proc.stdout.readline().rstrip().split(b":")[-1].replace(b" ", b"").decode()
+        )
+        net_range = f"{ip}/{net_dict[mask]}"
+    else:
+        proc = Popen(["ip", "-o", "-f", "inet", "addr", "show"], stdout=PIPE, env=child_environment())
+        regex = rf"\b{ip}/\b([0-9]|[12][0-9]|3[0-2])\b"
+        cmd_output = proc.stdout.read().decode()
+        net_range = search(regex, cmd_output).group()
+    return net_range
+
+
+def InitAutomation(args) -> None:
+    global DontAskForConfirmation
+    if args.yes_please:
+        DontAskForConfirmation = True
+    else:
+        DontAskForConfirmation = False
+
+
+def read_file_any_encoding(filepath: str) -> str:
+    # Try UTF-8 first; "utf-8-sig" drops the byte order mark that Windows editors and PowerShell write,
+    # which would otherwise end up inside the key.
+    try:
+        with open(filepath, "r", encoding="utf-8-sig") as f:
+            return f.readline().strip()
+    except UnicodeError:
+        pass
+    # Try UTF-16 variations
+    try:
+        with open(filepath, "r", encoding="utf-16") as f:
+            return f.readline().strip()
+    except UnicodeError:
+        try:
+            with open(filepath, "r", encoding="utf-16-le") as f:
+                return f.readline().strip()
+        except UnicodeError:
+            pass
+    # Try latin-1 (very permissive)
+    try:
+        with open(filepath, "r", encoding="latin-1") as f:
+            return f.readline().strip()
+    except Exception:
+        pass
+    # As a last resort, replace undecodable characters
+    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        return f.readline().strip()
+
+
+def _credential_file(variable, log):
+    """Credential named by an *_FILE variable, or None; a bad file is reported, never printed."""
+    try:
+        return credential_from_environment(variable)
+    except CredentialFileError as error:
+        log.logger("error", str(error))
+        return None
+
+
+def InitArgsAPI(args, log) -> str:
+    if args.api:
+        apiKey = args.api
+    elif (apiKey := _credential_file(NIST_API_KEY, log)) is not None:
+        pass
+    else:
+        apiKey = None
+        try:
+            apiKey = read_file_any_encoding("api.txt")
+        except FileNotFoundError:
+            log.logger(
+                "warning",
+                "No API key specified and no api.txt file found. "
+                + "Vulnerability detection is going to be slower! "
+                + "You can get your own NIST API key from "
+                + "https://nvd.nist.gov/developers/request-an-api-key",
+            )
+        except PermissionError:
+            log.logger("error", "Permission denied while trying to read api.txt!")
+        except Exception as e:
+            log.logger("error", f"Error reading api.txt: {e}")
+
+    return apiKey
+
+
+def InitArgsScanType(args, log) -> ScanType:
+    scantype = ScanType.Ping
+    if args.scan_type == "arp":
+        if is_root():
+            scantype = ScanType.ARP
+        else:
+            log.logger(
+                "warning",
+                "You need to be root in order to run arp scan.\n"
+                + "Changed scan mode to Ping Scan.",
+            )
+    elif args.scan_type is None or args.scan_type == "":
+        if is_root():
+            scantype = ScanType.ARP
+
+    return scantype
+
+
+def InitArgsTarget(args, log):
+    if args.target:
+        target = args.target
+    else:
+        if args.host_file:
+            # read targets from host file and insert all of them into an array
+            try:
+                with open(args.host_file, "r", encoding="utf-8-sig") as target_file:
+                    target = [line.strip() for line in target_file.read().splitlines()
+                              if line.strip() and not line.lstrip().startswith("#")]
+            except FileNotFoundError:
+                log.logger("error", "Host file not found!")
+            except PermissionError:
+                log.logger("error", "Permission denied while trying to read host file!")
+            except Exception:
+                log.logger("error", "Unknown error while trying to read host file!")
+            else:
+                if not target:
+                    log.logger("error", "Host file contains no targets!")
+                    raise SystemExit(1)
+                return target
+
+            # An explicitly requested host list must not silently turn into a
+            # scan of an automatically detected network after a read failure.
+            raise SystemExit(1)
+        else:
+            if DontAskForConfirmation:
+                try:
+                    target = DetectIPRange()
+                except Exception as e:
+                    log.logger("error", e)
+                    target = input("Enter target range to scan : ")
+            else:
+                try:
+                    target = input("Enter target range to scan : ")
+                except KeyboardInterrupt:
+                    raise SystemExit("Ctrl+C pressed. Exiting.") from None
+
+    return target
+
+
+def InitArgsMode(args, log) -> ScanMode:
+    scanmode = ScanMode.Normal
+
+    if args.mode == "evade":
+        if is_root():
+            scanmode = ScanMode.Evade
+            log.logger("info", "Evasion mode enabled!")
+        else:
+            log.logger(
+                "error",
+                "You must be root to use evasion mode!"
+                + " Switching back to normal mode ...",
+            )
+    elif args.mode == "noise":
+        scanmode = ScanMode.Noise
+        log.logger("info", "Noise mode enabled!")
+
+    return scanmode
+
+
+def InitReport(args, log) -> tuple:
+    if not args.report:
+        return ReportType.NONE, None
+
+    if args.report == "email":
+        Method = ReportType.EMAIL
+        if args.report_email:
+            ReportEmail = args.report_email
+        else:
+            ReportEmail = input("Enter your email address : ")
+
+        if args.report_email_password:
+            ReportMailPassword = args.report_email_password
+        elif (ReportMailPassword := _credential_file(SMTP_PASSWORD, log)) is None:
+            ReportMailPassword = input("Enter your email password : ")
+
+        if args.report_email_to:
+            ReportMailTo = args.report_email_to
+        else:
+            ReportMailTo = input("Enter the email address to send the report to : ")
+
+        if args.report_email_from:
+            ReportMailFrom = args.report_email_from
+        else:
+            ReportMailFrom = ReportEmail
+
+        if args.report_email_server:
+            ReportMailServer = args.report_email_server
+        else:
+            ReportMailServer = input(
+                "Enter the email server to send the report from : "
+            )
+            if ReportMailServer == "smtp.gmail.com":
+                log.logger(
+                    "warning", "Google no longer supports sending mails via SMTP."
+                )
+                return ReportType.NONE, None
+
+        if args.report_email_server_port:
+            ReportMailPort = args.report_email_server_port
+        else:
+            while True:
+                ReportMailPort = input(
+                    "Enter the email port to send the report from : "
+                )
+                try:
+                    int(ReportMailPort)
+                    break
+                except ValueError:
+                    log.logger("error", "Invalid port number!")
+
+        EmailObj = ReportMail(
+            ReportEmail,
+            ReportMailPassword,
+            ReportMailTo,
+            ReportMailFrom,
+            ReportMailServer,
+            int(ReportMailPort),
+        )
+
+        return Method, EmailObj
+
+    elif args.report == "webhook":
+        Method = ReportType.WEBHOOK
+        if args.report_webhook:
+            Webhook = args.report_webhook
+        elif (Webhook := _credential_file(WEBHOOK_URL, log)) is None:
+            Webhook = input("Enter your webhook URL : ")
+
+        return Method, Webhook
+
+
+def Confirmation(message) -> bool:
+    if DontAskForConfirmation:
+        return True
+
+    while True:
+        answer = input(message).strip().lower()
+        if answer in ("", "y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print("Please answer y or n.")
+
+
+def UserConfirmation(args) -> tuple[bool, bool, bool]:
+    portscan = Confirmation("Do you want to scan ports? [Y/n] : ")
+    if not portscan:
+        return False, False, False
+
+    vulnscan = Confirmation("Do you want to scan for vulnerabilities? [Y/n] : ")
+    if not vulnscan:
+        return True, False, False
+
+    if args.skip_exploit_download or getattr(args, "offline", False) is True or getattr(args, "vulnerability_source", None) == "offline":
+        return True, True, False
+    else:
+        downloadexploits = Confirmation("Do you want to download exploits? [Y/n] : ")
+
+    return portscan, vulnscan, downloadexploits
+
+
+def WebScan() -> bool:
+    return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
+
+
+class NoHostsFound(SystemExit):
+    """Discovery found nothing to scan. Uncaught it still ends the run with the message and status 1; the
+    daemon loop catches it to wait for its next round instead of exiting."""
+
+
+def GetHostsToScan(hosts, console) -> list[str]:
+    if len(hosts) == 0:
+        raise NoHostsFound(
+            "No hosts found! {time} - Scan completed.".format(
+                time=datetime.now().strftime("%b %d %Y %H:%M:%S")
+            )
+        )
+
+    index = 0
+    for host in hosts:
+        if not len(host) % 2 == 0:
+            host += " "
+
+        msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
+
+        console.print(msg, justify="center")
+
+        index += 1
+
+    if DontAskForConfirmation:
+        return hosts
+
+    console.print(
+        "\n[yellow]Enter the index number of the "
+        + "host you would like to enumurate further.\n"
+        + "Enter 'all' to enumurate all hosts.\n"
+        + "Enter 'exit' to exit [/yellow]"
+    )
+
+    while True:
+        host = input("────> ")
+        Targets = hosts
+
+        if host in hosts:
+            Targets = [host]
+            break
+        else:
+            if host == "all" or host == "":
+                break
+            elif host == "exit":
+                raise SystemExit(
+                    "{time} - Scan completed.".format(
+                        time=datetime.now().strftime("%b %d %Y %H:%M:%S")
+                    )
+                )
+            else:
+                try:
+                    index = int(host)
+                except ValueError:
+                    console.print(
+                        "Please enter a valid host number or 'all' " + "or 'exit'",
+                        style="red",
+                    )
+                    continue
+                if 0 <= index < len(hosts):
+                    Targets = [hosts[index]]
+                    break
+                else:
+                    console.print(
+                        "Please enter a valid host number or 'all' " + "or 'exit'",
+                        style="red",
+                    )
+
+    return Targets
+
+
+def InitArgsConf(args, log) -> None:
+    if not args.config:
+        return
+
+    try:
+        # Secrets, paths, Nmap flags and webhook URLs are case sensitive and may
+        # contain literal percent signs. Only enum values should be normalized.
+        config = ConfigParser(interpolation=None)
+        if not config.read(args.config, encoding="utf-8-sig"):
+            raise FileNotFoundError(args.config)
+
+        options = {
+            "AUTOPWN": [
+                ("scan_interval", "scan_interval", "int"),
+                ("target", "target", "text"),
+                ("hostfile", "host_file", "text"),
+                ("scantype", "scan_type", "lower"),
+                ("scan_type", "scan_type", "lower"),
+                ("nmapflags", "nmap_flags", "text"),
+                ("speed", "speed", "int"),
+                ("apikey", "api", "text"),
+                ("auto", "yes_please", "bool"),
+                ("skip_exploit_download", "skip_exploit_download", "bool"),
+                ("skip_discovery", "skip_discovery", "bool"),
+                ("offline", "offline", "bool"),
+                ("insecure_tls", "insecure_tls", "bool"),
+                ("vulnerability_source", "vulnerability_source", "lower"),
+                ("vuln_db", "vuln_db", "text"),
+                ("mode", "mode", "lower"),
+                ("noisetimeout", "noise_timeout", "int"),
+                ("host_timeout", "host_timeout", "int"),
+                ("output_folder", "output_folder", "text"),
+                ("output_type", "output_type", "lower"),
+            ],
+            "REPORT": [
+                ("output", "output", "text"),
+                ("outputtype", "output_type", "lower"),
+                ("outputfolder", "output_folder", "text"),
+                ("method", "report", "lower"),
+                ("email", "report_email", "text"),
+                ("email_password", "report_email_password", "text"),
+                ("email_to", "report_email_to", "text"),
+                ("email_from", "report_email_from", "text"),
+                ("email_server", "report_email_server", "text"),
+                ("email_port", "report_email_server_port", "int"),
+                ("webhook", "report_webhook", "text"),
+            ],
+            "WEBUI": [
+                ("enabled", "web", "bool"),
+                ("host", "web_host", "text"),
+                ("port", "web_port", "int"),
+            ],
+        }
+        for section, entries in options.items():
+            for option, attribute, kind in entries:
+                if not config.has_option(section, option):
+                    continue
+                if kind == "bool":
+                    value = config.getboolean(section, option)
+                elif kind == "int":
+                    value = config.getint(section, option)
+                else:
+                    value = config.get(section, option)
+                    if kind == "lower":
+                        value = value.strip().lower()
+                if attribute == "speed" and value not in range(6):
+                    raise ValueError("speed must be between 0 and 5")
+                if attribute in ("scan_interval", "host_timeout", "noise_timeout") and value < 0:
+                    raise ValueError(f"{option} must not be negative")
+                if attribute in ("report_email_server_port", "web_port") and not 1 <= value <= 65535:
+                    raise ValueError(f"{option} must be between 1 and 65535")
+                choices = {
+                    "scan_type": ("", "arp", "ping"),
+                    "mode": ("normal", "noise", "evade"),
+                    "output_type": ("html", "txt", "svg"),
+                    "report": ("", "none", "email", "webhook"),
+                    "vulnerability_source": ("auto", "online", "offline"),
+                }
+                if attribute in choices and value not in choices[attribute]:
+                    raise ValueError(f"Invalid value for {section}.{option}")
+                if attribute == "report" and value in ("", "none"):
+                    value = None
+                setattr(args, attribute, value)
+
+    except FileNotFoundError:
+        log.logger("error", "Config file not found!")
+        raise SystemExit(1) from None
+    except PermissionError:
+        log.logger("error", "Permission denied while trying to read config file!")
+        raise SystemExit(1) from None
+    except (ConfigError, ValueError) as error:
+        log.logger("error", f"Invalid config file: {error}")
+        raise SystemExit(1) from error
+
+
+def install_nmap_linux(log) -> None:
+    distro_ = distro.id().lower()
+    try:
+        if distro_ in [
+            "ubuntu",
+            "debian",
+            "linuxmint",
+            "raspbian",
+            "kali",
+            "parrot",
+        ]:
+            check_call(
+                ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"],
+                stderr=DEVNULL,
+                env=child_environment(),
+            )
+        elif distro_ in ["arch", "manjaro"]:
+            check_call(
+                ["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"],
+                stderr=DEVNULL,
+                env=child_environment(),
+            )
+        elif distro_ in ["fedora", "oracle"]:
+            check_call(
+                ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"],
+                stderr=DEVNULL,
+                env=child_environment(),
+            )
+        elif distro_ in ["rhel", "centos"]:
+            check_call(
+                ["/usr/bin/sudo", "yum", "install", "nmap", "-y"],
+                stderr=DEVNULL,
+                env=child_environment(),
+            )
+        elif distro_ in ["sles", "opensuse"]:
+            check_call(
+                ["/usr/bin/sudo", "zypper", "install", "nmap", "--non-interactive"],
+                stderr=DEVNULL,
+                env=child_environment(),
+            )
+        else:
+            raise CalledProcessError(1, "cmd")
+
+    except FileNotFoundError:
+        log.logger("error", "Couldn't install nmap (Linux): /usr/bin/sudo was not found.")
+        raise SystemExit(1) from None
+    except CalledProcessError:
+        if DontAskForConfirmation:
+            log.logger("error", "Couldn't install nmap (Linux)")
+            raise SystemExit(1) from None
+        _distro_choice_ = input(
+            "Cannot recognize the needed package manager for your "
+            + f"system that seems to be running in: {distro_} and "
+            + f"{sys_platform}, {platform()}, kindly select the "
+            + "correct package manager below to proceed to the "
+            + "installation, else, select, n.\n\t0 Abort installation\n"
+            + "\t1 apt-get\n\t2 dnf\n\t3 yum\n\t4 pacman\n\t5 zypper."
+            + "\nSelect option [0-5] >"
+        )
+        pkg_cmds = {
+            "1": ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"],
+            "2": ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"],
+            "3": ["/usr/bin/sudo", "yum", "install", "nmap", "-y"],
+            "4": ["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"],
+            "5": ["/usr/bin/sudo", "zypper", "install", "nmap", "--non-interactive"],
+        }
+        if _distro_choice_ in pkg_cmds:
+            try:
+                check_call(pkg_cmds[_distro_choice_], stderr=DEVNULL, env=child_environment())
+            except (CalledProcessError, FileNotFoundError):
+                log.logger("error", "Couldn't install nmap (Linux)")
+                raise SystemExit(1) from None
+        else:
+            log.logger("error", "Couldn't install nmap (Linux)")
+            raise SystemExit(1) from None
+
+
+def install_nmap_windows(log) -> None:
+    try:
+        check_call(
+            [
+                "C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\powershell.exe",
+                "winget",
+                "install",
+                "nmap",
+                "--silent",
+            ],
+            stderr=DEVNULL,
+        )
+        log.logger("warning", "Nmap is installed but shell restart is required.")
+        raise SystemExit
+    except CalledProcessError:
+        log.logger("error", "Couldn't install nmap! (Windows)")
+        raise SystemExit(1) from None
+
+
+def install_nmap_mac(log) -> None:
+    try:
+        # Homebrew refuses to run as root, so it must not be started through sudo.
+        check_call(["brew", "install", "nmap"], stderr=DEVNULL)
+    except (CalledProcessError, FileNotFoundError):
+        log.logger("error", "Couldn't install nmap! (Mac)")
+        raise SystemExit(1) from None
+
+
+def check_nmap(log, *, offline=False) -> None:
+    try:
+        check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL, env=child_environment())
+    except (CalledProcessError, FileNotFoundError):
+        log.logger("warning", "Nmap is not installed.")
+        if offline:
+            raise SystemExit("Nmap must be installed before using offline mode.") from None
+        if Confirmation(f"Install Nmap on your system ({system()})? [Y/n] : "):
+            platform_ = system().lower()
+            if platform_ == "linux":
+                install_nmap_linux(log)
+            elif platform_ == "windows":
+                install_nmap_windows(log)
+            elif platform_ == "darwin":
+                install_nmap_mac(log)
+            else:
+                raise SystemExit("Unknown OS! Auto installation not supported!") from None
+        else:
+            log.logger("error", "Denied permission to install Nmap.")
+            raise SystemExit(1) from None
+
+
+def ParamPrint(
+    args,
+    targetarg: str,
+    scantype_name: ScanType,
+    scanmode_name: ScanMode,
+    apiKey: str,
+    console,
+    log,
+) -> None:
+
+    if not is_root():
+        log.logger(
+            "warning",
+            "It is recommended to run this script as root"
+            + " since it is more silent and accurate.",
+        )
+
+    term_width = get_terminal_width()
+
+    msg = (
+        "\n┌─[ Scanning with the following parameters ]\n"
+        + "├"
+        + "─" * (term_width - 1)
+        + "\n"
+        + f"│\tTarget : {[redact_target(item) for item in targetarg] if isinstance(targetarg, list) else redact_target(targetarg)}\n"
+        + f"│\t{'Output file' if args.output else 'Output folder'} : [yellow]{args.output if args.output else args.output_folder}[/yellow]\n"
+        + f"│\tAPI Key : {type(apiKey) is str}\n"
+        + f"│\tAutomatic : {DontAskForConfirmation}\n"
+    )
+
+    if args.skip_discovery:
+        msg += "│\tSkip discovery: True\n"
+
+    if args.host_file:
+        msg += f"│\tHostfile: {args.host_file}\n"
+
+    if not args.host_timeout == 240:
+        msg += f"│\tHost timeout: {args.host_timeout}\n"
+
+    if scanmode_name == ScanMode.Normal:
+        msg += (
+            f"│\tScan type : [red]{scantype_name.name}[/red]\n"
+            + f"│\tScan speed : {args.speed}\n"
+        )
+    elif scanmode_name == ScanMode.Evade:
+        msg += (
+            f"│\tScan mode : {scanmode_name.name}\n"
+            + f"│\tScan type : [red]{scantype_name.name}[/red]\n"
+            + f"│\tScan speed : {args.speed}\n"
+        )
+    elif scanmode_name == ScanMode.Noise:
+        msg += f"│\tScan mode : {scanmode_name.name}\n"
+
+    if args.nmap_flags is not None and args.nmap_flags != "":
+        msg += f"│\tNmap flags : [blue]{args.nmap_flags}[/blue]\n"
+
+    if args.report:
+        msg += f"│\tReporting method : {args.report}\n"
+
+    msg += "└" + "─" * (term_width - 1)
+
+    console.print(msg)
+
+
+def CheckConnection(log) -> bool:
+    try:
+        get("https://google.com", timeout=10)
+    except Exception as e:
+        log.logger("error", "Connection failed.")
+        log.logger("error", e)
+        return False
+    else:
+        return True
+
+
+
+
+def _report_name(target) -> str:
+    """The target as a file name every platform accepts; Windows refuses `*`, `?` and `:` (a colon names a data stream).
+    The query values of a URL are redacted first: the name is printed in the report and stays on disk."""
+    return "multihost" if isinstance(target, list) else sub(r"[^A-Za-z0-9._-]", "_", redact_target(target))[:100]
+
+
+def SaveOutput(console, out_type, output_file, output_folder, target) -> None:
+    if output_file:
+        # User provided a path, use it directly
+        full_path = output_file
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(full_path) or '.', exist_ok=True)
+    elif output_folder:
+        os.makedirs(output_folder, exist_ok=True)
+        full_path = os.path.join(output_folder, f"{datetime.now().strftime('%Y-%m-%d')}_{_report_name(target)}")
+    else:
+        # No path provided, create a default one in the 'outputs' directory
+        output_dir = "outputs"
+        os.makedirs(output_dir, exist_ok=True)
+        full_path = os.path.join(output_dir, f"{datetime.now().strftime('%Y-%m-%d')}_{_report_name(target)}")
+
+    # Ensure the file has the correct extension
+    if not full_path.endswith(f".{out_type}"):
+        full_path += f".{out_type}"
+
+    if out_type == "html":
+        console.save_html(full_path)
+    elif out_type == "svg":
+        console.save_svg(full_path)
+    elif out_type == "txt":
+        console.save_text(full_path)
+
+    console.print(f"Report saved to [cyan]{full_path}[/cyan]")
+
+
+
+def get_terminal_width() -> int:
+    try:
+        width, _ = get_terminal_size()
+    except OSError:
+        width = 80
+
+    if system().lower() == "windows":
+        width -= 1
+
+    return width

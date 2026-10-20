@@ -19,6 +19,8 @@ TAG = re.compile(r"v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[
 IMAGE = re.compile(r"docker\.io/[a-z0-9]+(?:[._-][a-z0-9]+)*/autopwn-suite")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 OFFICIAL_IMAGE = "docker.io/gamehunterkaan/autopwn-suite"
+# Standalone binaries: target name -> executable suffix.
+BINARY_TARGETS = {"linux-amd64": "", "linux-arm64": "", "windows-amd64": ".exe", "macos-arm64": ""}
 
 
 def image_index(tag, output):
@@ -105,7 +107,15 @@ def release_commit(repo, tag, reviewed_ref="refs/remotes/origin/main"):
     version = re.search(r'^version\s*=\s*"([^"]+)"', source, re.MULTILINE)
     if not version or version[1] != tag[1:]:
         raise ValueError("Release tag does not match the source package version")
-    runtime = git(repo, "show", f"{commit}:autopwn.py")
+    # Releases before 2.7.0 kept the runtime version in autopwn.py.
+    for runtime_path in ("autopwn_suite/__init__.py", "autopwn.py"):
+        try:
+            runtime = git(repo, "show", f"{commit}:{runtime_path}")
+            break
+        except subprocess.CalledProcessError:
+            continue
+    else:
+        raise ValueError("Release source has no runtime version file")
     runtime_versions = re.findall(r'^\s*__version__\s*=\s*"([^"]+)"', runtime, re.MULTILINE)
     if runtime_versions != [tag[1:]]:
         raise ValueError("Release tag does not match the runtime version")
@@ -151,7 +161,28 @@ def prepare(repo, tag, output, changelog, reviewed_ref="refs/remotes/origin/main
     return commit
 
 
-def write_manifest(repo, tag, output, image, digest, reviewed_ref="refs/remotes/origin/main", *, backfill=False):
+def binary_names(tag):
+    return [f"autopwn-suite-{tag}-{target}{suffix}" for target, suffix in BINARY_TARGETS.items()]
+
+
+def binary_sbom_names(tag):
+    return [f"autopwn-suite-{tag}-binary-{target}.cdx.json" for target in BINARY_TARGETS]
+
+
+def write_checksums(output, names):
+    """SHA256SUMS in the format `sha256sum -c` reads, for files published next to it."""
+    lines = []
+    for name in sorted(names):
+        path = output / name
+        if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
+            raise ValueError("Unexpected or missing release staging assets")
+        lines.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {name}\n")
+    (output / "SHA256SUMS").write_text("".join(lines), encoding="utf-8", newline="\n")
+
+
+def write_manifest(repo, tag, output, image, digest, reviewed_ref="refs/remotes/origin/main", *, backfill=False, binaries=False):
+    if backfill and binaries:
+        raise ValueError("Backfill never rebuilds standalone binaries")
     commit = release_commit(repo, tag, reviewed_ref)
     if not IMAGE.fullmatch(image) or not DIGEST.fullmatch(digest):
         raise ValueError("Expected an official Docker Hub image and a SHA-256 digest")
@@ -163,6 +194,11 @@ def write_manifest(repo, tag, output, image, digest, reviewed_ref="refs/remotes/
         if not re.fullmatch(rf"autopwn-suite-{re.escape(tag)}-[a-zA-Z0-9][a-zA-Z0-9._-]*\.openvex\.json", name):
             raise ValueError("Invalid versioned VEX filename")
     names += [vex_index, *index["documents"]]
+    if binaries:
+        names += [*binary_names(tag), *binary_sbom_names(tag), "SHA256SUMS"]
+        if not all((output / name).is_file() for name in binary_sbom_names(tag)):
+            raise ValueError("Unexpected or missing release staging assets")
+        write_checksums(output, binary_names(tag))
     records = []
     if backfill:
         if image != OFFICIAL_IMAGE:
@@ -194,6 +230,14 @@ def write_manifest(repo, tag, output, image, digest, reviewed_ref="refs/remotes/
         package_names = {component.get("name") for component in sbom["components"]}
         if not {"nmap", "requests"}.issubset(package_names):
             raise ValueError("Image SBOM must include native and Python runtime dependencies")
+    if binaries:
+        for name in binary_sbom_names(tag):
+            sbom = json.loads((output / name).read_text(encoding="utf-8"))
+            if sbom.get("bomFormat") != "CycloneDX" or not sbom.get("components"):
+                raise ValueError("Every standalone binary requires a nonempty CycloneDX SBOM")
+            package_names = {str(component.get("name")).lower() for component in sbom["components"]}
+            if not {"flask", "requests", "cpython"}.issubset(package_names):
+                raise ValueError("Binary SBOMs must include the bundled Python runtime dependencies and interpreter")
     assets = []
     for name in names:
         path = output / name
@@ -205,15 +249,16 @@ def write_manifest(repo, tag, output, image, digest, reviewed_ref="refs/remotes/
     if backfill:
         manifest["publication"] = {"purpose": "authenticity_backfill", "security_clearance": False,
                                    "rebuilt": False, "platforms": records}
-    manifest["assets"], manifest["supporting_archive"] = bundle_supporting(output, tag, assets)
+    standalone = [*binary_names(tag), "SHA256SUMS"] if binaries else []
+    manifest["assets"], manifest["supporting_archive"] = bundle_supporting(output, tag, assets, standalone)
     (output / "release-manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     return manifest
 
 
-def bundle_supporting(output, tag, assets):
-    """Keep source downloads separate and bind every supporting file in one ZIP."""
-    sources = {f"autopwn-suite-{tag}.tar.gz", f"autopwn-suite-{tag}.zip"}
+def bundle_supporting(output, tag, assets, standalone=()):
+    """Keep source downloads (and any other standalone files) separate; bind every supporting file in one ZIP."""
+    sources = {f"autopwn-suite-{tag}.tar.gz", f"autopwn-suite-{tag}.zip", *standalone}
     supporting = sorted((asset for asset in assets if asset["name"] not in sources),
                         key=lambda asset: asset["name"])
     name = f"autopwn-suite-{tag}-security.zip"
@@ -236,9 +281,27 @@ def bundle_supporting(output, tag, assets):
     return published, {"name": name, "files": supporting}
 
 
+def pypi_files(tag):
+    """File names `python -m build` writes for a tag: they carry the PEP 440 form of the version (v2.8.0-rc.1 builds 2.8.0rc1)."""
+    if not TAG.fullmatch(tag):
+        raise ValueError("Expected a version tag")
+    # Only the PyPI build job has `packaging`; release validation runs on the runner's bare interpreter.
+    from packaging.version import Version
+    version = Version(tag[1:])
+    return [f"autopwn_suite-{version}-py3-none-any.whl", f"autopwn_suite-{version}.tar.gz"]
+
+
+def check_pypi_dist(tag, output):
+    """The build directory holds exactly the wheel and the source distribution of this release."""
+    expected = pypi_files(tag)
+    if sorted(path.name for path in output.iterdir()) != sorted(expected):
+        raise ValueError("Unexpected or missing PyPI distribution files")
+    return expected
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("prepare", "manifest", "image-index", "platform-digest", "backfill-record"))
+    parser.add_argument("mode", choices=("prepare", "manifest", "image-index", "platform-digest", "backfill-record", "pypi-dist"))
     parser.add_argument("--tag", required=True)
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--output", type=Path, required=True)
@@ -248,6 +311,7 @@ def main():
     parser.add_argument("--arch", choices=("amd64", "arm64"))
     parser.add_argument("--image-config", type=Path)
     parser.add_argument("--backfill", action="store_true")
+    parser.add_argument("--binaries", action="store_true", help="bind the standalone binaries, their checksums and SBOM")
     args = parser.parse_args()
     if not TAG.fullmatch(args.tag):
         parser.error("Expected a version tag such as v2.6.0")
@@ -263,10 +327,12 @@ def main():
         if not args.arch or not args.image_config:
             parser.error("backfill-record requires --arch and --image-config")
         backfill_record(args.repo, args.tag, args.output, args.arch, args.image_config)
+    elif args.mode == "pypi-dist":
+        print("\n".join(check_pypi_dist(args.tag, args.output)))
     else:
         if not args.image or not args.digest:
             parser.error("manifest requires --image and --digest")
-        write_manifest(args.repo, args.tag, args.output, args.image, args.digest, backfill=args.backfill)
+        write_manifest(args.repo, args.tag, args.output, args.image, args.digest, backfill=args.backfill, binaries=args.binaries)
 
 
 if __name__ == "__main__":

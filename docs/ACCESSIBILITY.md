@@ -3,7 +3,7 @@
 This document states what accessibility support the web dashboard and the project
 documentation actually provide, lists known gaps, and sets requirements for
 contributors. It is based on a manual review of the dashboard source in
-`modules/web_ui_static/` on 2026-10-16. **The project makes no claim of conformance
+`autopwn_suite/web_ui_static/` on 2026-10-16. **The project makes no claim of conformance
 with WCAG 2.x or any other accessibility standard**, and no automated or assistive-
 technology audit has been performed. The CLI, Python API and REST API need no visual
 interface and are usable from a terminal or screen reader as text.
@@ -12,7 +12,7 @@ interface and are usable from a terminal or screen reader as text.
 
 | Surface | Notes |
 | --- | --- |
-| CLI (`autopwn.py`) | Text output through `rich`. Colors are used for emphasis; the text itself carries the meaning. Scan results can be exported as JSON/HTML/text reports. |
+| CLI (`autopwn-suite`) | Text output through `rich`. Colors are used for emphasis; the text itself carries the meaning. Scan results can be exported as JSON/HTML/text reports. |
 | Web dashboard (`index.html`, `app.js`, `web_security.js`, `styles.css`) | Single-page application with a left scan form, a main tabbed area and a right detail panel. Dark theme only. |
 | Sign-in page (`login.html`, `login.css`, `login.js`) | A small separate form page. |
 | Documentation (`README.md`, `docs/*.md`, `.github/*.md`) | Markdown rendered by GitHub, which provides headings, links and responsive layout. |
@@ -32,14 +32,20 @@ Only features that exist in the source are listed.
   in browsers. Dialogs are labelled through `aria-labelledby`, and their close
   buttons have `aria-label`.
 - Scan progress bars expose `role="progressbar"` with `aria-valuemin`, `aria-valuemax`,
-  `aria-valuenow`, `aria-valuetext` and an `aria-label`.
+  `aria-valuenow`, `aria-valuetext` and an `aria-label`. Live progress updates leave the
+  buttons of a scan card (Stop, Resume, Export) in place, so keyboard focus on one of them
+  survives an update.
+- Toast messages (confirmations and errors) are announced through a polite live region
+  (`role="status"`, `aria-live="polite"`) that is in `index.html` before the first message.
 - The Web Security page uses real `<button>` elements for finding rows and
   detail tabs, with a visible `:focus-visible` outline (2 px accent color) and an
   `aria-label` for the tab group.
 - Primary body text on the dashboard background is high contrast (about 14:1 for
   the main text color).
 - Layout adapts at 1100 px and 760 px widths and the page scrolls on narrow
-  screens; the viewport zoom is not disabled.
+  screens; below 760 px the host detail panel moves under the main area (selecting
+  a host scrolls it into view) instead of being hidden. The viewport zoom is not
+  disabled.
 - A `.sr-only` utility class exists for visually hidden text.
 - Many form fields in Settings and Web controls use `<label for>`; boolean options use
   checkboxes, and one switch has `role="switch"`.
@@ -56,7 +62,7 @@ contributors at any time.
 | High | Most scan-form fields use a `<div class="fl">` caption instead of a `<label>`, so screen readers do not announce a name for them (the file has far fewer `<label>` elements than `<input>`/`<select>` controls). | `index.html` scan form | Associate each caption with its control using `<label for>` or `aria-labelledby`. |
 | High | Text input, select and textarea focus is shown only by a border-color change after `outline:none`; the focus color against its background is about 4:1 and the unfocused border is nearly invisible. Buttons, toggles and tabs lack a custom focus indicator. | `styles.css` | Restore a high-contrast `:focus-visible` outline for all interactive elements. |
 | High | Secondary text colors fail contrast: the "muted" tab, caption and footer color (`--text3`) is about 2.8:1 to 2.9:1 on the panel backgrounds, below the 4.5:1 normal-text minimum. Many labels are 10-11 px uppercase monospace. | `styles.css` | Raise muted text contrast to at least 4.5:1 and avoid text smaller than about 12 px. |
-| Medium | Live scan output and toast messages are not in `aria-live` regions, so progress changes, errors and completed scans are not announced. | `app.js` (`toast`, terminal view, scan cards) | Add polite live regions for status, errors and completion (avoid announcing every terminal line). |
+| Medium | Live scan output is not in an `aria-live` region, so scan progress changes and completed scans are not announced (toast messages are, see above). | `app.js` (terminal view, scan cards) | Add polite live regions for scan status and completion (avoid announcing every terminal line). |
 | Medium | Status is communicated mostly by color (severity, scan state pills, progress). Text labels exist for many but not all states. | `styles.css`, `app.js` | Ensure every color-coded state has a text or icon equivalent. |
 | Medium | No skip link, and keyboard focus order across the three-panel layout has not been tested. | `index.html` | Add a skip-to-main link; verify tab order. |
 | Medium | Icon-only links in the left footer use the `title` attribute only; the dashboard logo SVG and some decorative icons have no text alternative or `aria-hidden`. Links with `target="_blank"` do not warn that they open a new window. | `index.html` | Provide accessible names and mark decorative SVGs `aria-hidden`. |

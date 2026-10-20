@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules import nmap_progress as monitored
+from autopwn_suite import nmap_progress as monitored
 
 XML = b'''<?xml version="1.0"?>
 <nmaprun>
@@ -132,6 +132,70 @@ def test_xml_redirection_cannot_replace_the_managed_output(fake_spawn):
     spawn.assert_not_called()
 
 
+@pytest.mark.parametrize("flags", [
+    "-oX out.xml", "--oX out.xml", "-oA base", "--oA base", "-oXout.xml", "-oAbase", "--resume scan.log",
+    "--resu=scan.log", "--resum scan.log", "-resume scan.log", "--append-output", "--append_output", "--app", "-appe",
+    "-sV --oX -",
+])
+def test_every_spelling_of_the_managed_output_options_is_refused(fake_spawn, flags):
+    """getopt_long_only accepts "--oX" and unique abbreviations, so the guard cannot match one spelling."""
+    spawn, _ = fake_spawn
+    with pytest.raises(ValueError, match="redirected"):
+        monitored.scan_with_progress(scanner(), "192.0.2.1", flags, MagicMock())
+    spawn.assert_not_called()
+
+
+@pytest.mark.parametrize("flags", ["-oN notes.txt", "-oG notes.gnmap", "-iL targets.txt", "--exclude 192.0.2.9",
+                                   "--open --osscan-limit", "--version-intensity 5 -r", "--data 41 --datadir /opt/nmap"])
+def test_trusted_operator_flags_that_leave_the_managed_output_alone_still_run(fake_spawn, flags):
+    spawn, _ = fake_spawn
+    monitored.scan_with_progress(scanner(), "192.0.2.1", flags, None)
+    assert spawn.call_args.args[0][:3] == ["C:/Program Files/Nmap/nmap.exe", "-oX", "-"]
+
+
+@pytest.mark.parametrize("flag", [
+    "-oN", "-oNout.txt", "--oN", "-oG", "--oG", "-oS", "-oM", "-oX", "--oX", "-oA", "--oA", "-o", "-ox", "--o",
+    "-6o", "-Rno", "-Fo", "-6iL", "-i", "-iL", "--iL", "-iLhosts", "-6i", "--excludefile", "--excludef=hosts",
+    "--datadir", "--datad=/tmp", "--servicedb=x", "--serv=x", "--versiondb", "--versiond=x", "--stylesheet=x.xsl",
+    "--styl=x.xsl", "--resume", "--resu", "--append-output", "--appe", "-m", "-m=x", "-mout", "-6m", "-nm",
+    "-max-retries",  # documented over-match: a single-dash long option that starts like -m, -o or -i cannot be told from a cluster
+])
+def test_file_options_are_recognised_by_name(flag):
+    assert monitored.uses_files(flag)
+
+
+@pytest.mark.parametrize("flag", [
+    "-sS", "-sV", "-sn", "-O", "-A", "-n", "-r", "-R", "-F", "-6", "-ff", "-v", "-vv", "-d", "-dd", "-T4", "-Pn",
+    "-PS22,80", "-p", "-p-", "-e", "-g", "-S", "-D", "RND:10", "22,80", "192.0.2.1", "out.txt", "-", "--",
+    "--open", "--osscan-limit", "--osscan-guess", "-open", "--exclude", "--exclude=192.0.2.9", "--data", "--data-length",
+    "--data-string", "--version", "--version-intensity", "--script=default", "--script-args=a=b", "--top-ports",
+    "--host-timeout", "--stats-every", "--no-stylesheet", "--min-rate=100", "--reason", "--traceroute", "--iflist",
+    "-iR", "--iR", "--system-dns", "--dns-servers", "--max-retries", "--mtu", "--min-rate", "--max-rtt-timeout", "--min-parallelism", "-M",
+])
+def test_ordinary_scan_options_are_not_file_options(flag):
+    assert not monitored.uses_files(flag)
+
+
+@pytest.mark.parametrize("hosts", ["2001:db8::10", "2001:db8::/120", "::1", "fe80::1%eth0",
+                                   ["2001:db8::1", "2001:db8::2"], "2001:db8::1 2001:db8::2"])
+def test_ipv6_targets_get_the_option_nmap_needs_to_scan_them(fake_spawn, hosts):
+    """Without -6 Nmap skips an IPv6 target and exits 0 with no hosts, which looks like an offline host."""
+    spawn, _ = fake_spawn
+    monitored.scan_with_progress(scanner(), hosts, "-sn -n", None)
+    assert spawn.call_args.args[0].count("-6") == 1
+
+
+@pytest.mark.parametrize("hosts,flags", [
+    ("192.0.2.1", "-sn"), ("192.0.2.0/24", "-sn"), ("example.test", "-sn"),
+    (["2001:db8::1", "192.0.2.1"], "-sn"),  # one Nmap run cannot scan both families, so neither is forced
+    ("2001:db8::1", "-6 -sn"),
+])
+def test_dash_six_is_not_added_unless_every_target_is_ipv6_and_it_is_not_already_given(fake_spawn, hosts, flags):
+    spawn, _ = fake_spawn
+    monitored.scan_with_progress(scanner(), hosts, flags, None)
+    assert spawn.call_args.args[0].count("-6") == (1 if "-6" in flags else 0)
+
+
 def test_reader_error_still_drains_and_reaps_child(fake_spawn):
     _, process = fake_spawn
     callback = MagicMock(side_effect=RuntimeError("callback failed"))
@@ -176,7 +240,7 @@ def test_stderr_is_preserved_for_the_xml_parser(fake_spawn):
 
 
 def test_streaming_preserves_host_and_service_results(fake_spawn):
-    from modules.nmap_backend import PortScanner
+    from autopwn_suite.nmap_backend import PortScanner
     xml = b'''<nmaprun args="nmap -sV 192.0.2.1">
       <scaninfo type="syn" protocol="tcp" numservices="1" services="22"/>
       <taskprogress task="Service scan" time="2" percent="75.00"/>

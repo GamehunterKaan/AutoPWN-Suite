@@ -6,9 +6,11 @@ import importlib.util
 import os
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -22,28 +24,39 @@ posix_only = pytest.mark.skipif(
 
 # A stand-in interpreter: `python -m venv DIR` creates a fake virtualenv whose
 # activate script defines deactivate() and whose pip only records its arguments,
-# so the test never touches the network or the real system.
+# so the test never touches the network or the real system. The two `-c` checks
+# install.sh makes before it touches anything pass unless FAKE_OLD_PYTHON or
+# FAKE_NO_ENSUREPIP is set; the fake pip fails when FAKE_PIP_FAILS is set and, when
+# FAKE_PIP_HANGS names a file, creates it and waits to be killed.
 FAKE_PYTHON = """#!/usr/bin/env bash
 set -e
+if [ "$1" = "-c" ]; then
+    case "$2" in
+        *version_info*) exit "${FAKE_OLD_PYTHON:-0}" ;;
+        *ensurepip*) exit "${FAKE_NO_ENSUREPIP:-0}" ;;
+    esac
+fi
 [ "$1" = "-m" ] && [ "$2" = "venv" ] || { echo "unexpected: $*" >&2; exit 1; }
 venv="$3"
 mkdir -p "$venv/bin"
 printf '%s\\n' 'export PATH="'"$venv"'/bin:$PATH"' 'deactivate() { :; }' > "$venv/bin/activate"
-printf '%s\\n' '#!/usr/bin/env bash' 'echo "$*" >> "$PIP_LOG"' > "$venv/bin/pip"
+printf '%s\\n' '#!/usr/bin/env bash' 'echo "$*" >> "$PIP_LOG"' \\
+    '[ -z "${FAKE_PIP_HANGS:-}" ] || { touch "$FAKE_PIP_HANGS"; sleep 60; }' '[ -z "${FAKE_PIP_FAILS:-}" ]' > "$venv/bin/pip"
 printf '%s\\n' '#!/usr/bin/env bash' 'exit 0' > "$venv/bin/python"
-chmod +x "$venv/bin/pip" "$venv/bin/python"
+printf '%s\\n' '#!/usr/bin/env bash' 'exit 0' > "$venv/bin/autopwn-suite"
+chmod +x "$venv/bin/pip" "$venv/bin/python" "$venv/bin/autopwn-suite"
 """
 
 
 @pytest.fixture
 def source_tree(tmp_path):
     repo = tmp_path / "repo"
-    (repo / "modules").mkdir(parents=True)
+    (repo / "autopwn_suite").mkdir(parents=True)
     (repo / ".git").mkdir()
     (repo / ".venv").mkdir()
     (repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
     (repo / ".venv" / "marker").write_text("do not copy\n")
-    (repo / "modules" / "tool.py").write_text("print('tool')\n")
+    (repo / "autopwn_suite" / "tool.py").write_text("print('tool')\n")
     (repo / "autopwn.py").write_text("print('autopwn')\n")
     (repo / "requirements.txt").write_text("requests\n")
     (repo / "requirements-locked.txt").write_text("requests==1.0 --hash=sha256:00\n")
@@ -58,12 +71,35 @@ def source_tree(tmp_path):
 
 
 def run_script(repo, script, env_overrides, expect=0, cwd=None):
-    env = {k: v for k, v in os.environ.items() if k not in {"PREFIX", "BINDIR", "APPDIR", "DESTDIR", "PYTHON"}}
+    env = {k: v for k, v in os.environ.items() if k not in {"PREFIX", "BINDIR", "APPDIR", "DESTDIR", "PYTHON", "SYSTEMDDIR"}}
     env.update(env_overrides)
     result = subprocess.run(
         [BASH, str(repo / script)], env=env, capture_output=True, text=True, timeout=120, cwd=cwd)
     assert result.returncode == expect, result.stdout + result.stderr
     return result
+
+
+running_as_root = hasattr(os, "geteuid") and os.geteuid() == 0
+as_normal_user = pytest.mark.skipif(running_as_root, reason="root can write everywhere and never needs sudo")
+
+
+def fake_tools(tmp_path, root=False):
+    """A directory to put first on PATH and the log its tools append to ($TOOL_LOG). `sudo` records its
+    command line and runs nothing. With `root`, `id` reports uid 0, `chown` only records and `chmod` records
+    before it runs, so the root branches of install.sh can be exercised without being root."""
+    tools = tmp_path / "fake-tools"
+    tools.mkdir()
+    scripts = {"sudo": 'echo "sudo $*" >> "$TOOL_LOG"\n'}
+    if root:
+        scripts["id"] = (
+            f'case "$1" in -u) echo 0;; -un|-gn) echo root;; *) exec {shutil.which("id")} "$@";; esac\n')
+        scripts["chown"] = 'echo "chown $*" >> "$TOOL_LOG"\n'
+        # chmod also runs for the fake virtualenv (+x on its scripts), so it records and then does the real thing.
+        scripts["chmod"] = f'echo "chmod $*" >> "$TOOL_LOG"\nexec {shutil.which("chmod")} "$@"\n'
+    for name, body in scripts.items():
+        (tools / name).write_text("#!/usr/bin/env bash\n" + body)
+        (tools / name).chmod(0o755)
+    return tools, tmp_path / "tool.log"
 
 
 @posix_only
@@ -75,34 +111,45 @@ def test_scripts_are_valid_bash():
 
 
 @posix_only
-def test_destdir_stages_every_file_and_wrapper_uses_final_path(source_tree, tmp_path):
+def test_destdir_stages_the_source_and_links_to_the_final_path(source_tree, tmp_path):
     stage = tmp_path / "stage"
     result = run_script(source_tree, "install.sh", {"DESTDIR": str(stage), "PREFIX": "/usr"})
 
     app = stage / "usr/lib/autopwn-suite"
-    wrapper = stage / "usr/bin/autopwn-suite"
-    assert (app / "autopwn.py").is_file()
-    assert (app / "modules/tool.py").is_file()
-    assert not (app / ".git").exists() and not (app / ".venv").exists()
-    assert wrapper.stat().st_mode & 0o755 == 0o755
-
-    text = wrapper.read_text()
-    assert 'REPO_DIR="/usr/lib/autopwn-suite"' in text
-    assert str(stage) not in text
+    command_link = stage / "usr/bin/autopwn-suite"
+    assert (app / "src/autopwn.py").is_file()
+    assert (app / "src/autopwn_suite/tool.py").is_file()
+    assert not (app / "src/.git").exists() and not (app / "src/.venv").exists()
+    assert command_link.is_symlink()
+    assert os.readlink(command_link) == "/usr/lib/autopwn-suite/.venv/bin/autopwn-suite"
     # No venv is created inside DESTDIR; the operator is told how to make it.
     assert "python3 -m venv /usr/lib/autopwn-suite/.venv" in result.stdout
+    assert "pip install --no-deps /usr/lib/autopwn-suite/src" in result.stdout
     # Nothing escaped the staging directory.
     written = {p.relative_to(stage).parts[0] for p in stage.iterdir()}
     assert written == {"usr"}
 
 
 @posix_only
+@pytest.mark.parametrize("destdir", ["pkgroot", "debian/tmp"])
+def test_destdir_inside_the_checkout_is_not_copied_into_itself(source_tree, destdir):
+    # The documented `DESTDIR="$PWD/pkgroot"` and Debian's debian/tmp both sit inside the source tree.
+    stage = source_tree / destdir
+    for _ in range(2):  # the second run stages over the first
+        run_script(source_tree, "install.sh", {"DESTDIR": str(stage), "PREFIX": "/usr"}, cwd=source_tree)
+    staged = stage / "usr/lib/autopwn-suite/src"
+    assert (staged / "autopwn.py").is_file() and (staged / "autopwn_suite/tool.py").is_file()
+    assert not (staged / destdir).exists()
+    assert os.readlink(stage / "usr/bin/autopwn-suite") == "/usr/lib/autopwn-suite/.venv/bin/autopwn-suite"
+
+
+@posix_only
 def test_default_layout_is_unchanged_under_destdir(source_tree, tmp_path):
     stage = tmp_path / "stage"
     run_script(source_tree, "install.sh", {"DESTDIR": str(stage)})
-    assert (stage / "opt/autopwn-suite/autopwn.py").is_file()
-    wrapper = stage / "usr/local/bin/autopwn-suite"
-    assert 'REPO_DIR="/opt/autopwn-suite"' in wrapper.read_text()
+    assert (stage / "opt/autopwn-suite/src/autopwn.py").is_file()
+    command_link = stage / "usr/local/bin/autopwn-suite"
+    assert os.readlink(command_link) == "/opt/autopwn-suite/.venv/bin/autopwn-suite"
 
 
 @posix_only
@@ -111,14 +158,14 @@ def test_bindir_and_appdir_override_prefix(source_tree, tmp_path):
     run_script(
         source_tree, "install.sh",
         {"DESTDIR": str(stage), "PREFIX": "/usr", "BINDIR": "/usr/sbin", "APPDIR": "/srv/ap//"})
-    assert (stage / "srv/ap/autopwn.py").is_file()
-    assert 'REPO_DIR="/srv/ap"' in (stage / "usr/sbin/autopwn-suite").read_text()
+    assert (stage / "srv/ap/src/autopwn.py").is_file()
+    assert os.readlink(stage / "usr/sbin/autopwn-suite") == "/srv/ap/.venv/bin/autopwn-suite"
 
 
 @posix_only
 def test_relative_destdir_is_made_absolute(source_tree, tmp_path):
     run_script(source_tree, "install.sh", {"DESTDIR": "relative-stage"}, cwd=tmp_path)
-    assert (tmp_path / "relative-stage/opt/autopwn-suite/autopwn.py").is_file()
+    assert (tmp_path / "relative-stage/opt/autopwn-suite/src/autopwn.py").is_file()
 
 
 @posix_only
@@ -130,8 +177,13 @@ def test_non_staged_install_creates_venv_without_sudo(source_tree, tmp_path):
     sudo.chmod(0o755)
     pip_log = tmp_path / "pip.log"
     app, bindir = tmp_path / "live/app", tmp_path / "live/bin"
+    # An earlier release left a wrapper script here and the daemon keeps its configuration in the app directory.
+    bindir.mkdir(parents=True)
+    (bindir / "autopwn-suite").write_text("#!/usr/bin/env bash\n")
+    app.mkdir(parents=True)
+    (app / "autopwn-daemon.conf").write_text("[DAEMON]\n")
     env = {
-        "APPDIR": str(app), "BINDIR": str(bindir),
+        "APPDIR": str(app), "BINDIR": str(bindir), "SYSTEMDDIR": str(tmp_path / "no-systemd"),
         "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(pip_log),
         "REQUIREMENTS_FILE": "requirements-locked.txt",
         "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
@@ -139,15 +191,197 @@ def test_non_staged_install_creates_venv_without_sudo(source_tree, tmp_path):
     result = run_script(source_tree, "install.sh", env)
     assert "sudo-was-called" not in result.stderr
     assert (app / ".venv/bin/python").is_file()
-    assert (bindir / "autopwn-suite").stat().st_mode & stat.S_IXUSR
-    assert f'REPO_DIR="{app}"' in (bindir / "autopwn-suite").read_text()
+    assert (bindir / "autopwn-suite").is_symlink()
+    assert os.readlink(bindir / "autopwn-suite") == f"{app}/.venv/bin/autopwn-suite"
+    # Installed from the checkout itself: no second copy of the source tree.
+    assert not (app / "autopwn.py").exists() and not (app / "src").exists()
+    assert (app / "autopwn-daemon.conf").read_text() == "[DAEMON]\n"
     log = pip_log.read_text()
     assert "install --upgrade pip setuptools wheel" in log
-    assert f"install -r {app}/requirements-locked.txt" in log
+    assert f"install -r {source_tree}/requirements-locked.txt" in log
+    assert f"install --no-deps {source_tree}" in log
 
     run_script(source_tree, "uninstall.sh", {"APPDIR": str(app), "BINDIR": str(bindir),
                                             "PATH": env["PATH"]})
-    assert not app.exists() and not (bindir / "autopwn-suite").exists()
+    assert not app.exists() and not os.path.lexists(bindir / "autopwn-suite")
+
+
+def working_install(tmp_path):
+    """An existing install: a venv holding the command and a link to it, as install.sh leaves them."""
+    app, bindir = tmp_path / "live/app", tmp_path / "live/bin"
+    command = app / ".venv/bin/autopwn-suite"
+    command.parent.mkdir(parents=True)
+    command.write_text("#!/usr/bin/env bash\necho old\n")
+    command.chmod(0o755)
+    (app / ".venv/marker").write_text("working\n")
+    bindir.mkdir(parents=True)
+    (bindir / "autopwn-suite").symlink_to(command)
+    env = {
+        "APPDIR": str(app), "BINDIR": str(bindir), "SYSTEMDDIR": str(tmp_path / "no-systemd"),
+        "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(tmp_path / "pip.log"),
+    }
+    return app, bindir, env
+
+
+def assert_working_install_untouched(app, bindir):
+    assert (app / ".venv/marker").read_text() == "working\n"
+    assert (bindir / "autopwn-suite").resolve() == (app / ".venv/bin/autopwn-suite").resolve()
+    assert os.access(bindir / "autopwn-suite", os.X_OK)  # not a dangling link
+    assert sorted(path.name for path in app.iterdir()) == [".venv"]
+    assert sorted(path.name for path in (app / ".venv").iterdir()) == ["bin", "marker"]
+
+
+@posix_only
+@pytest.mark.parametrize("failure, message", [
+    ({"FAKE_OLD_PYTHON": "1"}, "3.10"),
+    ({"FAKE_NO_ENSUREPIP": "1"}, "python3-venv"),
+    ({"FAKE_PIP_FAILS": "1"}, "restoring the previous virtual environment"),
+], ids=["python-too-old", "no-venv-support", "pip-fails"])
+def test_failed_upgrade_leaves_the_working_install(source_tree, tmp_path, failure, message):
+    app, bindir, env = working_install(tmp_path)
+    result = run_script(source_tree, "install.sh", {**env, **failure}, expect=1)
+    assert message in result.stderr
+    assert_working_install_untouched(app, bindir)
+
+
+@posix_only
+def test_killed_upgrade_leaves_the_working_install(source_tree, tmp_path):
+    app, bindir, env = working_install(tmp_path)
+    started = tmp_path / "pip-started"
+    process = subprocess.Popen(
+        [BASH, str(source_tree / "install.sh")], env={**os.environ, **env, "FAKE_PIP_HANGS": str(started)},
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    try:
+        deadline = time.monotonic() + 60
+        while not started.exists():
+            assert process.poll() is None and time.monotonic() < deadline, "install.sh ended before pip ran"
+            time.sleep(0.05)
+        os.killpg(process.pid, signal.SIGTERM)  # the script and the pip it is waiting for
+        _, stderr = process.communicate(timeout=60)
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+    assert "restoring the previous virtual environment" in stderr
+    assert_working_install_untouched(app, bindir)
+
+
+@posix_only
+def test_upgrade_replaces_the_environment_and_removes_the_old_one(source_tree, tmp_path):
+    app, bindir, env = working_install(tmp_path)
+    result = run_script(source_tree, "install.sh", env)
+    assert "Installation complete!" in result.stdout
+    assert (app / ".venv/bin/python").is_file() and not (app / ".venv/marker").exists()
+    assert sorted(path.name for path in app.iterdir()) == [".venv"]  # nothing set aside is left behind
+    assert os.readlink(bindir / "autopwn-suite") == f"{app}/.venv/bin/autopwn-suite"
+
+
+@posix_only
+def test_environment_left_by_a_killed_upgrade_is_never_overwritten(source_tree, tmp_path):
+    app, bindir, env = working_install(tmp_path)
+    # A run that was killed mid-build left the working environment set aside and a half-built one in its place.
+    (app / ".venv").rename(app / ".venv.old")
+    (app / ".venv").mkdir()
+    (app / ".venv/marker").write_text("half-built\n")
+    result = run_script(source_tree, "install.sh", env, expect=1)
+    assert ".venv.old" in result.stderr
+    assert (app / ".venv.old/marker").read_text() == "working\n"
+    assert (app / ".venv/marker").read_text() == "half-built\n"
+
+
+@posix_only
+@as_normal_user
+def test_rerun_as_a_normal_user_uses_sudo_for_a_command_link_in_a_protected_directory(source_tree, tmp_path):
+    # The link resolves to the user's own virtualenv, which is writable, but replacing the link needs its directory.
+    app, bindir, env = working_install(tmp_path)
+    tools, log = fake_tools(tmp_path)
+    bindir.chmod(0o555)  # the directory belongs to someone else
+    try:
+        run_script(source_tree, "install.sh", {**env, "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}", "TOOL_LOG": str(log)})
+    finally:
+        bindir.chmod(0o755)
+    assert any(line.startswith("sudo ln -sfn") for line in log.read_text().splitlines())
+
+
+@posix_only
+def test_as_root_the_application_directory_is_handed_to_root(source_tree, tmp_path):
+    # A directory that an earlier run as a normal user left stays theirs unless root takes it over,
+    # and the daemon refuses an installation that another user owns.
+    tools, log = fake_tools(tmp_path, root=True)
+    app, bindir = tmp_path / "live/app", tmp_path / "live/bin"
+    app.mkdir(parents=True)
+    env = {
+        "APPDIR": str(app), "BINDIR": str(bindir), "SYSTEMDDIR": str(tmp_path / "no-systemd"),
+        "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(tmp_path / "pip.log"),
+        "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}", "TOOL_LOG": str(log),
+    }
+    result = run_script(source_tree, "install.sh", env)
+    calls = log.read_text().splitlines()
+    assert f"chown root:root {app}" in calls and f"chmod go-w {app}" in calls
+    assert not any(line.startswith("sudo") for line in calls)
+    assert "Note: this installation belongs to" not in result.stdout
+
+
+@posix_only
+@as_normal_user
+def test_install_as_a_normal_user_says_that_the_installation_is_not_owned_by_root(source_tree, tmp_path):
+    result, _ = install_with_unit(source_tree, tmp_path, None)
+    assert "Note: this installation belongs to" in result.stdout
+    assert "'sudo autopwn-suite' runs files that account can" in result.stdout and "sudo bash install.sh" in result.stdout
+
+
+LEGACY_UNIT = """[Service]
+WorkingDirectory=/opt/autopwn-suite
+ExecStart=/opt/autopwn-suite/.venv/bin/python /opt/autopwn-suite/autopwn.py -c /opt/autopwn-suite/autopwn-daemon.conf
+"""
+CURRENT_UNIT = """[Service]
+WorkingDirectory=/opt/autopwn-suite
+ExecStart=/opt/autopwn-suite/.venv/bin/python -m autopwn_suite -c /opt/autopwn-suite/autopwn-daemon.conf
+"""
+
+
+def install_with_unit(source_tree, tmp_path, unit, **extra):
+    """A non-staged install with a fake systemd directory, optionally holding a daemon unit."""
+    systemd = tmp_path / "systemd"
+    systemd.mkdir()
+    if unit is not None:
+        (systemd / "autopwn-daemon.service").write_text(unit)
+    env = {
+        "APPDIR": str(tmp_path / "live/app"), "BINDIR": str(tmp_path / "live/bin"),
+        "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(tmp_path / "pip.log"),
+        "SYSTEMDDIR": str(systemd),
+    }
+    env.update(extra)
+    return run_script(source_tree, "install.sh", env), systemd / "autopwn-daemon.service"
+
+
+@posix_only
+def test_install_warns_when_a_daemon_from_an_earlier_release_still_runs_its_own_copy(source_tree, tmp_path):
+    result, unit = install_with_unit(source_tree, tmp_path, LEGACY_UNIT)
+    assert "WARNING:" in result.stdout and "autopwn.py" in result.stdout
+    assert "sudo autopwn-suite --daemon-install" in result.stdout
+    # --daemon-install restarts the service itself, so no separate restart step is asked for.
+    assert "also restarts it" in result.stdout and "systemctl restart" not in result.stdout
+    if os.geteuid() != 0:
+        assert "sudo bash install.sh" in result.stdout
+    # The installer only reports: the service file is never rewritten or restarted.
+    assert unit.read_text() == LEGACY_UNIT
+
+
+@posix_only
+@pytest.mark.parametrize("unit", [CURRENT_UNIT, None], ids=["current-unit", "no-unit"])
+def test_install_stays_quiet_when_the_daemon_is_current_or_absent(source_tree, tmp_path, unit):
+    result, _ = install_with_unit(source_tree, tmp_path, unit)
+    assert "WARNING" not in result.stdout + result.stderr
+    assert "Installation complete!" in result.stdout
+
+
+@posix_only
+def test_staged_install_never_inspects_the_systemd_directory(source_tree, tmp_path):
+    systemd = tmp_path / "systemd"
+    systemd.mkdir()
+    (systemd / "autopwn-daemon.service").write_text(LEGACY_UNIT)
+    result = run_script(source_tree, "install.sh", {"DESTDIR": str(tmp_path / "stage"), "SYSTEMDDIR": str(systemd)})
+    assert "WARNING" not in result.stdout + result.stderr
 
 
 @posix_only
@@ -164,9 +398,30 @@ def test_uninstall_destdir_removes_only_staged_files(source_tree, tmp_path):
     result = run_script(source_tree, "uninstall.sh", env)
     assert "systemctl" not in result.stdout
     assert not (stage / "usr/lib/autopwn-suite").exists()
-    assert not (stage / "usr/bin/autopwn-suite").exists()
+    assert not os.path.lexists(stage / "usr/bin/autopwn-suite")
     assert not unit.exists()
     assert keep.read_text() == "keep\n"
+
+
+@posix_only
+def test_uninstall_goes_on_when_systemctl_cannot_reload(source_tree, tmp_path):
+    # In a container or chroot there is no running systemd, so every systemctl call fails.
+    app, bindir, env = working_install(tmp_path)
+    systemd = tmp_path / "systemd"
+    systemd.mkdir()
+    (systemd / "autopwn-daemon.service").write_text("[Unit]\n")
+    tools = tmp_path / "fake-tools"
+    tools.mkdir()
+    (tools / "systemctl").write_text("#!/usr/bin/env bash\nexit 1\n")
+    (tools / "systemctl").chmod(0o755)
+
+    result = run_script(source_tree, "uninstall.sh", {
+        "APPDIR": str(app), "BINDIR": str(bindir), "SYSTEMDDIR": str(systemd),
+        "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}"})
+
+    assert "daemon-reload failed" in result.stderr
+    assert not (systemd / "autopwn-daemon.service").exists()
+    assert not app.exists() and not os.path.lexists(bindir / "autopwn-suite")
 
 
 @posix_only
@@ -175,6 +430,7 @@ def test_unsafe_or_relative_paths_are_rejected(source_tree, tmp_path, script):
     run_script(source_tree, script, {"APPDIR": "/", "DESTDIR": str(tmp_path / "s")}, expect=2)
     run_script(source_tree, script, {"APPDIR": "relative/dir", "DESTDIR": str(tmp_path / "s")}, expect=2)
     run_script(source_tree, script, {"PREFIX": "usr", "DESTDIR": str(tmp_path / "s")}, expect=2)
+    run_script(source_tree, script, {"SYSTEMDDIR": "relative/dir", "DESTDIR": str(tmp_path / "s")}, expect=2)
 
 
 # ---------------------------------------------------------------- repeatable builds

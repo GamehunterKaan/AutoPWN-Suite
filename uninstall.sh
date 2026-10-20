@@ -92,7 +92,9 @@ if [ -f "$SERVICE_FILE" ]; then
     fi
     run_for "$SERVICE_FILE" rm -f "$SERVICE_FILE"
     if [ -z "$DESTDIR" ]; then
-        run_for "$SERVICE_FILE" systemctl daemon-reload
+        # Without a running systemd (a container, a chroot) this fails; the files below still have to go.
+        run_for "$SERVICE_FILE" systemctl daemon-reload ||
+            echo "Warning: systemctl daemon-reload failed; run it yourself once systemd is available." >&2
     fi
     echo "Service $SERVICE_NAME removed."
 else
@@ -107,12 +109,13 @@ else
     echo "Directory $TARGET_DIR does not exist; skipping."
 fi
 
-echo "[3/3] Removing wrapper $WRAPPER ..."
-if [ -f "$WRAPPER" ]; then
+echo "[3/3] Removing command $WRAPPER ..."
+# -L: the link dangles once the application directory is gone (older installs have a wrapper script).
+if [ -e "$WRAPPER" ] || [ -L "$WRAPPER" ]; then
     run_for "$WRAPPER" rm -f "$WRAPPER"
-    echo "Removed wrapper $WRAPPER"
+    echo "Removed command $WRAPPER"
 else
-    echo "Wrapper $WRAPPER does not exist; skipping."
+    echo "Command $WRAPPER does not exist; skipping."
 fi
 
 echo "Uninstallation complete!"

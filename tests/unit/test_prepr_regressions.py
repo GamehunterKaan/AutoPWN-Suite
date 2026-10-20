@@ -16,7 +16,7 @@ from tests.auth_helpers import authenticated_app
 @pytest.fixture
 def review_web(tmp_path, monkeypatch):
     monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
-    path = Path(__file__).parents[2] / "modules" / "web_ui.py"
+    path = Path(__file__).parents[2] / "autopwn_suite" / "web_ui.py"
     spec = importlib.util.spec_from_file_location("prepr_web", path)
     wu = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(wu)
@@ -111,7 +111,7 @@ def test_notification_operation_releases_its_reservation_on_failure(review_web):
 def test_cli_offline_ports_only_does_not_require_a_cve_database(tmp_path, monkeypatch):
     from rich.console import Console
 
-    import autopwn
+    import autopwn_suite.cli as autopwn
     monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
     monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(tmp_path / "missing.sqlite3"),
                                     "--skip-discovery", "-t", "192.0.2.1", "--no-color"])
@@ -130,8 +130,8 @@ def test_cli_offline_ports_only_does_not_require_a_cve_database(tmp_path, monkey
 
 
 def test_lazy_offline_lookup_still_fails_explicitly_if_cve_data_is_requested(tmp_path):
-    from modules.nist_search import VulnerabilityLookup
-    from modules.vulnerability_db import DatabaseUnavailable
+    from autopwn_suite.nist_search import VulnerabilityLookup
+    from autopwn_suite.vulnerability_db import DatabaseUnavailable
     lookup = VulnerabilityLookup("offline", tmp_path / "missing.sqlite3", lazy=True)
     assert lookup.local is None
     try:

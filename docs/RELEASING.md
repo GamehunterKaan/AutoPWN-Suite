@@ -3,8 +3,13 @@
 ## Maintainer procedure
 
 1. Review source, dependencies and known advisories. Update the runtime version
-   in `autopwn.py` and package version in `pyproject.toml` consistently.
+   in `autopwn_suite/__init__.py` and package version in `pyproject.toml` consistently.
    Give every release a unique `vMAJOR.MINOR.PATCH` tag (optional prerelease).
+   A prerelease tag such as `v2.8.0-rc.1` needs that text (`2.8.0-rc.1`) as the version
+   in both files, and its PyPI files are named with the PEP 440 form (`2.8.0rc1`),
+   which `publish-pypi.yml` works out itself. Use only `-alpha.N`, `-beta.N` or `-rc.N`
+   suffixes: a suffix PEP 440 cannot express fails the PyPI build while the
+   container release still goes ahead.
 2. Add a `## [VERSION] - YYYY-MM-DD` changelog entry with descriptive
    `### Functional changes` and `### Security changes`. Describe security impact
    and link applicable advisories; do not publish uncoordinated exploit details.
@@ -17,22 +22,84 @@
    [threat model](THREAT_MODEL.md) and advisories for relevant changes.
 4. Create the version tag at reviewed history on `main` and publish the GitHub
    release with its descriptive changelog. The publishing workflow archives the
-   exact tagged source, builds the multi-platform image, and signs/verifies both
-   the image digest and release manifest using GitHub OIDC and Cosign.
+   exact tagged source, builds the multi-platform image and the standalone
+   binaries, and signs/verifies the image digest, the release manifest and the
+   binary checksums using GitHub OIDC and Cosign. A second workflow publishes the
+   same commit to PyPI.
 5. Check every publishing/signing/upload step succeeds. Download the uploaded
    artifacts and independently verify signatures/hashes with the procedure below
    before claiming signed distribution. A configured workflow alone is not proof
-   that an existing release is signed.
+   that an existing release is signed. Confirm the new version appears on PyPI.
+
+One-time PyPI setup (the project `autopwn-suite` already exists and is owned by the
+maintainer account): add a trusted publisher on pypi.org with owner
+`GamehunterKaan`, repository `AutoPWN-Suite`, workflow `publish-pypi.yml` and
+environment `pypi`. No PyPI token or password is stored anywhere; never add one.
+The publish job runs in that GitHub environment, whose deployment link is the version
+page of the release (`https://pypi.org/project/autopwn-suite/VERSION/`, without the
+tag's `v`). The environment's deployment rules admit only tags that match `v*`, so
+only a run of the release event, whose ref is the tag, can publish: a run dispatched
+from `main` runs the gates and the build and is then refused at the publish job.
+Adding a `main` rule to the environment would change that, which is a repository
+setting for the maintainer to decide; nothing here relies on it. The earlier jobs are
+the gate. A required reviewer would add a manual approval before the immutable
+upload, which is also the maintainer's decision.
+Keep at least two project owners (see [continuity](CONTINUITY.md)).
 
 Read-only jobs validate/archive the release and run source security checks, then
 build each architecture without publication secrets. Syft generates a CycloneDX
 SBOM from each actual image archive; OSV checks installed OS/Python dependencies
-and Python licenses before registry publication. A separate push job has no
+and Python licenses before registry publication. A separate push job, which waits for
+the image builds, the dynamic analysis and the standalone binaries, has no
 GitHub token permissions and only the Docker Hub credentials it needs. Signing
 gets `contents:read`, `id-token:write` and registry signature-push access. Upload
 alone gets `contents:write` and no OIDC or Docker credentials. Workflow defaults
 remain read-only. Third-party actions/tools are pinned. These checks apply to
 historical rebuilds too; an old tag does not waive current security policy.
+
+The standalone binaries (linux-amd64, linux-arm64, windows-amd64, macos-arm64)
+are built by the reusable `build-binary.yml` from the exact source archive that release
+validation produced (the same handoff the image build uses; pull requests run it
+too, because `install-smoke.yml` archives the commit with `git archive` and passes that archive on, so the
+extraction runs on all four platforms before a release). `scripts/build_binary.py` builds each one with the
+CPython that `packaging/build-python.json` pins by SHA-256, the hash-pinned `requirements-locked.txt` and
+`packaging/requirements-build.txt`, `PYTHONHASHSEED=1` and the release commit time as `SOURCE_DATE_EPOCH`,
+**twice**, and the job fails unless both builds are byte-identical. Each binary is smoke-tested on the runner that
+built it (`scripts/smoke_install.py`: version check, then the dashboard serves its
+sign-in page), and `scripts/binary_sbom.py` writes a CycloneDX SBOM of that
+platform's bundled Python packages, PyInstaller and the interpreter. Because the inputs are pinned and no
+library of the runner is bundled, anyone can rebuild a binary and compare its SHA-256 with `SHA256SUMS`
+([how](BUILDING.md#rebuilding-a-standalone-binary)). The binaries
+are not code-signed for Windows (Authenticode) or macOS (notarization); release
+signatures are Sigstore signatures only. The signing job is the only job in
+`publish-docker.yml` that holds `id-token:write`; keep signing there so the
+certificate identity stays the `publish-docker.yml` workflow.
+
+`publish-pypi.yml` runs on the same release event. It validates the tag with the
+same `release_assets.py` checks, calls the same security and dynamic-analysis
+workflows, extracts the validated source archive and builds the wheel and source
+distribution from it twice with hash-pinned tools
+(`packaging/requirements-publish.txt`, backend `poetry-core==2.5.0`) and requires
+identical bytes, installs the wheel in a clean environment and starts it, and only
+then lets the final job publish through PyPI trusted publishing. PyPI uploads are
+immutable, so nothing is published unless every earlier job succeeded. The action
+also uploads PEP 740 attestations binding each file to this repository and
+workflow. This workflow does not touch GitHub release assets or notes.
+
+If the upload stops after one of the two files (PyPI keeps what it received and
+cannot replace it), re-run only the failed jobs of the release run:
+
+```sh
+gh run rerun RUN_ID --failed
+```
+
+The re-run keeps the tag ref that the `pypi` environment admits and publishes the
+`pypi-dist` artifact of the first attempt. Every attempt after the first uploads with
+`skip-existing`, so a file already on PyPI is left alone and only the missing one is
+added; the first attempt of the release run never skips. A run dispatched from `main`
+is not a recovery path, because the environment refuses its publish job (see the
+setup above). A skipped file is not compared with the new build, so afterwards check
+that the hashes on the PyPI release page equal those of the run's `pypi-dist` artifact.
 
 The build/publish workflow validates tag syntax, source package version and
 ancestry in `origin/main`. It refuses existing uploaded assets and never silently
@@ -42,16 +109,30 @@ run. Only GitHub's latest stable release updates the image's `latest` alias.
 ## Authenticity backfill for an existing release
 
 Use **Backfill release signatures**, dispatched from main, when adding signatures
-to an already published release such as v2.6.0:
+to an already published release that has no uploaded assets (v2.6.0 was signed
+this way):
 
 ```sh
-gh workflow run backfill-release-signatures.yml --ref main -f tag=v2.6.0 \
-  -f image-digest=sha256:7a241cc52d8afda6c63e5a67cceda69cee691e4570aaf674f5dae5c05c8748bb
+gh workflow run backfill-release-signatures.yml --ref main -f tag=vVERSION \
+  -f image-digest=sha256:ORIGINAL_IMAGE_INDEX_DIGEST
 ```
 
 Record the expected original index digest independently before dispatch; the
-example above is the verified original v2.6.0 digest. A tag that has moved to a
-different digest is rejected rather than silently signed.
+verified original v2.6.0 digest was
+`sha256:7a241cc52d8afda6c63e5a67cceda69cee691e4570aaf674f5dae5c05c8748bb`. A tag
+that has moved to a different digest is rejected rather than silently signed.
+
+Only tags from v2.7.0 on can be dispatched, here and for `publish-docker.yml` or
+`publish-pypi.yml` run by hand. Those workflows run the policy scripts from `main`
+against the tag's own source, and the policy scans `packaging/requirements-build.txt`,
+`packaging/requirements-publish.txt` and `.security/requirements-bandit.txt` there,
+which v2.6.1 and older do not have. A dispatch for such a tag stops before anything is
+signed or published. A tag before v2.6.0 fails release validation (its version files or
+its changelog section do not meet it). v2.6.0 and v2.6.1 pass validation and have
+uploaded assets, so they are refused in the validate job of `publish-docker.yml` and of
+the backfill; only `publish-pypi.yml`, which does not look at release assets, carries on
+to the source security job, where the error names the missing file. Those releases keep
+the layouts they were published with.
 
 This path does **not rebuild or replace application source or Docker images** and
 does not change version/latest image tags. It snapshots the existing official
@@ -78,34 +159,46 @@ GitHub OIDC, and uploads verified assets. It never publishes a new software tag.
 
 ## Published artifact format
 
-The next release using this layout publishes **five attached files**:
+Releases from v2.7.0 publish **twelve attached files**:
 
 | File | Contents |
 | --- | --- |
 | `autopwn-suite-vVERSION.tar.gz` | Exact tagged source, archived by `git archive` under a versioned directory. |
 | `autopwn-suite-vVERSION.zip` | The same tagged source in ZIP format. |
-| `autopwn-suite-vVERSION-security.zip` | Release notes, both platform SBOMs, VEX index/declarations and any backfill reports. |
-| `release-manifest.json` | Release/source identity, hashes of the three archives, hashes of every supporting ZIP member, and exact Docker image digest. |
+| `autopwn-suite-vVERSION-linux-amd64`, `-linux-arm64`, `-windows-amd64.exe`, `-macos-arm64` | Standalone single-file binaries. Release downloads carry no executable bit: `chmod +x` on Linux and macOS. |
+| `SHA256SUMS` | `sha256sum -c` file for the four binaries. |
+| `SHA256SUMS.sigstore.json` | Cosign bundle signing `SHA256SUMS`. |
+| `autopwn-suite-vVERSION-security.zip` | Release notes, both platform image SBOMs, one SBOM per binary, VEX index/declarations and any backfill reports. |
+| `release-manifest.json` | Release/source identity, hashes of every downloadable file above, hashes of every supporting ZIP member, and exact Docker image digest. |
 | `release-manifest.sigstore.json` | Cosign certificate/signature and transparency-log verification bundle for the manifest. |
+| `autopwn-suite-vVERSION.intoto.jsonl` | Signed SLSA v1 provenance (in-toto attestation bundle) whose subject is `release-manifest.json`. |
+
+The release before this layout (v2.6.1) published five files without binaries.
 
 The security ZIP preserves the original report filenames and bytes at its root:
 `release-notes.md`, per-platform `-linux-amd64.cdx.json` / `-linux-arm64.cdx.json`
-CycloneDX SBOMs, and a versioned `-vex-index.json` plus any listed OpenVEX files.
-The SBOMs include native and Python dependencies. The VEX index can be empty
+image CycloneDX SBOMs, the per-binary `-binary-TARGET.cdx.json` SBOMs, and a
+versioned `-vex-index.json` plus any listed OpenVEX files. The image SBOMs include
+native and Python dependencies. A binary SBOM lists the Python packages from the
+hash-pinned runtime requirements that were installed on the build platform, the
+PyInstaller version and the CPython version; it is generated from that build
+environment, not by scanning the executable, and does not enumerate native
+libraries that PyInstaller copies from the runner. The VEX index can be empty
 when no non-exploitability determination has been made. Authenticity backfills
 also include the original `-image-index.json` and per-architecture `-sca.json`,
 `-policy.json` and `-backfill.json` records. Findings stay available inside this
 archive, with the same assessment times and limitations.
 
-The manifest's `assets` array hashes the three downloadable archives. Its
+The manifest's `assets` array hashes the downloadable source archives, binaries,
+`SHA256SUMS` and the security ZIP. Its
 `supporting_archive` object identifies the security ZIP by `name` and lists each
 member's `name` and `sha256` in `files`. The ZIP uses fixed timestamps and member
 ordering; its completed contents are verified before separate staging copies
 are removed. Release notes are read from the ZIP for the GitHub release body.
 The container's exact `sha256:` digest also has a Cosign registry signature.
 
-Existing releases, including the already signed v2.6.0 release, retain their
-previous separate-file layout. This change does not replace their assets or
+Existing releases, including the already signed v2.6.0 release and v2.6.1, retain their
+previous layouts. This change does not replace their assets or
 invalidate their existing signatures. Both layouts use the same top-level
 manifest hash verification below; only bundled layouts add `supporting_archive`.
 
@@ -122,17 +215,30 @@ release files without executing them. Choose the expected signer identity
 from the trusted workflow/ref, not from an untrusted bundle:
 
 ```sh
-gh release download v2.6.0 --repo GamehunterKaan/AutoPWN-Suite --dir release-files
+gh release download v2.7.0 --repo GamehunterKaan/AutoPWN-Suite --dir release-files
 cd release-files
 cosign verify-blob --bundle release-manifest.sigstore.json \
-  --certificate-identity 'https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/backfill-release-signatures.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/tags/v2.7.0' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   release-manifest.json
 ```
 
-That exact identity is for an authenticity backfill from main. For an automatic
-published release, use `publish-docker.yml@refs/tags/vVERSION` under the same
-repository's `.github/workflows/` path instead. Confirm the
+That identity is the one for an automatic published release. The signer identity
+is the workflow file plus the ref the run started from (`GITHUB_WORKFLOW_REF`), not
+the release tag, so it depends on how the release was signed; every identity below
+is under `https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/`:
+
+| How the signatures were made | Signer identity |
+| --- | --- |
+| The automatic run for the published release | `publish-docker.yml@refs/tags/vVERSION` |
+| **Publish Docker Image** dispatched by hand from `main` to recover that release (v2.6.1 was recovered this way, with the workflow as it was then) | `publish-docker.yml@refs/heads/main` |
+| Signatures added afterwards by the authenticity backfill (v2.6.0 was signed this way) | `backfill-release-signatures.yml@refs/heads/main` |
+
+A validly signed recovered release therefore fails a command written for the tag
+form. Use the row that matches how the release was published (the Actions run
+history shows the trigger) and change nothing else: the manifest's source commit
+must still be the commit of the release tag, and the `SHA256SUMS` signature and the
+provenance attestation use the same identity as the manifest. Confirm the
 expected repository, workflow, ref and source commit against the release record.
 Do not disable identity or issuer checking. Missing signatures are a verification
 failure, not a reason to bypass verification.
@@ -166,6 +272,47 @@ if "supporting_archive" in manifest:
                 raise ValueError(f"Supporting hash mismatch: {entry['name']}")
 print(manifest["source_commit"], manifest["container"])
 ```
+
+To verify a standalone binary, check the signature on `SHA256SUMS` and then the
+binary against it. `sha256sum -c` reports a missing file for each binary you did
+not download, so check only yours. The identity below is the tag form; use the
+one from the table above that applies to the release:
+
+```sh
+cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity 'https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/tags/vVERSION' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+chmod +x autopwn-suite-vVERSION-linux-amd64
+```
+
+On macOS use `shasum -a 256 -c` and on Windows compare `Get-FileHash` output with
+the matching `SHA256SUMS` line. The binaries are not signed for Windows or macOS:
+SmartScreen warns about an unrecognized app, and macOS may need
+`xattr -d com.apple.quarantine <file>` after you have verified it.
+
+The provenance attests the manifest, which in turn binds every file's hash. It records the
+tag, the source commit, the workflow and the run that produced the release (identity as in
+the table above):
+
+```sh
+cosign verify-blob-attestation --type slsaprovenance1 --bundle autopwn-suite-vVERSION.intoto.jsonl \
+  --certificate-identity 'https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/tags/vVERSION' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  release-manifest.json
+```
+
+This is self-attested provenance: the workflow that builds also signs, so it shows what
+built the release and from which commit, not that an isolated builder produced it
+(SLSA build level 2 style, not level 3).
+
+To verify the PyPI package, check its PEP 740 attestation against the repository
+before trusting the file, for example with the `pypi-attestations` tool
+(`pypi-attestations verify pypi --repository https://github.com/GamehunterKaan/AutoPWN-Suite pypi:autopwn_suite-VERSION-py3-none-any.whl`;
+VERSION is the PEP 440 form of the version, for example `2.8.0rc1` for the tag
+`v2.8.0-rc.1`), or install with a pinned hash (`pip install --require-hashes`) taken from the
+hashes shown on the project page of the matching release.
 
 Verify the printed image **by digest**, using the same expected signing identity:
 

@@ -1,0 +1,19 @@
+# Used instead of the repository's .dockerignore for the ClusterFuzzLite image (which must keep
+# .clusterfuzzlite/ and fuzz/ in its build context, while the product image must not).
+.git
+.github
+__pycache__
+*.pyc
+.pytest_cache
+htmlcov
+coverage.xml
+.venv
+venv
+dist
+build
+outputs
+exploits
+api.txt
+autopwn-daemon.conf
+**/web_ui_auth.json*
+**/vulnerabilities.sqlite3*

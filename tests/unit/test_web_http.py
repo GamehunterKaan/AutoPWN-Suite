@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 from requests.exceptions import RequestException, TooManyRedirects
 
-from modules.web.http import same_origin, scoped_get
+from autopwn_suite.web.http import same_origin, scoped_get
 
 
 @pytest.mark.unit
@@ -46,7 +46,7 @@ def test_effective_ports_and_host_case_define_origin():
 
 @pytest.mark.unit
 def test_bounded_response_closes_connection_and_retains_only_prefix(web_response):
-    from modules.web.http import bounded_request
+    from autopwn_suite.web.http import bounded_request
     response = web_response("abcd" * 5000)
     get = Mock(return_value=response)
     result = bounded_request(get, "http://example.com/file", max_bytes=10000)
@@ -58,7 +58,7 @@ def test_bounded_response_closes_connection_and_retains_only_prefix(web_response
 
 @pytest.mark.unit
 def test_bounded_reader_releases_connection_on_stream_error(web_response):
-    from modules.web.http import bounded_request
+    from autopwn_suite.web.http import bounded_request
     response = web_response()
     response.iter_content = Mock(side_effect=RequestException("broken stream"))
     with pytest.raises(RequestException):
