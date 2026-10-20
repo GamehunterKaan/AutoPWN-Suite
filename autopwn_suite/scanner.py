@@ -118,7 +118,7 @@ def PortScan(
             raw_socket_flag = _re.compile(r'(?<!\S)(?:-O|-s[SAWMNFX])(?!\S)')
             dropped = raw_socket_flag.findall(customflags)
             if dropped:
-                log.logger("warning", f"Not running as root; dropping {', '.join(dropped)}, which need raw-socket privileges.")
+                log.logger("warning", _("Not running as root; dropping {flags}, which need raw-socket privileges.").format(flags=', '.join(dropped)))
                 customflags = raw_socket_flag.sub("", customflags)
             arguments = " ".join(
                 [
@@ -179,7 +179,7 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None, *,
         raise SystemExit(1)
 
     if len(Uphosts) > MAX_NOISE_HOSTS:
-        log.logger("warning", f"Creating noise on the first {MAX_NOISE_HOSTS} of {len(Uphosts)} hosts.")
+        log.logger("warning", _("Creating noise on the first {limit} of {count} hosts.").format(limit=MAX_NOISE_HOSTS, count=len(Uphosts)))
         Uphosts = Uphosts[:MAX_NOISE_HOSTS]
 
     stop = Event()
@@ -346,7 +346,7 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
 
     timed_out = HostTimedOut(nm[target])
     if timed_out:
-        log.logger("warning", f"Nmap timed out on {target}; port coverage is incomplete.")
+        log.logger("warning", _("Nmap timed out on {target}; port coverage is incomplete.").format(target=target))
 
     if len(tcp_ports) == 0 and len(udp_ports) == 0:
         if not timed_out:

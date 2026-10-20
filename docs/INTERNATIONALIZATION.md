@@ -169,6 +169,11 @@ remaining work with `msgattrib --only-fuzzy autopwn_suite/locales/tr/LC_MESSAGES
   CLI/report timestamps) and the dashboard formats dates with `toLocaleString()`.
   Stored job and schedule timestamps use ISO 8601 UTC.
 - The generated PoC and remediation text is English-only.
+- The dashboard server's own log lines and its start-up banners (`autopwn_suite/web_ui.py`, `web_auth.py`), the task
+  names that Nmap and the web checks report as scan progress, finding titles and the web-evidence text are shown as
+  the program or the scanned target produced them. The fixed progress phrases, the web-check names and every message of
+  the CLI are translated; `tests/unit/test_i18n_dictionary.py` checks that both dashboard languages have the same keys and
+  that every key a page uses exists.
 - CVE, exploit and Nmap data are shown in the language supplied by their sources.
 
 Reports of internationalization problems (for example mojibake or a crash on a

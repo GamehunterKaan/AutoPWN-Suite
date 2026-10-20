@@ -133,7 +133,7 @@ def main() -> None:
     log = Logger(console)
 
     if args.version:
-        print(f"AutoPWN Suite v{__version__}")
+        print(_("AutoPWN Suite v{version}").format(version=__version__))
         raise SystemExit
     elif args.daemon_install:
         InstallDaemon(console)
@@ -152,7 +152,7 @@ def main() -> None:
         try:
             reset_web_account()
         except (OSError, RuntimeError) as exc:
-            log.logger("error", "Dashboard account could not be reset. Check access to AUTOPWN_DATA_DIR.")
+            log.logger("error", _("Dashboard account could not be reset. Check access to AUTOPWN_DATA_DIR."))
             raise SystemExit(1) from exc
         return
 
@@ -160,13 +160,14 @@ def main() -> None:
     db_path = getattr(args, "vuln_db", None)
     if getattr(args, "update_vuln_db", False) is True:
         if offline:
-            raise SystemExit("Database downloads require internet. Run --update-vuln-db without --offline.")
+            raise SystemExit(_("Database downloads require internet. Run --update-vuln-db without --offline."))
         try:
             status = update_database(db_path, lambda msg, current, total: console.print(f"[{current}/{total}] {msg}"))
         except Exception as exc:
-            log.logger("error", f"Database update failed; previous database preserved: {exc}")
+            log.logger("error", _("Database update failed; previous database preserved: {error}").format(error=exc))
             raise SystemExit(1) from exc
-        console.print(f"Stored {status['count']} CVEs at {status['path']}; updated {status['updated_at']}.")
+        console.print(_("Stored {count} CVEs at {path}; updated {updated_at}.").format(
+            count=status['count'], path=status['path'], updated_at=status['updated_at']))
         return
     if getattr(args, "vuln_db_status", False) is True:
         console.print(database_status(db_path))
@@ -174,7 +175,7 @@ def main() -> None:
     apply = getattr(args, "apply_update", False) is True
     if apply or getattr(args, "check_update", False) is True:
         if offline:
-            raise SystemExit("Updates require internet. Run --check-update or --apply-update without --offline.")
+            raise SystemExit(_("Updates require internet. Run --check-update or --apply-update without --offline."))
         channel = resolve_update_channel(args.update_channel)
         try:
             if apply:
@@ -193,7 +194,7 @@ def main() -> None:
     if getattr(args, "web", False):
         try:
             if not FLASK_AVAILABLE:
-                console.print("[red]Flask not found. Install it with: pip install flask flask-cors[/red]")
+                console.print(_("[red]Flask not found. Install it with: pip install flask flask-cors[/red]"))
                 raise SystemExit(1)
             web_host = getattr(args, "web_host", "127.0.0.1")
             web_port = getattr(args, "web_port", 8080)
@@ -202,7 +203,7 @@ def main() -> None:
             start_server(host=web_host, port=web_port, version=__version__,
                          offline=offline, database=db_path)
         except KeyboardInterrupt:
-            raise SystemExit("\nWeb UI closed.") from None
+            raise SystemExit(_("\nWeb UI closed.")) from None
         raise SystemExit
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ def main() -> None:
 
     InitAutomation(args)
     if offline and not args.target and not args.host_file:
-        raise SystemExit("Specify --target or --host-file in offline mode; use IP addresses for airgapped scans.")
+        raise SystemExit(_("Specify --target or --host-file in offline mode; use IP addresses for airgapped scans."))
     targetarg = InitArgsTarget(args, log)
     scantype = InitArgsScanType(args, log)
     scanmode = InitArgsMode(args, log)
@@ -229,8 +230,8 @@ def main() -> None:
     no_hosts = None
     try:
         if lookup.local:
-            console.print(f"Local NVD database: {lookup.local.metadata['count']} CVEs; "
-                          f"updated {console_safe(lookup.local.metadata['updated_at'])}. Findings are possible vulnerabilities.")
+            console.print(_("Local NVD database: {count} CVEs; updated {updated_at}. Findings are possible vulnerabilities.").format(
+                count=lookup.local.metadata['count'], updated_at=console_safe(lookup.local.metadata['updated_at'])))
         StartScanning(args, targetarg, scantype, scanmode, apiKey, console, console2, log, lookup=lookup)
     except NoHostsFound as exc:
         # With a scan interval (the daemon) an empty discovery is a finished round: exiting would make systemd
@@ -241,11 +242,11 @@ def main() -> None:
     except RuntimeError as exc:
         # A lookup or Nmap failure late in a long scan must not discard the output recorded so far. The
         # reason stays the exit text on stderr (the lookup has logged its own); it is not added to the report.
-        log.logger("warning", "The scan did not finish; saving the output recorded so far.")
+        log.logger("warning", _("The scan did not finish; saving the output recorded so far."))
         try:
             SaveOutput(console, args.output_type, args.output, args.output_folder, targetarg)
         except OSError:
-            log.logger("error", "The recorded output could not be saved.")
+            log.logger("error", _("The recorded output could not be saved."))
         raise SystemExit(str(exc)) from exc
     finally:
         lookup.close()
@@ -260,7 +261,7 @@ def main() -> None:
         SaveOutput(console, args.output_type, args.output, args.output_folder, targetarg)
 
     if args.scan_interval and args.scan_interval > 0:
-        console.print(f"Sleeping for {args.scan_interval} seconds...")
+        console.print(_("Sleeping for {seconds} seconds...").format(seconds=args.scan_interval))
         sleep(args.scan_interval)
 
 
@@ -279,7 +280,7 @@ def run() -> None:
     try:
         main()
     except KeyboardInterrupt:
-        raise SystemExit("Ctrl+C pressed. Exiting.") from None
+        raise SystemExit(_("Ctrl+C pressed. Exiting.")) from None
 
 
 if __name__ == "__main__":

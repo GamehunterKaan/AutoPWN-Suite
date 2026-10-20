@@ -493,7 +493,7 @@ function portsError(ports){
     && /^[1-9][0-9]{0,4}(-[1-9][0-9]{0,4})?(,[1-9][0-9]{0,4}(-[1-9][0-9]{0,4})?)*$/.test(ports)
     && ports.match(/[0-9]+/g).every(number => Number(number) <= 65535)
     && ranges.every(range => Number(range.split('-')[0]) <= Number(range.split('-')[1]));
-  return valid ? '' : 'Ports must be port numbers from 1 to 65535, ranges and commas, such as 22,80,1-1000.';
+  return valid ? '' : window.i18n.t('profile.ports_invalid');
 }
 function loadProfile(){
   const pid = document.getElementById('f-profile').value;
@@ -512,11 +512,11 @@ function loadProfile(){
   document.getElementById('f-vuln-source').value = offlineServer ? 'offline' : (c.vulnerability_source || 'auto');
   window.webSecurity?.setControls('f', c);
   updateNmapPreview();
-  if(hasLegacyOptions(c)) toast('This profile holds Nmap options from an earlier release. They are not applied.', false);
+  if(hasLegacyOptions(c)) toast(window.i18n.t('profile.legacy_loaded'), false);
 }
 
 function refreshProfileSelects(){
-  const opts = `<option value="">— No profile —</option>` +
+  const opts = `<option value="">${esc(window.i18n.t('settings.no_profile_placeholder'))}</option>` +
     Object.values(profiles).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
   document.getElementById('f-profile').innerHTML = opts;
   document.getElementById('sf-profile').innerHTML = opts;
@@ -580,7 +580,7 @@ async function stopScan(scanId){
     const r = await fetch('/api/scan/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scan_id:scanId})});
     if(!r.ok){
       const d = await r.json().catch(()=>({}));
-      reportScanError(d.error||d.message||'Failed to stop scan.');
+      reportScanError(d.code ? window.i18n.tErrorCode(d.code, d.error||d.message) : (d.error||d.message||window.i18n.t('toast.stop_failed')));
     }
   }catch(e){ reportUnreachable(e); }
 }
@@ -682,6 +682,18 @@ async function poll(){
 }
 
 // ── Render: Active Scans ──────────────────────────────────────────────────────
+// The server words its progress details in English; the fixed ones and the keyword ones are shown in the active language.
+function progressDetail(detail){
+  const fixed = {'Preparing scan':'progress.preparing', 'Discovering hosts':'progress.discovering', 'Port and service scan':'progress.port_scan',
+    'Searching service vulnerabilities':'progress.searching', 'No searchable service versions':'progress.nothing_searchable',
+    'Resuming unfinished work':'progress.resuming', 'Scan completed':'progress.completed', 'Scan failed':'progress.failed'};
+  if(fixed[detail]) return window.i18n.t(fixed[detail]);
+  const keyword = {Querying:'progress.querying', Checked:'progress.checked'};
+  const match = /^(Querying|Checked) (.+)$/.exec(detail || '');
+  if(match) return window.i18n.t(keyword[match[1]], {keyword: match[2]});
+  const failed = /^Lookup failed: (.+)$/.exec(detail || '');
+  return failed ? window.i18n.t('progress.lookup_failed', {keyword: failed[1]}) : detail;
+}
 function scanProgressMarkup(job){
   const progress = job.progress || {};
   const active = job.status === 'running' || job.status === 'stopping';
@@ -694,7 +706,8 @@ function scanProgressMarkup(job){
   const phase = progress.phase || job.status;
   let label = labelKeys[phase] ? window.i18n.t(labelKeys[phase]) : window.i18n.t(active ? 'status.scanning_generic' : 'status.finished_generic');
   if(phase === 'vulnerabilities' && progress.total != null) label += ` ${progress.completed || 0}/${progress.total}`;
-  if(progress.detail && progress.detail !== label && active) label += ' · ' + progress.detail;
+  const detail = progressDetail(progress.detail);
+  if(detail && detail !== label && active) label += ' · ' + detail;
   if(job.status === 'stopping') label = window.i18n.t('status.stopping_prefix', {label});
   const indeterminate = active && percent === null;
   const percentText = percent === null ? (active ? window.i18n.t('status.working') : '') : `${Math.floor(percent)}%`;
@@ -1014,7 +1027,7 @@ function setSettingsLoaded(loaded){
 }
 function settingsNotLoaded(){
   if(settingsLoaded) return false;
-  toast('Settings have not loaded, so they cannot be saved. Refresh the page to retry.',false);
+  toast(window.i18n.t('toast.settings_not_loaded'),false);
   return true;
 }
 async function saveNistKey(){
@@ -1121,7 +1134,7 @@ function renderProfiles(){
     <div class="item-card">
       <div class="item-card-info">
         <div class="item-card-name">${esc(p.name)}</div>
-        <div class="item-card-meta">${esc(window.i18n.t('profile.meta',{mode:window.i18n.t('scan.mode_'+(p.config?.mode||'normal')),speed:p.config?.speed??3,description:p.description||window.i18n.t('profile.no_description')}))}${hasLegacyOptions(p.config||{})?' · Nmap options no longer accepted: edit and save to remove them':''}</div>
+        <div class="item-card-meta">${esc(window.i18n.t('profile.meta',{mode:window.i18n.t('scan.mode_'+(p.config?.mode||'normal')),speed:p.config?.speed??3,description:p.description||window.i18n.t('profile.no_description')}))}${hasLegacyOptions(p.config||{})?esc(window.i18n.t('profile.legacy_note')):''}</div>
       </div>
       <div class="item-card-actions">
         <button class="btn btn-ghost btn-sm" data-action="edit-profile" data-id="${esc(p.id)}">${esc(window.i18n.t('settings.edit'))}</button>
@@ -1171,7 +1184,7 @@ function editProfile(pid){
   document.getElementById('pf-vuln-source').value=c.vulnerability_source||'auto';
   window.webSecurity?.setControls('pf', c);
   updateProfilePreview();
-  if(hasLegacyOptions(c)) toast('This profile holds Nmap options from an earlier release. Saving it removes them and turns off the scheduled scans that use it.', false);
+  if(hasLegacyOptions(c)) toast(window.i18n.t('profile.legacy_saving'), false);
 }
 async function saveProfile(){
   const pid=document.getElementById('pf-id').value;
@@ -1360,13 +1373,13 @@ async function initDashboard(){
   logR.filter(e=>!e.level?.startsWith('__')).forEach(e=>addLog(e.scan_id,e.msg,e.level,e.ts));
   if(logR.length) lastLogId = logR[logR.length-1].id;
   renderScans(); renderHosts(); renderVulnTable(); updateBadges();
-  if(failed) addLog(null,'Some dashboard data could not be loaded. Refresh to retry.','error');
+  if(failed) addLog(null,window.i18n.t('log.data_load_failed'),'error');
 }
 
 // A render that throws on an unexpected field must not leave the page without its event stream and polling.
 async function startDashboard(){
   try{ await initDashboard(); }
-  catch(_){ addLog(null,'Some dashboard data could not be loaded. Refresh to retry.','error'); }
+  catch(_){ addLog(null,window.i18n.t('log.data_load_failed'),'error'); }
   connectSSE();
   schedulePoll();
   setInterval(()=>loadDatabaseStatus().catch(()=>{}), 5000);

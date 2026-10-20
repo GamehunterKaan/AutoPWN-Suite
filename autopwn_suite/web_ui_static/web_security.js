@@ -10,6 +10,8 @@
   const pending = {};
   const renderedPanels = new WeakMap();
   const limitLabel = key => window.i18n.t('web.limit.' + key);
+  // The check names come from the server catalog in English; the dictionary has the translation of each known one.
+  const checkLabel = (key, label) => { const id = 'web.check.' + key; const text = window.i18n.t(id); return text === id ? label : text; };
   const speedLabel = index => window.i18n.t('web.speed.' + index);
   let resumeJob = null, resumeBusy = false;
   let catalog = null, offline = false, rows = [], jobs = [], busy = false;
@@ -19,7 +21,7 @@
     const response = await fetch(url, options);
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.error || window.i18n.t('toast.request_failed', {status: response.status}));
+      throw new Error((body.code ? window.i18n.tErrorCode(body.code, body.error) : body.error) || window.i18n.t('toast.request_failed', {status: response.status}));
     }
     return response;
   }
@@ -71,7 +73,7 @@
         <label><span class="sr-only">${t('web.scan_scope_label')}</span><select id="${prefix}-web-scope"><option value="network">${t('web.scope_network')}</option><option value="web">${t('web.scope_web_only')}</option></select></label>
         <div class="web-control-warning" id="${prefix}-web-warning" hidden></div>
         <details><summary>${t('web.select_checks')}</summary><div class="web-preset-actions"><button data-web-action="preset" data-prefix="${prefix}" data-preset="all">${t('web.preset_all')}</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="light">${t('web.preset_light')}</button><button data-web-action="preset" data-prefix="${prefix}" data-preset="none">${t('web.preset_none')}</button></div>
-          <div class="web-check-grid">${Object.entries(catalog.checks).map(([key,label]) => `<label><input type="checkbox" id="${prefix}-web-check-${escape(key)}">${escape(label)}</label>`).join('')}</div></details>
+          <div class="web-check-grid">${Object.entries(catalog.checks).map(([key,label]) => `<label><input type="checkbox" id="${prefix}-web-check-${escape(key)}">${escape(checkLabel(key, label))}</label>`).join('')}</div></details>
         <details><summary>${t('web.speed_limits_crawl')}</summary><div class="web-limit-grid">${limitFields(prefix)}</div><p class="web-small-note">${t('web.speed_note')}</p>
           <label class="web-insecure-tls"><input type="checkbox" id="${prefix}-web-insecure-tls"> ${t('web.insecure_tls')}</label>
           <p class="web-small-note">${t('web.insecure_tls_note')}</p></details>
@@ -336,7 +338,7 @@
     $('web-verify-button').disabled = true;
     try {
       await json(endpoint(row) + '/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-      if (revision === detailRevision) { selected.verification = {status:'running',summary:'Replaying recorded requests.'}; renderVerification(selected); }
+      if (revision === detailRevision) { selected.verification = {status:'running',summary:window.i18n.t('web.replaying')}; renderVerification(selected); }
       refresh();
     } catch (error) { notify(error.message,false); if (revision === detailRevision) renderVerification(selected); }
   }

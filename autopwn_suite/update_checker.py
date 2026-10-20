@@ -73,8 +73,10 @@ def _checked_repo(repo):
     parts = repo.split("/") if isinstance(repo, str) else []
     if len(parts) != 2 or any(part in (".", "..") or not _REPO_PART.fullmatch(part) for part in parts):
         raise UpdateCheckError(
-            "The repository (--update-repo or AUTOPWN_UPDATE_REPO) must be written OWNER/REPO, "
-            "using letters, digits, '.', '_' and '-'."
+            _(
+                "The repository (--update-repo or AUTOPWN_UPDATE_REPO) must be written OWNER/REPO, "
+                "using letters, digits, '.', '_' and '-'."
+            )
         )
     return repo
 
@@ -91,7 +93,11 @@ def _checked_ref(name, what):
         or ".lock/" in name
         or name.endswith(("/", ".", ".lock"))
     ):
-        raise UpdateCheckError(f"The {what} name is not a plain git name.")
+        raise UpdateCheckError(
+            _("The release tag name is not a plain git name.")
+            if what == "release tag"
+            else _("The branch name is not a plain git name.")
+        )
     return name
 
 

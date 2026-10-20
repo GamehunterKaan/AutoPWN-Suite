@@ -704,7 +704,7 @@ def Confirmation(message) -> bool:
             return True
         if answer in ("n", "no"):
             return False
-        print("Please answer y or n.")
+        print(_("Please answer y or n."))
 
 
 def UserConfirmation(args) -> tuple[bool, bool, bool]:
@@ -937,11 +937,11 @@ def install_nmap_linux(log) -> None:
             raise CalledProcessError(1, "cmd")
 
     except FileNotFoundError:
-        log.logger("error", "Couldn't install nmap (Linux): /usr/bin/sudo was not found.")
+        log.logger("error", _("Couldn't install nmap (Linux): /usr/bin/sudo was not found."))
         raise SystemExit(1) from None
     except CalledProcessError:
         if DontAskForConfirmation:
-            log.logger("error", "Couldn't install nmap (Linux)")
+            log.logger("error", _("Couldn't install nmap (Linux)"))
             raise SystemExit(1) from None
         _distro_choice_ = input(
             _(

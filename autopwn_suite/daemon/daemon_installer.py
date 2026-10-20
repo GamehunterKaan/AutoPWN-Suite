@@ -61,8 +61,13 @@ def _get_validated_int(console, prompt: str, default: int = None, minimum: int =
             continue
         if (minimum is None or value >= minimum) and (maximum is None or value <= maximum):
             return value
-        limits = ([f"at least {minimum}"] if minimum is not None else []) + ([f"at most {maximum}"] if maximum is not None else [])
-        console.print(_("[red]Out of range. Please enter a whole number that is {value1}.[/red]").format(value1=' and '.join(limits)))
+        if minimum is not None and maximum is not None:
+            message = _("[red]Out of range. Please enter a whole number that is at least {minimum} and at most {maximum}.[/red]")
+        elif minimum is not None:
+            message = _("[red]Out of range. Please enter a whole number that is at least {minimum}.[/red]")
+        else:
+            message = _("[red]Out of range. Please enter a whole number that is at most {maximum}.[/red]")
+        console.print(message.format(minimum=minimum, maximum=maximum))
 
 def _get_validated_email(console, prompt: str, allow_empty: bool = False) -> str:
     """Gets and validates an email address from the user."""

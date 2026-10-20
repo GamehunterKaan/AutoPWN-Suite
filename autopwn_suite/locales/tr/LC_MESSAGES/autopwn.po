@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: AutoPWN Suite\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-20 19:40+0300\n"
+"POT-Creation-Date: 2026-10-20 19:51+0300\n"
 "PO-Revision-Date: 2026-10-20 03:52+0300\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -16,6 +16,98 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: autopwn_suite/cli.py:136
+#, fuzzy, python-brace-format
+msgid "AutoPWN Suite v{version}"
+msgstr "AutoPWN Suite v{version}"
+
+#: autopwn_suite/cli.py:155
+#, fuzzy
+msgid "Dashboard account could not be reset. Check access to AUTOPWN_DATA_DIR."
+msgstr "Panel hesabı sıfırlanamadı. AUTOPWN_DATA_DIR erişimini kontrol edin."
+
+#: autopwn_suite/cli.py:163
+#, fuzzy
+msgid ""
+"Database downloads require internet. Run --update-vuln-db without --offline."
+msgstr ""
+"Veritabanı indirmeleri internet gerektirir. --update-vuln-db komutunu "
+"--offline olmadan çalıştırın."
+
+#: autopwn_suite/cli.py:167
+#, fuzzy, python-brace-format
+msgid "Database update failed; previous database preserved: {error}"
+msgstr ""
+"Veritabanı güncellemesi başarısız oldu; önceki veritabanı korundu: {error}"
+
+#: autopwn_suite/cli.py:169
+#, fuzzy, python-brace-format
+msgid "Stored {count} CVEs at {path}; updated {updated_at}."
+msgstr "{path} konumunda {count} CVE saklandı; güncelleme: {updated_at}."
+
+#: autopwn_suite/cli.py:178
+#, fuzzy
+msgid ""
+"Updates require internet. Run --check-update or --apply-update without "
+"--offline."
+msgstr ""
+"Güncellemeler internet gerektirir. --check-update veya --apply-update "
+"komutunu --offline olmadan çalıştırın."
+
+#: autopwn_suite/cli.py:197
+#, fuzzy
+msgid ""
+"[red]Flask not found. Install it with: pip install flask flask-cors[/red]"
+msgstr ""
+"[red]Flask bulunamadı. Şununla kurun: pip install flask flask-cors[/red]"
+
+#: autopwn_suite/cli.py:206
+#, fuzzy
+msgid ""
+"\n"
+"Web UI closed."
+msgstr ""
+"\n"
+"Web arayüzü kapatıldı."
+
+#: autopwn_suite/cli.py:214
+#, fuzzy
+msgid ""
+"Specify --target or --host-file in offline mode; use IP addresses for "
+"airgapped scans."
+msgstr ""
+"Çevrimdışı modda --target veya --host-file belirtin; ağdan yalıtılmış "
+"taramalar için IP adresleri kullanın."
+
+#: autopwn_suite/cli.py:233
+#, fuzzy, python-brace-format
+msgid ""
+"Local NVD database: {count} CVEs; updated {updated_at}. Findings are possible"
+" vulnerabilities."
+msgstr ""
+"Yerel NVD veritabanı: {count} CVE; güncelleme: {updated_at}. Bulgular olası "
+"zafiyetlerdir."
+
+#: autopwn_suite/cli.py:245
+#, fuzzy
+msgid "The scan did not finish; saving the output recorded so far."
+msgstr "Tarama tamamlanmadı; şu ana kadar kaydedilen çıktı saklanıyor."
+
+#: autopwn_suite/cli.py:249
+#, fuzzy
+msgid "The recorded output could not be saved."
+msgstr "Kaydedilen çıktı saklanamadı."
+
+#: autopwn_suite/cli.py:264
+#, fuzzy, python-brace-format
+msgid "Sleeping for {seconds} seconds..."
+msgstr "{seconds} saniye bekleniyor..."
+
+#: autopwn_suite/cli.py:283 autopwn_suite/utils.py:598
+#, fuzzy
+msgid "Ctrl+C pressed. Exiting."
+msgstr "Ctrl+C algılandı. Çıkılıyor."
 
 #: autopwn_suite/daemon/daemon_installer.py:42
 #, fuzzy, python-brace-format
@@ -39,26 +131,46 @@ msgstr "[red]Geçersiz giriş. Lütfen bir tam sayı girin.[/red]"
 
 #: autopwn_suite/daemon/daemon_installer.py:65
 #, fuzzy, python-brace-format
-msgid "[red]Out of range. Please enter a whole number that is {value1}.[/red]"
-msgstr "[red]Aralık dışında. Lütfen {value1} olan bir tam sayı girin.[/red]"
+msgid ""
+"[red]Out of range. Please enter a whole number that is at least {minimum} and"
+" at most {maximum}.[/red]"
+msgstr ""
+"[red]Aralık dışında. Lütfen en az {minimum} ve en çok {maximum} olan bir tam "
+"sayı girin.[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:77
+#: autopwn_suite/daemon/daemon_installer.py:67
+#, fuzzy, python-brace-format
+msgid ""
+"[red]Out of range. Please enter a whole number that is at least "
+"{minimum}.[/red]"
+msgstr ""
+"[red]Aralık dışında. Lütfen en az {minimum} olan bir tam sayı girin.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:69
+#, fuzzy, python-brace-format
+msgid ""
+"[red]Out of range. Please enter a whole number that is at most "
+"{maximum}.[/red]"
+msgstr ""
+"[red]Aralık dışında. Lütfen en çok {maximum} olan bir tam sayı girin.[/red]"
+
+#: autopwn_suite/daemon/daemon_installer.py:82
 #, fuzzy
 msgid "[red]Invalid email format. Please enter a valid email address.[/red]"
 msgstr ""
 "[red]Geçersiz e-posta biçimi. Lütfen geçerli bir e-posta adresi girin.[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:85
+#: autopwn_suite/daemon/daemon_installer.py:90
 #, fuzzy
 msgid "[red]This field cannot be empty.[/red]"
 msgstr "[red]Bu alan boş bırakılamaz.[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:113
+#: autopwn_suite/daemon/daemon_installer.py:118
 #, fuzzy
 msgid "Welcome to AutoPWN Suite Config Creator!"
 msgstr "AutoPWN Suite Yapılandırma Oluşturucusuna hoş geldiniz!"
 
-#: autopwn_suite/daemon/daemon_installer.py:115
+#: autopwn_suite/daemon/daemon_installer.py:120
 #, fuzzy
 msgid ""
 "Enter the scan interval in [cyan]seconds[/cyan] (Set to 0 for no interval - "
@@ -67,42 +179,42 @@ msgstr ""
 "Tarama aralığını [cyan]saniye[/cyan] cinsinden girin (daemon olarak "
 "kullanmıyorsanız aralık olmaması için 0 girin): "
 
-#: autopwn_suite/daemon/daemon_installer.py:119
+#: autopwn_suite/daemon/daemon_installer.py:124
 #, fuzzy
 msgid "Would you like to enable email or webhook notifications?"
 msgstr "E-posta veya webhook bildirimlerini etkinleştirmek ister misiniz?"
 
-#: autopwn_suite/daemon/daemon_installer.py:120
+#: autopwn_suite/daemon/daemon_installer.py:125
 #, fuzzy
 msgid "Email"
 msgstr "E-posta"
 
-#: autopwn_suite/daemon/daemon_installer.py:120
+#: autopwn_suite/daemon/daemon_installer.py:125
 #, fuzzy
 msgid "Webhook"
 msgstr "Webhook"
 
-#: autopwn_suite/daemon/daemon_installer.py:120
+#: autopwn_suite/daemon/daemon_installer.py:125
 #, fuzzy
 msgid "None"
 msgstr "Hiçbiri"
 
-#: autopwn_suite/daemon/daemon_installer.py:125
+#: autopwn_suite/daemon/daemon_installer.py:130
 #, fuzzy
 msgid "Enter your [cyan]email address[/cyan]: "
 msgstr "[cyan]E-posta adresinizi[/cyan] girin: "
 
-#: autopwn_suite/daemon/daemon_installer.py:126
+#: autopwn_suite/daemon/daemon_installer.py:131
 #, fuzzy
 msgid "Enter your [cyan]email password[/cyan]: "
 msgstr "[cyan]E-posta şifrenizi[/cyan] girin: "
 
-#: autopwn_suite/daemon/daemon_installer.py:127
+#: autopwn_suite/daemon/daemon_installer.py:132
 #, fuzzy
 msgid "Enter the email address to [cyan]send the report to[/cyan]: "
 msgstr "Raporun [cyan]gönderileceği[/cyan] e-posta adresini girin: "
 
-#: autopwn_suite/daemon/daemon_installer.py:128
+#: autopwn_suite/daemon/daemon_installer.py:133
 #, fuzzy
 msgid ""
 "Enter the email address to [cyan]send from[/cyan] (leave empty to use login "
@@ -111,42 +223,42 @@ msgstr ""
 "[cyan]Gönderen[/cyan] e-posta adresini girin (oturum açma e-postasını "
 "kullanmak için boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:129
+#: autopwn_suite/daemon/daemon_installer.py:134
 #, fuzzy
 msgid "Enter the [cyan]email server[/cyan] to send the report from: "
 msgstr "Raporun gönderileceği [cyan]e-posta sunucusunu[/cyan] girin: "
 
-#: autopwn_suite/daemon/daemon_installer.py:130
+#: autopwn_suite/daemon/daemon_installer.py:135
 #, fuzzy
 msgid "Enter the [cyan]email port[/cyan] to send the report from: "
 msgstr "Raporun gönderileceği [cyan]e-posta portunu[/cyan] girin: "
 
-#: autopwn_suite/daemon/daemon_installer.py:131
+#: autopwn_suite/daemon/daemon_installer.py:136
 #, fuzzy
 msgid "[green]Email notifications enabled.[/green]"
 msgstr "[green]E-posta bildirimleri etkinleştirildi.[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:134
+#: autopwn_suite/daemon/daemon_installer.py:139
 #, fuzzy
 msgid "Enter your [cyan]webhook URL[/cyan]: "
 msgstr "[cyan]Webhook URL'nizi[/cyan] girin: "
 
-#: autopwn_suite/daemon/daemon_installer.py:135
+#: autopwn_suite/daemon/daemon_installer.py:140
 #, fuzzy
 msgid "[green]Webhook notifications enabled.[/green]"
 msgstr "[green]Webhook bildirimleri etkinleştirildi.[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:138
+#: autopwn_suite/daemon/daemon_installer.py:143
 #, fuzzy
 msgid "[yellow]No notifications enabled.[/yellow]"
 msgstr "[yellow]Hiçbir bildirim etkinleştirilmedi.[/yellow]"
 
-#: autopwn_suite/daemon/daemon_installer.py:140
+#: autopwn_suite/daemon/daemon_installer.py:145
 #, fuzzy
 msgid "Enter your [cyan]target[/cyan] (Leave empty for auto detection): "
 msgstr "[cyan]Hedefinizi[/cyan] girin (otomatik algılama için boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:141
+#: autopwn_suite/daemon/daemon_installer.py:146
 #, fuzzy
 msgid ""
 "Enter [cyan]host file[/cyan] (Leave empty for none - will override target): "
@@ -154,100 +266,100 @@ msgstr ""
 "[cyan]Host dosyasını[/cyan] girin (yoksa boş bırakın - hedefi geçersiz "
 "kılar): "
 
-#: autopwn_suite/daemon/daemon_installer.py:146
+#: autopwn_suite/daemon/daemon_installer.py:151
 #, fuzzy
 msgid "Would you like to [cyan]skip discovery[/cyan]? (y/n) "
 msgstr "[cyan]Keşfi atlamak[/cyan] ister misiniz? (y/n) "
 
-#: autopwn_suite/daemon/daemon_installer.py:149
+#: autopwn_suite/daemon/daemon_installer.py:154
 #, fuzzy
 msgid "Enter [cyan]API key[/cyan] (Leave empty for none): "
 msgstr "[cyan]API anahtarını[/cyan] girin (yoksa boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:150
+#: autopwn_suite/daemon/daemon_installer.py:155
 #, fuzzy
 msgid "Enter [cyan]nmap flags[/cyan] (Leave empty for none): "
 msgstr "[cyan]nmap bayraklarını[/cyan] girin (yoksa boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:151
+#: autopwn_suite/daemon/daemon_installer.py:156
 #, fuzzy
 msgid "Enter [cyan]speed[/cyan] (0-5, Leave empty for default): "
 msgstr "[cyan]Hızı[/cyan] girin (0-5, varsayılan için boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:156
+#: autopwn_suite/daemon/daemon_installer.py:161
 #, fuzzy
 msgid "Pick [cyan]scan type[/cyan] for host discovery (Leave empty for ARP): "
 msgstr ""
 "Host keşfi için [cyan]tarama türünü[/cyan] seçin (ARP için boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:157
+#: autopwn_suite/daemon/daemon_installer.py:162
 #, fuzzy
 msgid "ARP"
 msgstr "ARP"
 
-#: autopwn_suite/daemon/daemon_installer.py:157
+#: autopwn_suite/daemon/daemon_installer.py:162
 #, fuzzy
 msgid "Ping"
 msgstr "Ping"
 
-#: autopwn_suite/daemon/daemon_installer.py:162
+#: autopwn_suite/daemon/daemon_installer.py:167
 #, fuzzy
 msgid "Enter [cyan]host timeout[/cyan] (Leave empty for default): "
 msgstr "[cyan]Host zaman aşımını[/cyan] girin (varsayılan için boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:166
+#: autopwn_suite/daemon/daemon_installer.py:171
 #, fuzzy
 msgid "Enter [cyan]Scan Method[/cyan] (Leave empty for Normal): "
 msgstr "[cyan]Tarama Yöntemini[/cyan] girin (Normal için boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:167
+#: autopwn_suite/daemon/daemon_installer.py:172
 #, fuzzy
 msgid "Normal"
 msgstr "Normal"
 
-#: autopwn_suite/daemon/daemon_installer.py:167
+#: autopwn_suite/daemon/daemon_installer.py:172
 #, fuzzy
 msgid "Evade"
 msgstr "Kaçınma"
 
-#: autopwn_suite/daemon/daemon_installer.py:172
+#: autopwn_suite/daemon/daemon_installer.py:177
 #, fuzzy
 msgid "Enter [cyan]output folder[/cyan] (Leave empty for default): "
 msgstr "[cyan]Çıktı klasörünü[/cyan] girin (varsayılan için boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:177
+#: autopwn_suite/daemon/daemon_installer.py:182
 #, fuzzy
 msgid "Enter [cyan]output type[/cyan] (Leave empty for html): "
 msgstr "[cyan]Çıktı türünü[/cyan] girin (html için boş bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:178
+#: autopwn_suite/daemon/daemon_installer.py:183
 #, fuzzy
 msgid "HTML report"
 msgstr "HTML raporu"
 
-#: autopwn_suite/daemon/daemon_installer.py:178
+#: autopwn_suite/daemon/daemon_installer.py:183
 #, fuzzy
 msgid "Plain text"
 msgstr "Düz metin"
 
-#: autopwn_suite/daemon/daemon_installer.py:178
+#: autopwn_suite/daemon/daemon_installer.py:183
 #, fuzzy
 msgid "SVG image"
 msgstr "SVG görseli"
 
-#: autopwn_suite/daemon/daemon_installer.py:182
+#: autopwn_suite/daemon/daemon_installer.py:187
 #, fuzzy
 msgid "Creating config file..."
 msgstr "Yapılandırma dosyası oluşturuluyor..."
 
-#: autopwn_suite/daemon/daemon_installer.py:219
+#: autopwn_suite/daemon/daemon_installer.py:224
 #, fuzzy
 msgid "Enter [cyan]config file name[/cyan] (Leave empty for autopwn.conf): "
 msgstr ""
 "[cyan]Yapılandırma dosyası adını[/cyan] girin (autopwn.conf için boş "
 "bırakın): "
 
-#: autopwn_suite/daemon/daemon_installer.py:227
+#: autopwn_suite/daemon/daemon_installer.py:232
 #, fuzzy, python-brace-format
 msgid ""
 "[yellow]Config file '{config_file}' already exists. Would you like to "
@@ -256,28 +368,28 @@ msgstr ""
 "[yellow]'{config_file}' yapılandırma dosyası zaten mevcut. Üzerine yazmak "
 "ister misiniz?[/yellow] (y/n): "
 
-#: autopwn_suite/daemon/daemon_installer.py:229
+#: autopwn_suite/daemon/daemon_installer.py:234
 #, fuzzy, python-brace-format
 msgid "[red]Config file '{config_file}' not overwritten.[/red]"
 msgstr "[red]'{config_file}' yapılandırma dosyasının üzerine yazılmadı.[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:238
+#: autopwn_suite/daemon/daemon_installer.py:243
 #, fuzzy, python-brace-format
 msgid "[green]Config file '{config_file}' created successfully![/green]"
 msgstr ""
 "[green]'{config_file}' yapılandırma dosyası başarıyla oluşturuldu![/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:293
+#: autopwn_suite/daemon/daemon_installer.py:298
 #, fuzzy, python-brace-format
 msgid "Creating install directory: {path}"
 msgstr "Kurulum dizini oluşturuluyor: {path}"
 
-#: autopwn_suite/daemon/daemon_installer.py:297
+#: autopwn_suite/daemon/daemon_installer.py:302
 #, fuzzy, python-brace-format
 msgid "[red]Failed to create install directory {path}: {error}[/red]"
 msgstr "[red]{path} kurulum dizini oluşturulamadı: {error}[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:302
+#: autopwn_suite/daemon/daemon_installer.py:307
 #, fuzzy, python-brace-format
 msgid ""
 "[red]Refusing to install the daemon: it runs as root, but the interpreter, "
@@ -287,7 +399,7 @@ msgstr ""
 "paket veya {install_path} başka bir kullanıcı tarafından "
 "değiştirilebilir.[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:304
+#: autopwn_suite/daemon/daemon_installer.py:309
 #, fuzzy
 msgid ""
 "[yellow]Install AutoPWN Suite as root (for example with 'sudo bash "
@@ -298,7 +410,7 @@ msgstr ""
 " veya root'a ait bir dizinde tutulan bağımsız bir ikili dosyayla) ve "
 "--daemon-install komutunu bu kurulumdan çalıştırın.[/yellow]"
 
-#: autopwn_suite/daemon/daemon_installer.py:311
+#: autopwn_suite/daemon/daemon_installer.py:316
 #, fuzzy, python-brace-format
 msgid ""
 "[red]Refusing to install the daemon: the service would run '{command}' from "
@@ -309,7 +421,7 @@ msgstr ""
 "konumundan çalıştırırdı, ancak bu yorumlayıcı autopwn_suite'i oradan içe "
 "aktaramıyor.[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:315
+#: autopwn_suite/daemon/daemon_installer.py:320
 #, fuzzy
 msgid ""
 "[yellow]A source checkout started with 'python autopwn.py' is not enough. "
@@ -322,42 +434,42 @@ msgstr ""
 "ile veya root'a ait bir dizinde tutulan bağımsız bir ikili dosyayla) ve "
 "--daemon-install komutunu bu kurulumdan çalıştırın.[/yellow]"
 
-#: autopwn_suite/daemon/daemon_installer.py:344
+#: autopwn_suite/daemon/daemon_installer.py:349
 #, fuzzy, python-brace-format
 msgid "[red]Configuration file {src} does not exist.[/red]"
 msgstr "[red]{src} yapılandırma dosyası mevcut değil.[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:351
+#: autopwn_suite/daemon/daemon_installer.py:356
 #, fuzzy, python-brace-format
 msgid "[green]Configuration available at {dst}[/green]"
 msgstr "[green]Yapılandırma şurada: {dst}[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:353
+#: autopwn_suite/daemon/daemon_installer.py:358
 #, fuzzy, python-brace-format
 msgid "[red]Error copying {src} -> {dst}: {error}[/red]"
 msgstr "[red]{src} -> {dst} kopyalanırken hata: {error}[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:362
+#: autopwn_suite/daemon/daemon_installer.py:367
 #, fuzzy, python-brace-format
 msgid "[green]Created log file: {path}[/green]"
 msgstr "[green]Günlük dosyası oluşturuldu: {path}[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:364
+#: autopwn_suite/daemon/daemon_installer.py:369
 #, fuzzy, python-brace-format
 msgid "[yellow]Warning: could not create log file {path}: {error}[/yellow]"
 msgstr "[yellow]Uyarı: {path} günlük dosyası oluşturulamadı: {error}[/yellow]"
 
-#: autopwn_suite/daemon/daemon_installer.py:392
+#: autopwn_suite/daemon/daemon_installer.py:397
 #, fuzzy, python-brace-format
 msgid "Writing systemd service file to {path} ..."
 msgstr "systemd servis dosyası {path} konumuna yazılıyor ..."
 
-#: autopwn_suite/daemon/daemon_installer.py:395
+#: autopwn_suite/daemon/daemon_installer.py:400
 #, fuzzy, python-brace-format
 msgid "[green]Service file written to {path}[/green]"
 msgstr "[green]Servis dosyası {path} konumuna yazıldı[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:397
+#: autopwn_suite/daemon/daemon_installer.py:402
 #, fuzzy, python-brace-format
 msgid ""
 "[red]Permission denied writing {path}. Run this script as root or use "
@@ -366,27 +478,27 @@ msgstr ""
 "[red]{path} konumuna yazma izni reddedildi. Bu betiği root olarak çalıştırın "
 "veya sudo kullanın.[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:398
+#: autopwn_suite/daemon/daemon_installer.py:403
 #, fuzzy
 msgid "[yellow]Here’s the unit content to save manually:[/yellow]"
 msgstr "[yellow]Manuel olarak kaydedilecek birim (unit) içeriği:[/yellow]"
 
-#: autopwn_suite/daemon/daemon_installer.py:405
+#: autopwn_suite/daemon/daemon_installer.py:410
 #, fuzzy
 msgid "Reloading systemd daemon ..."
 msgstr "systemd daemon yeniden yükleniyor ..."
 
-#: autopwn_suite/daemon/daemon_installer.py:407
+#: autopwn_suite/daemon/daemon_installer.py:412
 #, fuzzy
 msgid "Enabling and starting service ..."
 msgstr "Servis etkinleştiriliyor ve başlatılıyor ..."
 
-#: autopwn_suite/daemon/daemon_installer.py:410
+#: autopwn_suite/daemon/daemon_installer.py:415
 #, fuzzy
 msgid "[green]Service enabled and started successfully.[/green]"
 msgstr "[green]Servis başarıyla etkinleştirildi ve başlatıldı.[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:411
+#: autopwn_suite/daemon/daemon_installer.py:416
 #, fuzzy
 msgid ""
 "[blue]Check status with: sudo systemctl status autopwn-daemon.service[/blue]"
@@ -394,12 +506,12 @@ msgstr ""
 "[blue]Durumu kontrol etmek için: sudo systemctl status autopwn-"
 "daemon.service[/blue]"
 
-#: autopwn_suite/daemon/daemon_installer.py:413
+#: autopwn_suite/daemon/daemon_installer.py:418
 #, fuzzy, python-brace-format
 msgid "[red]Systemctl command failed: {error}[/red]"
 msgstr "[red]Systemctl komutu başarısız oldu: {error}[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:414
+#: autopwn_suite/daemon/daemon_installer.py:419
 #, fuzzy
 msgid ""
 "[yellow]You may need to run manually: sudo systemctl daemon-reload && sudo "
@@ -410,12 +522,12 @@ msgstr ""
 "sudo systemctl enable autopwn-daemon.service && sudo systemctl restart "
 "autopwn-daemon.service[/yellow]"
 
-#: autopwn_suite/daemon/daemon_installer.py:417
+#: autopwn_suite/daemon/daemon_installer.py:422
 #, fuzzy
 msgid "[green]AutoPWN daemon installation complete.[/green]"
 msgstr "[green]AutoPWN daemon kurulumu tamamlandı.[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:424
+#: autopwn_suite/daemon/daemon_installer.py:429
 #, fuzzy
 msgid ""
 "Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"
@@ -423,12 +535,12 @@ msgstr ""
 "Daemon yalnızca [cyan]Linux[/cyan] üzerinde ve [cyan]root[/cyan] olarak "
 "kurulabilir!"
 
-#: autopwn_suite/daemon/daemon_installer.py:440
+#: autopwn_suite/daemon/daemon_installer.py:445
 #, fuzzy
 msgid "[yellow]systemctl could not be run.[/yellow]"
 msgstr "[yellow]systemctl çalıştırılamadı.[/yellow]"
 
-#: autopwn_suite/daemon/daemon_installer.py:449
+#: autopwn_suite/daemon/daemon_installer.py:454
 #, fuzzy
 msgid ""
 "Daemon can only be removed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"
@@ -436,12 +548,12 @@ msgstr ""
 "Daemon yalnızca [cyan]Linux[/cyan] üzerinde ve [cyan]root[/cyan] olarak "
 "kaldırılabilir!"
 
-#: autopwn_suite/daemon/daemon_installer.py:455
+#: autopwn_suite/daemon/daemon_installer.py:460
 #, fuzzy
 msgid "Stopping and disabling the service ..."
 msgstr "Servis durduruluyor ve devre dışı bırakılıyor ..."
 
-#: autopwn_suite/daemon/daemon_installer.py:457
+#: autopwn_suite/daemon/daemon_installer.py:462
 #, fuzzy
 msgid ""
 "[yellow]The service could not be stopped and disabled; it may not be "
@@ -450,17 +562,17 @@ msgstr ""
 "[yellow]Servis durdurulup devre dışı bırakılamadı; kurulu olmayabilir. Devam "
 "ediliyor.[/yellow]"
 
-#: autopwn_suite/daemon/daemon_installer.py:464
+#: autopwn_suite/daemon/daemon_installer.py:469
 #, fuzzy, python-brace-format
 msgid "[red]Could not remove {service_path}: {error}[/red]"
 msgstr "[red]{service_path} kaldırılamadı: {error}[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:467
+#: autopwn_suite/daemon/daemon_installer.py:472
 #, fuzzy, python-brace-format
 msgid "[green]Removed {service_path}[/green]"
 msgstr "[green]{service_path} kaldırıldı[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:469
+#: autopwn_suite/daemon/daemon_installer.py:474
 #, fuzzy
 msgid ""
 "[yellow]systemd was not told about the removal; run: sudo systemctl daemon-"
@@ -469,27 +581,27 @@ msgstr ""
 "[yellow]systemd kaldırmadan haberdar edilmedi; şunu çalıştırın: sudo "
 "systemctl daemon-reload[/yellow]"
 
-#: autopwn_suite/daemon/daemon_installer.py:471
+#: autopwn_suite/daemon/daemon_installer.py:476
 #, fuzzy, python-brace-format
 msgid "No service file at {service_path}."
 msgstr "{service_path} konumunda servis dosyası yok."
 
-#: autopwn_suite/daemon/daemon_installer.py:477
+#: autopwn_suite/daemon/daemon_installer.py:482
 #, fuzzy, python-brace-format
 msgid "[red]Could not remove {config_path}: {error}[/red]"
 msgstr "[red]{config_path} kaldırılamadı: {error}[/red]"
 
-#: autopwn_suite/daemon/daemon_installer.py:480
+#: autopwn_suite/daemon/daemon_installer.py:485
 #, fuzzy, python-brace-format
 msgid "[green]Removed {config_path}[/green]"
 msgstr "[green]{config_path} kaldırıldı[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:482
+#: autopwn_suite/daemon/daemon_installer.py:487
 #, fuzzy
 msgid "[green]AutoPWN daemon removed.[/green]"
 msgstr "[green]AutoPWN daemon kaldırıldı.[/green]"
 
-#: autopwn_suite/daemon/daemon_installer.py:483
+#: autopwn_suite/daemon/daemon_installer.py:488
 #, fuzzy, python-brace-format
 msgid ""
 "[blue]Left in place: the program, the log file /var/log/autopwn-daemon.log "
@@ -655,6 +767,16 @@ msgid "NVD lookup failed for {keyword}; vulnerability coverage is incomplete."
 msgstr ""
 "{keyword} için NVD sorgusu başarısız oldu; güvenlik açığı kapsamı eksik."
 
+#: autopwn_suite/random_user_agent.py:29
+#, fuzzy
+msgid "User agent database not found."
+msgstr "Kullanıcı aracısı veritabanı bulunamadı."
+
+#: autopwn_suite/random_user_agent.py:33
+#, fuzzy
+msgid "User agent database is empty."
+msgstr "Kullanıcı aracısı veritabanı boş."
+
 #: autopwn_suite/report.py:55
 #, fuzzy
 msgid "Sending email report..."
@@ -705,6 +827,14 @@ msgstr "Webhook teslimi başarısız oldu: {reason}"
 msgid "Scanning {target} for open ports ..."
 msgstr "{target} açık portlar için taranıyor ..."
 
+#: autopwn_suite/scanner.py:121
+#, fuzzy, python-brace-format
+msgid ""
+"Not running as root; dropping {flags}, which need raw-socket privileges."
+msgstr ""
+"root olarak çalışılmıyor; ham soket ayrıcalığı gerektiren {flags} "
+"kaldırılıyor."
+
 #: autopwn_suite/scanner.py:141
 #, fuzzy, python-brace-format
 msgid "Error: {error}"
@@ -724,6 +854,11 @@ msgstr "Gürültü oluşturuluyor..."
 #, fuzzy
 msgid "No hosts found for noise scan."
 msgstr "Gürültü taraması için host bulunamadı."
+
+#: autopwn_suite/scanner.py:182
+#, fuzzy, python-brace-format
+msgid "Creating noise on the first {limit} of {count} hosts."
+msgstr "Gürültü, {count} hostun ilk {limit} tanesinde oluşturuluyor."
 
 #: autopwn_suite/scanner.py:188
 #, fuzzy
@@ -764,6 +899,11 @@ msgstr "{target} hedefi çevrimdışı görünüyor."
 #, fuzzy, python-brace-format
 msgid "Target {target} seems to be us."
 msgstr "{target} hedefi bizim gibi görünüyor."
+
+#: autopwn_suite/scanner.py:349
+#, fuzzy, python-brace-format
+msgid "Nmap timed out on {target}; port coverage is incomplete."
+msgstr "Nmap {target} üzerinde zaman aşımına uğradı; port kapsamı eksik."
 
 #: autopwn_suite/scanner.py:353
 #, fuzzy, python-brace-format
@@ -856,32 +996,51 @@ msgstr ""
 "│\t\t[cyan]İstismar Edilebilirlik: [/cyan] {exploitability}\n"
 "│\t\t[cyan]Detaylar: [/cyan] {details_url}"
 
-#: autopwn_suite/update_checker.py:110
+#: autopwn_suite/update_checker.py:77
+#, fuzzy
+msgid ""
+"The repository (--update-repo or AUTOPWN_UPDATE_REPO) must be written "
+"OWNER/REPO, using letters, digits, '.', '_' and '-'."
+msgstr ""
+"Depo (--update-repo veya AUTOPWN_UPDATE_REPO) SAHİP/DEPO biçiminde, harf, "
+"rakam, '.', '_' ve '-' kullanılarak yazılmalıdır."
+
+#: autopwn_suite/update_checker.py:97
+#, fuzzy
+msgid "The release tag name is not a plain git name."
+msgstr "Sürüm etiketi adı düz bir git adı değil."
+
+#: autopwn_suite/update_checker.py:99
+#, fuzzy
+msgid "The branch name is not a plain git name."
+msgstr "Dal adı düz bir git adı değil."
+
+#: autopwn_suite/update_checker.py:116
 #, fuzzy, python-brace-format
 msgid "Could not reach GitHub ({error_type})."
 msgstr "GitHub'a ulaşılamadı ({error_type})."
 
-#: autopwn_suite/update_checker.py:112
+#: autopwn_suite/update_checker.py:118
 #, fuzzy, python-brace-format
 msgid "Nothing found at {url}."
 msgstr "{url} adresinde hiçbir şey bulunamadı."
 
-#: autopwn_suite/update_checker.py:114
+#: autopwn_suite/update_checker.py:120
 #, fuzzy
 msgid "GitHub API rate limit exceeded; try again later."
 msgstr "GitHub API hız sınırı aşıldı; lütfen daha sonra tekrar deneyin."
 
-#: autopwn_suite/update_checker.py:116
+#: autopwn_suite/update_checker.py:122
 #, fuzzy, python-brace-format
 msgid "GitHub API returned HTTP {status}."
 msgstr "GitHub API HTTP {status} döndürdü."
 
-#: autopwn_suite/update_checker.py:120 autopwn_suite/update_checker.py:122
+#: autopwn_suite/update_checker.py:126 autopwn_suite/update_checker.py:128
 #, fuzzy
 msgid "GitHub API returned an unexpected response."
 msgstr "GitHub API beklenmeyen bir yanıt döndürdü."
 
-#: autopwn_suite/update_checker.py:177
+#: autopwn_suite/update_checker.py:183
 #, fuzzy
 msgid ""
 "Commit-based update checks require a git checkout of AutoPWN Suite; use "
@@ -890,7 +1049,7 @@ msgstr ""
 "Commit tabanlı güncelleme kontrolleri, AutoPWN Suite'in bir git checkout'unu "
 "gerektirir; bunun yerine --update-channel release kullanın."
 
-#: autopwn_suite/update_checker.py:203
+#: autopwn_suite/update_checker.py:209
 #, fuzzy, python-brace-format
 msgid ""
 "Update available ({mode}): {current} -> {latest}\n"
@@ -899,17 +1058,17 @@ msgstr ""
 "Güncelleme mevcut ({mode}): {current} -> {latest}\n"
 "{url}"
 
-#: autopwn_suite/update_checker.py:206
+#: autopwn_suite/update_checker.py:212
 #, fuzzy, python-brace-format
 msgid "Up to date ({mode}): {current} (latest: {latest})."
 msgstr "Güncel ({mode}): {current} (en son: {latest})."
 
-#: autopwn_suite/update_checker.py:230
+#: autopwn_suite/update_checker.py:236
 #, fuzzy, python-brace-format
 msgid "git {command} could not run ({error_type})."
 msgstr "git {command} çalıştırılamadı ({error_type})."
 
-#: autopwn_suite/update_checker.py:237
+#: autopwn_suite/update_checker.py:243
 #, fuzzy
 msgid ""
 "Working tree has uncommitted changes; commit or stash them before applying an"
@@ -918,12 +1077,12 @@ msgstr ""
 "Çalışma ağacında commit edilmemiş değişiklikler var; bir güncelleme "
 "uygulamadan önce bunları commit edin veya stash'leyin."
 
-#: autopwn_suite/update_checker.py:253
+#: autopwn_suite/update_checker.py:259
 #, fuzzy, python-brace-format
 msgid "git fetch from {repo} failed (exit status {status})."
 msgstr "{repo} deposundan git fetch başarısız oldu (çıkış durumu {status})."
 
-#: autopwn_suite/update_checker.py:261
+#: autopwn_suite/update_checker.py:267
 #, fuzzy, python-brace-format
 msgid ""
 "Cannot fast-forward to {onto}: the local branch has diverged. Resolve "
@@ -933,13 +1092,13 @@ msgstr ""
 " çözün (örn. git rebase veya değişiklikleri yedekledikten sonra git reset "
 "--hard)."
 
-#: autopwn_suite/update_checker.py:272 autopwn_suite/update_checker.py:287
+#: autopwn_suite/update_checker.py:278 autopwn_suite/update_checker.py:293
 #, fuzzy
 msgid "Applying an update requires a git checkout of AutoPWN Suite."
 msgstr ""
 "Bir güncelleme uygulamak, AutoPWN Suite'in bir git checkout'unu gerektirir."
 
-#: autopwn_suite/update_checker.py:274
+#: autopwn_suite/update_checker.py:280
 #, fuzzy
 msgid ""
 "HEAD is detached; checkout a branch before applying a commit-based update."
@@ -947,17 +1106,17 @@ msgstr ""
 "HEAD ayrık (detached) durumda; commit tabanlı bir güncelleme uygulamadan önce"
 " bir dala (branch) geçiş yapın."
 
-#: autopwn_suite/update_checker.py:292
+#: autopwn_suite/update_checker.py:298
 #, fuzzy
 msgid "Latest release has no tag name."
 msgstr "En son sürümün (release) bir etiket (tag) adı yok."
 
-#: autopwn_suite/update_checker.py:299
+#: autopwn_suite/update_checker.py:305
 #, fuzzy, python-brace-format
 msgid "git checkout {tag} failed (exit status {status})."
 msgstr "git checkout {tag} başarısız oldu (çıkış durumu {status})."
 
-#: autopwn_suite/update_checker.py:315
+#: autopwn_suite/update_checker.py:321
 #, fuzzy, python-brace-format
 msgid ""
 "Updated ({mode}) {previous} -> {new} ({ref}). Restart AutoPWN Suite to use "
@@ -1357,11 +1516,6 @@ msgstr "Host dosyası hiçbir hedef içermiyor!"
 msgid "Enter target range to scan : "
 msgstr "Taranacak hedef aralığını girin: "
 
-#: autopwn_suite/utils.py:598
-#, fuzzy
-msgid "Ctrl+C pressed. Exiting."
-msgstr "Ctrl+C algılandı. Çıkılıyor."
-
 #: autopwn_suite/utils.py:609
 #, fuzzy
 msgid "Evasion mode enabled!"
@@ -1418,6 +1572,11 @@ msgstr "Geçersiz port numarası!"
 #, fuzzy
 msgid "Enter your webhook URL : "
 msgstr "Webhook URL'nizi girin: "
+
+#: autopwn_suite/utils.py:707
+#, fuzzy
+msgid "Please answer y or n."
+msgstr "Lütfen y veya n yanıtını verin."
 
 #: autopwn_suite/utils.py:711
 #, fuzzy
@@ -1500,6 +1659,17 @@ msgstr "Yapılandırma dosyası okunmaya çalışılırken izin reddedildi!"
 msgid "Invalid config file: {error}"
 msgstr "Geçersiz yapılandırma dosyası: {error}"
 
+#: autopwn_suite/utils.py:940
+#, fuzzy
+msgid "Couldn't install nmap (Linux): /usr/bin/sudo was not found."
+msgstr "Nmap kurulamadı (Linux): /usr/bin/sudo bulunamadı."
+
+#: autopwn_suite/utils.py:944 autopwn_suite/utils.py:968
+#: autopwn_suite/utils.py:971
+#, fuzzy
+msgid "Couldn't install nmap (Linux)"
+msgstr "nmap kurulamadı (Linux)"
+
 #: autopwn_suite/utils.py:948
 #, fuzzy, python-brace-format
 msgid ""
@@ -1520,11 +1690,6 @@ msgstr ""
 "\t4 pacman\n"
 "\t5 zypper.\n"
 "Seçenek seçin [0-5] >"
-
-#: autopwn_suite/utils.py:968 autopwn_suite/utils.py:971
-#, fuzzy
-msgid "Couldn't install nmap (Linux)"
-msgstr "nmap kurulamadı (Linux)"
 
 #: autopwn_suite/utils.py:987
 #, fuzzy
