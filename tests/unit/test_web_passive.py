@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.web.passive import inspect_response
+from autopwn_suite.web.passive import inspect_response
 
 
 @pytest.mark.unit

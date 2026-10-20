@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
 import gettext
+import os
 import shutil
 import sys
 import tempfile
@@ -12,6 +13,10 @@ import pytest
 # Add the project root to the Python path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+# The dashboard account, settings and CVE database default to a per-user directory;
+# keep every test away from the real one. Tests of the default itself unset this.
+os.environ["AUTOPWN_DATA_DIR"] = tempfile.mkdtemp(prefix="autopwn-tests-")
 
 
 @pytest.fixture
@@ -176,7 +181,7 @@ def reset_sys_modules():
     yield
     modules_after = set(sys.modules.keys())
     for module in modules_after - modules_before:
-        if module.startswith(("modules.", "api", "autopwn")):
+        if module.startswith("autopwn_suite.") or module in {"api", "autopwn"}:
             sys.modules.pop(module, None)
 
 

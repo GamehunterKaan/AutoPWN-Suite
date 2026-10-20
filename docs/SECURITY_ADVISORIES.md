@@ -4,19 +4,19 @@ This is the project's predictable public vulnerability-information channel,
 alongside [GitHub Security Advisories](https://github.com/GamehunterKaan/AutoPWN-Suite/security/advisories).
 Use [private reporting](../SECURITY.md) for new issues and coordinated disclosure.
 Local `AUTOPWN-SA-*` identifiers below are project tracking identifiers, **not
-CVE or GHSA identifiers**. These entries summarize the 2026-10-15 source
-assessment. They do not claim that any remediation has shipped.
+CVE or GHSA identifiers**. Entries 001 to 006 summarize the 2026-10-15 source
+assessment; entries 007 and later come from the review of the code for release
+2.7.0 and say so. Each entry states its status and, once a fix has shipped, the
+release that contains it.
 
 ## AUTOPWN-SA-2026-001 — Unauthenticated dashboard administration
 
 - Assessed affected version: **2.6.0** (`c24c1d4`). Earlier versions not assessed.
-- Status: **fixed in unreleased changes; v2.6.0 remains affected.** On 2026-10-16
+- Status: **fixed in v2.6.1; v2.6.0 remains affected.** On 2026-10-16
   the maintainer decided that the dashboard authentication below closes this
   advisory (superseding the earlier request to leave it unchanged for
-  trusted-operator deployments). Fixed released version: **none until the next
-  release is published**; this advisory must not be described as fixed in any
-  published version before then. Residual limits remain documented under the
-  mitigation.
+  trusted-operator deployments). Fixed released version: **2.6.1**. Residual
+  limits remain documented under the mitigation.
 - CWE-306; medium under conditional network exposure.
 - Prerequisite: an untrusted client can reach the dashboard. In v2.6.0 the default
   listener is `0.0.0.0:8080`; the localhost display does not restrict network binding.
@@ -26,7 +26,7 @@ assessment. They do not claim that any remediation has shipped.
 - Mitigation: restrict network access to trusted operators, explicitly bind
   loopback where possible, and put remote access behind authenticated ingress.
   Do not expose it to the public internet. Treat all API access as administrative.
-- Unreleased mitigation (not in v2.6.0 or any published version): the dashboard
+- Mitigation in v2.6.1 (not in v2.6.0): the dashboard
   requires sign-in as a single administrator account stored in `web_ui_auth.json`
   (plaintext username, scrypt hash, revision). A random `admin` password is
   generated and printed once at first launch, can be changed under Settings ->
@@ -39,44 +39,45 @@ assessment. They do not claim that any remediation has shipped.
   `AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy). The default
   bind is now `127.0.0.1` (the supplied Compose file sets it explicitly; the
   Dockerfile still sets `0.0.0.0` inside the container, so publish the port to
-  loopback only).
-- Residual after the unreleased mitigation: one shared administrator account with
+  loopback only; a bridge-published port is not loopback to the dashboard, so
+  signing in through it needs HTTPS or host networking, as README.md explains).
+- Residual after the v2.6.1 mitigation: one shared administrator account with
   no MFA or per-user roles, settings still stored as plaintext at rest unless
   `*_FILE` credential files are used, and HTTPS for remote access is the
   operator's responsibility. The exposure severity above describes v2.6.0 and is
   not re-rated here.
-- Source: `modules/web_ui.py` application construction and administrative routes;
-  `modules/nmap_progress.py` native option processing; `modules/web_auth.py`
-  (unreleased authentication, tests in `tests/unit/test_web_auth.py` and
+- Source: `autopwn_suite/web_ui.py` application construction and administrative routes;
+  `autopwn_suite/nmap_progress.py` native option processing; `autopwn_suite/web_auth.py`
+  (authentication added in v2.6.1, tests in `tests/unit/test_web_auth.py` and
   `tests/unit/test_web_auth_ui.py`).
 
 ## AUTOPWN-SA-2026-002 — Stored script injection in profile descriptions
 
 - Assessed affected version: **2.6.0**. Earlier versions not assessed.
-- Status: **fixed locally, awaiting release** (2026-10-16). Fixed released version: none.
+- Status: **fixed in v2.6.1** (2026-10-16). Fixed released version: **2.6.1**.
 - CWE-79; medium, requiring profile modification and an operator page view.
 - Impact: saved descriptions are inserted as HTML in the dashboard, allowing
   script execution in its origin when a profile list is rendered.
 - Mitigation: restrict profile writers and dashboard access; use an isolated
   browser context. A code fix must render descriptions as text/escaped content.
-- Source: profile POST/PUT handlers in `modules/web_ui.py` and `renderProfiles`
-  in `modules/web_ui_static/app.js`.
-- Local fix: escape description, mode and speed at the HTML rendering boundary,
+- Source: profile POST/PUT handlers in `autopwn_suite/web_ui.py` and `renderProfiles`
+  in `autopwn_suite/web_ui_static/app.js`.
+- Fix in v2.6.1: escape description, mode and speed at the HTML rendering boundary,
   including legacy saved configuration; ordinary text and form editing remain supported.
   Regression: `tests/unit/test_web_ui_behavior.py` profile metadata test.
 
 ## AUTOPWN-SA-2026-003 — SMTP server certificates are not validated
 
 - Assessed affected version: **2.6.0**. Earlier versions not assessed.
-- Status: **fixed locally, awaiting release** (2026-10-16). Fixed released version: none.
+- Status: **fixed in v2.6.1** (2026-10-16). Fixed released version: **2.6.1**.
 - CWE-295; medium, requiring an active network intermediary or forged endpoint.
 - Impact: implicit-TLS/STARTTLS connections use an unverified standard-library
   default before SMTP login, permitting disclosure of credentials/report data.
 - Mitigation: disable email notifications or use a separately authenticated
   protected transport. Merely selecting port 465/STARTTLS is not a fix.
-- Source: email delivery in `modules/report.py` and `_smtp_connection` in
-  `modules/web_ui.py`. A fix must supply a validating SSL context on both paths.
-- Local fix: both implicit TLS and STARTTLS use `ssl.create_default_context()`
+- Source: email delivery in `autopwn_suite/report.py` and `_smtp_connection` in
+  `autopwn_suite/web_ui.py`. A fix must supply a validating SSL context on both paths.
+- Fix in v2.6.1: both implicit TLS and STARTTLS use `ssl.create_default_context()`
   before authentication. Invalid chains and hostname mismatches fail before
   credentials or reports are sent. Regression: `tests/unit/test_smtp_security.py`
   covers CLI/dashboard, untrusted and mismatched peers, and trusted delivery.
@@ -84,7 +85,7 @@ assessment. They do not claim that any remediation has shipped.
 ## AUTOPWN-SA-2026-004 — Ambient credentials in core web requests
 
 - Assessed affected version: **2.6.0**. Earlier versions not assessed.
-- Status: **fixed locally, awaiting release** (2026-10-16). Fixed released version: none.
+- Status: **fixed in v2.6.1** (2026-10-16). Fixed released version: **2.6.1**.
 - CWE-522; medium, requiring a matching/default `.netrc` credential entry in the
   scanner account. No real credential files were accessed during assessment.
 - Impact: core discovery/crawl/injection/directory HTTP paths may implicitly
@@ -92,13 +93,13 @@ assessment. They do not claim that any remediation has shipped.
   and unchecked target TLS can expose them to an intermediary as well.
 - Mitigation: use a dedicated scanner account with no ambient `.netrc`
   credentials. Stronger anonymity in additional diagnostic probes and replay
-  does not currently protect every core request.
-- Source: `modules/web/http.py`, `webvuln.py` and `dirbust.py` request consumers.
-- Local fix: all diagnostic HTTP uses private sessions with environment trust
+  does not protect every core request in v2.6.0.
+- Source: `autopwn_suite/web/http.py`, `webvuln.py` and `dirbust.py` request consumers.
+- Fix in v2.6.1: all diagnostic HTTP uses private sessions with environment trust
   disabled and authentication/cookie headers removed. `.netrc`, environment
   proxies and their credentials are not imported. Synthetic-credential regressions
   cover core, scoped, additional probes and evidence replay.
-- Related unreleased change (not part of this fix): web scan requests, including
+- Related change in v2.6.1 (not part of this fix): web scan requests, including
   replay, now verify target certificates by default (`--insecure-tls`,
   INI `insecure_tls` or the dashboard's "Accept untrusted certificates" option
   opt out and are recorded with findings), where v2.6.0 did not verify them. TLS
@@ -108,7 +109,7 @@ assessment. They do not claim that any remediation has shipped.
 ## AUTOPWN-SA-2026-005 — Unbounded slow HTTP response duration
 
 - Assessed affected version: **2.6.0**. Earlier versions not assessed.
-- Status: **fixed locally, awaiting release** (2026-10-16). Fixed released version: none.
+- Status: **fixed in v2.6.1** (2026-10-16). Fixed released version: **2.6.1**.
 - CWE-400; medium, requiring a hostile selected HTTP target.
 - Impact: trickled response bytes can retain scan/verification workers despite
   configured inactivity timeouts and an operator Stop request. Response byte
@@ -116,15 +117,784 @@ assessment. They do not claim that any remediation has shipped.
 - Mitigation: isolate scanning from other services and enforce process-level
   time limits. Terminating the dashboard loses in-memory jobs/checkpoints, so
   export needed results first. A code fix needs deadline-aware transport reads.
-- Source: `bounded_request` in `modules/web/http.py` and streaming replay in
-  `modules/web/poc_runtime.py`.
-- Local fix: scans and standalone Python replay share deadline-aware transport.
+- Source: `bounded_request` in `autopwn_suite/web/http.py` and streaming replay in
+  `autopwn_suite/web/poc_runtime.py`.
+- Fix in v2.6.1: scans and standalone Python replay share deadline-aware transport.
   Nonblocking TCP connects share one deadline across resolved addresses and honor
   Stop. An owned socket duplicate allows a joined watchdog to interrupt active HTTP/TLS
   reads during headers, bodies, incomplete chunks and trailers; scan Stop raises
   cancellation and stream failures leave tasks resumable. OS DNS resolution is
   outside this network-I/O deadline. Loopback regressions are in
   `tests/unit/test_web_transport_security.py`; this is not a DNS timeout guarantee.
+
+## AUTOPWN-SA-2026-006 — Webhook URL written to logs and reports on delivery failure
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-532; low, requiring a failed webhook delivery and access to the resulting
+  log, report or server log.
+- Impact: a webhook URL is a credential (for Slack, Discord and similar services
+  anyone holding it can post to the channel). `requests` quotes the full URL in
+  its error messages, and three failure paths logged that text: the CLI wrote it
+  to the console, which is saved into report files and can be sent by email; the
+  dashboard added it to the in-memory log history served by `GET /api/log` and
+  replayed to every `/api/events` stream; the test-webhook endpoint wrote it with
+  a traceback to the server log.
+- Mitigation: rotate a webhook URL that appeared in a log or report, and keep
+  report files, dashboard access and server logs private. A `*_FILE` credential
+  file keeps the URL out of settings but does not stop this leak.
+- Source: `SendWebhook` in `autopwn_suite/report.py`; `_deliver_webhook` and
+  `api_test_webhook` in `autopwn_suite/web_ui.py`.
+- Fix in v2.7.0: delivery failures report only the exception class and, when the
+  server answered, the HTTP status (`delivery_error_summary` in
+  `autopwn_suite/credential_files.py`). Regressions use a synthetic URL and fail
+  on the previous code: `tests/unit/test_report.py`, `tests/unit/test_web_ui.py`
+  and `tests/unit/test_credential_files.py`.
+- Found 2026-10-18 during a review of the repository documentation; it is not part
+  of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-007 — Dashboard settings file readable by other local users
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19), completely. The dashboard creates and saves its settings, profiles and schedules files owner-only, and when it starts it also restricts such a file that an earlier release left readable (POSIX), so an upgraded installation no longer waits for the next save. Fixed released version: **2.7.0**.
+
+(Mitigation: keep the data directory owner-only (mode 0700), supply credentials through `*_FILE` files from 2.6.1 on, and rotate a credential that was stored while another local account could read it. For a host that still runs 2.6.x or earlier, keep the existing instruction to run `chmod 600` on the existing `web_ui_settings.json`, `web_ui_profiles.json` and `web_ui_schedules.json` and on any leftover `.web_ui_*.json.*.tmp` file. Delete the sentence that says the files keep their old mode until saved again after upgrading, and instead say that starting the dashboard on 2.7.0 does this itself.)
+- CWE-732; low, requiring a local account on the same host, credentials that an
+  operator saved in the dashboard settings, and a data directory that account can
+  enter.
+- Prerequisite: the dashboard ran on a multi-user host with a umask that leaves the
+  other-read bit (the usual 022; a umask of 077 already gave a 0600 file), and
+  another local account can enter its data directory. In 2.6.1 and 2.6.0 that
+  directory is the package directory unless `AUTOPWN_DATA_DIR` names another (for
+  example `/opt/autopwn-suite/modules/` after `install.sh`).
+- Impact: `web_ui_settings.json` holds the SMTP password, the NVD API key and the
+  webhook URL once an operator has saved them in the dashboard (in 2.6.1 not when
+  `*_FILE` credential files supply them; 2.6.0 has none). The settings, profiles
+  and schedules were written through a temporary file created with the process
+  umask, usually mode 0644, that then replaced the real file, so another local user
+  could read the credentials. The profiles and schedules files hold scan targets and
+  options, not credentials. The account file `web_ui_auth.json` was already created
+  owner-only in 2.6.1 and is not affected. In 2.6.0 the unauthenticated dashboard
+  (AUTOPWN-SA-2026-001) also returned the NVD key and webhook URL from
+  `GET /api/settings` to any client that could reach it.
+- Mitigation: keep the data directory owner-only (mode 0700), supply credentials through `*_FILE` files from 2.6.1 on, and rotate a credential that was stored while another local account could read it. On a host that still runs 2.6.x or earlier, run `chmod 600` on the existing `web_ui_settings.json`, `web_ui_profiles.json` and `web_ui_schedules.json` and on any leftover `.web_ui_*.json.*.tmp` file; v2.7.0 restricts them itself when the dashboard starts.
+- Source: `_write_json` in `autopwn_suite/web_ui.py` (`modules/web_ui.py` in 2.6.1
+  and 2.6.0), which the settings, profiles and schedules saves use.
+- Fix in v2.7.0: the temporary file is created with `os.open`, `O_EXCL` and mode 0600, like the account file, so the saved file is owner-only on POSIX whatever the umask (Windows has no POSIX modes, so nothing changes there). The dashboard creates a missing data directory with mode 0700; an existing data directory keeps its own mode. In addition, `start_server` now calls `_tighten_data_files` before it loads anything. On POSIX it makes `web_ui_settings.json`, `web_ui_profiles.json`, `web_ui_schedules.json` and the account file `web_ui_auth.json` owner-only (mode 0600) when group or others have any permission on them, and removes a leftover `.web_ui_*.json.*.tmp` file of an interrupted save once it is more than 60 seconds old (a younger one may belong to a save that is still running in another process, so it is only restricted). Each file is opened with `O_NOFOLLOW` and its mode is changed through the open descriptor, so a symlink is never followed and what it points to is never changed, and anything that is not a regular file is skipped. It never stops the dashboard from starting: a file that cannot be changed (a read-only file system, a file that another account owns) is left as it was and reported once, and the other files are still processed. When it changed something it logs one fixed warning line, and when it could not change something one more fixed line; neither names a path or carries exception text. The CVE database and the data directory's own mode are not touched. The copy that the dashboard keeps of a profiles or schedules file it cannot load (`<name>.corrupt-<UTC timestamp>`, new in 2.7.0) is created owner-only as well; it was created with `shutil.copy2`, which briefly has the process umask's mode. A file that cannot be parsed at all is moved aside by a rename instead of being copied, and keeps the mode it had, which the start-up restriction has already made 0600 unless it could not change that file. What the fix cannot undo: a credential that another local account read while the file was readable stays exposed, so rotate it. Regressions fail on the previous code: `tests/unit/test_web_ui.py` `TestExistingDataFilesAreRestricted` (`test_a_file_that_group_or_others_can_access_becomes_owner_only`, `test_an_owner_only_file_is_not_touched_or_reported`, `test_the_leftover_of_an_interrupted_save_is_removed_when_it_is_old_and_restricted_when_it_may_be_running`, `test_a_chmod_that_fails_never_stops_startup_and_is_logged_once_with_fixed_text`, `test_one_file_that_cannot_be_restricted_does_not_leave_the_others_exposed`, `test_a_symlink_is_not_followed`, `test_the_dashboard_starts_with_old_files_restricted_and_also_when_that_fails`, `test_start_server_restricts_the_files_before_it_loads_them`, `test_a_copy_kept_of_an_unreadable_file_is_created_owner_only`, `test_a_file_moved_aside_keeps_the_mode_it_had` (POSIX only; its restricted-first case fails on the previous code, which has no start-up restriction)) together with the existing `test_persisted_files_are_created_owner_only`. Most of these cases are POSIX only; the ones that mock `os.open`, `os.fstat` and `os.fchmod` also run on Windows.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-008 — SMTP server's reply written to logs when an email fails
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-532; low, requiring a failed email delivery and read access to the log that
+  received the text.
+- Prerequisite: email notifications enabled in the dashboard settings, an SMTP
+  delivery that fails (a refused login, a failed certificate check, a dropped
+  connection) and read access to the log in question: the dashboard process's log
+  output for the test email, the dashboard log (`GET /api/log`, `/api/events`) for the
+  scan notification. That needs a signed-in client in v2.6.1; v2.6.0 has no sign-in
+  (see AUTOPWN-SA-2026-001), so any client that can reach the dashboard could read it.
+- Impact: two dashboard paths wrote the exception text of a failed email. For an SMTP
+  error that text is the server's reply or the TLS check's message, so it can carry
+  host names, account names and the server's own wording. `api_test_email` logged the
+  failure with its traceback, which put the text in the dashboard process's log
+  output. `_deliver_email` (scan notifications) broadcast `Email notification failed:`
+  followed by the text, which the dashboard keeps in its in-memory log history and
+  replays to every client. The HTTP response of the test endpoint and the CLI email
+  report already used fixed text.
+- Mitigation: keep the dashboard process's log output and dashboard access private.
+- Source: `api_test_email` and `_deliver_email` in `autopwn_suite/web_ui.py`
+  (`modules/web_ui.py` in v2.6.1 and v2.6.0).
+- Fix in v2.7.0: both paths report only the exception class
+  (`delivery_error_summary` in `autopwn_suite/credential_files.py`), with no traceback.
+  Regressions in `tests/unit/test_web_ui.py`, each raising an SMTP error that carries
+  a host name and a marker:
+  `TestAPITestEmail::test_email_failure_is_logged_as_the_class_only` (test email)
+  and `TestEmail::test_email_failure_is_logged_as_the_class_only` (scan notification).
+  Both fail on v2.6.1.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-009 — Malformed sign-in and JSON bodies end in HTTP 500
+
+- Assessed affected version: **2.6.1**. **2.6.0** has no sign-in (see
+  AUTOPWN-SA-2026-001), so only the nested-body case applies to it, on its JSON
+  routes. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-755; low and availability only: neither case signs anyone in or stops the
+  dashboard.
+- Prerequisite: network access to the sign-in route, which is public by design
+  (a valid challenge from `GET /api/auth/login` is enough). The dashboard listens
+  on loopback by default, so that means a local user or process, or any client that
+  can reach a listener the operator bound beyond loopback. On the other JSON routes
+  of 2.6.1 the nested-body case needs a signed-in session.
+- Impact: a sign-in with a lone-surrogate username (`"\ud800"`) and any password of
+  1 to 128 characters raised an encoding error after the password hash had run, so
+  the answer was HTTP 500, the attempt was not counted as a failed sign-in and each
+  request held a hashing slot for the whole hash time. Because nothing was counted,
+  a client address was never throttled (a wrong username is throttled after 5
+  attempts per address): three concurrent clients on one address kept both hashing
+  slots busy, and other clients' sign-ins got HTTP 429 for as long as they kept
+  sending. A JSON body nested about a thousand levels deep (a 2 KB body, on Python
+  3.10 and 3.11, measured on 3.11) raised `RecursionError`, which Flask does not
+  treat as malformed JSON, so the sign-in route answered HTTP 500 and so did every
+  other JSON route for a signed-in client. On Python 3.12 and later the nesting
+  needed is about ten thousand levels or more (measured on 3.12 and 3.14), more
+  than the 4 KB body limit of the sign-in route, so only the signed-in routes are
+  reachable there.
+- Mitigation: restrict network access to the dashboard and rate-limit sign-in
+  requests at a reverse proxy.
+- Source: `dashboard_login`, defined in `install_auth` in
+  `autopwn_suite/web_auth.py` (`modules/web_auth.py` in v2.6.1), and the
+  `request.get_json` calls in `autopwn_suite/web_ui.py` (`modules/web_ui.py` in
+  v2.6.1 and v2.6.0).
+- Fix in v2.7.0: the username is compared as UTF-8 with `surrogatepass`, so it is an
+  ordinary 401 that counts toward the throttle (the request still runs the hash
+  while it holds a slot), and the app's JSON provider reports `RecursionError` as
+  malformed JSON, so every JSON route handles it as a malformed body (HTTP 400 on
+  the sign-in route, not 500). Regressions fail on the previous code:
+  `tests/unit/test_web_auth.py`
+  (`test_lone_surrogate_username_is_a_throttled_failed_sign_in_not_a_server_error`
+  and `test_sign_in_body_nested_too_deeply_is_malformed_json_not_a_server_error`,
+  which simulates the interpreter's `RecursionError` because a 4 KB body is too
+  small to cause it on Python 3.12 and later) and `tests/unit/test_web_ui.py`
+  (`TestNestedJSONBodies`, which sends 200 KB bodies to signed-in routes).
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-010 — FLASK_DEBUG enables the Werkzeug debugger and console without sign-in
+
+- Assessed affected version: **2.6.1**. **2.6.0** makes the same `app.run` call and `FLASK_DEBUG` enables the debugger there too, but 2.6.0 has no sign-in at all (see AUTOPWN-SA-2026-001), so a sign-in bypass does not describe it. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-489; low, because it needs a non-default development setting and running code in the console needs the Werkzeug debugger PIN.
+- Prerequisite: `FLASK_DEBUG` set to a true value (anything except empty, `0`, `false` or `no`) in the environment of the dashboard process, and HTTP access to its port: loopback by default, so a local user or process, or any client that can reach a listener the operator bound beyond loopback. AutoPWN Suite never sets the variable itself.
+- Impact: `start_server` called `app.run` without `debug=`, so Flask took the setting from `FLASK_DEBUG` and Werkzeug wrapped the whole application in its `DebuggedApplication`. That middleware answers before Flask's request hooks, so the sign-in check never sees these requests. On a v2.6.1 dashboard started with `FLASK_DEBUG=1`, an unauthenticated client got the interactive console page at `/console` (HTTP 200, where every dashboard route answered 401 or redirected to `/login`); the debugger's script and style resources on any path, including `/api/...` paths that answer 401 without the parameter; and, for any unhandled exception on a route reachable without sign-in (for example the HTTP 500 case of AUTOPWN-SA-2026-009), a 500 page with the traceback, the application's source lines around each frame and local file paths, in place of the generic error. The console runs commands only after PIN entry: a command carrying the page's secret but no PIN cookie was redirected to sign-in and not executed. With `WERKZEUG_DEBUG_PIN=off` also set, the same request ran `1+1` without sign-in, which is unauthenticated code execution as the account that runs the dashboard. The console and command requests are refused (HTTP 400) unless the `Host` header is a localhost name, `127.0.0.1` or the address the server was bound to; the resources and the traceback page are not restricted by `Host`.
+- Mitigation: start the dashboard without `FLASK_DEBUG` (or with `FLASK_DEBUG=0`), never set `WERKZEUG_DEBUG_PIN=off` for it, keep it on loopback, and restart it after changing the environment. A dashboard that ran with `FLASK_DEBUG` set and the PIN off exposed code execution to anyone who could reach the port, so treat the credentials of its account as exposed.
+- Source: the `app.run(...)` call in `start_server` in `autopwn_suite/web_ui.py` (`modules/web_ui.py` in v2.6.1).
+- Fix in v2.7.0: `app.run` is called with `debug=False`, which overrides every other source of the setting, so the application is no longer wrapped in the debugger. With `FLASK_DEBUG=1` the fixed code answers `/console` and the debugger resource URLs with the sign-in redirect or 401, and the lone-surrogate sign-in request ends in an ordinary 401. Regression: `tests/unit/test_web_ui.py` (`TestStartServer::test_flask_debug_environment_cannot_enable_the_unauthenticated_debugger`) starts the server with `FLASK_DEBUG=1`, captures the application handed to Werkzeug, and checks that it is not a `DebuggedApplication` and that `/console` only redirects to `/login`; it fails on the code before the fix.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-011 — A hostile web target can stall a scan and the dashboard
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19) for the cases listed under "Fix in v2.7.0", which are bounds on
+  the project's own code. The standard library's HTML parser, which every HTML reader here uses, is slow
+  on some inputs in older Python releases; that is not changed by this fix (see "Remaining in v2.7.0").
+  Fixed released version: **2.7.0**.
+- CWE-400 (CWE-1333 for the regular expressions, CWE-407 for the quadratic readers and comparisons); medium,
+  like AUTOPWN-SA-2026-005: a hostile or compromised web target that the operator scans is enough, and the
+  effect is availability only.
+- Prerequisite: a web scan of a target whose response bodies an attacker controls (the CLI's web
+  vulnerability prompt, the dashboard's web scan, a replay of a recorded check, or the Python API):
+  a hostile or compromised web server, a page that a user of the scanned site can publish (the
+  crawler follows same-origin links), or an on-path attacker for a plain-HTTP target. The attacker needs no
+  sign-in or credential. The dashboard's web scan is off by default; the CLI prompt defaults to yes.
+  All web checks run by default.
+- Impact: availability only. A body that makes a regular expression backtrack stalls the scan, and
+  `re` holds the interpreter lock while it matches, so the Stop button and the whole dashboard (every
+  thread of the process) stopped answering until the match ended; in a reproduction on the v2.6.1
+  code a second thread in the same process did not run for 8.7 s of an 8.8 s match. The other cases
+  are pure Python: the dashboard keeps answering, but the scan thread stays busy and Stop only takes
+  effect between steps. A crawl could also keep much more memory in the job's checkpoint than the pages it
+  read, which is a memory risk for the dashboard process, not a CPU one.
+- Worst cases (fix commit messages, tests and reruns on Python 3.14 on a loaded Windows machine, so the
+  times differ by up to about a factor of two between runs; a 100 KB to 1 MB body is enough):
+  - `microsoft odbc ` repeated for 15 KB kept the SQL error check busy for 25 to 48 s, and the time grows
+    about with the cube of the length (the regression test's 180 KB body of this kind did not finish in
+    15 minutes); a `/.env` body of 100,000 newlines took 150 to 220 s; a 5xx page of 100,000 word
+    characters 100 to 150 s.
+  - 16,000 nested unclosed tags took 9 to 17 s in the reflected-XSS check and the PoC parser (14 to 26 s
+    with unmatched end tags); 25,000 nested `<h1>` tags (100 KB) about 30 s per probed path in
+    directory-listing detection; 8,000 nested unclosed `<form>` tags (48 KB) 26 to 67 s in the crawler.
+  - `difflib` on bodies of many different characters took 19 to 57 s for one pair of 100 KB bodies
+    (boolean SQL injection) and 0.5 s per pair of 20 KB bodies in directory discovery; one periodic
+    pair of 20,000 characters took 4 to 7 minutes.
+  - Recording 2,000 findings took 20 to 54 s (quadratic; a hostile site has to make the scan produce that
+    many distinct findings within the request budget of 10,000 requests, which was not demonstrated end to
+    end). A crawled page of 55,000 short links (1.3 MB; the default response limit of 1 MB allows about
+    44,000 of them) left about 1.9 MB as JSON, 4.3 MB as Python objects, in the job's checkpoint, for each
+    page crawled; a 61 KB page with a 20,000-character same-origin `<base href>` and 2,000 short relative
+    links left 40 million characters (about 40 MB) in the checkpoint for that one page, six such pages
+    240 million, and the total grew with the pages crawled (250 by default, up to 2,000), which at the
+    default would be about 10 GB (extrapolated, not run).
+  - A 5xx page of `Error:at a(` repeated to 100,000 characters kept the Java stack-trace check busy for
+    68 s (`Exception:at a(` 33 s) while a second thread of the process did not run; the time grows with the
+    square of the body. A link with 40,000 query parameters (a 268 KB URL) made one call of
+    `parameter_indexes` take 38 s (20,000 parameters 7 s), for each of five checks, because it
+    serialized the whole URL again for every parameter.
+- Mitigation: scan only web targets you trust with the web checks, or run them in a disposable
+  process or container with CPU-time and memory limits so that a stalled scan can be killed. A scan
+  stuck in a regular expression cannot be stopped from the dashboard, and killing the dashboard
+  loses in-memory jobs and checkpoints, so export needed results first. Run a current patch release of
+  your Python minor version (see the HTML parser item under "Remaining in v2.7.0"). A Python PoC downloaded
+  from an affected version embeds the old `poc_runtime.py` code; download it again from 2.7.0.
+- Source: `SQLIScanner` patterns and `_errors` in `autopwn_suite/web/sqli.py`; the `.env`, SQL dump
+  and Java stack-trace patterns and the heading read in `inspect_content` in
+  `autopwn_suite/web/content.py`; `reflection_context` in `autopwn_suite/web/xss.py`; `_Document`,
+  `_sql_errors` and the response conditions in `autopwn_suite/web/poc_runtime.py`; `_similar` in
+  `autopwn_suite/web/boolean_sqli.py` and `_catch_all` in `autopwn_suite/web/dirbust.py` (both
+  `difflib.SequenceMatcher`); `ScanContext.record_finding` in `autopwn_suite/web/runtime.py`;
+  `crawl` and `link_finder` in `autopwn_suite/web/crawler.py`; `parameter_indexes` in
+  `autopwn_suite/web/query.py`. In v2.6.x these files are under `modules/web/`.
+- Fix in v2.7.0:
+  - The SQL error patterns use gaps of at most 200 characters and read the first 50,000 characters;
+    the `.env` check reads at most 5,000 lines of 500 characters, one line at a time; the SQL dump
+    pattern is bounded; the Java stack-trace pattern reads at most 1,000 characters before a frame and 100
+    characters of a frame's file name (the worst 100 KB body found takes about 0.3 s); the downloadable
+    PoC carries the same patterns.
+  - The reflected-XSS check and the PoC parser read the page tree once and do not enter an inactive
+    element; directory-listing detection in the scanner reads at most eight headings and the first 500
+    characters of each (the PoC parser reads each heading text once).
+  - Body comparisons (boolean SQL injection, directory discovery, PoC) use `similarity()` in
+    `autopwn_suite/web/similarity.py` (the PoC carries its own copy): difflib's ratio, on a shorter
+    prefix when the estimated work of one search is large, with the search for further common blocks
+    stopping after half a second.
+  - `record_finding` keeps a set of recorded IDs and copies only the new finding into the checkpoint.
+  - The crawler's form analysis reads at most 100 forms, 2,000 controls, a fixed number of elements
+    below a form or select, and 200,000 elements for all the forms of one page, and reports a page that
+    exceeds a bound as partly analysed. The crawl checkpoint keeps, per page, at most 10,001 followable
+    links in crawl order.
+  - The crawler does not follow a link or form URL longer than 8,192 characters (a web server rejects
+    a longer request line anyway), takes no links from a page whose base URL is that long, keeps at most
+    4 million characters of links of one page, and the crawl keeps at most 4 million characters of links in
+    all for resuming (a page past that is crawled but read again on a resume); a page that exceeds one
+    of these is reported as partly crawled. A URL of at most 8,192 characters bounds the cost of
+    `parameter_indexes` to milliseconds per call (about 0.03 s for a URL of that size with the shortest
+    parameters), and the checkpoint can no longer grow with the pages crawled.
+- Regression (each fails on the previous code, a parametrized test in at least one of its cases; the
+  regular-expression tests on the code before their own fix): `tests/unit/test_web_hostile_bodies.py`
+  (`test_sql_error_patterns_stay_fast_on_hostile_bodies`,
+  `test_exposed_file_checks_stay_fast_on_hostile_bodies`,
+  `test_error_page_signatures_stay_fast_on_hostile_bodies`,
+  `test_deeply_nested_html_stays_fast_for_reflection_analysis`,
+  `test_nested_headings_stay_fast_and_ordinary_listing_headings_are_still_read`,
+  `test_similarity_stays_fast_on_hostile_bodies_and_stays_meaningful`,
+  `test_similarity_stays_fast_on_periodic_bodies`,
+  `test_directory_catch_all_check_uses_the_bounded_comparison` (it checks that the bounded comparison is
+  called, which the previous code has none of, not the time),
+  `test_deeply_nested_forms_and_controls_stay_fast_for_the_crawler`,
+  `test_a_page_with_more_forms_than_the_limit_is_analysed_up_to_it_and_reported`);
+  `tests/unit/test_web_resume.py` (`test_recording_many_findings_stays_fast_and_keeps_the_checkpoint_in_step`);
+  `tests/unit/test_web_crawler.py`
+  (`test_checkpoint_keeps_a_bounded_list_of_links_per_page_and_a_raised_limit_resumes_from_it`,
+  `test_links_the_crawl_never_follows_do_not_use_up_the_stored_list`,
+  `test_links_to_other_origins_do_not_use_up_the_stored_list`,
+  `test_a_link_longer_than_a_server_accepts_is_not_followed_and_is_reported`,
+  `test_a_page_whose_base_url_is_too_long_offers_no_links`,
+  `test_the_links_of_one_page_are_cut_to_a_total_size_and_stay_fast`,
+  `test_a_crawl_stores_links_for_resuming_only_up_to_a_total_size`); `tests/unit/test_web_poc.py` keeps a
+  Java trace detected in the downloadable PoC.
+- Remaining in v2.7.0:
+  - The HTML parser of the Python standard library is itself slow on some inputs in older releases, and
+    every HTML reader above uses it. On Python 3.11.9, `<a ` repeated 8,000 times (24 KB) took 14 s,
+    `<a b= ` repeated 8,000 times (48 KB) 23 s and 20,000 repetitions of `<a ` (60 KB) about 2 minutes,
+    growing with the square of the body; the dashboard kept answering during these runs (pure Python).
+    Python 3.14.4 took 0.02 s or less for the same inputs. Other releases were not tested; the Docker image
+    and the standalone binaries use Python 3.13.16 (`packaging/build-python.json`, `Dockerfile`), which
+    was not tested here.
+  - The other bounds are budgets, not exact limits: one body comparison can still take about half a
+    second; text beyond the prefix a comparison reads is not compared (a difference only after it is
+    not seen; the prefix is about 26,000 characters of varied text and about 9,000 of a text with a
+    hundred different characters); a database error message after the first 50,000 characters of a body,
+    or an `.env` assignment after the 5,000th line or the 500th character of a line, is not seen; a page
+    with more than 100 forms or 2,000 form controls, or a link longer than 8,192 characters, is analysed
+    or followed only in part and reported as incomplete coverage; a crawl that stores more than 4 million
+    characters of links reads the pages past that again on a resume. A crawl checkpoint holds at most
+    about 15 MB of links for each scan job that was stopped or ended with an error (a completed scan
+    releases it, and the dashboard keeps up to 100 finished jobs). The fix bounds the cases above; it does not show that no other response can make a check
+    slow.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-012 — Vulnerability severity inserted unescaped into dashboard markup
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-79; low, requiring control of NVD content or a hostile vulnerability
+  database file that the operator copies in, and an operator who then opens the
+  dashboard. The rating describes v2.6.1 and is not re-rated for v2.6.0.
+- Prerequisite: a vulnerability record whose severity is attacker-chosen text, from
+  one of two kinds of source. Either NVD content (the lookup is `requests.get` to
+  `services.nvd.nist.gov`, and the database updater fetches the yearly feeds from
+  `nvd.nist.gov`, both over HTTPS with certificate verification, so a network
+  attacker alone is not enough) or a hostile `vulnerabilities.sqlite3` that the
+  operator copies in. A scan run from the dashboard must then return that record
+  for a service it found.
+- Impact: the severity text (the `baseSeverity` of the NVD metric, lowercased by the
+  server but not restricted) was written into class attributes and into the page
+  without escaping. The injected markup became real elements: a severity of
+  `high"><img src=x onerror=...>` ran its handler when the vulnerability table was
+  filled at page load. The same sinks were the host detail panel and the four PDF
+  report windows (`printScan`, `printHost`, `printAllVulns`, `printAllHosts`), which
+  write the markup into a same-origin window. In v2.6.1 the script runs in the
+  dashboard origin with the administrator's session (the dashboard's
+  Content-Security-Policy allows inline script, and `GET /api/auth/session` hands
+  the CSRF token to same-origin script), so it can call the dashboard's
+  administrative API; see AUTOPWN-SA-2026-001 for what that API can do. v2.6.0 has
+  no sign-in and sends no Content-Security-Policy header. The CVSS score was
+  printed unescaped at the same sites, but the NVD parsing takes a score only from a
+  metric whose `baseScore` is numeric (a metric with a text score is skipped, and a
+  record with no usable metric yields an unknown severity and 0.0), so I found no
+  way to put markup into it in either release.
+- Mitigation: upgrade to 2.7.0. Until then use only a vulnerability database that you
+  built yourself with the updater (`--update-vuln-db` or the dashboard's Download
+  database button) or whose origin you trust, and do not open the dashboard against
+  scans that used a database or an NVD answer you do not trust. Build it at a path
+  where no copied-in database exists: the updater starts from the database already
+  at the path and replaces only the years it re-downloads, so updating a copied-in
+  file does not clean it (delete the file first).
+- Source: the severity sinks in `modules/web_ui_static/app.js` of v2.6.1 and v2.6.0
+  (`renderDetail`, `renderVulnTable`, `printScan`, `printHost`, `printAllVulns`,
+  `printAllHosts`); the severity reaches them unchanged through `FindVars` in
+  `modules/nist_search.py` and the finding records built in
+  `_collect_host_results` in `modules/web_ui.py`.
+- Fix in v2.7.0: `sevClass()` in `autopwn_suite/web_ui_static/app.js` maps any value
+  to one of `critical`, `high`, `medium`, `low` or `unknown`, and every one of those
+  sites uses that word for both the class and the label; `cvssText()` escapes the
+  score. The host badge and both severity filters use the same mapping. The server
+  still stores and serves the severity text as given (lowercased), so the allowlist
+  is applied where the dashboard renders it and any other consumer of
+  `GET /api/hosts` must treat the field as untrusted text. Regression:
+  `tests/unit/test_web_ui_behavior.py`
+  (`test_detail_panel_and_vulnerability_table_never_render_severity_or_cvss_as_markup`,
+  `test_exported_reports_never_render_severity_or_cvss_as_markup` for the three
+  report windows that read host data, and
+  `test_scan_report_never_renders_severity_or_cvss_as_markup`), which inject a tag
+  through severity and CVSS and fail on the previous code. Their fixture also holds a
+  record with a null severity, which throws first on the previous code; without
+  that record the injection assertions fail on their own.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-013 — Daemon configuration file readable by other local users
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19), completely. The file the wizard writes and the installed copy are owner-only from their first byte, including on a first installation, and the installer never writes into a file that already exists. Fixed released version: **2.7.0**.
+
+(Replace the "Fix in v2.7.0" paragraph and the "Residual after the v2.7.0 fix" paragraph with the following. The Mitigation paragraph stays for hosts that still run v2.6.x; on v2.7.0, running `--daemon-install` again replaces an installed copy that an earlier release left readable with an owner-only one.)
+- CWE-732; low, requiring a local account on the same host, a process umask that
+  leaves the other-read bit (the usual 022) and a directory that account can enter.
+- Prerequisite: `--daemon-install` (or `--create-config`) was run on a multi-user
+  host with a umask such as 022 (a umask of 077 already gave a 0600 file), and
+  another local account can enter the directory holding the file: the
+  `/opt/autopwn-suite` that the installer creates with the process umask (mode
+  0755 under 022), or the working directory the wizard ran in.
+- Impact: `CreateConfig` opened the INI file with `open(..., "w")`, so it was
+  created with the process umask, mode 0644 under 022. `--daemon-install` runs it
+  for `autopwn-daemon.conf` in the working directory, and `CopyFiles` copied that
+  file to `/opt/autopwn-suite/autopwn-daemon.conf` with `shutil.copy2`, which gives
+  the copy the source's mode, also when the destination already existed. The file
+  holds what the wizard asked for: the SMTP password (`email_password`), the NVD
+  API key (`apikey`) and the webhook URL (`webhook`), so another local user could
+  read them. `--create-config` writes its file the same way.
+- Mitigation: `chmod 600` the installed `/opt/autopwn-suite/autopwn-daemon.conf`
+  and any `autopwn-daemon.conf` or `--create-config` file left in a working
+  directory, and rotate a credential that was stored on a host with other local
+  accounts. On an affected version, running `--daemon-install` again and answering
+  yes to overwriting the working-directory file recreates that file and copies it
+  over the installed one, so both are mode 0644 again under 022 (answering no stops
+  before any copy). On v2.7.0, running `--daemon-install` again replaces an installed copy that an earlier release left readable with an owner-only one.
+- Source: `CreateConfig` and `CopyFiles` in `autopwn_suite/daemon/daemon_installer.py`
+  (`modules/daemon/daemon_installer.py` in 2.6.1 and 2.6.0).
+- Fix in v2.7.0: `_private_file` in `autopwn_suite/daemon/daemon_installer.py` creates a new temporary file beside the target with `os.open`, `O_EXCL` and mode 0600, writes and syncs it, and renames it over the final name with `os.replace`. `_write_config` (the wizard's file for `--create-config` and `--daemon-install`) and `_install_config` (the copy to `/opt/autopwn-suite/autopwn-daemon.conf`, which no longer uses `shutil.copy2` and no longer relies on a `chmod` after the copy) both use it. The final name is therefore only ever the old file or the complete mode-0600 file: no file that group or others can open exists at any moment, so there is nothing to poll, and a reader that already holds an older copy open sees only that copy's old content, because an existing copy, including a 0644 one that an earlier release installed, is replaced by a new file and never written into. A failure removes the temporary file and leaves the old file in place. The wizard also no longer follows a symlink planted at its file name (it used to open the name with `O_TRUNC` and so created the link's target as root); the link is replaced instead. `/opt/autopwn-suite` is now created with mode 0755 (never wider, because the umask can only remove bits, so an umask of 077 gives 0700; before, the default 0777 under an umask of 000 gave a directory that anyone could write, which `_root_controlled` then refused); it has to stay enterable for the users who run the installed program, the configuration inside it is 0600, and the existing root-ownership check (`_root_controlled`) still refuses a directory that others can write. An existing directory keeps its mode. The systemd unit holds no secret (its `Environment=` lines are `PYTHONUNBUFFERED=1` and `AUTOPWN_LANG`, a language code from a fixed list), `install.sh` and `uninstall.sh` never read or write the configuration, and `--daemon-uninstall` still deletes the installed copy. Measured on Linux with an unprivileged user id that opened and read every entry of the install directory in a loop during 40 first installations of a 1.2 MB synthetic configuration: 538 reads on the code before the fix, none on the fixed code, which left a single mode-0600 file and no temporary file. `--daemon-install` runs only on Linux; on Windows, where `--create-config` also runs, there are no POSIX modes. Not part of this issue and unchanged: the wizard's own file `autopwn-daemon.conf` stays in the working directory (mode 0600) after the installation. Regressions in `tests/unit/test_daemon_installer.py` fail on the previous code: `TestOwnerOnlyConfigInstall` (`test_the_installed_config_is_never_copied_onto_its_final_name`, `test_the_installed_config_is_created_exclusively_with_mode_0600_and_replaces_the_final_name`, `test_nothing_in_the_install_directory_is_readable_by_others_when_the_file_is_put_in_place` and `test_a_local_user_polling_the_directory_never_sees_a_readable_file` (POSIX only), `test_an_existing_0644_installed_config_is_replaced_not_written_into` (POSIX only), `test_a_failed_installation_leaves_the_old_config_and_no_temporary_file`, `test_a_write_that_fails_halfway_leaves_no_temporary_file`, `test_a_new_install_directory_is_0755_less_what_the_umask_removes` (POSIX only; it runs under umasks 000, 022, 027 and 077, and only the umask-000 case fails on the previous code, which created a 0777 directory)) and `TestCreateConfig` (`test_create_config_creates_the_file_for_its_owner_only`, `test_create_config_does_not_write_through_a_dangling_symlink` (POSIX only), `test_create_config_leaves_no_file_behind_when_it_cannot_finish`).
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-014 — Dashboard accepts Nmap options that make a root dashboard write or read files
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**. The dashboard no longer accepts Nmap options as text at all, so neither the file options nor the NSE options (`--script`, `--script-args`, `--script-args-file`) can reach Nmap from it. **v2.6.0** and **v2.6.1** remain affected; upgrading either closes the exposure. Not changed: the trusted command line (`--nmap-flags`, the daemon configuration) and the Python API (`nmap_args`) still hand operator-chosen Nmap options, NSE included, to Nmap, because they are trusted operator input in `docs/THREAT_MODEL.md` and not a capability of a signed-in dashboard user.
+- CWE-88; low, requiring the dashboard's administrator sign-in (which
+  AUTOPWN-SA-2026-001 documents as administrative) and a dashboard process that can
+  reach files its users should not.
+- Prerequisite: in v2.6.1, a signed-in dashboard session (the single shared
+  administrator account) on a dashboard that runs with more file access than the
+  people who hold that account should have: as root (the README recommends `sudo`) or
+  in the Docker image, which declares no `USER`. In v2.6.0 the same flags needed no
+  sign-in; AUTOPWN-SA-2026-001 already lists output-file writes through custom Nmap
+  options for that version.
+- Impact: the dashboard checked the `nmap_flags`, `scan_technique` and `ports` of a
+  scan, profile or schedule only for allowed characters, so any Nmap option reached
+  Nmap. The one refusal was in `scan_with_progress`, which, when the job started,
+  rejected an argument that began with `-oX`, `-oA`, `--resume` or `--append-output`.
+  Nmap reads options with `getopt_long_only` (one or two dashes, unique prefixes,
+  short-option clusters), so every other spelling passed. Checked with the Windows
+  build of Nmap 7.99: `-oN`, `-oG`, `-oS`, `-oM`, `-o`, `-m`, `--oN`, `--oG`, `--oX`,
+  `--oA` and clusters such as `-6o`, `-6m` and `-nm` each created the named file, and
+  `-iL`, `-6i`, `--excludefile`, `--servicedb` and `--versiondb` made Nmap read one.
+  Through a signed-in 2.6.1 dashboard on loopback, `-oN`, `-oG`, `-6o`, `-m` and `--oX`
+  created files; `-oG` replaced the content of an existing file; `--oX` replaced the
+  job's own XML output (the scan then failed with "Invalid or incomplete Nmap XML
+  output"); and `--excludefile` put the first entry of the named file that is not a
+  valid host into the job log served by `GET /api/log`. The written files hold Nmap's
+  own report. Most formats start with a comment line that repeats the command line, so
+  the options the user typed appear in it, but the allowlist excludes line breaks and
+  no other user-chosen text was seen in a file; this entry does not establish code
+  execution. The file access is the dashboard process's, so on a root dashboard a user
+  could create, truncate or overwrite files that only root should change. That
+  consequence follows from the process identity: the checks above ran as an
+  unprivileged user on Windows and were not repeated as root or with POSIX paths.
+  Through the Nmap options named here, reading was confirmed to reach the dashboard
+  only for `--excludefile`.
+- Remaining exposure in v2.7.0: none through the dashboard's request, profile or schedule fields. A profile that v2.6.x saved with options keeps that text in `web_ui_profiles.json`, in the copy of the file set aside at startup and in the `GET /api/profiles` answer until it is saved again or deleted; the dashboard never applies it. Checked on the 2.7.0 code with the checks that the Impact paragraph describes: the same requests (`-oN`, `-oG`, `-6o`, `-m`, `--oX`, `--excludefile`, `--script http-fetch`, `--script http-put`, `--script-args-file`) sent as `nmap_flags`, `scan_technique` or `ports` of a scan or profile are answered with HTTP 400 and do not start a job; no value outside the nine fixed technique names (`-sS`, `-sT`, `-sA`, `-sW`, `-sM`, `-sU`, `-sN`, `-sF`, `-sX`) starts an option, and no field accepted whitespace inside a value, in the seeded fuzz tests.
+- Mitigation: upgrade to v2.7.0. On v2.6.0 or v2.6.1, until then: run the dashboard as an unprivileged account, or in a container started with a non-root user (its data directory must then be writable by that user), where the reduced scan features are acceptable; limit who holds the dashboard sign-in; and check the saved profiles (`web_ui_profiles.json`, which schedules use) for Nmap options. After upgrading, a schedule whose profile held options is disabled, with one log line that names the reason, either when it next comes due or when the profile is saved again. Saving the profile replaces the stored options with the structured fields, even when the request does not mention `nmap_flags`, and turns off every enabled schedule that uses it (the log line reads `Scheduled scan disabled after a profile edit that removed its stored Nmap options`), because those schedules would otherwise start running without the options they had. Open the profile, check its technique, ports and detection settings, save it, and enable each schedule again by hand. The copy `web_ui_profiles.json.corrupt-<UTC timestamp>` shows what the old profile held.
+- Source: `_validate_nmap_flags` in `autopwn_suite/web_ui.py` (allowed characters
+  only) and `scan_with_progress` in `autopwn_suite/nmap_progress.py` (exact-prefix
+  refusal of four spellings); in v2.6.1 and v2.6.0 both are under `modules/`. In v2.7.0 `scan_with_progress` is the only option check left (for the library and the command line); the dashboard builds its arguments from structured fields.
+- Fix in v2.7.0: the free-text "Extra Nmap Flags" field is removed from the scan and profile forms, and the dashboard builds the Nmap arguments only from structured fields (`_profile_config` and `_build_nmap_flags` in `autopwn_suite/web_ui.py`). A scan, profile or schedule request whose `nmap_flags` is not empty is refused with HTTP 400 and one fixed message, whatever the option; an absent or empty value is stored as `""`. `scan_technique` must be `""` or one of the nine techniques the forms offer (`-sS`, `-sT`, `-sA`, `-sW`, `-sM`, `-sU`, `-sN`, `-sF`, `-sX`); `ports` must be a comma list of port numbers 1-65535 and ranges whose first number is at most the last, at most 2048 characters, with no whitespace inside, no `T:`/`U:` prefix and no `-` shorthand; `version_intensity` is an integer from 0 to 9, `speed` an integer from 0 to 5, `host_timeout` an integer of at least 1 (it has no upper bound) and the toggles are JSON booleans. So the only values that start with a dash are the nine fixed technique names, and no field can add an argument. A target with a part that starts with a dash is also refused with HTTP 400 (before, the library guard in `scan_with_progress` failed the job when it started). The arguments are still built as a list and run with `shell=False`. A profile or schedule saved by an earlier release with Nmap options, or with a technique or ports outside those lists, is kept as it was and is not used: at startup a copy of the file is set aside as `<name>.corrupt-<UTC timestamp>` (one copy of an identical file), the scheduler's validation refuses it and disables the schedule that uses it once, with a log line (`Scheduled scan disabled after stored Nmap options`) and a dashboard note. Saving the profile again (a `PUT /api/profiles/<pid>` that does not send `nmap_flags`) replaces the stored options and, because the schedules that use the profile would then run without them, disables every enabled schedule that uses it at that moment, with the log line `Scheduled scan disabled after a profile edit that removed its stored Nmap options` and a dashboard note; each schedule is enabled again by hand. A request that still sends non-empty `nmap_flags` is refused with HTTP 400 and changes nothing. A schedule record that carries an `nmap_flags` key is treated the same way. `replaces_xml_output` and `uses_files` in `autopwn_suite/nmap_progress.py` are unchanged for the Python API and the trusted command line. Regressions that fail on the previous code: `tests/unit/test_web_ui.py` (`TestStructuredNmapSettings::test_any_nmap_flags_text_is_refused_with_the_fixed_message`, `TestStructuredNmapSettings::test_anything_else_in_the_ports_field_is_refused`, `TestStructuredNmapSettings::test_a_technique_the_forms_do_not_offer_is_refused`, `TestStructuredNmapSettings::test_a_target_that_starts_an_nmap_option_is_refused`, `TestAPIScans::test_start_scan_refuses_any_nmap_flags_text`, `TestAPIScans::test_start_scan_refuses_structured_values_that_would_carry_an_option`), `tests/unit/test_web_ui_review.py` (`test_stored_profile_with_nmap_options_disables_its_schedule_once_and_saving_it_again_removes_them`, `test_saving_a_profile_that_held_options_disables_the_schedules_that_would_run_without_them`, `test_loading_profiles_saved_with_nmap_options_keeps_them_and_a_copy_of_the_file`, `test_profile_routes_refuse_any_nmap_flags_text_with_the_fixed_message`, `test_schedule_routes_refuse_nmap_flags_text_too`, `test_stored_schedule_that_carries_options_is_disabled_when_due_and_an_edit_removes_them`), `tests/unit/test_fuzz_inputs.py` (`test_dashboard_refuses_every_nmap_flags_text_whatever_the_option`, `test_structured_scan_fields_can_only_produce_the_fixed_nmap_arguments`), `tests/unit/test_web_ui_behavior.py` (`test_scan_form_sends_the_structured_nmap_controls_and_no_free_text_options`, `test_profile_form_sends_the_structured_nmap_controls_and_no_free_text_options`, `test_a_profile_saved_with_nmap_options_shows_a_notice_and_never_applies_or_resends_them`) and `tests/unit/test_web_ui_static.py::test_the_dashboard_has_no_free_text_nmap_options_field`. They replace `TestValidateNmapFlags`, `test_stored_profile_with_a_refused_flag_disables_its_schedule_until_the_flag_is_removed_and_it_is_enabled_again`, `test_start_scan_rejects_flags_that_read_or_write_files` and `test_flag_allowlist_rejects_every_file_option_spelling_among_random_flags`, which tested the file-option allowlist that no longer exists in `web_ui.py`; `tests/unit/test_nmap_progress.py::test_every_spelling_of_the_managed_output_options_is_refused` still covers the library guard.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-015 — Webhook posts follow HTTP redirects
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-200; low, requiring a webhook receiver that is hijacked or misconfigured so that
+  it answers a post with a redirect.
+- Prerequisite: the operator has configured the CLI webhook report or the dashboard
+  webhook, and the host in that URL (or whoever has taken it over) answers the post with
+  a redirect whose `Location` names another origin.
+- Impact: `requests` follows redirects by default and, for a 307 or 308, sends the same
+  method and body again. The CLI posts the saved console output of the scan, the
+  dashboard posts the scan-event JSON (`event`, `scan_id`, `target`, host and
+  vulnerability counts, start and finish times, `error` and `timestamp`), and its
+  test-webhook route posts a fixed test event that carries no scan data. On a 307 or
+  308 each of them was re-sent to the other origin, and the `Location` could be plain
+  `http://` although the configured URL was `https://`. When the second origin
+  answered 2xx, the CLI logged a successful delivery, the dashboard logged no failure
+  and the test route answered 200, so the operator saw a normal delivery. A 301, 302
+  or 303 became a GET without a body to the `Location`: no report or event was
+  forwarded, but the scanner host made that request and its answer decided the
+  reported result. The host that sent the redirect had already received the same post,
+  so the redirect adds exposure only at the origin its `Location` names: a different
+  party, a plain-HTTP network path, or an address that only the scanner host can reach,
+  such as loopback (the regression servers are both on 127.0.0.1). Checked with
+  `requests` 2.33.0, the version both tags lock.
+- Mitigation: use a webhook receiver you control and keep its account secured; leave
+  the CLI webhook report and the dashboard webhook unconfigured when the receiver
+  cannot be trusted. No setting turns redirect following off in an affected version.
+- Source: `SendWebhook` in `autopwn_suite/report.py`; `_deliver_webhook` and
+  `api_test_webhook` in `autopwn_suite/web_ui.py` (the package directory is `modules/`
+  in v2.6.0 and v2.6.1).
+- Fix in v2.7.0: both senders pass `allow_redirects=False`, so any 3xx answer is a
+  failed delivery and nothing is sent to the `Location`. The CLI logs
+  `Webhook delivery failed: HTTP <status>`; the dashboard's scan-event delivery and
+  test-webhook route share `_post_webhook` in `autopwn_suite/web_ui.py`, which raises
+  `HTTPError` for a 3xx answer, so the delivery log shows `HTTPError (HTTP <status>)`
+  and the route answers 500 with its fixed text. A 2xx answer is still a delivery. The
+  configured receiver still gets what is posted to it: a hijacked receiver is not
+  stopped, only the second hop. Regression: two 127.0.0.1 servers, the second must
+  receive nothing, for 301, 302, 303, 307 and 308: `tests/unit/test_report.py`
+  (`TestSendWebhook::test_a_redirect_is_a_failed_delivery_and_is_not_followed`)
+  and `tests/unit/test_web_ui.py`
+  (`TestWebhookRedirects::test_a_redirect_is_a_failed_delivery_and_is_not_followed`
+  and `TestWebhookRedirects::test_the_test_webhook_route_reports_a_redirect_as_a_failure`).
+  On the previous code the 307 and 308 cases of all three fail: the CLI and
+  dashboard-event tests because the second server receives the report or event, the
+  route test because the route answers 200 after the second server answered 2xx. The
+  301, 302 and 303 cases fail on the CLI and dashboard-event tests (the redirect is
+  followed with a GET, so the logged status is the second server's 501) and pass on
+  the route test, where that 501 also reads as a failure.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-016 — Terminal control sequences from a target reach web findings
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19) for every output path listed under "Fix in v2.7.0". Fixed released version: **2.7.0**. The "Not covered" paragraph says what this entry does not claim, among it what a given terminal does with characters that are not removed.
+- CWE-150; low, requiring an operator who runs a CLI web scan against a hostile target and views the output in a terminal that acts on escape sequences.
+- Prerequisite: the CLI scan reaches its web stage (the "scan for web vulnerabilities" prompt, answered yes or skipped by `-y`; not offline mode) against an HTTP service the attacker controls. The output goes to the terminal, and the same text goes into the report that the CLI always saves (html by default; html, svg and txt reports all keep the characters).
+- Impact: text the target controls was copied into web scan output with control characters intact. Three paths were reproduced against a loopback target on the v2.6.1 code: the `Location` header in the evidence of a directory-discovery observation (`DIR`); a crawled link in the URL of a finding (a `CORS` finding); and a crawled link in the "Unable to crawl <url>: HTTP 500" log line and coverage note. ESC sequences, DEL and C1 characters (`ESC[2J`, `ESC]0;...ESC\`, `ESC[1A`, `ESC[2K`, U+009B) reached the console output and `console.export_text()`, which is what the `txt` report writes. The same crawled link also reached the stored result with raw control and layout characters in the request URLs of the finding's reproduction plan, in its observations and recorded redirect chain and in its target, and the curl proof-of-concept download of the dashboard (`/api/web/findings/<scan>/<id>/poc?format=curl`, a `.sh` file) wrote them (ESC, BEL, U+202E, U+2028) into the file; a loopback check on the first v2.7.0 mitigation (a CORS finding on a crawled link, a server that reflects `Origin`) showed the finding's URL and the console line clean and these fields raw, and those URLs were never cleaned in v2.6.0 or v2.6.1 either. A terminal that acts on them can clear the screen, set the window title, or move the cursor up and erase a line so that a result line is replaced by text the target chose. Rich (14.0.0, the locked version) already drops CR, BEL, backspace, VT and FF from the console line, so those did not reach the terminal, but they stayed in the stored finding text. The first mitigation in v2.7.0 removed those control characters but kept line breaks: in a loopback check (Python 3.14.4, requests 2.33.0, urllib3 2.6.3), a `Location` header with an obsolete line fold (a continuation line that starts with a space) put `[+] DIR (observation, info): ... - FORGED line` on a console line of its own, behind one leading space. The first mitigation also did not remove the other characters that change how a line is displayed, and it removed the characters from the finding's URL, so a finding that used the default reproduction replayed a different URL than the one probed: the bidirectional overrides (U+202A to U+202E, U+2066 to U+2069, U+200E, U+200F, U+061C), the line and paragraph separators (U+2028, U+2029), NEL (U+0085) and the zero-width characters (including U+180E, the Mongolian vowel separator). Text printed outside the web scan was not cleaned at all. Checked on that code with recorded Nmap XML written with character references (NEL, U+2028, U+2029, a line feed, U+202E, U+200B, U+200E, an 8-bit CSI), a service name, product, version, vendor, OS name and hostname carried those characters into the parsed result, the port table, the host summary and the dashboard's host data. An NVD description with ESC, U+202E and U+2028, and the same in the description and the update time of a copied vulnerability database, reached the vulnerability record that the CVE listing, the API and the dashboard use. Exploit-DB platform, type, author, date and file name did the same in the exploit listing and in the file name on disk. All of it was also in the saved txt, svg and html reports and in the webhook report. A JSON escape for a lone surrogate in a description made the CVE listing raise `UnicodeEncodeError` on a UTF-8 console stream, which ended the scan. In a live check with Nmap 7.99 and a loopback service that sent ESC, BEL, NEL, U+2028, U+2029, U+202E, U+200B, U+200E, a tab, an 8-bit CSI, DEL, a byte order mark, VT, FF and CR inside a banner that Nmap recognized (a POP3 greeting), every one of those bytes came back as `.` in the `extrainfo` field, and the `banner` script printed them as backslash escapes, with newlines as `&#xa;`; with that version the characters did not reach the XML through those two paths. Other Nmap versions, other scripts and reverse-DNS hostnames were not checked, and XML loaded with `PortScanner.load_xml` does not come from Nmap at all. The names in a target's certificate (subject and issuer, kept with a TLS finding's reproduction) carried the same characters: `rfc4514_string()` escapes only its own special characters. Only the output text, the stored results and the downloaded PoC text were affected; no other effect was found.
+- Mitigation: upgrade to v2.7.0, which removes these characters from the text and percent-encodes them in URLs. On v2.6.1 and v2.6.0, treat the output of a web scan of an untrusted target as untrusted. Do not print a saved report raw in a terminal: open an html or svg report in a browser, and read a `txt` report with `cat -v` or an editor. Run the scan in a terminal whose screen and title you can lose.
+- Source: `printable` and `wire_url` in `autopwn_suite/text.py`; `finding` and `emit` in `autopwn_suite/web/findings.py`; `redact_url`, `redact_text` and `ScanContext.capture` in `autopwn_suite/web/runtime.py`; `ScanLog.logger` in `autopwn_suite/web/webvuln.py`; `console_safe`, `banner` and `Logger.logger` in `autopwn_suite/logger.py`; `parse_nmap_xml` in `autopwn_suite/nmap_backend.py`; the port table and host summary in `autopwn_suite/scanner.py`; `Vulnerability` in `autopwn_suite/nist_search.py`; `_metadata` in `autopwn_suite/vulnerability_db.py`; the CVE listing in `autopwn_suite/searchvuln.py`; the exploit listing and `_safe_path_component` in `autopwn_suite/getexploits.py`; the local database line in `autopwn_suite/cli.py`; `inspect_certificate` in `autopwn_suite/web/tls.py`; `scan_with_progress` in `autopwn_suite/nmap_progress.py`; `PortScan` in `autopwn_suite/scanner.py`; `WebLogger.logger` and `_log` in `autopwn_suite/web_ui.py`; the target recorded by `webvuln` in `autopwn_suite/web/webvuln.py`. In v2.6.1 and v2.6.0 the web files are under `modules/web/`.
+- Fix in v2.7.0: `printable` (`autopwn_suite/text.py`) makes text that a host or a data provider controls one line. A tab, a line feed and the Unicode line and paragraph separators (U+2028, U+2029) become a space. Every other character that acts on a terminal or changes how a line is displayed is removed: the C0 controls (ESC, BEL, CR, VT, FF and the rest), DEL, the C1 controls (including NEL), U+061C, U+180E (Mongolian vowel separator), U+200B to U+200F (zero-width characters and the left-to-right and right-to-left marks), U+202A to U+202E, U+2060 to U+206F (word joiner, invisible operators, bidirectional isolates and the deprecated format characters), U+FEFF, U+FFF9 to U+FFFB, the tag characters (U+E0000 to U+E007F) and unpaired surrogates (U+D800 to U+DFFF). CR, VT, FF and NEL are removed rather than turned into a space, as the earlier mitigation already did, so that they cannot split a URL away from the redaction of its query (AUTOPWN-SA-2026-017). `multiline=True` keeps only the line feed; the fields that need it are the output of an NSE script (and the text of the elements inside a script), the OS fingerprint that Nmap writes one probe result per line, and the CLI's own log messages that span lines. The function is applied where the text enters: `finding` to the parameter and evidence (the URL is encoded, see below), `redact_text` to every web scan log line and coverage issue (`ScanLog.logger`, `ScanContext.issue`), `ScanContext.capture` to the response headers kept with a finding, `parse_nmap_xml` to every attribute and text of the Nmap XML and to Nmap's stderr lines (script output keeps its line feeds), the `Vulnerability` record to its ID, description, severity and URL (the online lookup, a database copied from another machine, the API and the dashboard), the update time of a vulnerability database when its metadata is read, and the name of a downloaded exploit file, so the name on disk is the name that is printed, the names in a target's certificate, Nmap's failure message (`scan_with_progress`, `PortScan`) and every line that `WebLogger.logger` and the dashboard's `_log` put into the job log. A URL cannot lose these characters, because a replay and a downloaded PoC must send the request that the scan sent. `wire_url` (`autopwn_suite/text.py`, applied by `redact_url` and `finding`, and to the scan target that `webvuln` records) percent-encodes every character that `printable` removes or turns into a space, as UTF-8, the way the HTTP client sends it (for the characters concerned the result is identical to the prepared request of `requests`, checked for each of them). The URL of a finding, the recorded requests and observations of its reproduction plan, the redirect chain, the target, the `Location` header kept as evidence and the generated curl and Python PoCs are therefore plain text, and a replay sends the same request line as the scan (checked against a loopback server that records the request targets); `[`, `]` and spaces are not touched, the client encodes the brackets itself on both paths. It is applied again where the CLI prints: `emit` for a finding's console line, `console_safe` (`printable`, then the Rich markup escape, in that order) for the port table, the host summary, the CVE and exploit listings, the status lines and the local database line, `banner` for banners and `Logger.logger` for every log line (it keeps the line breaks of the CLI's own messages). The txt, svg and html reports, the webhook and email reports and the dashboard job log are exports or copies of that output, so they carry the same text, and the HTML report stays escaped. The same check on v2.7.0 code (a loopback server that answers with an obsolete line fold, recorded Nmap XML, an NVD record, a copied database and Exploit-DB metadata, each with the characters above) found none of them in the console output, `console.export_text()`, `export_html()`, `export_svg()`, the files written by `SaveOutput` or the webhook report, and the folded `Location` header printed one console line; a loopback CORS finding on a crawled link carried none of them in the stored result, its reproduction, observations and target, in the curl PoC or in the Python PoC, and the replay request equalled the scan request. Regression, all of which fail on the previous code except the cases that pin unchanged behavior (the non-string case of `printable`, the NUL case of the file-name test, the ordinary-text case of `redact_url`, and the two fold tests, which pin the first mitigation; the raw-socket one fails on the original development code, 929f259): `tests/unit/test_hostile_text.py` (`test_a_header_with_an_obsolete_line_fold_cannot_forge_a_result_line`, `test_every_code_point_is_kept_removed_or_turned_into_a_space`, `test_printable_character_classes`, `test_console_safe_removes_the_characters_before_it_escapes_markup`, `test_log_lines_keep_their_own_newlines_but_nothing_that_drives_a_terminal`, `test_banners_are_one_clean_line`, `test_findings_are_one_line_without_control_or_layout_characters`, `test_a_finding_prints_as_one_line_even_when_the_result_was_not_built_by_finding`, `test_crawled_link_text_never_reaches_the_log_or_the_coverage_notes_with_layout_characters`, `test_a_coverage_issue_and_its_log_line_are_one_clean_line`, `test_response_headers_kept_with_a_finding_are_cleaned`), `tests/unit/test_hostile_nmap_text.py` (`test_nmap_text_is_cleaned_when_the_xml_is_read_and_scripts_keep_only_their_newlines`, `test_the_port_table_and_host_summary_show_one_clean_line_per_value`, `test_a_service_that_was_not_read_from_nmap_xml_is_cleaned_when_it_is_printed`, `test_the_dashboard_keeps_and_logs_only_clean_host_text`), `tests/unit/test_hostile_provider_text.py` (`test_an_nvd_description_is_one_clean_line_in_every_result`, `test_the_cve_listing_prints_the_clean_text_and_never_starts_a_line_of_its_own`, `test_an_unpaired_surrogate_in_provider_text_cannot_abort_the_listing`, `test_a_copied_database_cannot_put_hostile_text_into_results_or_its_own_status`, `test_exploit_details_are_printed_clean_and_the_file_name_on_disk_is_the_printed_one`, `test_remote_names_lose_control_and_layout_characters`), `tests/unit/test_hostile_urls.py` (all its tests; they fail on the previous code except the one case that pins ordinary non-ASCII text), `test_a_certificate_name_that_the_target_chose_is_cleaned`, `test_the_os_fingerprint_keeps_its_lines_and_a_cpe_is_one_line`, `test_the_error_nmap_prints_when_a_scan_fails_is_cleaned`, `test_the_message_that_ends_a_scan_and_the_job_log_are_cleaned`, `test_a_folded_header_read_from_the_raw_bytes_cannot_forge_a_result_line` (reads the bytes through a plain socket and always runs; the client-based test skips only when the installed requests and urllib3 really drop the continuation line) and `tests/unit/test_hostile_reports.py` (`test_the_exports_and_saved_reports_hold_none_of_the_characters` for txt, html and svg, and `test_the_webhook_report_holds_none_of_the_characters`) and the seeded fuzz test `test_random_unicode_never_leaves_a_line_break_a_control_or_a_layout_character` in `tests/unit/test_fuzz_inputs.py`. The two tests of the first mitigation that named its behavior were updated: `tests/unit/test_web_dirbust.py` (`test_findings_are_one_line_and_drop_control_characters`, formerly `test_findings_keep_newlines_and_tabs_and_drop_other_control_characters`) and a case of `test_redact_text_hides_query_secrets_in_every_url_of_a_message` in `tests/unit/test_web_webvuln.py`; `test_terminal_control_characters_in_a_redirect_never_reach_the_console` and `test_terminal_control_characters_in_a_crawled_url_never_reach_the_console_or_the_issues` still pass unchanged.
+- Not covered: what a given terminal does with characters that are not removed was not tested (for example the soft hyphen, the variation selectors, other invisible or combining characters, very wide text or emoji sequences); only the ranges listed above are removed. A target can still write misleading words. The zero-width joiner and non-joiner and the Mongolian vowel separator are removed from scanned text, which changes how some scripts shape and splits emoji sequences. The response headers recorded by a dashboard replay verification (`autopwn_suite/web/poc_runtime.py`, which is also the standalone PoC script) are not cleaned; the dashboard shows them JSON-encoded and HTML-escaped and the PoC script prints JSON with ASCII escapes. Visible-blank filler characters (U+115F, U+1160, U+3164, U+FFA0) and other format characters (U+0600 to U+0605, U+06DD, U+070F, U+0890, U+0891, U+08E2, U+110BD, U+110CD, U+13430 to U+1343F, U+1BCA0 to U+1BCA3, U+1D173 to U+1D17A) are not removed. Python's own exception messages (for example the error that the dashboard stores for a job that failed for a reason other than an Nmap failure) are printed as they are; they quote what the operator typed, not scanned data. The error text of a failed Nmap run is cleaned. The live Nmap check covered one version (7.99), one recognized banner and the `banner` script; other versions, other scripts and reverse-DNS hostnames were not checked, which is why the cleaning is also done when the XML is read.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-017 — URL query secrets written to web scan log lines, coverage notes and reports
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19) for the paths listed under Impact and for the two paths that an earlier draft of this entry listed as remaining (the console line that announces a web scan, and a target typed without a lowercase http:// or https:// scheme); the limits listed under Limits remain, most of all that a finding redacts by parameter name only. Fixed released version: **2.7.0**.
+- CWE-532; low, requiring a scanned URL that carries a secret-looking query parameter
+  and read access to the console, log, coverage table, export or report that holds it.
+- Prerequisite: a web scan of a URL whose query carries a credential (a token, session
+  id or API key). The dashboard's web-only scan and `webvuln()` take an explicit URL
+  with its query; the CLI scans the root URL of each web port and reaches other URLs
+  by crawling, so there the values come from links on the target or from a redirect
+  that the target answers with. The readers are a signed-in dashboard user, whoever
+  holds the saved, emailed or webhook-posted report and, in v2.6.0, any client that
+  can reach the dashboard, which needs no sign-in there (AUTOPWN-SA-2026-001).
+- Impact: findings already showed such values as `REDACTED`, but the web scan's log
+  lines and coverage notes carried the URL as scanned. Checked against a loopback
+  target (`?id=1&session=…&api_key=…`) on both versions: "Connection error raised on:
+  <url>, skipping" from the SQL injection, XSS and file-inclusion probes, which
+  repeats every parameter of the probe URL, including the ones the probe did not
+  change; "Crawling web application at <url> ..."; "<probe> incomplete on <url>.";
+  and "Unable to crawl <url>: <error>", where the crawler logged the `requests`
+  error, which quotes the path and query again. A root URL whose crawl finds a link
+  with `token=…` showed the same value in "Unable to crawl <url>: HTTP 500". The scan
+  log copies coverage messages into the issues of the web coverage table. The text
+  reached the CLI console, which is saved into report files and into the email and
+  webhook reports; the dashboard's in-memory log history (`GET /api/log`, replayed to
+  every new `/api/events` stream in these versions); and the job's `web_coverage`,
+  which the scan status JSON, the downloaded JSON report
+  (`/api/scans/<id>/download`) and the printable report include.
+- Mitigation: do not put credentials in the query of a scan URL (use a dedicated
+  low-privilege test account or a short-lived token), keep report files, dashboard
+  access and the console output private, and rotate a value that appeared in a log or
+  report.
+- Source: `ScanLog.logger` inside `webvuln` (`autopwn_suite/web/webvuln.py`),
+  `ScanContext.issue` (`autopwn_suite/web/runtime.py`), `crawl` and `link_finder`
+  (`autopwn_suite/web/crawler.py`) and the probe messages in `sqli.py`, `lfi.py`,
+  `xss.py`, `boolean_sqli.py`, `additional.py`, `probes.py`, `dirbust.py`, `http.py`
+  and `tls.py`.
+- Fix in v2.7.0: web scan diagnostics now redact by position, not by parameter name, and no character inside a URL can cut the redaction short. Two functions in `autopwn_suite/web/runtime.py` do it. `redact_target` takes a string that is known to be one target as typed (what a dashboard record, answer, notification, report file name or the CLI summary echoes) and walks the whole string with no tokenizing, so an apostrophe, a quote, an angle bracket, a space or a Unicode space (U+00A0, U+2028, U+3000) inside a query value or the userinfo cannot end the URL early and leave the rest of the query visible (an earlier form of this fix split free text at those characters and printed `?q=REDACTED'Brien&token=SECRET` for `?q=O'Brien&token=SECRET`). `redact_text` redacts the URLs inside free text such as log lines and coverage notes: a URL starts at its scheme (or at a word that holds `?`, `@` or `#`) and runs to the next space, tab or line break, and only the sentence punctuation behind it (`.`, `,`, `;`, `:`, `)`) and the quote or bracket that closes one opened in front of it stay out of the redacted part. Both replace every query value with `REDACTED` whatever the parameter is called (`?id=REDACTED&x=REDACTED`; the names stay), drop the userinfo and the fragment (an access token of a redirect-based sign-in lives there), and replace the value of a `;name=value` path parameter (`;jsessionid=...`). They read a scheme in any case (`HTTP://`, `HtTpS://`) and also a target typed without a scheme: `host:8080?x=y`, `host/app?x=y`, `[::1]:80/?x=y`, `user:pw@host` and `//user:pw@host`. A query part without `=` is replaced whole in a URL and in every target that `redact_target` echoes (`host/verify?3f9a7c` becomes `host/verify?REDACTED`); in free text it is kept in a word without a scheme (`what?`) so that prose stays readable. The walk is plain string work, does not raise, and ran in linear time on 1 MB inputs. Every web log line (`ScanLog.logger`) and coverage issue (`ScanContext.issue`) goes through `redact_text`; the two messages that quote the target as typed ("No reachable in-scope web endpoint on <target>." and "<target> presented a certificate that could not be verified ...") redact it with `redact_target` before the text is built, and so does the console line "Testing web application on <url> ..." in `webvuln`, which was printed to the recording console without redaction. The target a dashboard shows or exports is redacted as one string by `redact_target`: `ScanJob.to_dict` (`target` and `config.target`, hence the scan status JSON, the scan history, the downloaded JSON report and the printable report), the web coverage `endpoint` and `target`, a finding's `endpoint` and the target of its reproduction plan (a replay reads only the origin of that field), the webhook event `target`, the email subject, report and command line (`ScanJob.public_target`), the "Scheduled scan fired" log line and the answer to `POST /api/scan/start`; the CLI prints its parameter summary ("Target : ...") and builds a generated report file name from the redacted target as well. Redaction changes only what is displayed and exported: `ScanJob.target`, `config["target"]` and the endpoint passed to `webvuln` stay as typed, and tests show that a scan runs with, and Resume reaches again, the typed URL. The dashboard also stopped writing exception text where a request error can quote a URL with its query: the web check and evidence verification handlers log the class of the exception only (`Web application check failed (RuntimeError)`), and a failed scan records `Unexpected error (<class>)` or `Scan aborted (<class>)` in the job log and in `job.error`, which the status JSON, the webhook and the email carry. Findings keep redacting by parameter name (`redact_url`), because a PoC replays the other values and `validate_plan` rejects a request that still holds `REDACTED`; the name list was extended (`pwd`, `otp`, `totp`, `hotp`, `sig`, `sid`, `sessid`, `key`, `code`, `pw`, `ticket`, `nonce`, `verifier`, `SAMLResponse`, `RelayState`, `api`/`access`/`private`/`app`/`client`/`license` keys, `bearer`, `credential`, `cred`, `cookie`, `hmac`, `xsrf` and the verification codes such as `reset_code` and `mfa_code`), with whole-word rules so that `sort_key`, `monkey`, `keyword`, `design`, `credit`, `country_code`, `zipcode` and `tickets` still replay (`key` and `code` count only as the whole name), and the narrowing that keeps `author`, `bypass`, `passage` and `passenger` readable stays. `;` now ends a query pair as well as `&`, a URL without a credential value is returned byte for byte instead of re-encoded, a finding's evidence text is redacted by name (the directory-discovery "redirect to" evidence quoted a raw `Location` header), and the standalone copy in `autopwn_suite/web/poc_runtime.py` carries the same pattern and algorithm (a test pins both). Regression: `tests/unit/test_web_webvuln.py` (`test_a_quote_an_angle_bracket_or_a_unicode_space_inside_a_url_does_not_cut_the_redaction_short`, `test_a_target_is_redacted_as_one_string_with_no_tokenizing`, `test_a_breaker_character_in_the_target_leaves_no_later_value_in_the_banner_the_log_and_the_summary`, `test_a_breaker_character_in_the_typed_target_leaves_no_later_value_in_the_unreachable_messages`, `test_the_announcement_line_of_a_web_scan_does_not_carry_query_secrets`, `test_the_target_as_typed_is_redacted_in_the_unreachable_and_certificate_messages`, `test_redact_text_hides_every_query_value_userinfo_and_fragment_of_a_target` and the updated `test_probe_log_lines_and_coverage_issues_do_not_carry_query_secrets` and `test_redact_text_hides_query_secrets_in_every_url_of_a_message`), `tests/unit/test_web_dashboard.py` (`test_scan_record_exports_show_a_redacted_target_and_the_scan_keeps_the_one_typed`, `test_a_breaker_character_in_the_typed_target_leaves_no_later_value_in_a_record_an_answer_or_a_notification`, `test_starting_a_web_scan_answers_with_a_redacted_target_and_launches_the_one_typed`, `test_finding_and_coverage_endpoints_hide_every_value_of_the_target`, `test_notifications_carry_the_redacted_target`, `test_the_scheduler_log_line_hides_the_target_it_fired_and_launches_the_one_stored`, `test_a_failed_web_check_or_scan_logs_and_records_the_class_of_the_exception_only`), `tests/unit/test_utils.py` (`test_param_print_redacts_the_target_it_echoes`, `test_a_breaker_character_in_a_typed_target_leaves_no_later_value_in_the_summary_and_the_report_name`, `test_a_generated_report_name_does_not_carry_the_query_values_of_a_url_target`), `tests/unit/test_web_poc.py` (the extended `test_only_credential_parameters_are_redacted_from_urls`, `test_redacting_a_url_keeps_everything_but_the_credential_values`, `test_finding_replays_every_parameter_that_is_not_a_credential_name`, `test_scanner_and_standalone_poc_redact_alike`) and `tests/unit/test_web_dirbust.py` (`test_a_redirect_in_the_evidence_of_a_finding_hides_credential_values`); they fail on the code before the fix (94 test cases of these files, run with only the new function name aliased to the old one so that they execute). The seeded fuzz test `test_redact_text_never_raises_and_leaves_no_value_of_a_diagnostic_target` in `tests/unit/test_fuzz_inputs.py` feeds 3000 random URL-like strings (random scheme case, userinfo, host, path parameters, `&` and `;` queries, bare query parts, credential and ordinary names, fragments) whose values hold apostrophes, quotes, angle brackets, U+00A0, U+2028 and U+3000 between serial-numbered chunks (and, for a whole target, spaces and tabs), once as a message and once as a target, and checks that nothing raises, that no chunk of any value is left, that the result is idempotent, and that the finding form leaves no chunk of a credential-named value, no userinfo and no fragment; 3000 URLs with a random hostile run in front of a credential parameter check that the credential is hidden, and 3000 arbitrary strings check that the scanner and the downloaded PoC redact a URL alike.
+- Limits: a finding still redacts by parameter name only, because its URL must stay replayable. A secret in a parameter whose name is not on the list (`ref`, `s`, `id` or any name the application chose), in the URL path, in a `;name=value` path parameter, in a query part without `=`, or nested inside the value of another parameter (`redirect_uri=https%3A%2F%2Fapp%2Fcb%3Fcode%3Dabc`, `next=http://h/?token=abc`: only the outer name is read) is shown in a finding's `url`, in its recorded requests and in the finding line that the CLI prints (and so in the CLI's saved and emailed reports), and a name that is on the list hides a value a replay would need, so such a PoC must be restored by hand. Diagnostics redact every query value but not the URL path: a secret in a path segment (`/reset/<token>`) is shown. A log line, coverage note or finding evidence ends a URL at the next space, tab or line break, so a raw space inside a URL cuts it there and the part after the space is not recognized; a link in a page is written with `%20` when the scan reads it (`resolve_url`, which is what a browser and the HTTP client send), so this needs a URL typed with a space or a redirect target or `Location` value that carries one; a Unicode space does not end a URL in free text, so the prose after a no-break space is redacted with it. A password with an unescaped `/`, `?` or `#` in the userinfo of a URL is cut where a URL parser cuts it, so the part before that character stays visible. In free text a target typed without a scheme is parsed only when its word shows a `?`, an `@` or a `#`, and a `//` that follows a prefix (`target=//user@host`) is not read as a network-path reference; the targets that the dashboard and the CLI echo go through `redact_target`, which reads the whole string as a target, and the messages that quote the typed target redact it before building the text. Not changed: the Nmap-stage console lines of the CLI ("Scanning <target> ...", "Target <target> seems to be offline", "Portscan results for <target>") print the typed target as given (an Nmap target cannot carry a query, so a URL there is an operator error); saved schedules and profiles store and display the target as typed, because the edit form fills it in; and the job log lines of the network-scan paths of the dashboard ("Port scan failed for <host>: ...", "Host discovery failed: ...", "CVE search error (...)") still carry exception text, because those targets are hosts and ranges and cannot hold a query. The dashboard's web check and evidence verification handlers, and its scan-failure handlers (job log and `job.error`), no longer write exception text (the class only). Rotate a credential that appeared in a log, report or export of an earlier version.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-018 — Records of a copied vulnerability database are not validated
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19) for the failures listed under Impact; the
+  limits listed under Residual remain. Fixed released version: **2.7.0**.
+- CWE-409 and CWE-755; low and availability only, requiring a database file that an
+  attacker shaped or damage corrupted, and an operator who then scans with it.
+- Prerequisite: the scanner reads a database file that was copied from another machine
+  or removable medium (`--vuln-db`, the `vuln_db` key of a configuration file, the
+  `vuln_db` argument of the Python API, or `vulnerabilities.sqlite3` in the data
+  directory), or an attacker can write to that file. The dashboard has no route that
+  accepts a database file.
+- Impact: the offline lookup trusted the records in the file. It inflated each matching
+  record with no size limit and passed the parsed JSON to `FindVars` unchecked. A record
+  of the wrong shape (a `descriptions` entry, `metrics` or `cvssData` that is not an
+  object) raised `AttributeError`, which the lookup did not turn into its "database
+  coverage is incomplete" failure: the CLI scan ended with a traceback, a Python API
+  `scan()` call raised it, and the dashboard marked that host's lookup partial. A record
+  nested 200,000 levels deep raised `RecursionError`; the CLI exited with Python's own
+  error text and the dashboard marked the lookup partial. A record whose description was
+  a number, or whose severity was a list, was accepted as a finding and failed later:
+  printing the number raised `AttributeError` in the CLI, and in the dashboard the list
+  severity raised it outside the lookup's error handling, so the scan job ended with
+  status `error`. Nothing limited memory: a 1,044 KiB database whose one record inflates
+  to 1 GiB used a peak working set of 2.0 GiB, and 40 matching records of 15 MiB (a
+  664 KiB database) returned 600 MiB of text. These are measurements on Windows with
+  Python 3.14, not tests to exhaustion.
+- Mitigation: take the database only from a source you trust, preferably built with
+  `--update-vuln-db` on a connected machine of your own; keep the file and its directory
+  writable only by the scanner account; and limit the memory of the scanning process. A
+  later `--update-vuln-db` does not repair a copied file, because it keeps the stored
+  records of every year whose recorded feed checksum is unchanged. Delete the file and
+  download it again.
+- Source: `OfflineDatabase.search` in `autopwn_suite/vulnerability_db.py`
+  (`zlib.decompress` without an output limit; the caught exceptions omitted
+  `AttributeError` and `RecursionError`) and `FindVars` in
+  `autopwn_suite/nist_search.py`, which raised on the wrong shapes. In v2.6.1 and v2.6.0
+  the package directory is `modules/`.
+- Fix in v2.7.0: each record is inflated through `zlib.decompressobj` with a 16 MiB
+  limit (`MAX_RECORD_BYTES`), and one search has a 256 MiB budget of inflated data for
+  all the records it reads (`MAX_SEARCH_BYTES`), because a per-record limit alone still
+  let 40 matching 15 MiB records add up to 600 MiB. A truncated or oversized record, or
+  an exhausted budget, is rejected. The lookup also treats `AttributeError` and
+  `RecursionError` as malformed-record errors and requires the CVE ID, description and
+  severity to be text. All of these end as `DatabaseUnavailable` ("Local vulnerability
+  lookup failed; database coverage is incomplete."): the CLI exits with that message,
+  the dashboard marks the host's lookup partial and the Python API raises it.
+  Regressions: `tests/unit/test_vulnerability_db.py`
+  `test_hostile_copied_records_are_reported_as_an_unusable_database` (seven of its nine
+  cases fail on the previous code; the not-zlib and truncated cases were already handled
+  there) and `tests/unit/test_fuzz_inputs.py`
+  `test_copied_mirror_records_only_raise_database_unavailable` (fails on the previous
+  code). `test_one_search_inflates_a_bounded_total_not_only_a_bounded_record` covers the
+  search budget; it patches the new limits, so it cannot run on the previous code as it
+  is.
+- Residual after the fix: the records are bounded and type-checked, not authenticated,
+  and the limits count inflated bytes, not what a record costs once parsed or what the
+  file around it can do. A record of valid shape is used as it is, so a database from an
+  untrusted source can still hide a CVE or report a false one, and the 16 MiB and
+  256 MiB limits are fixed in the code. A valid-shaped record can also still break the
+  consumers of the result. A score of NaN or Infinity (Python's JSON parser accepts both)
+  passes the lookup, and the dashboard returns it as a bare `NaN` or `Infinity` in
+  `GET /api/hosts`, which a browser's `JSON.parse` rejects; the dashboard's polling
+  request ignores that failure, so its scan and host lists stop updating while that
+  scan's result is held (read from `app.js`, not run in a browser). A description with a
+  lone surrogate (`"\ud800"`, which is valid JSON) ends the CLI scan with a
+  `UnicodeEncodeError` traceback when it is printed (measured with a UTF-8 console on
+  Windows). Memory is bounded but not by 256 MiB: a 16 MiB record made of `{},` entries
+  parses to about 480 MiB of Python objects, and because the lookup keeps the previous
+  record until the next one is parsed, a search over two or more of them peaked at about
+  870 MiB, and a search over 16 took 10 s (a 284 KiB database; Windows, Python 3.14).
+  The SQLite structure of the file is not validated either: a view named `cves` in a
+  12 KiB file made one search take 3.8 s by generating 20 million rows, and a file's
+  author can choose a longer time.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-019 — Rich markup in a service banner or vulnerability text aborts a scan
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-116; medium, availability only (no code execution, disclosure or persistence). It
+  needs a hostile host the operator chose to scan, or poisoned NVD, Exploit-DB or
+  local-database text. The rating follows AUTOPWN-SA-2026-005 (a hostile scanned service
+  that denies the scan): one host ends the whole run, and in the supplied systemd daemon
+  it does so on every restart.
+- Prerequisite: a scanned service reports a product or version string that contains Rich
+  console markup such as `[/bold]` (Nmap's version detection passes banner text on wherever a
+  match rule captures free text, for example its "AXIS ... Network Fixed Dome Camera" FTP
+  rule; reproduced with Nmap 7.99 against a loopback test service), or an NVD record, an
+  Exploit-DB record or a copied local database that the scan prints contains such text.
+- Impact: Rich raised `MarkupError` ("closing tag ... doesn't match any open tag") when it
+  printed such a value. That is not a `RuntimeError`, so the CLI ended with a traceback
+  (exit status 1): no later target was scanned (checked with two loopback targets) and no
+  output file or email or webhook report was written. The supplied systemd unit sets
+  `Restart=always` and `RestartSec=5`, so the daemon starts the run again 5 seconds later and,
+  while the host still answers with that banner, ends it the same way: it finishes no round
+  and sends no report for any host (read from the unit and the exit path; not run under
+  systemd). The dashboard ended the job with status `error`; it reaches the defect only
+  through `AnalyseScanResults`, not through `SearchSploits` or the exploit download. When the
+  error hit while an exploit was being saved, an empty exploit file stayed behind. Markup that
+  did not raise styled the rest of the text printed in the same call: in a test that stubs the
+  NVD lookup, `[conceal]` made Rich emit the terminal's conceal attribute for the following
+  lines of the block and `[link=https://...]` made it emit a terminal hyperlink to an address
+  the text chose. Log lines are not parsed as markup and were not affected.
+- Mitigation: upgrade to 2.7.0. On an affected version, scan targets in separate runs or
+  dashboard jobs so that one host cannot end the scan of the others; exclude a host that
+  ends a run with a `MarkupError` traceback (the last "Scanning <host> for open ports" log
+  line before the traceback names the Nmap target, which is a whole range when a range was
+  given); for the daemon, remove that host from the scanned range or stop the service until
+  it is upgraded; and treat colours and links in the output as untrusted.
+- Source: the print sites of target, NVD and Exploit-DB text: `TargetInfo.colored` and
+  `AnalyseScanResults` in `autopwn_suite/scanner.py`, `SearchSploits` in
+  `autopwn_suite/searchvuln.py`, `GetExploitAsFile` and `GetExploitsFromArray` in
+  `autopwn_suite/getexploits.py` (the package directory was `modules/` in v2.6.0 and
+  v2.6.1). The values reached `console.print`, table cells and spinner status lines as
+  plain strings. `TargetInfo.colored` prints the MAC address, vendor and OS names, which come
+  from the host's MAC address and Nmap's own tables, so it is covered as defence in depth.
+- Fix in v2.7.0: `markup_safe` (`autopwn_suite/logger.py`, `rich.markup.escape` of
+  `str(value)`) escapes each of those values before it is printed, including the status
+  lines; bracketed labels such as `[ keyword ]` are escaped as a whole. The dashboard reuses
+  `AnalyseScanResults`, so its job completes. This stops Rich from parsing the text as
+  markup; it does not print every character verbatim: emoji short codes such as `:smile:`
+  are still replaced by the emoji, and a backslash directly before a bracket can print
+  without that backslash (display only, no abort). Raw terminal control characters in such text are removed by the fix of AUTOPWN-SA-2026-016. Regressions (each fails on the code before the fix, with
+  `MarkupError` or, for the dashboard, job status `error`):
+  `tests/unit/test_scan_regressions.py::test_hostile_banner_text_is_printed_literally_instead_of_aborting_the_scan`,
+  `tests/unit/test_searchvuln.py::test_hostile_banner_and_cve_text_is_printed_literally_instead_of_aborting`,
+  `tests/unit/test_getexploits.py::test_hostile_exploit_metadata_is_printed_literally_and_the_file_is_still_written`,
+  `tests/unit/test_getexploits.py::test_hostile_software_title_does_not_break_the_download_status_line`
+  and `tests/unit/test_web_dashboard.py::test_markup_in_a_service_banner_does_not_fail_the_scan_job`.
+  `tests/unit/test_fuzz_inputs.py::test_banner_and_cve_text_survives_rich_markup_parsing_unchanged`
+  adds seeded fuzz coverage of `markup_safe`.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-020 — Confirmation prompts accept "no" as yes
+
+- Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**.
+- CWE-184; low and a consent bypass only: an operator at the console has to answer a
+  prompt, no remote party can trigger it, and the actions that ran anyway are ones the
+  same operator had already started or could run.
+- Prerequisite: an interactive CLI run (`autopwn.py`) where the operator declines a
+  prompt in words (`no`, `nope`) or with stray spacing (`n `, ` n`). `-y/--yes-please`
+  answers every confirmation prompt yes by design and is not affected.
+- Impact: every `[Y/n]` prompt compared the answer with the single letter `n`
+  (`input(...).lower() != "n"`), so only exactly `n` or `N` declined; `no`, `No`,
+  `nope`, `n ` and ` n` all counted as yes. The same comparison guarded the offer to
+  install Nmap, which had its own copy of it. An operator who typed `no` therefore still
+  got the step they refused: the port scan, the vulnerability lookup, the web probes of the
+  chosen targets, the download of exploit files from Exploit-DB into `exploits/` (the
+  download code only writes them, it never runs them), or the Nmap installation (a
+  `sudo` package-manager command on Linux and macOS, `winget` on Windows; `sudo` applies
+  its own authentication where the account needs a password). An empty answer was and
+  still is accepted, as the `[Y/n]` hint says.
+- Mitigation: on an affected version decline with exactly `n` or `N` (no other answer
+  declines), press Ctrl-C at the prompt, pass `--skip-exploit-download` to avoid the
+  exploit prompt and download, and install Nmap before the first run.
+- Source: `Confirmation` (used by `UserConfirmation` and `WebScan`) and `check_nmap` in
+  `autopwn_suite/utils.py` (`modules/utils.py` in 2.6.x). The dashboard and the
+  library API do not use these prompts.
+- Fix in v2.7.0: `Confirmation` trims and lower-cases the answer; empty, `y` and `yes`
+  accept, `n` and `no` decline, and anything else prints "Please answer y or n." and asks
+  again, so an unrecognized answer is never consent. `check_nmap` now asks through
+  `Confirmation` and its prompt shows `[Y/n]`. Regression: `tests/unit/test_utils.py`
+  (`test_confirmation_accepts_words_case_and_surrounding_space`,
+  `test_confirmation_asks_again_after_an_unrecognized_answer`,
+  `test_check_nmap_declining_the_install_offer_runs_no_installer`,
+  `test_check_nmap_asks_again_after_an_unrecognized_answer`); the cases for `no`, a padded
+  `n` and unrecognized answers fail on the previous code.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-021 — Pending sign-in challenges can be evicted by a client on another address
+
+- Assessed affected version: **2.6.1**, which introduced the sign-in; **2.6.0** has no
+  sign-in and so no challenges, and does not have this defect. Earlier versions not assessed.
+- Status: **fixed in v2.7.0** (2026-10-19). Fixed released version: **2.7.0**. What
+  remains is listed under Impact: a flood still costs the dashboard work, but it can no
+  longer cause a failed sign-in or use memory.
+- CWE-410; low and availability only: a flood delays a sign-in, it discloses and grants
+  nothing, and signed-in sessions are kept in a separate pool.
+- Prerequisite: the attacker's requests reach `GET /api/auth/login` (public, no
+  credentials) and pass the HTTPS rule, which means a loopback peer, or any peer when
+  `AUTOPWN_WEB_SECURE_COOKIE=1` is set (a non-loopback peer on plain HTTP is answered
+  403 and creates no challenge). The operator must be starting a sign-in during the flood.
+- Impact: every `GET /api/auth/login` without a valid challenge cookie created a
+  server-side challenge, and the server kept 128 of them, dropping the oldest. In 2.6.1
+  a client that sent 128 such requests after the operator opened the sign-in page removed
+  the operator's challenge, and the operator's sign-in then answered HTTP 403 "Sign-in
+  expired. Refresh the page and retry." A flood that placed 128 newer challenges between
+  the operator's page load and submit kept the operator from signing in for as long as it
+  lasted; a flood too slow to do that did not stop a sign-in. It signed nobody in, was not
+  counted by the failed-sign-in throttle (which counts failed `POST` requests), and did
+  not evict signed-in sessions (a session survived 1000 challenge requests). The
+  dashboard uses the TCP peer address and ignores `X-Forwarded-For`, so clients behind one
+  TLS-terminating proxy, a Docker bridge gateway (README.md) or loopback share one peer
+  address; any limit per address isolated none of them.
+  Not removed by the fix in v2.7.0:
+  - A flood of `GET /api/auth/login` still costs the dashboard one read of the account
+    file and one HMAC per request. It stores nothing and cannot make a sign-in fail.
+  - The failed-sign-in throttle (5 failures per peer address and 30 in all within a
+    minute, answered 429) is unchanged. A client that can reach `POST /api/auth/login`
+    and fail sign-ins on purpose can still delay the operator's sign-in for a minute,
+    because any client can obtain a valid challenge. That is the throttle's design, not
+    this defect.
+  - A challenge is not single-use. It carries no authority, since any client can fetch
+    one, so a captured cookie and token pair can only be replayed to attempt a sign-in
+    within its 5 minutes, which the throttle counts; a successful sign-in still issues a
+    new random session. Recording used challenges would need server-side state and add
+    no protection.
+  - A restart of the dashboard, `--web-reset-account` or an account change ends the
+    challenges that are open; the operator sees "Sign-in expired" once and the page
+    fetches a new challenge.
+- Mitigation: none is needed for the eviction once v2.7.0 is installed. To limit the
+  remaining cost of floods and deliberate failed sign-ins, rate-limit `/api/auth/login` at
+  the reverse proxy and restrict who can reach the dashboard (default loopback bind,
+  firewall or VPN). On 2.6.1, rate-limit `GET /api/auth/login` and reload the sign-in
+  page when it answers "Sign-in expired" while no flood is running.
+- Source: `DashboardAuth.new_session` and the `GET` branch of `dashboard_login` in
+  `autopwn_suite/web_auth.py` (`modules/web_auth.py` in v2.6.1).
+- Fix in v2.7.0: the sign-in challenge is stateless. `GET /api/auth/login` returns a
+  random CSRF token in the body and sets the `autopwn_login` cookie to an expiry (5
+  minutes) and an HMAC-SHA256 signature over the expiry, the CSRF token and the account
+  revision, made with a random key that `DashboardAuth` creates when the process starts
+  (`DashboardAuth.new_challenge`). The sign-in `POST` recomputes the signature from the
+  cookie, the `X-CSRF-Token` header and the current account revision, compares it in
+  constant time and checks the expiry (`DashboardAuth.challenge_valid`); a missing,
+  expired, altered, foreign or non-matching challenge answers 403 "Sign-in expired.
+  Refresh the page and retry." before the credentials are read. The server keeps no
+  challenge, so there is nothing to evict and no memory to exhaust; the per-address cap
+  (`PENDING_CHALLENGES_PER_ADDRESS`), the limit of 128 and `LoginSession.address` are
+  removed. Signed-in sessions, the throttle, the hashing slots, the HTTPS rule and the
+  cookie attributes are unchanged. Regression:
+  `tests/unit/test_web_auth.py::test_a_flood_of_challenge_requests_never_invalidates_another_clients_pending_sign_in`
+  (1,000 challenge requests from one shared address and from a thousand addresses; the
+  operator's sign-in and the oldest flooded challenge both answer 200; on the previous
+  code the operator's sign-in answers 403 in both cases),
+  `test_issuing_challenges_keeps_no_server_side_state`,
+  `test_tampered_forged_foreign_and_restarted_challenges_answer_403`,
+  `test_a_restart_ends_open_challenges_and_a_fresh_one_works`,
+  `test_a_challenge_lasts_five_minutes`,
+  `test_challenge_cookie_alone_is_not_enough_the_csrf_token_must_match`,
+  `test_changing_the_account_ends_the_pending_challenges`,
+  `test_a_replayed_challenge_only_permits_a_throttled_sign_in_attempt_and_never_reuses_a_session`
+  and `test_challenge_is_valid_only_for_the_process_token_and_account_it_was_issued_for`,
+  with seeded fuzz coverage in
+  `tests/unit/test_fuzz_inputs.py::test_sign_in_challenge_check_never_raises_and_only_accepts_the_issued_cookie_and_token`.
+  The first two tests fail on the previous code; the others exercise the new challenge
+  format and are not evidence of the defect.
+- Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
 
 ## Local fix validation — 2026-10-16
 
@@ -142,7 +912,7 @@ candidate review identified the TCP-connect cancellation gap, which was correcte
 and covered by deterministic tests. No external targets, real credentials,
 published releases or repository protection settings were changed.
 
-Later local run (unreleased tree, Windows): `python -m pytest tests/unit -q`
+Later local run (Windows, before the v2.6.1 release): `python -m pytest tests/unit -q`
 reports **1062 passed, 11 platform-specific skips** with 91.93% statement and
 87.93% branch coverage (90.67% combined). `ruff check .`, `node --check` on all
 four dashboard scripts, ESLint and `scripts/export_locked_requirements.py --check`
@@ -150,7 +920,9 @@ pass locally. These are local results, not CI or release evidence.
 
 ## Record maintenance
 
-Assessment date: **2026-10-15**; local remediation update: **2026-10-16**. Publication
+Assessment date: **2026-10-15**; local remediation update: **2026-10-16**;
+AUTOPWN-SA-2026-006 added **2026-10-18**; AUTOPWN-SA-2026-007 through 021 added
+**2026-10-19**. Publication
 occurs when this document is merged into the public repository. Update affected
 and fixed versions, mitigations and references as validation or fixes progress.
 See [assessment scope and limitations](SECURITY_ASSESSMENT.md); this list does

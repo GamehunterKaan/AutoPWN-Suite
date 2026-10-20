@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 from rich.text import Text
 
-from modules.logger import Logger, banner
+from autopwn_suite.logger import Logger, banner
 
 
 @pytest.mark.unit
@@ -20,7 +20,7 @@ class TestLogger:
         """Fixture for a mocked Rich Console."""
         return MagicMock()
 
-    @patch("modules.logger.logging")
+    @patch("autopwn_suite.logger.logging")
     def test_logger_init(self, mock_logging, mock_console):
         """Verify that the logger is initialized correctly."""
         Logger(mock_console)
@@ -50,7 +50,7 @@ class TestLogger:
 
 
 @pytest.mark.unit
-@patch("modules.logger.get_terminal_width", return_value=80)
+@patch("autopwn_suite.logger.get_terminal_width", return_value=80)
 def test_banner(mock_width):
     """Test that the banner function prints correctly."""
     mock_console = MagicMock()

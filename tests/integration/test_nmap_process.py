@@ -8,8 +8,8 @@ import threading
 
 import pytest
 
-from modules import nmap_progress as runner
-from modules.nmap_backend import PortScanner
+from autopwn_suite import nmap_progress as runner
+from autopwn_suite.nmap_backend import PortScanner
 
 pytestmark = pytest.mark.integration
 

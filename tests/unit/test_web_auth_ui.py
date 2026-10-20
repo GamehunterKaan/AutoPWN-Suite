@@ -2,6 +2,7 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Execute login/account browser logic and shared request protection in Node."""
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -9,7 +10,7 @@ from pathlib import Path
 import pytest
 from bs4 import BeautifulSoup
 
-ROOT = Path(__file__).resolve().parents[2] / "modules" / "web_ui_static"
+ROOT = Path(__file__).resolve().parents[2] / "autopwn_suite" / "web_ui_static"
 NODE = shutil.which("node")
 pytestmark = [pytest.mark.unit, pytest.mark.skipif(not NODE, reason="Node.js is unavailable")]
 
@@ -135,3 +136,35 @@ def test_auth_script_loads_before_both_dashboard_clients_and_forms_have_password
     login = BeautifulSoup((ROOT / "login.html").read_text(encoding="utf-8"), "html.parser")
     assert login.select_one("#login-password")["type"] == "password"
     assert login.select_one("#login-password")["autocomplete"] == "current-password"
+
+
+def _string_table(source, start, end):
+    block = source[source.index(start):source.index(end, source.index(start))]
+    return dict(re.findall(r"'([\w.]+)':\s*'((?:[^'\\]|\\.)*)'", block))
+
+
+def test_the_sign_in_table_matches_the_dashboard_dictionary():
+    login = (ROOT / "login.js").read_text(encoding="utf-8")
+    dictionary = (ROOT / "i18n.js").read_text(encoding="utf-8")
+    page = BeautifulSoup((ROOT / "login.html").read_text(encoding="utf-8"), "html.parser")
+    assert not [item for item in page.find_all("script", src=True) if item["src"] == "/i18n.js"]
+    shown = {element["data-i18n"] for element in page.find_all(attrs={"data-i18n": True})}
+    for lang, (login_start, login_end, dict_start, dict_end) in {
+        "en": ("    en: {", "    },\n    tr: {", "    en: {", "\n    },\n    tr: {"),
+        "tr": ("    tr: {", "    },\n  };", "    tr: {", "\n    },\n  };"),
+    }.items():
+        table = _string_table(login, login_start, login_end)
+        reference = _string_table(dictionary, dict_start, dict_end)
+        assert shown <= set(table), sorted(shown - set(table))
+        assert table and all(reference[key] == value for key, value in table.items()), (lang, {
+            key: (value, reference.get(key)) for key, value in table.items() if reference.get(key) != value})
+
+
+def test_sign_in_language_choice_is_remembered_and_applied():
+    run_js("login.js", r"""
+assert.equal(document.documentElement.lang,'en');
+nodes.get('login-lang').value='tr';handlers['login-lang:change']();
+assert.equal(localStorage.getItem('apwn_lang'),'tr');assert.equal(document.documentElement.lang,'tr');
+nodes.get('login-lang').value='<script>';handlers['login-lang:change']();
+assert.equal(localStorage.getItem('apwn_lang'),'en');assert.equal(document.documentElement.lang,'en');
+""")

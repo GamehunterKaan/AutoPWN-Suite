@@ -1,7 +1,7 @@
 # Roadmap
 
 This roadmap covers **Q4 2026 through Q4 2027** (five calendar quarters, 2026-10-01
-to 2027-12-31) and was last reviewed on 2026-10-16. It states what the maintainer
+to 2027-12-31) and was last reviewed on 2026-10-19. It states what the maintainer
 intends to work on and what the project deliberately will not do. AutoPWN Suite is
 a volunteer-maintained project: items are **intentions, not commitments or delivery
 dates**, and they may move, shrink or be dropped as security reports, contributor
@@ -10,34 +10,32 @@ roadmap features. The maintainer reviews this file at least once per quarter and
 whenever a stable release is published; completed or abandoned items are recorded in
 [CHANGELOG.md](../CHANGELOG.md) or noted here rather than silently deleted.
 
-Sources for this plan: the open and locally fixed items in
+Sources for this plan: the open items in
 [Security advisories](SECURITY_ADVISORIES.md), the known gaps in the
 [threat model](THREAT_MODEL.md) and [secret management](SECRETS.md), the
 OpenSSF Best Practices criteria, and the `Unreleased` section of the changelog. Contributions are welcome
-for any item; see [CONTRIBUTING.md](../.github/CONTRIBUTING.md) and open an issue
-before starting large work.
+for any item; see [CONTRIBUTING.md](../.github/CONTRIBUTING.md) and check the non-goals
+below before starting large work.
 
 ## Where the project is today
 
-- **v2.6.0** (2026-10-15) is the supported stable release ([support policy](../SUPPORT.md)).
-- `main` contains unreleased work: fixes for AUTOPWN-SA-2026-002 through 005, a
+- **v2.7.0** (2026-10-19) is the supported stable release ([support policy](../SUPPORT.md)).
+- v2.6.1 (2026-10-16) shipped fixes for AUTOPWN-SA-2026-002 through 005, a
   required dashboard login, signed-release tooling and expanded documentation.
-  Until a release ships them, v2.6.0 users do not have these changes.
-- Known open items: no tagged release yet contains the dashboard login or the four
-  medium-severity fixes; the project has a single maintainer
+  v2.6.0 and earlier do not have these changes.
+- Known open items: the project has a single maintainer
   ([continuity plan](CONTINUITY.md)); integration credentials are stored in plaintext
   in `web_ui_settings.json`; and there are accessibility and internationalization
   gaps ([accessibility](ACCESSIBILITY.md), [internationalization](INTERNATIONALIZATION.md)).
 
 ## Planned work by quarter
 
-### Q4 2026 (October-December): ship the pending fixes and harden the release path
+### Q4 2026 (October-December): harden the release path
 
-- Cut the next stable release (version assigned by the maintainer under SemVer)
-  containing the dashboard login and the AUTOPWN-SA-2026-002..005 fixes, with
-  complete release notes, a signed manifest and verified SBOMs
-  ([release procedure](RELEASING.md)).
-- Update [SECURITY_ADVISORIES.md](SECURITY_ADVISORIES.md), the threat model,
+- Done: v2.6.1 (2026-10-16) shipped the dashboard login and the
+  AUTOPWN-SA-2026-002..005 fixes, followed by v2.7.0 (2026-10-19); the release notes
+  are in [CHANGELOG.md](../CHANGELOG.md) ([release procedure](RELEASING.md)).
+- At each stable release, update [SECURITY_ADVISORIES.md](SECURITY_ADVISORIES.md), the threat model,
   interface and support documents so they match the released behavior (the dashboard
   login changes the original AUTOPWN-SA-2026-001 conditions), and update
   [SUPPORT.md](../SUPPORT.md) with the new supported version and end-of-life range.
@@ -54,11 +52,12 @@ before starting large work.
 
 - Review the new dashboard session handling end to end (cookie flags, session
   expiry and revocation, logout, brute-force throttling, CSRF exposure of state-changing
-  routes, and the permissive CORS configuration noted in
+  routes, and the same-origin `Origin` checks noted in
   [ARCHITECTURE.md](ARCHITECTURE.md)) and fix what the review finds, with
   regression tests.
-- Reduce the plaintext-secret exposure documented in [SECRETS.md](SECRETS.md): evaluate
-  owner-only file permissions enforced by the application and an option to supply
+- Reduce the plaintext-secret exposure documented in [SECRETS.md](SECRETS.md): the dashboard
+  now creates its files with mode `0600` on POSIX, so evaluate tightening what that leaves
+  (an existing data directory keeps its mode; files from earlier releases are restricted when the dashboard starts) and an option to supply
   integration secrets through environment variables or a file outside the data
   directory instead of the JSON settings.
 - Address the high-impact items in the [accessibility plan](ACCESSIBILITY.md): keyboard-operable
@@ -67,9 +66,11 @@ before starting large work.
 
 ### Q2 2027 (April-June): maintainability and internationalization groundwork
 
-- Move user-facing dashboard strings and CLI messages toward single, reviewable
-  locations per the [internationalization plan](INTERNATIONALIZATION.md), without
-  shipping translations yet.
+- English and a machine-translated Turkish interface are shipped. Have a native
+  Turkish speaker review the fuzzy-marked catalog and the dashboard dictionary,
+  starting with security-meaning strings, per the
+  [internationalization plan](INTERNATIONALIZATION.md), and keep new messages
+  translatable.
 - Decide whether to continue supporting Python 3.10, whose upstream end-of-life is
   scheduled for October 2026, and update `pyproject.toml`, CI, documentation and
   [SUPPORT.md](../SUPPORT.md) together if support is dropped. Evaluate adding the
@@ -118,7 +119,7 @@ need not propose them:
 - **Guaranteed vulnerability-free output or safety clearance.** CVE matching is
   keyword and version based; a clean result does not prove a target is secure.
 - **Native desktop or mobile applications, and a proprietary or paid tier.**
-- **Shipping translations before the internationalization groundwork is reviewed**
+- **Adding a language without a named reviewer who reads it**
   ([plan](INTERNATIONALIZATION.md)), and **guaranteeing full WCAG conformance
   within this period** ([accessibility](ACCESSIBILITY.md) lists a prioritized
   improvement plan, not a conformance claim).

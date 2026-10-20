@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from modules.report import SendEmail
+from autopwn_suite.report import SendEmail
 from tests.unit.test_web_dashboard import dashboard as dashboard
 from tests.unit.test_web_transport_security import local_certificate as local_certificate
 
@@ -23,8 +23,8 @@ def assert_validating(context):
 
 @pytest.mark.parametrize("port", [465, 587])
 def test_cli_smtp_authenticates_peer_before_sending(port):
-    with patch("modules.report.SMTP") as plain, patch("modules.report.SMTP_SSL") as implicit, \
-         patch("modules.report.open", mock_open(read_data="report")):
+    with patch("autopwn_suite.report.SMTP") as plain, patch("autopwn_suite.report.SMTP_SSL") as implicit, \
+         patch("autopwn_suite.report.open", mock_open(read_data="report")):
         SendEmail("user", "password", "to", "from", "mail.example", port, MagicMock())
         factory = implicit if port == 465 else plain
         server = factory.return_value
@@ -57,7 +57,7 @@ def test_dashboard_smtp_authenticates_peer_and_rejects_certificate_failure(dashb
 
 
 def test_cli_certificate_failure_skips_login_and_report_and_cleans_up():
-    with patch("modules.report.SMTP") as factory, patch("modules.report.open", mock_open(read_data="report")):
+    with patch("autopwn_suite.report.SMTP") as factory, patch("autopwn_suite.report.open", mock_open(read_data="report")):
         server = factory.return_value
         server.starttls.side_effect = ssl.SSLCertVerificationError("hostname mismatch")
         log = MagicMock()
@@ -139,9 +139,9 @@ def test_real_smtp_tls_rejects_unknown_peer_and_preserves_trusted_delivery(dashb
         try:
             if entry == "cli":
                 log = MagicMock()
-                with patch("modules.report.SMTP", side_effect=plain), patch("modules.report.SMTP_SSL", side_effect=implicit), \
-                     patch("modules.report.ssl.create_default_context", return_value=client_context), \
-                     patch("modules.report.open", mock_open(read_data="report")):
+                with patch("autopwn_suite.report.SMTP", side_effect=plain), patch("autopwn_suite.report.SMTP_SSL", side_effect=implicit), \
+                     patch("autopwn_suite.report.ssl.create_default_context", return_value=client_context), \
+                     patch("autopwn_suite.report.open", mock_open(read_data="report")):
                     SendEmail("synthetic-user", "synthetic-password", "to@example.invalid", "from@example.invalid", hostname, port, log)
                 assert log.logger.call_args.args[0] == ("success" if accepted else "error")
             else:

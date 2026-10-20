@@ -1,7 +1,7 @@
 # Contributing
 
-When contributing to this repository, please first discuss the change you wish to make via issue,
-email, or any other method with the owners of this repository before making a change. 
+Pull requests with suggested changes and fixes are welcome directly: you do not need to open an
+issue or ask the owners first. Describe the change and why it is needed in the pull request.
 
 Please note we have a code of conduct, please follow it in all your interactions with the project.
 
@@ -14,7 +14,7 @@ Please note we have a code of conduct, please follow it in all your interactions
 3. Add or update tests for behavior changes and document functional and security
    modifications under `Unreleased` in [CHANGELOG.md](../CHANGELOG.md). The
    maintainer assigns the release version using [SemVer](https://semver.org/).
-4. Run `poetry check --lock`, `poetry run ruff check .` and `poetry run test`
+4. Run `poetry check --lock`, `poetry run ruff check .` and `poetry run pytest`
    using Poetry 2.5.1, and follow the [coding standards](../docs/CODING_STANDARDS.md)
    (PEP 8 via Ruff for Python, ESLint for the dashboard JavaScript). All required
    CI checks must pass before merging. The maintainer reviews and merges accepted
@@ -105,9 +105,9 @@ The full text of the certificate follows.
 ## Accessibility and internationalization requirements
 
 The dashboard has known accessibility gaps listed in
-[ACCESSIBILITY.md](../docs/ACCESSIBILITY.md), and the project is English-only as
+[ACCESSIBILITY.md](../docs/ACCESSIBILITY.md), and the interface is English with a machine-translated Turkish catalog, as
 described in [INTERNATIONALIZATION.md](../docs/INTERNATIONALIZATION.md). Changes to
-`modules/web_ui_static/` or other user-facing output must not make either worse:
+`autopwn_suite/web_ui_static/` or other user-facing output must not make either worse:
 
 - Use native controls (`<button>`, `<label for>`, `<dialog>`) or the correct ARIA
   roles, names and keyboard handling; do not add `onclick` to a plain `<div>`.
@@ -125,20 +125,20 @@ user-visible text.
 ## Good first contributions
 
 New or occasional contributors can pick any of these small, self-contained tasks. Each one
-is a single focused pull request that does not need deep knowledge of the scanner. Comment
-on (or open) an issue first so work is not duplicated; maintainers label starter issues
-`good first issue` and `help wanted`.
+is a single focused pull request that does not need deep knowledge of the scanner. Open the
+pull request directly, or comment on an issue first if you want to avoid duplicated work;
+maintainers label starter issues `good first issue` and `help wanted`.
 
 | Task | Where to start | Skills |
 | --- | --- | --- |
-| Add real `<label>` elements for the scan-form fields that only have a caption `<div>` | `modules/web_ui_static/index.html`, gap list in [ACCESSIBILITY.md](../docs/ACCESSIBILITY.md) | HTML |
-| Add a "skip to main content" link and check keyboard tab order | `modules/web_ui_static/index.html` | HTML, CSS |
-| Honor `prefers-reduced-motion` for dashboard animations | `modules/web_ui_static/styles.css` | CSS |
-| Raise the contrast of the muted `--text3` text color to at least 4.5:1 | `modules/web_ui_static/styles.css` | CSS |
-| Add `aria-live` to toast messages so screen readers announce them | `modules/web_ui_static/app.js` (`toast`) | JavaScript |
-| Add tests for the uncovered lines of `modules/random_user_agent.py` (error and empty-file paths) | `tests/unit/`, `python -m pytest --cov=modules.random_user_agent` | Python, pytest |
-| Add tests for the uncovered branches of `modules/nist_search.py` | `tests/unit/test_nist_search.py` | Python, pytest |
-| Improve an unclear error message or help text in `modules/utils.py` (`cli()`), keeping the existing wording style | `modules/utils.py` | Python |
+| Add real `<label>` elements for the scan-form fields that only have a caption `<div>` | `autopwn_suite/web_ui_static/index.html`, gap list in [ACCESSIBILITY.md](../docs/ACCESSIBILITY.md) | HTML |
+| Add a "skip to main content" link and check keyboard tab order | `autopwn_suite/web_ui_static/index.html` | HTML, CSS |
+| Honor `prefers-reduced-motion` for dashboard animations | `autopwn_suite/web_ui_static/styles.css` | CSS |
+| Raise the contrast of the muted `--text3` text color to at least 4.5:1 | `autopwn_suite/web_ui_static/styles.css` | CSS |
+| Announce scan progress and completion to screen readers with a polite live region (not every terminal line) | `autopwn_suite/web_ui_static/app.js` (scan cards), gap list in [ACCESSIBILITY.md](../docs/ACCESSIBILITY.md) | JavaScript |
+| Add tests for the uncovered lines of `autopwn_suite/random_user_agent.py` (error and empty-file paths) | `tests/unit/`, `python -m pytest --cov=autopwn_suite.random_user_agent` | Python, pytest |
+| Add tests for the uncovered branches of `autopwn_suite/nist_search.py` | `tests/unit/test_nist_search.py` | Python, pytest |
+| Improve an unclear error message or help text in `autopwn_suite/utils.py` (`cli()`), keeping the existing wording style | `autopwn_suite/utils.py` | Python |
 | Fix a typo or unclear sentence in the documentation | `README.md`, `docs/` | Markdown |
 
 Before you start, read the [coding standards](../docs/CODING_STANDARDS.md) and the test
@@ -152,12 +152,13 @@ Run the same quality checks locally that run in the required Poetry CI job:
 
 ```sh
 poetry run ruff check .
-node --check modules/web_ui_static/app.js
-node --check modules/web_ui_static/web_security.js
-node --check modules/web_ui_static/auth.js
-node --check modules/web_ui_static/login.js
-npx --yes eslint@10.12.0 --config eslint.config.mjs modules/web_ui_static
+node --check autopwn_suite/web_ui_static/app.js
+node --check autopwn_suite/web_ui_static/web_security.js
+node --check autopwn_suite/web_ui_static/auth.js
+node --check autopwn_suite/web_ui_static/login.js
+npx --yes eslint@10.12.0 --config eslint.config.mjs autopwn_suite/web_ui_static
 poetry run python scripts/export_locked_requirements.py --check
+poetry run python scripts/i18n_messages.py check --lang tr  # needs GNU gettext (msgfmt)
 ```
 
 Ruff 0.17.1 enforces PEP 8 (`E`, `W`), Pyflakes (`F`), flake8-bugbear (`B`) and
@@ -174,7 +175,7 @@ remain registered/exported without unused-import warnings. Security findings fol
 
 ## Test policy and interpreting results
 
-Run `poetry run test` locally with Python 3.10+ after installing the dependencies
+Run `poetry run pytest` locally with Python 3.10+ after installing the dependencies
 in [BUILDING.md](../docs/BUILDING.md). Pytest runs unit and integration tests in
 `tests/`, including native Nmap contracts, configuration/offline behavior, web
 probe budgets, dashboard/API/scheduler state, persistence, provider parsing and

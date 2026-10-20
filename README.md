@@ -9,7 +9,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml/badge.svg" alt="security policy"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml/badge.svg" alt="dynamic analysis"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/releases"><img src="https://img.shields.io/github/v/release/GamehunterKaan/AutoPWN-Suite?color=3ba9ee&label=release" alt="release"></a>
-      <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="license: Apache 2.0"></a>
+      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="license: Apache 2.0"></a>
       <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.10%2B-3776AB.svg" alt="Python 3.10+"></a>
     </td>
   </tr>
@@ -32,30 +32,30 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 
 ## Quick start
 
-1. Install [Nmap](https://nmap.org/download.html) and Python 3.10 or newer, then
-   get the source (see [Installation](#installation) for Linux, Docker and other options):
+1. Install [Nmap](https://nmap.org/download.html) (needed for network scans, not for
+   website-only dashboard scans) and AutoPWN Suite with [pipx](https://pipx.pypa.io/)
+   or [uv](https://docs.astral.sh/uv/). It needs Python 3.10 or newer. See
+   [Installation](#installation) for standalone binaries, Docker and other options:
 
    ```console
-   git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
-   cd AutoPWN-Suite
-   pip install -r requirements.txt
+   pipx install autopwn-suite
    ```
 
 2. Scan a host or network **that you are authorized to test**:
 
    ```console
-   python autopwn.py -t <target ip address>
+   autopwn-suite -t <target ip address>
    ```
 
 3. Or start the [web dashboard](#web-ui), then sign in with the `admin` account whose
    random password is printed once in the terminal on first launch:
 
    ```console
-   python autopwn.py --web
+   autopwn-suite --web
    ```
 
-Use `-h` for all options. Report problems through [support](SUPPORT.md) and
-vulnerabilities privately through the [security policy](SECURITY.md).
+Use `-h` for all options. Report problems through [support](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SUPPORT.md) and
+vulnerabilities privately through the [security policy](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SECURITY.md).
 
 ### Security expectations
 
@@ -63,7 +63,7 @@ AutoPWN Suite is an operator-controlled scanner that runs with your privileges a
 stores integration credentials in plaintext JSON. Scan only systems you are authorized
 to test, do not expose the dashboard to the public internet, keep it behind HTTPS and
 trusted network controls, and verify releases before use. See the
-[security policy](SECURITY.md) for reporting, response times and deployment guidance.
+[security policy](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SECURITY.md) for reporting, response times and deployment guidance.
 
 ## Achievements and project health
 
@@ -71,21 +71,21 @@ The badges at the top show the status that
 [OpenSSF Best Practices project 15518](https://www.bestpractices.dev/projects/15518)
 reports for the Best Practices levels and the
 [OpenSSF Baseline](https://www.bestpractices.dev/en/projects/15518/baseline-3) levels.
-They are updated by OpenSSF, not by this repository. The [roadmap](docs/ROADMAP.md) lists
-planned work and non-goals, and the [continuity plan](docs/CONTINUITY.md) describes
+They are updated by OpenSSF, not by this repository. The [roadmap](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/ROADMAP.md) lists
+planned work and non-goals, and the [continuity plan](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/CONTINUITY.md) describes
 maintainer succession.
 
 ## Features
 
-Project documentation: [build from source](docs/BUILDING.md),
-[dependency management](docs/DEPENDENCIES.md), [architecture](docs/ARCHITECTURE.md),
-[interfaces](docs/INTERFACES.md), [governance](GOVERNANCE.md),
-[changelog](CHANGELOG.md), [release verification](docs/RELEASING.md), and
-[security policy](SECURITY.md), [support lifecycle](SUPPORT.md),
-[threat model](docs/THREAT_MODEL.md), [secret management](docs/SECRETS.md), and
-[security checks](docs/SECURITY_TESTING.md), [roadmap](docs/ROADMAP.md),
-[access continuity](docs/CONTINUITY.md), [accessibility](docs/ACCESSIBILITY.md) and
-[internationalization](docs/INTERNATIONALIZATION.md).
+Project documentation: [build from source](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/BUILDING.md),
+[dependency management](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/DEPENDENCIES.md), [architecture](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/ARCHITECTURE.md),
+[interfaces](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/INTERFACES.md), [governance](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/GOVERNANCE.md),
+[changelog](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/CHANGELOG.md), [release verification](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/RELEASING.md), and
+[security policy](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SECURITY.md), [support lifecycle](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/SUPPORT.md),
+[threat model](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/THREAT_MODEL.md), [secret management](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/SECRETS.md), and
+[security checks](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/SECURITY_TESTING.md), [roadmap](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/ROADMAP.md),
+[access continuity](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/CONTINUITY.md), [accessibility](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/ACCESSIBILITY.md) and
+[internationalization](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/INTERNATIONALIZATION.md).
 
 ### CLI
 - Fully [automatic](#usage) scanning and exploitation
@@ -110,43 +110,46 @@ Project documentation: [build from source](docs/BUILDING.md),
 
 AutoPWN Suite includes a built-in web dashboard for managing scans from your browser.
 
-![Web UI Dashboard](images/screenshots/dashboard.png)
+![Web UI Dashboard](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/dashboard.png)
 
 **Signing in.** The dashboard requires a login. On first launch the server creates an `admin`
 account with a random password and prints both once in the terminal; only a scrypt hash of the
-password is stored in `web_ui_auth.json` (inside `AUTOPWN_DATA_DIR`, or the `modules` directory by
+password is stored in `web_ui_auth.json` (inside `AUTOPWN_DATA_DIR`, or the per-user data directory by
 default). Change the username and password after signing in under **Settings → Account**. If you
-forget the password, run `python autopwn.py --web-reset-account` on the server to restore `admin`
+forget the password, run `autopwn-suite --web-reset-account` on the server to restore `admin`
 with a new random password and sign out all sessions. Remote access requires HTTPS (or set
-`AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy); localhost works over plain HTTP.
+`AUTOPWN_WEB_SECURE_COOKIE=1` behind a TLS-terminating proxy that passes the browser's `Host` header
+through, or sign-in is refused as cross-origin); localhost works over plain HTTP.
 
 - **Multiple concurrent scans** - Launch and monitor several scans at the same time
 - **Live terminal output** - Watch nmap commands and results in real time via SSE
 - **Scan progress** - Live Nmap stage percentages, completed CVE lookup counts and target completion counters. The bar follows the current stage; stages without a reported percentage show ongoing activity. Stopped and failed scans retain their last measured progress.
-- **Scan profiles** - Save and reuse scan configurations (technique, speed, timeout, ports, evasion, custom flags)
+- **Scan profiles** - Save and reuse scan configurations (technique, speed, timeout, ports, version intensity, OS detection, evasion)
 - **Web security dashboard** - Select application checks, inspect captured evidence and remediation, download PoCs, and explicitly replay recorded checks
 - **Scheduled scans** - Set up recurring scans on a cron schedule with automatic profile loading
-- **Scan techniques** - Choose between TCP SYN, TCP Connect, UDP, Window, ACK, FIN, Xmas, Null, Maimon and SCTP scans
+- **Scan techniques** - Choose between TCP SYN, TCP Connect, UDP, Window, ACK, FIN, Xmas, Null and Maimon scans
+- **No free-text Nmap options** - Since v2.7.0 the dashboard builds the Nmap arguments only from its own controls (scan technique list, ports, version intensity, OS detection, speed, timeout and mode). It has no box for Nmap options, so it cannot be made to run NSE scripts or to read or write files through Nmap, and the API refuses a non-empty `nmap_flags`. The ports field takes numbers from 1 to 65535, ranges and comma lists (`22,80,1-1000`). A profile saved by an earlier release with Nmap options is kept but not used: its scheduled scans are disabled (when they next come due, or when you save the profile again, which removes the options), and you enable the schedule again by hand afterwards. Custom Nmap flags remain available to the trusted command line (`--nmap-flags`) and the Python API (`nmap_args`)
 - **Evasion mode** - Fragmented packets, spoofed source port and padded data length
 - **Email notifications** - Get notified on scan completion with inline result summaries
 - **Webhook notifications** - Post scan results to any webhook endpoint
 - **Persistent settings** - All settings, profiles and schedules are saved to disk
 - **Configurable via environment variables** - Set host, port and data directory without touching code
 
-![Scan Profiles](images/screenshots/profiles.png)
+![Scan Profiles](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/profiles.png)
 
-![Scheduled Scans](images/screenshots/schedules.png)
+![Scheduled Scans](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/schedules.png)
 
 
 ## How Does It Work?
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of software running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of keywords to search the [NIST vulnerability database.](https://www.nist.gov/)
 
-The CLI, Python API and dashboard use the project's `modules/nmap_backend.py` adapter
+The CLI, Python API and dashboard use the project's `autopwn_suite/nmap_backend.py` adapter
 to run the system Nmap executable directly and parse its
 [XML output](https://nmap.org/book/output-formats-xml-output.html) with Python's standard library.
 Install Nmap and make sure `nmap` is on `PATH`; no Python Nmap wrapper is required.
-Host discovery, TCP/UDP services, OS/vendor detection, custom Nmap flags and NSE
+Host discovery, TCP/UDP services, OS/vendor detection, custom Nmap flags (command line and
+Python API only; the dashboard builds its arguments from its own controls) and NSE
 results are supported. Dashboard scans retain live progress and cancellation.
 The adapter also exposes complete raw XML, CPE identifiers and nested NSE tables
 for callers that need more detail, and rejects failed or incomplete XML output.
@@ -166,7 +169,9 @@ TCP HTTP(S) service, including nonstandard ports; otherwise it tries the host's 
 The crawler follows same-origin links and discovers
 GET forms, preserving blank inputs, repeated parameter names and other query values. It skips
 POST forms, password forms and uploads. The default crawl limits are 250 pages, 1,000 discovered
-URLs and five levels of links; reaching a limit is reported as limited coverage.
+URLs and five levels of links; reaching a limit is reported as limited coverage. A page with more than
+100 forms, with more than 2,000 form controls, or with forms that hold more than 200,000 elements in all, is analysed only in part and reported the same way, and a link or form
+URL longer than 8,192 characters is not followed.
 
 SQLi and LFI checks compare against the original response and repeat promising probes before
 reporting new database errors or Unix/Windows file signatures. Reflected XSS checks require an
@@ -235,16 +240,18 @@ Offline mode continues to disable web probes.
 Module callers can supply a host, `host:port`, IPv6 address or explicit application URL:
 
 ```python
-from modules.web.webvuln import webvuln
+from autopwn_suite.web.webvuln import webvuln
 
 findings = webvuln("https://example.com:8443/app/", log, console)
 ```
 
 Each returned finding contains `type`, `url`, `parameter`, `severity`, `confidence`, `evidence`,
 an ID, timestamp, detection/impact/remediation context, captured exchanges and a reproduction plan.
-Sensitive query values and URL credentials are redacted. Captured exchanges include request roles,
+A finding replaces a query value with `REDACTED` when its parameter name looks like a credential (`token`, `session`, `code`, `key`, `sig`, `otp`, `pwd`, an `api`, `access`, `private`, `app`, `client`, `consumer`, `license`, `encryption`, `signing`, `master`, `service`, `ssh` or `developer` key, and similar) and drops URL credentials (userinfo and fragment), so that a PoC can still replay the other values; a secret in a parameter with another name, in the URL path, or inside the value of another parameter (a `redirect_uri` or `next` URL) is not recognized there. Everything else the web scan writes about a URL (the line that announces a scan, log lines, coverage notes, and the target a dashboard job record, export, notification or the CLI parameter summary shows) replaces every query value, and a query part without `=`, with `REDACTED` whatever the parameter is called (`?id=REDACTED&x=REDACTED`) and drops userinfo and fragments, for any case of the scheme and for a target typed without a scheme. A target is redacted as one string, so a quote, an angle bracket or any kind of space inside it cannot leave a later part visible; a log line ends a URL at the next space, tab or line break. Only a secret in the URL path, in a query part without `=` inside a word without a scheme, or after a raw space inside a URL that a log line quotes, stays visible (a link in a page is written with `%20` when the scan reads it, so this needs a URL that was typed with a space or a redirect that carries one). The scan itself uses the target as typed. Captured exchanges include request roles,
 diagnostic headers, status, response-prefix hash/size, latency and truncation state; response bodies
 and cookie values are omitted. The CLI prints these results through its existing console/export flow.
+
+Text that a scanned host or a data provider controls (response headers, crawled links, Nmap banners and hostnames, certificate names, NVD, local-database and Exploit-DB descriptions) is printed, saved and returned as a single line: line breaks, escape sequences and other control characters, bidirectional overrides and zero-width characters are removed or replaced by a space, so a hostile target cannot forge a result line or drive your terminal through it (the response headers that a dashboard replay records are kept as received and are shown escaped). A URL keeps such characters as the percent-encoding that the HTTP client sends (a crawled link with an escape sequence is stored as `%1B...`), so the recorded requests, a replay and the generated PoCs send the request that the scan sent. Nmap script output and the OS fingerprint keep their newlines. The scanned text can still be misleading, so read scan output of an untrusted target with care.
 
 ### TLS certificate verification
 
@@ -327,8 +334,8 @@ downloading only those files is insufficient for vulnerability detection.
 On a connected machine, explicitly download the database:
 
 ```bash
-python autopwn.py --update-vuln-db
-python autopwn.py --vuln-db-status
+autopwn-suite --update-vuln-db
+autopwn-suite --vuln-db-status
 ```
 
 The first download covers all yearly feeds from 2002 through the current year, including
@@ -338,13 +345,16 @@ feed downloads. Repeat `--update-vuln-db` whenever you want fresh data. Each upd
 year's metadata and downloads only changed yearly feeds, so updates also cover long periods
 without internet. Checksums and record counts are verified before publishing the new database;
 a failed or interrupted update preserves the previous database. Concurrent updates are rejected.
+If NVD has not published the current year's feed yet (early January) and no record of that year was
+ever indexed, the update skips that feed and says so in its last message. The database does not record
+the gap and lacks that year's CVEs until a later update indexes them, so repeat the update after a few days.
 An update may need to be retried after active scans finish if the operating system locks the database file.
 
 Run an airgapped scan with an explicit target:
 
 ```bash
-python autopwn.py --offline -t 192.168.1.0/24 -y
-python autopwn.py --web --offline
+autopwn-suite --offline -t 192.168.1.0/24 -y
+autopwn-suite --web --offline
 ```
 
 Offline mode uses local CVE lookups, skips internet connectivity checks, exploit downloads,
@@ -355,8 +365,49 @@ requirements. Install Python dependencies and Nmap before disconnecting, or tran
 packages from a connected machine. The dashboard uses local assets and system fonts.
 
 The default `--vuln-source auto` tries online NVD lookups and falls back to a ready local database
-if NVD is unavailable, staying local for the rest of that scan. `--vuln-source online` requires
+if NVD is unavailable, staying local for the rest of that scan. That fallback does not make the scan
+offline: its web checks, reports and email/webhook notifications still run, and only an offline mode
+you chose skips them. `--vuln-source online` requires
 online lookups. Use `--offline` (or `--vuln-source offline`) to avoid trying NVD at all.
+Missing or invalid local data fails explicitly rather than reporting a clean vulnerability scan:
+when NVD fails and no local database is ready, the scan stops with exit status 1 and a message that
+names both failures, and the output recorded so far is still saved. A scan whose host discovery fails
+saves its output the same way and ends with that error's text; a failed Nmap port scan ends the scan with
+its error text and saves nothing. A saved partial report goes to the usual output file, so it replaces an
+earlier report with the same name.
+Stored data remains usable without an expiry; its update time is shown in scan logs and dashboard
+results. Offline matching uses description keyword prefixes, with all query terms required,
+and keeps versions such as `10.1.18` distinct from a query for `1.1`. As with online keyword scans,
+findings are possible vulnerabilities, not proof of exploitability or exact version applicability.
+
+In the dashboard, **Settings → Offline vulnerability database** provides manual Download/Update,
+progress, CVE count, update time and an **Export for airgapped system** link. Select the vulnerability
+data source in **New Scan** or save it in a scan profile for scheduled scans. Starting the server
+with `--offline` forces every scan to use local data and blocks downloads and test notifications.
+The **Offline mode — whole dashboard** toggle in Settings saves this preference across restarts
+and overrides the source for all new and scheduled scans. It also blocks downloads and notifications.
+Turn it off when you want to download updates. Finish or stop active online scans and let any database
+update or pending notification finish before turning it on. A server started with `--offline` keeps offline mode enforced.
+On Windows a database that a running scan has open cannot be replaced. A scan that is already running when
+the update starts stops it before it downloads anything. A scan that opens the database during the download
+blocks the final replace, which is retried for a few seconds, and then the finished download is discarded.
+Either way the previous database is kept and the update asks you to close running scans first. Windows
+reports a read-only database file the same way, so the update also asks you to make the file writable.
+
+The default file is `vulnerabilities.sqlite3` in the per-user data directory (`~/.local/share/autopwn-suite`,
+`%LOCALAPPDATA%\autopwn-suite` or `~/Library/Application Support/autopwn-suite`), or
+`AUTOPWN_DATA_DIR/vulnerabilities.sqlite3` when that environment variable is set. Copy this single file to the airgapped machine's data
+directory, or select its location explicitly:
+
+```bash
+autopwn-suite --offline --vuln-db /media/transfer/vulnerabilities.sqlite3 -t 192.168.1.10
+autopwn-suite --web --offline --vuln-db /media/transfer/vulnerabilities.sqlite3
+```
+
+The database contains public vulnerability data, without scan targets, credentials or exploit files.
+It is portable between platforms. Configuration files also support `offline`, `vulnerability_source`
+and `vuln_db` in `[AUTOPWN]`. Python callers can use
+`AutoScanner().scan("192.168.1.10", offline=True, vuln_db="/path/vulnerabilities.sqlite3")`.
 
 ## Checking for updates and self-updating
 
@@ -375,41 +426,28 @@ then exits. Neither runs automatically during a scan — both are explicit, one-
 By default both compare against the repo's latest GitHub release tag (`--update-channel
 release`, the default). Pass `--update-channel commit` to instead target the latest commit on
 `--update-branch` (default `main`). Use `--update-repo OWNER/REPO` (or the `AUTOPWN_UPDATE_REPO`
-environment variable) to point at a different fork. Requires internet access.
+environment variable) to point at a different fork. The repository must be written `OWNER/REPO` and the branch
+must be a plain git branch name; anything else is refused. An explicit `--update-channel` is remembered in
+`update_channel.txt` in the data directory. Both need internet access and refuse to run with `--offline`
+(or `--vuln-source offline`).
 
-`--apply-update` requires a git checkout of AutoPWN Suite (not a plain pip install) with a clean
+`--apply-update` requires a git checkout of AutoPWN Suite (a pip or pipx install, a standalone binary and a
+copy inside another git repository are refused) with a clean
 working tree, and only fast-forwards — it refuses and leaves your checkout untouched if the
 working tree has uncommitted changes or the local branch has diverged from the target (resolve
-that manually, e.g. with `git rebase` or by committing/stashing first). Restart AutoPWN Suite
-after it reports success so the updated code takes effect.
-Missing or invalid local data fails explicitly rather than reporting a clean vulnerability scan.
-Stored data remains usable without an expiry; its update time is shown in scan logs and dashboard
-results. Offline matching uses description keyword prefixes, with all query terms required,
-and keeps versions such as `10.1.18` distinct from a query for `1.1`. As with online keyword scans,
-findings are possible vulnerabilities, not proof of exploitability or exact version applicability.
+that manually, e.g. with `git rebase` or by committing/stashing first). It does not verify signatures: it
+trusts the repository named by `--update-repo`, so keep the default unless you trust another. Restart
+AutoPWN Suite after it reports success so the updated code takes effect.
 
-In the dashboard, **Settings → Offline vulnerability database** provides manual Download/Update,
-progress, CVE count, update time and an **Export for airgapped system** link. Select the vulnerability
-data source in **New Scan** or save it in a scan profile for scheduled scans. Starting the server
-with `--offline` forces every scan to use local data and blocks downloads and test notifications.
-The **Offline mode — whole dashboard** toggle in Settings saves this preference across restarts
-and overrides the source for all new and scheduled scans. It also blocks downloads and notifications.
-Turn it off when you want to download updates. Finish or stop active online scans and let any database
-update or pending notification finish before turning it on. A server started with `--offline` keeps offline mode enforced.
+## Interface language
 
-The default file is `modules/vulnerabilities.sqlite3`, or `AUTOPWN_DATA_DIR/vulnerabilities.sqlite3`
-when that environment variable is set. Copy this single file to the airgapped machine's data
-directory, or select its location explicitly:
-
-```bash
-python autopwn.py --offline --vuln-db /media/transfer/vulnerabilities.sqlite3 -t 192.168.1.10
-python autopwn.py --web --offline --vuln-db /media/transfer/vulnerabilities.sqlite3
-```
-
-The database contains public vulnerability data, without scan targets, credentials or exploit files.
-It is portable between platforms. Configuration files also support `offline`, `vulnerability_source`
-and `vuln_db` in `[AUTOPWN]`. Python callers can use
-`AutoScanner().scan("192.168.1.10", offline=True, vuln_db="/path/vulnerabilities.sqlite3")`.
+AutoPWN Suite speaks English and Turkish. `--lang tr` (or `--language tr`) selects the language of the CLI,
+the daemon installer and the reports, and is remembered in `language.txt` in the data directory. Without
+it the language follows the `AUTOPWN_LANG` environment variable, then the last explicit choice, then your
+system locale, then English. The dashboard has a language selector on the sign-in page and in Settings.
+The Turkish text is machine-translated and not yet reviewed by a native speaker, and scanned data (CVE
+descriptions, banners, exploit titles) is never translated. See the
+[internationalization notes](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/INTERNATIONALIZATION.md).
 
 ## Demo
 
@@ -420,29 +458,68 @@ AutoPWN Suite has a very user friendly easy to read output.
 
 ## Installation
 
-### Windows
+AutoPWN Suite needs [Nmap](https://nmap.org/download.html) on `PATH` for network scans
+(`sudo apt install nmap`, `brew install nmap`, or the installer from nmap.org on Windows).
+Website-only dashboard scans do not need it, and the command line offers to install it
+on first use. Every method below gives you the `autopwn-suite` command. Verify downloads
+as described in [Releasing](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/RELEASING.md#consumer-verification).
+
+### pipx or uv (recommended)
+
+Needs Python 3.10 or newer. This keeps AutoPWN Suite and its dependencies in their own
+environment on Linux, macOS and Windows:
+
+```bash
+pipx install autopwn-suite        # or: uv tool install autopwn-suite
+pipx upgrade autopwn-suite        # update
+pipx uninstall autopwn-suite      # remove
+```
+
+### Standalone binary
+
+Each [release](https://github.com/GamehunterKaan/AutoPWN-Suite/releases) attaches
+single-file binaries that need no Python installation: `linux-amd64`, `linux-arm64`,
+`windows-amd64.exe` and `macos-arm64`. Verify the signed `SHA256SUMS`
+([how](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/RELEASING.md#consumer-verification)), then on Linux or macOS make the file
+executable and run it:
+
+```bash
+chmod +x autopwn-suite-v2.7.0-linux-amd64
+./autopwn-suite-v2.7.0-linux-amd64 --help
+```
+
+The binaries are checksum-verified and Sigstore-signed but not code-signed for Windows or
+macOS, so on first run Windows SmartScreen shows an "unrecognized app" warning
+(**More info**, then **Run anyway**) and macOS may block the file until you run
+`xattr -d com.apple.quarantine <file>`. Only do this for a file whose signature and
+checksum you verified. Rename the file to `autopwn-suite` and place it on your `PATH`
+if you want the short command.
+
+### Linux system-wide
+For a system-wide installation from a checkout (requires root privileges), use the provided script:
 ```bash
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
-pip install -r requirements.txt
-```
-
-### Linux
-For a system-wide installation on Linux (which requires root privileges), use the provided installation script. (Recommended)
-```bash
 # Install as root
 sudo bash install.sh
 # Uninstall
 sudo bash uninstall.sh
 ```
 
-You can clone the repo and create a virtual environment. This installation method can be used for non-root installation in Linux.
+It creates a virtual environment in `/opt/autopwn-suite`, installs the package into it and
+links `/usr/local/bin/autopwn-suite` to it. Run without `sudo`, the script asks for it only where needed and
+the installation then belongs to your account, so `--daemon-install` refuses it and `sudo autopwn-suite`
+would run files you can change; `sudo bash install.sh` makes the installation belong to root. `PREFIX`, `BINDIR`, `APPDIR` and `DESTDIR` are
+honored, and `REQUIREMENTS_FILE=requirements-locked.txt` installs hash-verified dependencies
+(see [Building](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/BUILDING.md)).
+
+### From source
 ```bash
 git clone https://github.com/GamehunterKaan/AutoPWN-Suite.git
 cd AutoPWN-Suite
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install .                    # or: pip install -r requirements.txt && python autopwn.py
 ```
 
 ### Docker
@@ -466,12 +543,22 @@ environment:
   - AUTOPWN_WEB_PORT=8080        # Listen port
 ```
 
-> **Note:** Host networking (`network_mode: host`) is required for nmap to discover and scan devices on your local network.
+> **Note:** Host networking (`network_mode: host`) is required for nmap to discover and scan devices on your local network. It is also why you can sign in over plain HTTP at `http://localhost:8080`: replacing it with a published port (`ports:` or `docker run -p 127.0.0.1:8080:8080`) makes the dashboard see the bridge gateway instead of loopback and refuse sign-in without HTTPS (explained under Usage, Web UI).
 
 You can also run the CLI via Docker:
 ```bash
 docker run -it --net=host gamehunterkaan/autopwn-suite -t 192.168.1.0/24 -y
 ```
+
+### Where your data lives
+
+The dashboard account, settings, profiles, schedules and the local CVE database are stored
+in a per-user directory (`~/.local/share/autopwn-suite`, `%LOCALAPPDATA%\autopwn-suite` or
+`~/Library/Application Support/autopwn-suite`), or in `AUTOPWN_DATA_DIR` when set.
+Uninstalling never removes it, because it holds your administrator password hash and
+plaintext integration settings: delete the directory yourself when you no longer want them.
+Scan outputs, downloaded exploits, `api.txt` and configuration files stay in the directory
+you run the command from.
 
 ### Cloud
 You can use Google Cloud Shell.
@@ -516,6 +603,25 @@ For more details about usage and flags use `-h` flag.
 autopwn-suite --daemon-install
 ```
 
+Run it as root on Linux from a root-owned installation of AutoPWN Suite: `sudo bash install.sh` or a
+standalone binary kept in a root-owned directory. The service runs as root, so it refuses an installation
+that another user can modify (a pipx or `uv tool` environment or a virtual environment in a home directory) and a
+source checkout started with `python autopwn.py`, which the service could not import. It checks this before asking any question.
+The systemd service starts that same installation, and the generated configuration is kept in
+`/opt/autopwn-suite/autopwn-daemon.conf` (mode `0600` from the moment it is created, never copied and tightened afterwards, as it can hold the SMTP password, NVD key or webhook URL).
+Running `--daemon-install` again rewrites the service and restarts it, so a new configuration or a newer
+installation takes effect. A daemon installed by release 2.6 or earlier keeps running
+its old copy of the source until you do (`install.sh` warns when it finds
+one).
+
+```console
+sudo autopwn-suite --daemon-uninstall
+```
+
+stops and disables the service and deletes its unit file and `/opt/autopwn-suite/autopwn-daemon.conf`. The program,
+`/var/log/autopwn-daemon.log` and the other files in `/opt/autopwn-suite` stay; remove the program with
+`sudo bash uninstall.sh`, `pipx uninstall autopwn-suite` or by deleting the binary.
+
 ### Web UI
 
 Launch the web dashboard:
@@ -530,9 +636,9 @@ The dashboard listens on `127.0.0.1` by default. With a custom host and port:
 autopwn-suite --web --web-host 0.0.0.0 --web-port 3000
 ```
 
-Listening beyond localhost exposes the sign-in page to the network. Remote clients must then use HTTPS (terminate TLS in a reverse proxy, set `AUTOPWN_WEB_SECURE_COOKIE=1`, and firewall the service). Inside containers, publish the port to loopback only (`-p 127.0.0.1:8080:8080`).
+Listening beyond localhost exposes the sign-in page to the network. Remote clients must then use HTTPS (terminate TLS in a reverse proxy that passes the `Host` header through, e.g. nginx `proxy_set_header Host $http_host;`, which keeps a non-default port, set `AUTOPWN_WEB_SECURE_COOKIE=1`, and firewall the service). Inside containers, `-p 127.0.0.1:8080:8080` keeps the published port off the network, but a port published from Docker's bridge network reaches the dashboard from the bridge gateway, which is not loopback, so sign-in over plain HTTP is refused. For plain-HTTP sign-in on the Docker host use host networking with `AUTOPWN_WEB_HOST=127.0.0.1` (as `docker-compose.yml` does); otherwise put a TLS reverse proxy that keeps the `Host` header in front and set `AUTOPWN_WEB_SECURE_COOKIE=1`.
 
-![Scan Running](images/screenshots/scan-running.png)
+![Scan Running](https://raw.githubusercontent.com/GamehunterKaan/AutoPWN-Suite/main/images/screenshots/scan-running.png)
 
 ### REST API
 
@@ -545,7 +651,7 @@ The web UI exposes a full REST API:
 | `POST` | `/api/scan/stop` | Stop a running scan |
 | `GET` | `/api/hosts` | All discovered hosts (merged) |
 | `GET` | `/api/log` | Log history |
-| `GET` | `/api/events` | SSE event stream |
+| `GET` | `/api/events` | SSE event stream; `after=<id>` or `Last-Event-ID` resumes after a log entry |
 | `GET` | `/api/web/catalog` | Web check names, default controls, bounds and offline state |
 | `GET` | `/api/web/findings` | Web finding summaries across current scans |
 | `GET` | `/api/web/findings/<scan_id>/<finding_id>` | Complete finding, evidence and verification history |
@@ -566,7 +672,7 @@ The web UI exposes a full REST API:
 ## Module Usage
 
 ```python
-from api import AutoScanner
+from autopwn_suite import AutoScanner
 
 scanner = AutoScanner()
 json_results = scanner.scan("192.168.0.1")
@@ -593,19 +699,19 @@ that the lockfile matches the project; CI runs the same check before installatio
 #### Running Tests
 ```console
 # Run all tests with coverage
-poetry run test
+poetry run pytest
 
 # Run tests without coverage
-poetry run test --no-cov
+poetry run pytest --no-cov
 
 # Run only unit tests
-poetry run test -m unit
+poetry run pytest -m unit
 
 # Run only integration tests
-poetry run test -m integration
+poetry run pytest -m integration
 
 # Run tests excluding slow tests
-poetry run test -m "not slow"
+poetry run pytest -m "not slow"
 ```
 
 #### Running with Docker (Development)
@@ -613,18 +719,18 @@ poetry run test -m "not slow"
 docker build --tag autopwn-suite:local .
 ```
 
-See [Build from source](docs/BUILDING.md) for prerequisites, package builds and
+See [Build from source](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/docs/BUILDING.md) for prerequisites, package builds and
 running the locally built image. The Compose file runs a published image.
 
 
 ## Contributing to AutoPWN Suite
 
-I would be glad if you are willing to contribute this project. I am looking forward to merge your pull request unless its something that is not needed or just a personal preference. Also minor changes and bug fixes will not be merged. Please create an issue for those and I will do it myself. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
+Pull requests with suggested changes and fixes are welcome directly: you do not need to open an issue or ask first. [Click here for more info!](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/.github/CONTRIBUTING.md)
 
 
 ## License
 
-AutoPWN Suite is licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
+AutoPWN Suite is licensed under the [Apache License 2.0](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/LICENSE). See [NOTICE](https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/NOTICE) for attribution.
 
 Third-party dependencies are covered by their own licenses.
 

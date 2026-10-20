@@ -3,6 +3,8 @@
 """Real loopback adversaries exercise the HTTP boundary, not mocked reads."""
 
 import errno
+import os
+import select
 import socket
 import socketserver
 import ssl
@@ -19,12 +21,13 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from modules.nmap_progress import ScanCancelled
-from modules.web.http import ProbeClient, bounded_request, scoped_get
-from modules.web.poc import python_poc
-from modules.web.poc_runtime import verify_plan
-from modules.web.runtime import ScanContext
-from modules.web.transport import RequestCancelled, read_response
+from autopwn_suite.nmap_progress import ScanCancelled
+from autopwn_suite.web.http import ProbeClient, bounded_request, scoped_get
+from autopwn_suite.web.poc import python_poc
+from autopwn_suite.web.poc_runtime import verify_plan
+from autopwn_suite.web.runtime import ScanContext
+from autopwn_suite.web.transport import RequestCancelled, read_response
+from autopwn_suite.web.webvuln import webvuln
 
 # Several tests deliberately disable certificate verification against a loopback server.
 pytestmark = pytest.mark.filterwarnings("ignore:Unverified HTTPS request:urllib3.exceptions.InsecureRequestWarning")
@@ -192,7 +195,7 @@ def test_downloaded_poc_is_standalone_and_obeys_its_network_deadline(diagnostic_
         finding = {"type": "WEB_CONFIG", "url": url, "endpoint": url, "evidence": "X-Content-Type-Options is missing or is not nosniff"}
         namespace = {"__name__": "downloaded_poc"}
         code = python_poc(finding)
-        assert "from modules." not in code
+        assert "from autopwn_suite." not in code
         exec(compile(code, "downloaded_poc.py", "exec"), namespace)
         # Same generated implementation, shortened local deadline keeps CI fast.
         original = namespace["_RequestDeadline"]
@@ -205,6 +208,38 @@ def test_downloaded_poc_is_standalone_and_obeys_its_network_deadline(diagnostic_
                                           "target": url, "requests": [{"url": url}]})
         assert result["status"] == "inconclusive"
         assert time.monotonic() - started < 1.5
+
+
+@pytest.mark.parametrize("host", ["example..test", "a" * 70 + ".test"])
+def test_host_that_cannot_be_encoded_is_a_connection_failure_not_a_unicode_error(host):
+    with pytest.raises(requests.exceptions.ConnectionError):
+        scoped_get(requests.get, f"http://{host}/")
+    log = MagicMock()
+    assert webvuln(f"http://{host}/", log, MagicMock()) == []
+    log.logger.assert_any_call("warning", f"No reachable in-scope web endpoint on http://{host}/.")
+
+
+@pytest.mark.skipif(not hasattr(select, "poll"), reason="Only platforms with poll() have select()'s descriptor limit to work around")
+@pytest.mark.parametrize("tls", [False, True])
+def test_requests_work_when_descriptors_are_above_the_select_limit(diagnostic_server, tls):
+    import resource
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if hard != resource.RLIM_INFINITY and hard < 1400:
+        pytest.skip("The descriptor limit cannot be raised past select()'s 1024")
+    try:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (max(soft, 1400), hard))
+    except (ValueError, OSError):  # for example a platform that caps the soft limit below the one asked for
+        pytest.skip("The descriptor limit cannot be raised past select()'s 1024")
+    held = []
+    try:
+        # Sockets opened now get descriptors of 1100 and more, which select() rejects with ValueError.
+        held = [os.open(os.devnull, os.O_RDONLY) for _ in range(1100)]
+        with diagnostic_server(tls=tls) as (url, _, _):
+            assert read_response(None, "GET", url, timeout=5, verify=False).text == "safe"
+    finally:
+        for descriptor in held:
+            os.close(descriptor)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
 
 
 def test_precancelled_request_never_opens_a_socket():
@@ -225,7 +260,7 @@ def test_pollable_tls_preserves_certificate_and_hostname_validation(diagnostic_s
 
 @pytest.mark.parametrize("cancel", [False, True])
 def test_pending_tcp_connect_uses_one_deadline_and_honors_stop(monkeypatch, cancel):
-    import modules.web.transport as transport
+    import autopwn_suite.web.transport as transport
     stop = threading.Event()
     sockets = []
     original_socket = socket.socket
@@ -261,7 +296,7 @@ def test_pending_tcp_connect_uses_one_deadline_and_honors_stop(monkeypatch, canc
 def test_unsupported_address_family_still_falls_back_to_working_address(diagnostic_server, monkeypatch):
     from urllib.parse import urlsplit
 
-    import modules.web.transport as transport
+    import autopwn_suite.web.transport as transport
     original_socket = socket.socket
     def create(family, kind, protocol=0, **kwargs):
         if family == socket.AF_INET6:
@@ -294,7 +329,7 @@ def test_insecure_tls_option_is_an_explicit_per_scan_opt_out(diagnostic_server):
 
 
 def test_verify_tls_control_is_validated_and_defaults_to_verification():
-    from modules.web.options import normalize_options
+    from autopwn_suite.web.options import normalize_options
     assert normalize_options()["verify_tls"] is True
     assert normalize_options({"verify_tls": False})["verify_tls"] is False
     # A later resume that omits the control keeps the original choice.
@@ -305,8 +340,8 @@ def test_verify_tls_control_is_validated_and_defaults_to_verification():
 
 
 def test_poc_plans_and_curl_commands_keep_the_recorded_tls_policy():
-    from modules.web.poc import build_plan, curl_poc
-    from modules.web.poc_runtime import validate_plan
+    from autopwn_suite.web.poc import build_plan, curl_poc
+    from autopwn_suite.web.poc_runtime import validate_plan
     finding = {"endpoint": "https://example.test/", "url": "https://example.test/", "type": "CORS", "evidence": "x",
                "reproduction": {"strategy": "response", "target": "https://example.test/",
                                 "requests": [{"url": "https://example.test/", "method": "GET"}]}}

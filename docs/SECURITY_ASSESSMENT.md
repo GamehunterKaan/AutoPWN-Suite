@@ -35,7 +35,7 @@ capability gain. Actual deployment/firewall/ACL protections remain unverified.
 
 | Issue | Likelihood prerequisites | Impact | Priority and mitigation |
 | --- | --- | --- | --- |
-| Unauthenticated dashboard administration | Untrusted client can reach the listener; v2.6.0 defaults bind all interfaces. | Read results/integration settings, change jobs/settings and invoke scanner-native capabilities, including Nmap output-file options. | Medium; restrict ingress, bind loopback and use authenticated access. v2.6.0 has no application authentication; see the unreleased mitigation below. |
+| Unauthenticated dashboard administration | Untrusted client can reach the listener; v2.6.0 defaults bind all interfaces. | Read results/integration settings, change jobs/settings and invoke scanner-native capabilities, including Nmap output-file options. | Medium; restrict ingress, bind loopback and use authenticated access. v2.6.0 has no application authentication; see the v2.6.1 mitigation below. |
 | Stored HTML/script injection through profile description | Attacker can save a profile that an operator later views. | Script runs in the dashboard browser origin. | Medium; restrict profile writers and use isolated operator access until rendering is fixed. |
 | SMTP peer certificate not validated | Email configured and an active intermediary/forged SMTP endpoint is possible. | SMTP credentials and scan reports may be disclosed. | Medium; disable email or use a separately authenticated protected transport pending a validating TLS-context fix. |
 | Ambient `.netrc` credentials in core web probes | Scanner account has a matching/default credential entry. | Credentials may be sent without explicit per-scan consent, including HTTP or unchecked HTTPS. | Medium; use a dedicated account without such credentials until all probe paths suppress ambient authentication. |
@@ -49,31 +49,31 @@ locations, mitigations and fix status. No runtime fix is claimed for that releas
 
 ### Local remediation update — 2026-10-16
 
-The current working tree fixes findings AUTOPWN-SA-2026-002 through 005:
+v2.6.1 fixes findings AUTOPWN-SA-2026-002 through 005:
 profile HTML escaping, validating SMTP TLS contexts, anonymous diagnostic HTTP,
 and deadline/cancellation-aware response transport shared with portable replay.
 Focused tests include malicious saved metadata, real loopback SMTP certificates,
 synthetic `.netrc` entries and slow HTTP/HTTPS headers/chunks/bodies/trailers.
 These changes are not present in v2.6.0 and do not rewrite the original assessment.
 Finding 001 was left unchanged at the maintainer's earlier request for
-trusted-operator use; later unreleased changes mitigate it, as described next.
-See the [advisory index](SECURITY_ADVISORIES.md) for current local versus released status.
+trusted-operator use; later changes in v2.6.1 address it, as described next.
+See the [advisory index](SECURITY_ADVISORIES.md) for current status and fixed versions.
 
-### Unreleased dashboard authentication and secure defaults
+### Dashboard authentication and secure defaults (v2.6.1)
 
-After the update above, further local changes (also absent from v2.6.0) add a
+After the update above, further changes in v2.6.1 (also absent from v2.6.0) add a
 sign-in requirement for the dashboard and change several defaults: a single
 administrator account stored as a scrypt hash, server-side revocable 8-hour
 sessions, CSRF tokens, same-origin checks, failed-login rate limiting, HTTPS
 required for non-loopback clients, and a `127.0.0.1` default bind; web scan
 requests verify target certificates by default (`--insecure-tls` opts out); and
 NVD/SMTP/webhook secrets can be read from `*_FILE` credential files. Finding 001
-is therefore **mitigated in unreleased changes**, not fixed in a published
-version. Residual limits are one shared administrator account without MFA,
+is therefore **fixed in v2.6.1** (the maintainer decided on 2026-10-16 that these
+changes close it); v2.6.0 remains affected. Residual limits are one shared
+administrator account without MFA,
 plaintext-at-rest settings unless credential files are used, and operator-provided
 HTTPS for remote access. This code is not covered by the original independent
-assessment, and whether it closes finding 001 needs
-maintainer confirmation. The original v2.6.0 assessment above is not rewritten.
+assessment. The original v2.6.0 assessment above is not rewritten.
 
 ## Controls checked and candidate dispositions
 

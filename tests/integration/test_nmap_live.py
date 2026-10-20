@@ -16,10 +16,10 @@ from xml.etree import ElementTree
 
 import pytest
 
-from api import AutoScanner
-from modules.nmap_backend import PortScanner
-from modules.scanner import AnalyseScanResults, PortScan, TestArp, TestPing
-from modules.web.webvuln import web_endpoints
+from autopwn_suite.api import AutoScanner
+from autopwn_suite.nmap_backend import PortScanner
+from autopwn_suite.scanner import AnalyseScanResults, PortScan, TestArp, TestPing
+from autopwn_suite.web.webvuln import web_endpoints
 
 pytestmark = [pytest.mark.integration,
               pytest.mark.skipif(shutil.which("nmap") is None, reason="System Nmap is not installed")]
@@ -79,8 +79,8 @@ def local_server(*, ipv6=False, tls_context=None):
 
 
 def test_live_discovery_cli_api_and_dashboard(tmp_path, monkeypatch):
-    monkeypatch.setattr("modules.scanner.is_root", lambda: False)
-    monkeypatch.setattr("api.is_root", lambda: False)
+    monkeypatch.setattr("autopwn_suite.scanner.is_root", lambda: False)
+    monkeypatch.setattr("autopwn_suite.api.is_root", lambda: False)
     assert TestPing("127.0.0.1", offline=True) == ["127.0.0.1"]
     assert TestArp("127.0.0.1", offline=True) == ["127.0.0.1"]
     with local_server() as port:
@@ -103,7 +103,7 @@ def test_live_discovery_cli_api_and_dashboard(tmp_path, monkeypatch):
         assert api_result["127.0.0.1"]["ports"][port]["product"] == service["product"]
 
         monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))
-        spec = importlib.util.spec_from_file_location("live_nmap_dashboard", Path(__file__).parents[2] / "modules/web_ui.py")
+        spec = importlib.util.spec_from_file_location("live_nmap_dashboard", Path(__file__).parents[2] / "autopwn_suite/web_ui.py")
         dashboard = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(dashboard)
         monkeypatch.setattr(dashboard, "_notify", MagicMock())
@@ -142,7 +142,7 @@ def test_live_tls_service_and_nse_certificate_are_preserved(tmp_path, monkeypatc
                                            serialization.NoEncryption()))
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(cert_path, key_path)
-    monkeypatch.setattr("modules.scanner.is_root", lambda: False)
+    monkeypatch.setattr("autopwn_suite.scanner.is_root", lambda: False)
     with local_server(tls_context=context) as port:
         nm = PortScanner()
         nm.scan("127.0.0.1", arguments=f"-sT -sV -Pn -n --version-light -p {port} --script ssl-cert",

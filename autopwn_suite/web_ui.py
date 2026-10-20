@@ -1,0 +1,2591 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-2026 Kaan Gültekin
+"""
+AutoPWN Suite - Embedded Web UI
+================================
+Usage:
+    autopwn-suite --web [--web-host 127.0.0.1] [--web-port 8080]
+
+Features:
+  - Multiple concurrent scans (browser-launched)
+  - Scan profiles (saved configurations)
+  - Scheduled scans (cron-style)
+  - Email + webhook notifications on scan completion
+  - Persistent settings (stored in web_ui_settings.json)
+
+API:
+  GET  /                        -> dashboard
+
+  Scans:
+  GET  /api/scans               -> list all scan jobs
+  POST /api/scan/start          -> start a new scan
+  POST /api/scan/stop           -> stop a scan {"scan_id": "..."}
+
+  Hosts / log / events:
+  GET  /api/hosts               -> all hosts (merged)
+  GET  /api/log                 -> log history
+  GET  /api/events              -> SSE stream
+
+  Settings:
+  GET  /api/settings            -> all settings
+  PUT  /api/settings            -> save settings (full replace)
+
+  Profiles:
+  GET  /api/profiles            -> list scan profiles
+  POST /api/profiles            -> create profile
+  PUT  /api/profiles/<id>       -> update profile
+  DELETE /api/profiles/<id>     -> delete profile
+
+  Schedules:
+  GET  /api/schedules           -> list scheduled scans
+  POST /api/schedules           -> create schedule
+  PUT  /api/schedules/<id>      -> update schedule
+  DELETE /api/schedules/<id>    -> delete schedule
+"""
+
+from __future__ import annotations
+
+import errno
+import gettext
+import html as _html
+import io
+import json
+import logging
+import math
+import os
+import queue
+import shutil
+import smtplib
+import ssl
+import stat
+import threading
+import time
+import uuid
+from contextlib import contextmanager
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from functools import wraps
+from pathlib import Path
+from typing import Optional
+
+from autopwn_suite import i18n
+from autopwn_suite.credential_files import (
+    NIST_API_KEY,
+    SMTP_PASSWORD,
+    WEBHOOK_URL,
+    CredentialFileError,
+    credential_from_environment,
+    delivery_error_summary,
+)
+from autopwn_suite.nist_search import VulnerabilityLookup
+from autopwn_suite.nmap_progress import ScanCancelled
+from autopwn_suite.paths import data_dir
+from autopwn_suite.text import printable
+from autopwn_suite.vulnerability_db import DatabaseInUse, database_path, database_status, update_database
+from autopwn_suite.web.options import CHECKS as WEB_CHECKS
+from autopwn_suite.web.options import normalize_options
+from autopwn_suite.web.runtime import redact_target
+from autopwn_suite.web_auth import ACCOUNT_FILE, COOKIE, AccountStore, install_auth, show_credentials
+
+try:
+    import requests as _requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+
+try:
+    from flask import Flask, Response, jsonify, request, send_from_directory
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+
+
+# ── Input validation ──────────────────────────────────────────────────────────
+
+import re as _re
+
+# Characters allowed in nmap targets: IPs, CIDR, hostnames, ranges
+_TARGET_RE = _re.compile(r'^[a-zA-Z0-9\.\-\:\/\, ]+$')
+# Shell metacharacters that must never appear in nmap arguments
+_SHELL_DANGEROUS = set(';|&`$(){}[]<>!\n\r\\\'\"~')
+
+# The dashboard has no free-text Nmap options: it builds the arguments itself from the structured scan settings.
+_NMAP_OPTIONS_REFUSED = "Nmap options are not accepted; use the scan technique, ports and detection settings"
+# The scan techniques the Scan Technique list of the scan and profile forms offers; "" leaves the default.
+_SCAN_TECHNIQUES = ("", "-sS", "-sT", "-sA", "-sW", "-sM", "-sU", "-sN", "-sF", "-sX")
+# A port specification: port numbers (1-65535), ranges and comma lists. Nothing in it is whitespace or starts an option.
+_PORT_SPEC_RE = _re.compile(r"[1-9][0-9]{0,4}(?:-[1-9][0-9]{0,4})?(?:,[1-9][0-9]{0,4}(?:-[1-9][0-9]{0,4})?)*")
+_PORT_SPEC_MAX = 2048
+
+
+class _OptionsRefused(ValueError):
+    """Free-text Nmap options in a request, or in a profile or schedule that an earlier release stored."""
+
+
+def _validate_target(target: str) -> Optional[str]:
+    """Return an error string if the target is invalid, else None."""
+    if not isinstance(target, str):
+        return "target must be a string"
+    if not target.strip():
+        return "'target' is required"
+    if any(c in _SHELL_DANGEROUS for c in target):
+        return "target contains invalid characters"
+    if not _TARGET_RE.match(target):
+        return "target contains invalid characters"
+    if any(token.startswith("-") for token in _re.split(r"[\s,]+", target)):
+        return "target contains invalid characters"  # a target that starts with a dash is an Nmap option
+    return None
+
+
+def _refuse_options(value) -> None:
+    """Nmap options are not accepted as text: only an empty (or blank) string is the default."""
+    if not isinstance(value, str):
+        raise ValueError("'nmap_flags' must be a string")
+    if value.strip():
+        raise _OptionsRefused(_NMAP_OPTIONS_REFUSED)
+
+
+def _checked_ports(ports: str) -> str:
+    """The port specification without surrounding blanks, or ValueError unless it is numbers, ranges and lists."""
+    ports = ports.strip()
+    if not ports:
+        return ""
+    if (len(ports) > _PORT_SPEC_MAX or not _PORT_SPEC_RE.fullmatch(ports)
+            or any(int(number) > 65535 for number in _re.findall(r"[0-9]+", ports))
+            or any(int(first) > int(last) for first, last in _re.findall(r"([0-9]+)-([0-9]+)", ports))):
+        raise ValueError("'ports' must be port numbers and ranges such as 22,80,1-1000")
+    return ports
+
+
+def _validate_job_target(target, config):
+    if config.get("scan_web") and not config.get("scan_ports", True):
+        from autopwn_suite.web.webvuln import target_urls
+        if not isinstance(target, str) or not target.strip() or len(target) > 8192:
+            return "A web target is required (hostname or HTTP(S) URL)"
+        if any(character in target for character in "\r\n\t ") or ("://" not in target and any(character in target for character in "/,")):
+            return "Web-only scans require one hostname or HTTP(S) URL"
+        try:
+            target_urls(target)
+        except ValueError:
+            return "Invalid HTTP(S) target"
+        return None
+    if isinstance(target, str) and "://" in target:
+        return "Use Web only for an HTTP(S) URL"
+    return _validate_target(target)
+
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+
+_MODULE_DIR  = Path(__file__).parent
+_STATIC_DIR  = _MODULE_DIR / "web_ui_static"
+_DATA_DIR    = data_dir()
+try:
+    _DATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+except OSError:
+    # Importing the CLI must not need a writable data directory (--version, --help); the dashboard fails when it
+    # first writes there.
+    pass
+_SETTINGS_FILE = _DATA_DIR / "web_ui_settings.json"
+_OFFLINE_ONLY = False
+_mode_lock = threading.RLock()
+_notification_operations = 0
+_VULNERABILITY_DB = None
+_database_update_lock = threading.Lock()
+_database_update = {"running": False, "message": "", "current": 0, "total": 0, "error": None}
+
+
+def _database_progress(message, current, total):
+    with _database_update_lock:
+        _database_update.update(message=message, current=current, total=total)
+
+
+def _update_vulnerability_database():
+    try:
+        update_database(_VULNERABILITY_DB, _database_progress)
+    except Exception as error:
+        logging.exception("Vulnerability database update failed; retaining the previous database")
+        text = ("A running scan is using the database, or the file is read-only. Stop running scans, make it writable and update again; "
+                "the previous database is preserved." if isinstance(error, DatabaseInUse) else
+                "Download failed. Check your connection and available disk space; "
+                "the previous database is preserved.")
+        with _database_update_lock:
+            _database_update.update(error=text, message="Update failed")
+    finally:
+        with _database_update_lock:
+            _database_update["running"] = False
+
+
+# ── Settings persistence ──────────────────────────────────────────────────────
+
+_DEFAULT_SETTINGS = {
+    "nist_api_key": "",
+    "offline_mode": False,
+    "language": "",
+    "email": {
+        "enabled":  False,
+        "smtp_host": "",
+        "smtp_port": 587,
+        "username":  "",
+        "password":  "",
+        "from_addr": "",
+        "to_addr":   "",
+        "on_complete": True,
+        "on_error":    True,
+        "on_vuln_found": True,
+    },
+    "webhook": {
+        "enabled":       False,
+        "url":           "",
+        "on_complete":   True,
+        "on_error":      True,
+        "on_vuln_found": True,
+    },
+}
+
+_settings: dict = {}
+_settings_lock  = threading.Lock()
+
+
+def _load_settings() -> None:
+    global _settings
+    if _SETTINGS_FILE.exists():
+        try:
+            data = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or any(k in data and not isinstance(data[k], dict) for k in ("email", "webhook")):
+                raise ValueError("Settings must contain objects")
+            if "offline_mode" in data and not isinstance(data["offline_mode"], bool):
+                raise ValueError("offline_mode must be a boolean")
+            # Deep merge with defaults so new keys are always present
+            merged = _deep_merge(_DEFAULT_SETTINGS, data)
+            with _settings_lock:
+                _settings = merged
+            return
+        except (OSError, ValueError, TypeError, RecursionError):
+            logging.exception("Could not load settings; preserving the existing file")
+    with _settings_lock:
+        _settings = _deep_merge(_DEFAULT_SETTINGS, {})
+    if not _SETTINGS_FILE.exists():
+        _save_settings()
+
+
+def _write_json(path: Path, data: dict) -> None:
+    """Replace a complete JSON document; an interrupted save keeps the old one."""
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        # Owner-only like the account file: these files hold the SMTP password, NVD key and webhook URL,
+        # and an existing data directory keeps whatever mode it already had.
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            json.dump(data, output, indent=2)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _owner_only(path: Path, discard_after: Optional[float] = None) -> bool:
+    """Restrict an existing regular file that group or others can access to its owner (mode 0600), or delete it
+    when `discard_after` seconds have passed since it was written. True when that ended an exposure to group or
+    others. The file is opened without following symlinks, so the mode never changes on what a link points to."""
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+    except FileNotFoundError:
+        return False
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            return False  # a symlink: its target is not ours to change
+        raise
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            return False
+        exposed = bool(info.st_mode & 0o077)
+        if discard_after is not None and time.time() - info.st_mtime > discard_after:
+            os.unlink(path)
+            return exposed
+        if not exposed:
+            return False
+        os.fchmod(descriptor, 0o600)
+        return True
+    finally:
+        os.close(descriptor)
+
+
+# A temporary file younger than this may belong to a save that is still running in another process.
+_STALE_TEMPORARY_SECONDS = 60
+
+
+def _tighten_data_files() -> None:
+    """Make the dashboard files that can hold credentials or scan targets owner-only. Releases before 2.7.0 wrote
+    them with the process umask (usually mode 0644), and a file keeps its mode until it is saved again, which for
+    the settings is only when settings change. This also deals with the temporary file of a save that an earlier
+    release left behind. It never stops the dashboard from starting. POSIX only: Windows has no POSIX modes."""
+    if os.name == "nt":
+        return
+    changed = failed = False
+    try:
+        leftovers = [(leftover, _STALE_TEMPORARY_SECONDS) for leftover in _DATA_DIR.glob(".web_ui_*.json.*.tmp")]
+    except OSError:
+        leftovers, failed = [], True
+    files = [(file, None) for file in (_SETTINGS_FILE, _PROFILES_FILE, _SCHEDULES_FILE, _DATA_DIR / ACCOUNT_FILE)]
+    for file, discard_after in files + leftovers:
+        try:
+            changed |= _owner_only(file, discard_after)
+        except OSError:
+            failed = True
+    # Fixed text: neither a path nor the reason (it can name a file or an account) goes to the log.
+    if changed:
+        logging.warning("Restricted dashboard data files that other local users could read to their owner (mode 0600). "
+                        "Rotate credentials that were saved while other accounts could read them.")
+    if failed:
+        logging.warning("Could not restrict every dashboard data file to its owner (mode 0600). "
+                        "Check who owns and can read the files in the data directory.")
+
+
+def _save_settings() -> None:
+    with _settings_lock:
+        _write_json(_SETTINGS_FILE, _settings)
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    result = deepcopy(base)
+    for k, v in override.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            result[k] = _deep_merge(result[k], v)
+        else:
+            result[k] = deepcopy(v)
+    return result
+
+
+# Credentials supplied through *_FILE variables override, and are never copied into,
+# the persisted settings, so they stay in their own owner-only files.
+_FILE_CREDENTIALS = {("nist_api_key",): NIST_API_KEY, ("email", "password"): SMTP_PASSWORD,
+                     ("webhook", "url"): WEBHOOK_URL}
+
+
+def _file_credential(path):
+    try:
+        return credential_from_environment(_FILE_CREDENTIALS[path])
+    except CredentialFileError as error:
+        logging.getLogger(__name__).error("%s", error)
+        return None
+
+
+def _get_setting(*keys):
+    with _settings_lock:
+        d = _settings
+    for k in keys:
+        d = d.get(k, {}) if isinstance(d, dict) else None
+        if d is None:
+            return None
+    if keys in _FILE_CREDENTIALS:
+        secret = _file_credential(keys)
+        return d if secret is None else secret
+    section = [path for path in _FILE_CREDENTIALS if path[:-1] == keys]
+    if section and isinstance(d, dict):
+        d = dict(d)
+        for path in section:
+            secret = _file_credential(path)
+            if secret is not None:
+                d[path[-1]] = secret
+    return d
+
+
+def _offline_enabled():
+    """The CLI restriction takes precedence over the persisted dashboard toggle."""
+    return _OFFLINE_ONLY or _get_setting("offline_mode") is True
+
+
+def _notifications_offline(job):
+    """Offline mode as the operator chose it (CLI restriction, toggle, or the job's own source).
+
+    An automatic fallback to the local database (vulnerability_source_used) is not offline mode.
+    """
+    return _offline_enabled() or job.config.get("vulnerability_source") == "offline"
+
+
+@contextmanager
+def _notification_operation(job=None):
+    """Reserve outbound notification work against an offline-mode transition."""
+    global _notification_operations
+    with _mode_lock:
+        allowed = not (_notifications_offline(job) if job is not None else _offline_enabled())
+        if allowed:
+            _notification_operations += 1
+    try:
+        yield allowed
+    finally:
+        if allowed:
+            with _mode_lock:
+                _notification_operations -= 1
+
+
+def _online_notification_route(handler):
+    @wraps(handler)
+    def guarded(*args, **kwargs):
+        with _notification_operation() as allowed:
+            if not allowed:
+                return jsonify({"error": "Notifications are disabled in offline mode.", "code": "notifications_offline"}), 409
+            return handler(*args, **kwargs)
+    return guarded
+
+
+# ── Profiles persistence ──────────────────────────────────────────────────────
+
+_PROFILES_FILE = _DATA_DIR / "web_ui_profiles.json"
+_profiles: dict = {}   # id -> profile dict
+_profiles_lock  = threading.Lock()
+
+
+def _set_aside(path: Path, *, move: bool) -> str:
+    """Keep what the dashboard could not load (the next save rewrites the file) and log where it went."""
+    kept = path.with_name(f"{path.name}.corrupt-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}")
+    try:
+        if move:
+            os.replace(path, kept)
+        else:
+            current = path.read_bytes()
+            for earlier in path.parent.glob(path.name + ".corrupt-*"):
+                try:
+                    if earlier.read_bytes() == current:  # a start after a crash must not pile up copies
+                        return f"The original of {path.name} is already kept as {earlier.name}."
+                except OSError:
+                    continue
+            # Owner-only from creation like the original, which can hold scan targets.
+            descriptor = os.open(kept, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(descriptor, "wb") as copy:
+                copy.write(current)
+    except OSError:
+        return f"Could not keep a copy of {path.name}; the next save replaces it."
+    return f"The original of {path.name} is kept as {kept.name}."
+
+
+def _refused_profiles(profiles: dict) -> list:
+    """Ids of the stored profiles that this release's validation refuses: those saved with Nmap options, which the
+    dashboard no longer accepts, or with a technique or ports outside the structured fields."""
+    refused = []
+    for pid, profile in profiles.items():
+        try:
+            _profile_config({}, profile.get("config", {}))
+        except Exception:  # a hand-edited file can hold anything; loading must not stop on it
+            refused.append(pid)
+    return refused
+
+
+def _load_profiles() -> None:
+    global _profiles
+    if _PROFILES_FILE.exists():
+        try:
+            data = json.loads(_PROFILES_FILE.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("Profiles must be an object of profile objects")
+            valid = {pid: profile for pid, profile in data.items() if isinstance(profile, dict)}
+            if len(valid) != len(data):
+                logging.error("Skipped %d invalid entries of %s. %s", len(data) - len(valid), _PROFILES_FILE.name,
+                              _set_aside(_PROFILES_FILE, move=False))
+            refused = _refused_profiles(valid)
+            if refused:  # kept as they are: nothing scans with them until they are saved again
+                logging.error("Kept %d profile(s) of %s that this release refuses (Nmap options, or a technique or ports "
+                              "outside the structured fields); scheduled scans that use them are disabled when due. %s",
+                              len(refused), _PROFILES_FILE.name, _set_aside(_PROFILES_FILE, move=False))
+            with _profiles_lock:
+                _profiles = valid
+            return
+        except Exception:
+            logging.error("Could not load %s; starting without profiles. %s", _PROFILES_FILE.name,
+                          _set_aside(_PROFILES_FILE, move=True))
+    with _profiles_lock:
+        _profiles = {}
+
+
+def _save_profiles() -> None:
+    with _profiles_lock:
+        _write_json(_PROFILES_FILE, _profiles)
+
+
+# ── Schedules persistence ─────────────────────────────────────────────────────
+
+_SCHEDULES_FILE = _DATA_DIR / "web_ui_schedules.json"
+_schedules: dict = {}   # id -> schedule dict
+_schedules_lock  = threading.Lock()
+
+# Track last-run time per schedule so we don't double-fire
+_schedule_last_run: dict = {}
+_schedule_last_run_lock = threading.Lock()
+# The scan each schedule started last, so a schedule never overlaps its own previous run. Only the
+# scheduler thread uses these two.
+_schedule_jobs: dict = {}
+_schedule_overlap_logged: set = set()
+
+
+def _holds_options(record: dict) -> bool:
+    """Whether a stored record carries Nmap options as text, which the dashboard no longer accepts."""
+    try:
+        if "nmap_flags" in record:
+            _refuse_options(record["nmap_flags"])
+    except ValueError:
+        return True
+    return False
+
+
+def _load_schedules() -> None:
+    global _schedules
+    if _SCHEDULES_FILE.exists():
+        try:
+            data = json.loads(_SCHEDULES_FILE.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("Schedules must be an object")
+            valid = {sid: sched for sid, sched in data.items()
+                     if isinstance(sid, str) and isinstance(sched, dict)}
+            if len(valid) != len(data):
+                logging.error("Skipped %d invalid entries of %s. %s", len(data) - len(valid), _SCHEDULES_FILE.name,
+                              _set_aside(_SCHEDULES_FILE, move=False))
+            held = [sid for sid, sched in valid.items() if _holds_options(sched)]
+            if held:  # kept as they are: each is disabled when it comes due
+                logging.error("Kept %d schedule(s) of %s that carry Nmap options, which the dashboard no longer accepts. %s",
+                              len(held), _SCHEDULES_FILE.name, _set_aside(_SCHEDULES_FILE, move=False))
+            data = valid
+            with _schedules_lock:
+                _schedules = data
+            # Restore last_run times so schedules don't fire immediately on restart
+            with _schedule_last_run_lock:
+                _schedule_last_run.clear()
+                for sid, sched in data.items():
+                    lr = sched.get("last_run")
+                    if isinstance(lr, str) and lr:
+                        try:
+                            restored = datetime.fromisoformat(lr.replace("Z", "+00:00"))
+                            if restored.tzinfo is None:
+                                restored = restored.replace(tzinfo=timezone.utc)
+                            _schedule_last_run[sid] = restored.astimezone(timezone.utc)
+                        except (ValueError, TypeError, OverflowError):
+                            pass
+            return
+        except Exception:
+            logging.error("Could not load %s; starting without schedules. %s", _SCHEDULES_FILE.name,
+                          _set_aside(_SCHEDULES_FILE, move=True))
+    with _schedules_lock:
+        _schedules = {}
+    with _schedule_last_run_lock:
+        _schedule_last_run.clear()
+
+
+def _save_schedules() -> None:
+    with _schedules_lock:
+        _write_json(_SCHEDULES_FILE, _schedules)
+
+
+# ── Per-scan job ──────────────────────────────────────────────────────────────
+
+class ScanJob:
+    def __init__(self, scan_id: str, target: str, config: dict):
+        self.id          = scan_id
+        self.target      = target
+        self.config      = config
+        self.status      = "running"
+        self.started_at  = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.finished_at = ""
+        self.error       = ""
+        self._lock       = threading.RLock()
+        self._stop_flag  = threading.Event()
+        self._hosts: dict[str, dict] = {}
+        self._web_findings = {}
+        self._web_coverage = []
+        self._web_checkpoints = {}
+        self._network_results = {}
+        self._lookup_results = {}
+        self._targets = None
+        self._completed_hosts = set()
+        self.resume_count = 0
+        self._progress = {"phase": "preparing", "detail": "Preparing scan", "percent": None,
+                          "completed": None, "total": None, "host": "",
+                          "target_index": 0, "targets_completed": 0, "targets_total": None,
+                          "revision": 0}
+
+    @property
+    def public_target(self) -> str:
+        """The target as it is shown and exported: query values, userinfo and fragments of a URL are redacted. The scan
+        itself runs, resumes and re-runs with `self.target` and `self.config["target"]`, which stay as typed."""
+        return redact_target(self.target)
+
+    def _publish_progress(self):
+        with self._lock:
+            event = {"scan_id": self.id, "level": "__scan_progress__", "msg": "", "ts": "",
+                     "progress": deepcopy(self._progress), "status": self.status,
+                     "finished_at": self.finished_at}
+        _broadcast(event)
+
+    def set_progress(self, phase, detail, *, percent=None, completed=None, total=None,
+                     host=None, target_index=None, targets_completed=None, targets_total=None):
+        if percent is not None:
+            percent = float(percent)
+            percent = max(0.0, min(100.0, percent)) if math.isfinite(percent) else None
+        with self._lock:
+            if self.status not in ("running", "stopping"):
+                return
+            self._progress.update(phase=phase, detail=detail, percent=percent,
+                                  completed=completed, total=total)
+            for key, value in (("host", host), ("target_index", target_index),
+                               ("targets_completed", targets_completed), ("targets_total", targets_total)):
+                if value is not None:
+                    self._progress[key] = value
+            self._progress["revision"] += 1
+        self._publish_progress()
+
+    def complete_target(self):
+        with self._lock:
+            if self.status not in ("running", "stopping"):
+                return
+            self._progress["targets_completed"] += 1
+            self._progress["revision"] += 1
+        self._publish_progress()
+
+    def should_stop(self) -> bool:
+        return self._stop_flag.is_set()
+
+    def request_stop(self) -> None:
+        self._stop_flag.set()
+        with self._lock:
+            if self.status == "running":
+                self.status = "stopping"
+            self._progress["revision"] += 1
+        self._publish_progress()
+
+    def mark_done(self, status: str = "completed") -> None:
+        with self._lock:
+            self.status      = status
+            self.finished_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            self._progress.update(phase=status, detail={"completed": "Scan completed",
+                                                       "partial": "Finished with incomplete coverage",
+                                                       "stopped": "Scan stopped"}.get(status, status))
+            if status == "completed":
+                self._progress["percent"] = 100.0
+                # A completed scan cannot be resumed, so its Nmap results and caches only hold memory
+                # (about 15 MB for a /24 with -sV -O), and up to 100 finished jobs are kept.
+                self._network_results.clear()
+                self._lookup_results.clear()
+                self._web_checkpoints.clear()
+                self._targets = None
+            self._progress["revision"] += 1
+        self._publish_progress()
+
+    def mark_error(self, msg: str) -> None:
+        with self._lock:
+            self.status      = "error"
+            self.error       = msg
+            self.finished_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            self._progress.update(phase="error", detail="Scan failed")
+            self._progress["revision"] += 1
+        self._publish_progress()
+
+    def get_or_create_host(self, ip: str) -> dict:
+        with self._lock:
+            if ip not in self._hosts:
+                self._hosts[ip] = {
+                    "ip": ip, "mac": "", "vendor": "", "os": "",
+                    "ports": [], "vulns": [],
+                    "scan_status": "scanning",
+                    "scan_id":     self.id,
+                }
+            return self._hosts[ip]
+
+    def mark_host_done(self, ip: str, status: str = "completed") -> None:
+        with self._lock:
+            if ip in self._hosts:
+                self._hosts[ip]["scan_status"] = status
+
+    def hosts_list(self) -> list:
+        with self._lock:
+            return deepcopy(list(self._hosts.values()))
+
+    def add_web_finding(self, ip, endpoint, result):
+        result = deepcopy(result)
+        result.update(scan_id=self.id, host=ip, endpoint=redact_target(endpoint))
+        with self._lock:
+            self._web_findings[result["id"]] = result
+            host = self.get_or_create_host(ip)
+            host["web_finding_count"] = sum(row["host"] == ip for row in self._web_findings.values())
+        _broadcast({"scan_id": self.id, "level": "__web_finding__", "msg": "", "finding_id": result["id"]})
+
+    def web_findings(self, full=False):
+        with self._lock:
+            rows = deepcopy(list(self._web_findings.values()))
+        if full:
+            return rows
+        return [{key: row.get(key) for key in ("id", "scan_id", "host", "endpoint", "type", "url", "parameter", "severity", "confidence", "evidence", "observed_at", "verification")}
+                | {"title": row.get("details", {}).get("title", row["type"])} for row in rows]
+
+    def web_finding(self, finding_id):
+        with self._lock:
+            return deepcopy(self._web_findings.get(finding_id))
+
+    def set_web_verification(self, finding_id, result):
+        with self._lock:
+            if finding_id in self._web_findings:
+                self._web_findings[finding_id]["verification"] = deepcopy(result)
+                if result.get("status") != "running":
+                    history = self._web_findings[finding_id].setdefault("verification_history", [])
+                    history.append(deepcopy(result))
+                    del history[:-10]
+        _broadcast({"scan_id": self.id, "level": "__web_finding__", "msg": "", "finding_id": finding_id})
+
+    def add_web_coverage(self, ip, endpoint, summary):
+        with self._lock:
+            public_endpoint = redact_target(endpoint)
+            self._web_coverage = [row for row in self._web_coverage
+                                  if (row["host"], row["endpoint"]) != (ip, public_endpoint)]
+            self._web_coverage.append({"host": ip, "endpoint": public_endpoint, **deepcopy(summary)})
+            statuses = [row["status"] for row in self._web_coverage if row["host"] == ip]
+            self._hosts[ip]["web_status"] = "completed" if all(s == "completed" for s in statuses) else "partial"
+
+    def to_dict(self) -> dict:
+        with self._lock:
+            hosts = deepcopy(list(self._hosts.values()))
+            status = self.status
+            finished_at = self.finished_at
+            error = self.error
+            progress = deepcopy(self._progress)
+            web_count = len(self._web_findings)
+            web_coverage = deepcopy(self._web_coverage)
+            # The scan thread adds keys to the config under this lock; iterating it outside would raise.
+            config = {k: deepcopy(v) for k, v in self.config.items() if k != "api_key"}
+        if isinstance(config.get("target"), str):
+            config["target"] = redact_target(config["target"])
+        return {
+            "id":          self.id,
+            "target":      self.public_target,
+            "config":      config,
+            "status":      status,
+            "started_at":  self.started_at,
+            "finished_at": finished_at,
+            "error":       error,
+            "host_count":  len(hosts),
+            "port_count":  sum(len(h["ports"]) for h in hosts),
+            "vuln_count":  sum(len(h["vulns"])  for h in hosts),
+            "progress":    progress,
+            "web_finding_count": web_count,
+            "web_coverage": web_coverage,
+            "resume_count": self.resume_count,
+            "can_resume": status in ("partial", "stopped", "error"),
+            "resume_web_options": _resume_web_options(self) if status in ("partial", "stopped", "error") and self.config.get("scan_web") else None,
+        }
+
+    def to_full_dict(self) -> dict:
+        with self._lock:
+            hosts = deepcopy(list(self._hosts.values()))
+            base_dict = self.to_dict()
+
+        structured_hosts = []
+        for h in hosts:
+            sh = {
+                "ip": h.get("ip", ""),
+                "mac": h.get("mac", ""),
+                "vendor": h.get("vendor", ""),
+                "os": h.get("os", ""),
+                "ports": [],
+                "scan_status": h.get("scan_status", ""),
+                "lookup_status": h.get("lookup_status", "not_run"),
+            }
+            mapped_vulns = []
+            for p in h.get("ports", []):
+                port_num = p.get("port")
+                port_vulns = []
+                for v in h.get("vulns", []):
+                    if v.get("port") == port_num and v.get("protocol", "tcp") == p.get("protocol", "tcp"):
+                        port_vulns.append(v)
+                        if v not in mapped_vulns:
+                            mapped_vulns.append(v)
+                sh["ports"].append({
+                    "port": p.get("port"),
+                    "service": p.get("service"),
+                    "product": p.get("product"),
+                    "version": p.get("version"),
+                    "protocol": p.get("protocol", "tcp"),
+                    "vulnerabilities": port_vulns
+                })
+
+            unmapped = [v for v in h.get("vulns", []) if v not in mapped_vulns]
+            if unmapped:
+                sh["unmapped_vulnerabilities"] = unmapped
+            structured_hosts.append(sh)
+
+        base_dict["hosts"] = structured_hosts
+        base_dict["web_findings"] = self.web_findings(full=True)
+        return base_dict
+
+# ── Global scan registry + SSE ────────────────────────────────────────────────
+
+_scans: dict[str, ScanJob] = {}
+_scans_lock   = threading.Lock()
+_sse_subscribers: list = []
+_sse_subscribers_lock = threading.Lock()
+_log_history: list = []
+_log_history_lock = threading.Lock()
+# Every history entry gets the next id, so a client can resume where it stopped (see api_events). The counter
+# starts from the clock, not from zero: a restarted dashboard then never reuses an id a still-open page has seen.
+_log_seq = time.time_ns() // 1000
+_MAX_LOG_HISTORY = 5000
+_MAX_COMPLETED_SCANS = 100
+_web_verifications_running = 0
+
+
+def _broadcast(event: dict) -> None:
+    global _log_seq
+    with _log_history_lock:
+        if event.get("level") != "__scan_progress__":
+            _log_seq += 1
+            event = {**event, "id": _log_seq}
+            _log_history.append(event)
+            if len(_log_history) > _MAX_LOG_HISTORY:
+                del _log_history[:len(_log_history) - _MAX_LOG_HISTORY]
+        with _sse_subscribers_lock:
+            for q in _sse_subscribers:
+                try:
+                    q.put_nowait(event)
+                except queue.Full:
+                    # A slow dashboard must not block scans or grow memory forever.
+                    try:
+                        q.get_nowait()
+                    except queue.Empty:
+                        pass
+                    q.put_nowait(event)
+
+
+def _resume_point(*candidates):
+    """The log id an event stream resumes after: the first candidate (`Last-Event-ID` header, then the `after`
+    parameter) that is 1 to 18 ASCII digits. None means no resume point, so only later entries are sent."""
+    for raw in candidates:
+        if isinstance(raw, str) and 0 < len(raw) <= 18 and raw.isascii() and raw.isdigit():
+            return int(raw)
+    return None
+
+
+def _sse_frame(entry: dict) -> str:
+    # Progress events are not retained, so they have no id and cannot be resumed.
+    return (f"id: {entry['id']}\n" if "id" in entry else "") + f"data: {json.dumps(entry)}\n\n"
+
+
+def _register_scan(job: ScanJob) -> None:
+    with _scans_lock:
+        _scans[job.id] = job
+        # Prune oldest completed/error scans if over limit
+        done = [(k, v) for k, v in _scans.items()
+                if v.status in ("completed", "error", "partial", "stopped")]
+        if len(done) > _MAX_COMPLETED_SCANS:
+            done.sort(key=lambda x: x[1].finished_at)
+            for k, _ in done[:len(done) - _MAX_COMPLETED_SCANS]:
+                del _scans[k]
+
+
+def _get_scan(scan_id: str) -> Optional[ScanJob]:
+    with _scans_lock:
+        return _scans.get(scan_id)
+
+
+def _all_scans() -> list[ScanJob]:
+    with _scans_lock:
+        return list(_scans.values())
+
+
+# ── WebLogger ─────────────────────────────────────────────────────────────────
+
+class WebLogger:
+    _LEVEL_MAP = {"info": "info", "error": "error", "warning": "warning", "success": "success"}
+
+    def __init__(self, scan_id: str):
+        self.scan_id = scan_id
+
+    def logger(self, exception_: str, message: str) -> None:
+        level = self._LEVEL_MAP.get(exception_, "info")
+        _broadcast({
+            "scan_id": self.scan_id,
+            "ts":      datetime.now(timezone.utc).strftime("%H:%M:%S"),
+            "level":   level,
+            "msg":     printable(str(message), multiline=True),
+        })
+
+
+# ── NullConsole ───────────────────────────────────────────────────────────────
+
+class _NullStatus:
+    def __enter__(self): return self
+    def __exit__(self, *_): pass
+    def start(self): pass
+    def stop(self): pass
+    def update(self, *_, **__): pass
+
+
+class NullConsole:
+    def status(self, *_, **__): return _NullStatus()
+    def print(self, *_, **__): pass
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+def _notification_gettext():
+    """Translator for notification bodies, independent of any request's language.
+
+    These are built minutes later on a background thread, so they use the
+    operator's configured notification language (falling back to the server's
+    resolved language) instead of a per-request choice. A fresh translation
+    object is used rather than autopwn_suite.i18n.install() so this never mutates
+    the process-wide builtins._ that concurrent requests rely on.
+    """
+    lang = _get_setting("language")
+    if not isinstance(lang, str) or lang not in i18n.SUPPORTED_LANGUAGES:
+        lang = i18n.resolve_language()
+    translation = gettext.translation(
+        i18n.DOMAIN, localedir=str(i18n.LOCALE_DIR), languages=[lang], fallback=True
+    )
+    return translation.gettext
+
+
+def N_(message):
+    """Mark a message for extraction and return it unchanged; the notification code translates it later with tr()."""
+    return message
+
+
+# xgettext cannot read calls inside f-strings, so the notification texts that tr() translates there are listed here.
+# test_i18n.py checks that every tr("...") message of this module is listed and present in the Turkish catalog.
+_NOTIFICATION_MESSAGES = (
+    N_('CVE'),
+    N_('CVSS'),
+    N_('Command:'),
+    N_('Description'),
+    N_('Error:'),
+    N_('Finished:'),
+    N_('Host: {ip}'),
+    N_('Hosts Discovered ({count})'),
+    N_('MAC:'),
+    N_('No hosts were found during this scan.'),
+    N_('No open ports found.'),
+    N_('OS:'),
+    N_('Open Ports'),
+    N_('Port'),
+    N_('Product'),
+    N_('Scan ID:'),
+    N_('Scan Report'),
+    N_('Service'),
+    N_('Severity'),
+    N_('Started:'),
+    N_('Status:'),
+    N_('Target:'),
+    N_('Vendor:'),
+    N_('Version'),
+    N_('Vulnerabilities'),
+    N_('[*] Email notification failed: {error}'),
+    N_('[*] Webhook delivery failed: {error}'),
+)
+
+
+def _post_webhook(url, payload):
+    """POST a JSON event; a redirect is a failed delivery, since a 307/308 would re-send it to whatever host the Location names."""
+    response = _requests.post(url, json=payload, timeout=10, allow_redirects=False)
+    response.raise_for_status()
+    if response.status_code // 100 == 3:
+        raise _requests.HTTPError(response=response)
+    return response
+
+
+def _send_webhook(job: ScanJob) -> None:
+    with _notification_operation(job) as allowed:
+        if allowed:
+            _deliver_webhook(job)
+
+
+def _deliver_webhook(job: ScanJob) -> None:
+    cfg = _get_setting("webhook")
+    if not cfg or not cfg.get("enabled") or not cfg.get("url"):
+        return
+    if not REQUESTS_AVAILABLE:
+        return
+
+    hosts = job.hosts_list()
+    vuln_count = sum(len(h["vulns"]) for h in hosts)
+
+    # Send if ANY matching condition is enabled
+    should_send = False
+    if job.status == "completed" and cfg.get("on_complete"):
+        should_send = True
+    if job.status in ("error", "partial") and cfg.get("on_error"):
+        should_send = True
+    if vuln_count and cfg.get("on_vuln_found"):
+        should_send = True
+    if not should_send:
+        return
+
+    payload = {
+        "event":      "scan_" + job.status,
+        "scan_id":    job.id,
+        "target":     job.public_target,
+        "host_count": len(hosts),
+        "vuln_count": vuln_count,
+        "started_at": job.started_at,
+        "finished_at":job.finished_at,
+        "error":      job.error,
+        "timestamp":  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    try:
+        _post_webhook(cfg["url"], payload)
+    except Exception as e:
+        tr = _notification_gettext()
+        _broadcast({
+            "scan_id": job.id, "level": "warning",
+            "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
+            "msg": tr("[*] Webhook delivery failed: {error}").format(error=delivery_error_summary(e)),
+        })
+
+
+@contextmanager
+def _smtp_connection(cfg):
+    port = int(cfg.get("smtp_port", 587))
+    factory = smtplib.SMTP_SSL if port == 465 else smtplib.SMTP
+    context = ssl.create_default_context()
+    tls_options = {"context": context} if port == 465 else {}
+    with factory(cfg["smtp_host"], port, timeout=30, **tls_options) as srv:
+        srv.ehlo()
+        if port != 465:
+            srv.starttls(context=context)
+            srv.ehlo()
+        if cfg.get("username") and cfg.get("password"):
+            srv.login(cfg["username"], cfg["password"])
+        yield srv
+
+
+def _send_email(job: ScanJob) -> None:
+    with _notification_operation(job) as allowed:
+        if allowed:
+            _deliver_email(job)
+
+
+def _deliver_email(job: ScanJob) -> None:
+    cfg = _get_setting("email")
+    if not cfg or not cfg.get("enabled"):
+        return
+    if not cfg.get("smtp_host") or not cfg.get("to_addr"):
+        return
+
+    hosts     = job.hosts_list()
+    vuln_count = sum(len(h["vulns"]) for h in hosts)
+
+    # Send if ANY matching condition is enabled
+    should_send = False
+    if job.status == "completed" and cfg.get("on_complete"):
+        should_send = True
+    if job.status in ("error", "partial") and cfg.get("on_error"):
+        should_send = True
+    if vuln_count and cfg.get("on_vuln_found"):
+        should_send = True
+    if not should_send:
+        return
+
+    _e = _html.escape
+    tr = _notification_gettext()
+    target = job.public_target
+    subject = f"[AutoPWN] Scan {job.status.upper()} — {target}"
+
+    c = job.config or {}
+    if c.get("mode") == "evade":
+        cmd_base = f"nmap {target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10"
+    else:
+        cmd_base = f"nmap {target} -sS -sV --host-timeout {c.get('host_timeout', 240)} -Pn -O -T {c.get('speed', 3)}"
+    flags = c.get("nmap_flags", "")
+    if flags:
+        if "-O" in cmd_base and "-O" in flags:
+            flags = flags.replace("-O", "").strip()
+        if flags:
+            cmd_base += " " + flags
+
+    favicon_path = _STATIC_DIR / "favicon.ico"
+    _icon_data = None
+    logo_html = ""
+    if favicon_path.exists():
+        try:
+            _icon_data = favicon_path.read_bytes()
+            logo_html = '<img src="cid:autopwn_icon" style="width: 40px; height: 40px; display: block;" alt="Logo">'
+        except Exception:
+            pass
+
+    html = f"""<!DOCTYPE html><html><head><title>{tr("Scan Report")} - {_e(target)}</title>
+    <style>
+      body{{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}}
+      h1, h2, h3, h4{{color: #111; margin-bottom: 8px;}}
+      table{{width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;}}
+      th, td{{border: 1px solid #ddd; padding: 10px; text-align: left;}}
+      th{{background-color: #f5f5f5;}}
+      .meta{{background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #eee;}}
+      .meta p{{margin: 5px 0;}}
+      .sev-critical{{color: #d32f2f; font-weight: bold;}}
+      .sev-high{{color: #f57c00; font-weight: bold;}}
+      .sev-medium{{color: #fbc02d; font-weight: bold;}}
+      .sev-low{{color: #388e3c; font-weight: bold;}}
+      .sev-unknown{{color: #777;}}
+    </style>
+    </head><body>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+      <tr>
+        <td width="50" valign="middle">
+          {logo_html}
+        </td>
+        <td valign="middle">
+          <h1 style="margin: 0; color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">AutoPWN Suite
+            <span style="color: #777; font-weight: normal;">— {tr("Scan Report")}</span></h1>
+        </td>
+      </tr>
+    </table>
+    <div class="meta">
+      <p><strong>{tr("Target:")}</strong> {_e(target)}</p>
+      <p><strong>{tr("Scan ID:")}</strong> {_e(job.id)}</p>
+      <p><strong>{tr("Status:")}</strong> {_e(job.status)}</p>
+      <p><strong>{tr("Command:")}</strong> {_e(cmd_base.strip())}</p>
+      <p><strong>{tr("Started:")}</strong> {_e(job.started_at)}</p>
+      <p><strong>{tr("Finished:")}</strong> {_e(job.finished_at or 'N/A')}</p>
+    </div>
+    """
+    if job.error:
+        html += f'<div class="meta" style="border-color:#ff3f4f;"><p style="color:#ff3f4f;"><strong>{tr("Error:")}</strong> {_e(job.error)}</p></div>'
+
+    html += f'<h2>{tr("Hosts Discovered ({count})").format(count=len(hosts))}</h2>\n'
+
+    if hosts:
+        for h in hosts:
+            html += f'<h3>{tr("Host: {ip}").format(ip=_e(h.get("ip", "")))}</h3>\n'
+            html += (f'<div class="meta"><p><strong>{tr("MAC:")}</strong> {_e(h.get("mac") or "—")} &nbsp;|&nbsp; '
+                     f'<strong>{tr("OS:")}</strong> {_e(h.get("os") or "—")} &nbsp;|&nbsp; '
+                     f'<strong>{tr("Vendor:")}</strong> {_e(h.get("vendor") or "—")}</p></div>\n')
+            if h.get("ports"):
+                html += (f'<h4>{tr("Open Ports")}</h4><table><tr><th>{tr("Port")}</th><th>{tr("Service")}</th>'
+                         f'<th>{tr("Product")}</th><th>{tr("Version")}</th></tr>\n')
+                for p in h.get("ports", []):
+                    html += f"<tr><td>{_e(str(p.get('port','')))}</td><td>{_e(p.get('service',''))}</td><td>{_e(p.get('product',''))}</td><td>{_e(p.get('version',''))}</td></tr>\n"
+                html += "</table>\n"
+            else:
+                html += f'<p>{tr("No open ports found.")}</p>\n'
+
+            vulns = h.get("vulns", [])
+            if vulns:
+                html += (f'<h4>{tr("Vulnerabilities")}</h4><table><tr><th>{tr("CVE")}</th><th>{tr("Severity")}</th>'
+                         f'<th>{tr("CVSS")}</th><th>{tr("Description")}</th></tr>\n')
+                for v in vulns:
+                    sev = _e(v.get("severity", "unknown").lower())
+                    html += (f"<tr><td>{_e(v.get('cve',''))}</td><td class=\"sev-{sev}\">{_e(v.get('severity', '').upper())}</td>"
+                             f"<td>{_e(str(v.get('cvss', '—')))}</td><td>{_e(v.get('description',''))}</td></tr>\n")
+                html += "</table>\n"
+            html += '<hr style="border:0; border-top:2px dashed #eee; margin:30px 0;">\n'
+    else:
+        html += f'<p>{tr("No hosts were found during this scan.")}</p>\n'
+
+    html += "</body></html>"
+
+    try:
+        from email.mime.image import MIMEImage
+        msg = MIMEMultipart("related")
+        msg["From"]    = cfg.get("from_addr") or cfg.get("username", "")
+        msg["To"]      = cfg["to_addr"]
+        msg["Subject"] = subject
+        msg.attach(MIMEText(html, "html"))
+        if _icon_data:
+            icon_part = MIMEImage(_icon_data, _subtype="x-icon")
+            icon_part.add_header("Content-ID", "<autopwn_icon>")
+            icon_part.add_header("Content-Disposition", "inline", filename="favicon.ico")
+            msg.attach(icon_part)
+
+        with _smtp_connection(cfg) as srv:
+            srv.sendmail(msg["From"], [cfg["to_addr"]], msg.as_string())
+    except Exception as e:
+        _broadcast({
+            "scan_id": job.id, "level": "warning",
+            "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
+            "msg": tr("[*] Email notification failed: {error}").format(error=delivery_error_summary(e)),
+        })
+
+
+def _notify(job: ScanJob) -> None:
+    if _notifications_offline(job):
+        return
+    threading.Thread(target=_send_webhook, args=(job,), daemon=True).start()
+    threading.Thread(target=_send_email,   args=(job,), daemon=True).start()
+
+
+# ── Scan engine ───────────────────────────────────────────────────────────────
+
+def _log(job: ScanJob, msg: str, level: str = "info") -> None:
+    _broadcast({
+        "scan_id": job.id,
+        "ts":      datetime.now(timezone.utc).strftime("%H:%M:%S"),
+        "level":   level,
+        "msg":     printable(msg, multiline=True),
+    })
+
+
+def _build_nmap_flags(config: dict) -> str:
+    """Build the Nmap arguments from the structured fields of a config that _profile_config has validated
+    (scan_technique, ports, version_intensity, os_detection). Each is a fixed option name or a value without
+    whitespace that cannot start an option, so the string splits back into exactly these arguments."""
+    parts = []
+    if config.get("scan_technique"):
+        parts.append(config["scan_technique"])
+    if config.get("ports"):
+        parts.append(f"-p {config['ports']}")
+    vi = config.get("version_intensity")
+    if vi is not None and vi != "":
+        parts.append(f"--version-intensity {vi}")
+    if config.get("os_detection"):
+        parts.append("-O")
+    return " ".join(parts)
+
+
+def _run_scan(job: ScanJob) -> None:
+    log  = WebLogger(job.id)
+    had_failures = False
+    lookup = None
+
+    try:
+        job.set_progress("preparing", "Preparing scan")
+        config = job.config
+        target = config["target"]
+        mode = config.get("mode", "normal")
+        speed = int(config.get("speed", 3))
+        scan_type = config.get("scan_type") or None
+        nmap_flags = config.get("nmap_flags", "")
+        api_key = config.get("api_key") or _get_setting("nist_api_key") or None
+        host_timeout = int(config.get("host_timeout", 240))
+        scan_ports = config.get("scan_ports", True)
+        scan_vulns = config.get("scan_vulns", True)
+        skip_discovery = config.get("skip_discovery", False)
+        source = "offline" if _offline_enabled() else config.get("vulnerability_source", "auto")
+        if source == "offline":
+            nmap_flags = (nmap_flags + " -n").strip()
+            with job._lock:
+                config["vulnerability_source"] = "offline"
+                config["nmap_flags"] = nmap_flags
+        if config.get("scan_web") and not scan_ports:
+            from urllib.parse import urlsplit
+
+            from rich.console import Console
+
+            from autopwn_suite.web.webvuln import target_urls
+            endpoint = target_urls(target)[0]
+            ip = urlsplit(endpoint).hostname
+            job.get_or_create_host(ip)
+            failed = _run_host_web(job, ip, [target], log, Console(file=io.StringIO()))
+            job.complete_target()
+            job.mark_done("stopped" if job.should_stop() else "partial" if failed else "completed")
+            return
+        if scan_vulns:
+            lookup = VulnerabilityLookup(source, _VULNERABILITY_DB)
+            if lookup.local:
+                with job._lock:
+                    config["vulnerability_database_updated_at"] = lookup.local.metadata["updated_at"]
+                _log(job, f"[*] Using local NVD database updated {lookup.local.metadata['updated_at']}; findings are possible vulnerabilities.")
+        from rich.console import Console
+        silent = Console(file=io.StringIO(), color_system=None)
+
+        _log(job, f"[*] Starting scan on {target}")
+
+        if not shutil.which("nmap"):
+            _log(job, "[-] nmap not found. Please install nmap.", "error")
+            job.mark_error("nmap not found")
+            return
+
+        from autopwn_suite.scanner import DiscoverHosts, PortScan, ResolveScanHosts
+        from autopwn_suite.utils import ScanMode, ScanType, is_root
+
+        # Scan mode
+        scanmode = ScanMode.Normal
+        if mode == "evade":
+            if is_root():
+                scanmode = ScanMode.Evade
+                _log(job, "[*] Evasion mode enabled", "warning")
+            else:
+                _log(job, "[*] Root required for evasion mode, using normal", "warning")
+        elif mode == "noise":
+            # NoiseScan requires a dedicated long-running process and is not
+            # supported from the web UI.  Fall back to normal mode.
+            _log(job, "[*] Noise mode is not supported in web UI, using normal mode", "warning")
+
+        # Scan type
+        scantype = ScanType.ARP if is_root() else ScanType.Ping
+        if scan_type == "arp":
+            scantype = ScanType.ARP if is_root() else ScanType.Ping
+        elif scan_type == "ping":
+            scantype = ScanType.Ping
+
+        # Host discovery
+        if job._targets is not None:
+            targets = list(job._targets)
+        elif not skip_discovery:
+            job.set_progress("discovery", "Discovering hosts", host=target)
+            _log(job, f"[*] Discovering hosts on {target}")
+            if job.should_stop():
+                job.mark_done("stopped")
+                return
+            try:
+                hosts_found = DiscoverHosts(target, silent, scantype, scanmode, offline=source == "offline",
+                                            progress=lambda task, percent: job.set_progress("discovery", task, percent=percent),
+                                            should_stop=job.should_stop)
+            except ScanCancelled:
+                raise
+            except Exception as e:
+                _log(job, f"[-] Host discovery failed: {e}", "error")
+                had_failures = True
+                hosts_found = [target] if isinstance(target, str) else list(target)
+
+            if not hosts_found:
+                _log(job, "[-] No hosts found.", "warning")
+                job.mark_done()
+                return
+
+            _log(job, f"[+] {len(hosts_found)} host(s) discovered", "success")
+            targets = hosts_found
+            if not had_failures:
+                job._targets = list(targets)
+        else:
+            targets = [target] if isinstance(target, str) else list(target)
+            job._targets = list(targets)
+
+        # Per-host
+        for target_index, host_ip in enumerate(targets):
+            if job.should_stop():
+                _log(job, "[*] Scan stopped by user.", "warning")
+                break
+
+            _log(job, f"[*] Scanning {host_ip}")
+            job.set_progress("port_scan", "Port and service scan", host=host_ip,
+                             target_index=target_index + 1, targets_total=len(targets))
+            if not scan_ports:
+                job.get_or_create_host(host_ip)
+                job.mark_host_done(host_ip)
+                job.complete_target()
+                continue
+
+            try:
+                nm = job._network_results.get(host_ip)
+                if nm is None:
+                    nm = PortScan(host_ip, log, speed, host_timeout, scanmode, nmap_flags,
+                                  progress=lambda task, percent: job.set_progress("port_scan", task, percent=percent),
+                                  should_stop=job.should_stop)
+            except ScanCancelled:
+                raise
+            except SystemExit as e:
+                _log(job, f"[-] Port scan failed for {host_ip}: {e}", "error")
+                had_failures = True
+                job.get_or_create_host(host_ip)
+                job.mark_host_done(host_ip, "error")
+                job.complete_target()
+                continue
+            except Exception as e:
+                _log(job, f"[-] Port scan failed for {host_ip}: {e}", "error")
+                had_failures = True
+                job.get_or_create_host(host_ip)
+                job.mark_host_done(host_ip, "error")
+                job.complete_target()
+                continue
+            # Nmap returns IP keys even when the request is a hostname or range.
+            resolved = ResolveScanHosts(nm, host_ip)
+            if not resolved:
+                had_failures = True
+                job.get_or_create_host(host_ip)
+                job.mark_host_done(host_ip, "not_observed")
+                _log(job, f"[-] No scan observation returned for {host_ip}", "warning")
+                job.complete_target()
+                continue
+            timed_out = {ip for ip in resolved if ip not in job._completed_hosts
+                         and str(nm[ip].get("timedout", "false")).lower() == "true"}
+            if timed_out:
+                # Retrying this target must run Nmap again, including when a
+                # range returned a mixture of complete and timed-out hosts.
+                job._network_results.pop(host_ip, None)
+            else:
+                job._network_results[host_ip] = nm
+            for observed_ip in resolved:
+                if job.should_stop():
+                    break
+                previous = job.get_or_create_host(observed_ip)
+                if observed_ip in job._completed_hosts:
+                    continue
+                if observed_ip in timed_out:
+                    had_failures = True
+                    job.mark_host_done(observed_ip, "partial")
+                    _log(job, f"[-] Nmap timed out on {observed_ip}; port coverage is incomplete. Resume to retry.", "warning")
+                    continue
+                if previous.get("lookup_status") in ("completed", "skipped"):
+                    host_failed = False
+                else:
+                    host_failed = _collect_host_results(job, nm, observed_ip, log, silent, scan_vulns, api_key, lookup=lookup)
+                if config.get("scan_web"):
+                    from autopwn_suite.web.webvuln import web_endpoints
+                    host_data = job.get_or_create_host(observed_ip)
+                    web_rows = [[observed_ip, port["port"], port["service"], port["product"], port["version"], port["protocol"]] for port in host_data["ports"]]
+                    scan_data = {"scan": {observed_ip: {"tcp": nm[observed_ip].get("tcp", {})}}}
+                    host_failed = _run_host_web(job, observed_ip, web_endpoints(observed_ip, web_rows, scan_data), log, silent,
+                                                offline=source == "offline") or host_failed
+                if host_failed:
+                    had_failures = True
+                    job.mark_host_done(observed_ip, "partial")
+                elif not job.should_stop():
+                    job.mark_host_done(observed_ip)
+                    job._completed_hosts.add(observed_ip)
+            if not job.should_stop():
+                job.complete_target()
+
+        outcome = "stopped" if job.should_stop() else "partial" if had_failures else "completed"
+        _log(job, f"[+] Scan {job.id[:8]} {outcome}.", "success" if outcome == "completed" else "warning")
+        job.mark_done(outcome)
+
+    except ScanCancelled:
+        job.mark_done("stopped")
+    except SystemExit as exc:
+        # The text of an exception can quote a URL or a command line with the query secrets of the target: the job
+        # log, the record and its notifications carry fixed text and the class of the exception.
+        _log(job, f"[-] Scan aborted ({type(exc).__name__}).", "error")
+        job.mark_error(f"Scan aborted ({type(exc).__name__})")
+    except Exception as exc:
+        _log(job, f"[-] Unexpected error ({type(exc).__name__}).", "error")
+        job.mark_error(f"Unexpected error ({type(exc).__name__})")
+
+    finally:
+        if lookup is not None:
+            with job._lock:
+                job.config["vulnerability_source_used"] = "online" if lookup.source == "auto" else lookup.source
+                if lookup.local:
+                    job.config["vulnerability_database_updated_at"] = lookup.local.metadata["updated_at"]
+            lookup.close()
+        _broadcast({"scan_id": job.id, "level": "__scan_done__", "msg": "", "ts": ""})
+        _notify(job)
+
+
+def _run_host_web(job, ip, endpoints, log, console, *, offline=False):
+    from autopwn_suite.web.webvuln import webvuln
+    host = job.get_or_create_host(ip)
+    if offline or _offline_enabled() or job.config.get("vulnerability_source") == "offline":
+        with job._lock:
+            host["web_status"] = "skipped_offline"
+        _log(job, "Web application checks are disabled in offline mode.", "warning")
+        return False
+    failed = False
+    for endpoint in dict.fromkeys(endpoints):
+        if job.should_stop():
+            raise ScanCancelled("Web scan stopped")
+        summary = {}
+        with job._lock:
+            if any(row["host"] == ip and row["endpoint"] == redact_target(endpoint) and row["status"] == "completed"
+                   for row in job._web_coverage):
+                continue
+            checkpoint = job._web_checkpoints.setdefault((ip, endpoint), {})
+            host["web_status"] = "scanning"
+        try:
+            webvuln(endpoint, log, console, controls=job.config.get("web_options"), should_stop=job.should_stop,
+                    progress=lambda stage, used, budget: job.set_progress("web_checks", f"{stage} · {used}/{budget} requests", host=ip),
+                    on_finding=lambda result: job.add_web_finding(ip, endpoint, result), on_complete=summary.update,
+                    checkpoint=checkpoint)
+        except ScanCancelled:
+            if summary:
+                job.add_web_coverage(ip, endpoint, summary)
+            raise
+        except Exception as exc:
+            # A request error quotes the URL it sent, query included: the server log carries the class only.
+            logging.error("Web application check failed (%s)", type(exc).__name__)
+            summary = {"status": "partial", "requests": 0, "issues": ["Web checks failed; see server logs."], "target": redact_target(endpoint)}
+        summary.setdefault("status", "completed")
+        summary["target"] = redact_target(summary.get("target", endpoint))
+        job.add_web_coverage(ip, endpoint, summary)
+        failed = failed or summary["status"] != "completed"
+        with job._lock:
+            host["observed_at"] = datetime.now(timezone.utc).isoformat()
+    job.mark_host_done(ip, "partial" if failed else "completed")
+    return failed
+
+
+def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, lookup=None) -> bool:
+    """Record one actual host. Return whether its vulnerability lookup failed."""
+    from autopwn_suite.nist_search import searchCVE
+    from autopwn_suite.scanner import AnalyseScanResults
+    from autopwn_suite.searchvuln import GenerateKeyword
+
+    h = job.get_or_create_host(ip)
+    nm_host = nm[ip]
+    addresses = nm_host.get("addresses", {})
+    os_matches = nm_host.get("osmatch", [])
+    rows = AnalyseScanResults(nm, log, silent, ip)
+    ports = [{"port": row[1], "service": row[2], "product": row[3],
+              "version": row[4], "protocol": row[5] if len(row) > 5 else "tcp"}
+             for row in rows if len(row) >= 5]
+    with job._lock:
+        h["mac"] = addresses.get("mac", "")
+        h["vendor"] = (nm_host.get("vendor") or {}).get(h["mac"], "")
+        h["os"] = os_matches[0].get("name", "") if os_matches else ""
+        h["ports"] = ports
+        h["lookup_status"] = "not_run" if scan_vulns else "skipped"
+        h["observed_at"] = datetime.now(timezone.utc).isoformat()
+    for port in ports:
+        _log(job, f"    ├─ {port['port']}/{port['protocol']}  {port['service']}  {port['product']} {port['version']}".rstrip())
+    if not scan_vulns or not ports or job.should_stop():
+        job.mark_host_done(ip, "stopped" if job.should_stop() else "completed")
+        return False
+
+    findings = []
+    failed = False
+    tasks = [(port, GenerateKeyword(str(port["product"]), str(port["version"]))) for port in ports]
+    tasks = [(port, keyword) for port, keyword in tasks if keyword]
+    job.set_progress("vulnerabilities", "Searching service vulnerabilities" if tasks else "No searchable service versions",
+                     percent=0 if tasks else 100, completed=0, total=len(tasks), host=ip)
+    for lookup_index, (port, keyword) in enumerate(tasks):
+        if job.should_stop():
+            break
+        provider = "local NVD database" if lookup is not None and lookup.source == "offline" else "NIST"
+        _log(job, f"[*] Querying {provider} for {port['port']}/{port['protocol']}: {keyword}")
+        job.set_progress("vulnerabilities", f"Querying {keyword}", percent=100 * lookup_index / len(tasks),
+                         completed=lookup_index, total=len(tasks))
+        try:
+            cache_key = (ip, port["port"], port["protocol"], keyword)
+            cves = job._lookup_results.get(cache_key)
+            if cves is None:
+                cves = (lookup.search(keyword, log, api_key) if lookup is not None
+                        else searchCVE(keyword, log, api_key, strict=True))
+                cves = list(cves)
+                job._lookup_results[cache_key] = cves
+        except Exception as exc:
+            failed = True
+            _log(job, f"[-] CVE search error ({keyword}): {exc}", "error")
+            job.set_progress("vulnerabilities", f"Lookup failed: {keyword}", percent=100 * (lookup_index + 1) / len(tasks),
+                             completed=lookup_index + 1, total=len(tasks))
+            continue
+        for cve in cves:
+            severity = (cve.severity or "unknown").lower()
+            findings.append({"cve": cve.CVEID, "description": cve.description,
+                             "severity": severity, "cvss": cve.severity_score or 0,
+                             "keyword": keyword, "port": port["port"], "protocol": port["protocol"],
+                             "data_source": cve.data_source, "database_updated_at": cve.database_updated_at})
+            _log(job, f"    └─ {cve.CVEID} [{severity.upper()}] CVSS:{cve.severity_score}", "warning")
+        with job._lock:
+            h["vulns"] = list(findings)
+        job.set_progress("vulnerabilities", f"Checked {keyword}", percent=100 * (lookup_index + 1) / len(tasks),
+                         completed=lookup_index + 1, total=len(tasks))
+    with job._lock:
+        h["vulns"] = findings
+        h["lookup_status"] = "partial" if failed or job.should_stop() else "completed"
+    job.mark_host_done(ip, "stopped" if job.should_stop() else "completed")
+    return failed
+
+
+def _launch_scan(config: dict) -> ScanJob:
+    """Create, register, and start a scan job. Returns the job."""
+    with _mode_lock:
+        if _offline_enabled():
+            config = dict(config, vulnerability_source="offline")
+        scan_id = str(uuid.uuid4())
+        job     = ScanJob(scan_id, config["target"], config)
+        _register_scan(job)
+        threading.Thread(target=_run_scan, args=(job,), daemon=True).start()
+        return job
+
+
+# ── Scheduler ─────────────────────────────────────────────────────────────────
+
+def _resume_web_options(job):
+    """Expand discovery/parameter caps that blocked the previous attempt."""
+    from autopwn_suite.web.options import LIMITS
+    controls = normalize_options(job.config.get("web_options"))
+    issues = " ".join(issue for row in job._web_coverage for issue in row.get("issues", [])).lower()
+    for name in ("max_pages", "max_urls", "max_depth", "max_parameters", "max_response_kb"):
+        blocked = ((name == "max_parameters" and "parameter" in issues)
+                   or (name in ("max_pages", "max_urls", "max_depth") and "crawl budget" in issues)
+                   or (name == "max_response_kb" and ("size limit" in issues or "response exceeded" in issues)))
+        if blocked:
+            controls[name] = min(LIMITS[name][2], max(controls[name] + 1, controls[name] * 2))
+    return controls
+
+def _integer_option(value, field, minimum, maximum=None):
+    """Accept JSON integers or integer form values without silently truncating."""
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError(f"'{field}' must be an integer")
+    if isinstance(value, str) and not _re.fullmatch(r"[+-]?\d+", value.strip()):
+        raise ValueError(f"'{field}' must be an integer")
+    number = int(value)
+    if number < minimum or (maximum is not None and number > maximum):
+        bounds = f"{minimum}-{maximum}" if maximum is not None else f"at least {minimum}"
+        raise ValueError(f"'{field}' must be {bounds}")
+    return number
+
+
+def _refusal(error: ValueError, generic: str) -> str:
+    """Fixed text for a refused configuration; the error's own text is never sent."""
+    return _NMAP_OPTIONS_REFUSED if isinstance(error, _OptionsRefused) else generic
+
+
+def _refusal_body(error: ValueError, generic: str, code: str) -> dict:
+    """JSON body for a refused configuration. The stable `code` goes with the generic text only: the dashboard shows
+    its own localized text for a code, which would hide the specific Nmap-options refusal."""
+    message = _refusal(error, generic)
+    return {"error": message, "code": code} if message == generic else {"error": message}
+
+
+def _profile_config(body, existing=None):
+    """Apply the same profile rules when creating, editing, or scheduling."""
+    defaults = {"mode": "normal", "speed": 3, "scan_type": None,
+                "scan_technique": "", "ports": "", "version_intensity": None,
+                "os_detection": False, "nmap_flags": "", "host_timeout": 240,
+                "scan_ports": True, "scan_vulns": True, "skip_discovery": False, "scan_web": False, "web_options": {}}
+    defaults["vulnerability_source"] = "auto"
+    if not isinstance(body, dict) or (existing is not None and not isinstance(existing, dict)):
+        raise ValueError("Profile configuration must be an object")
+    config = dict(defaults)
+    for source in (existing or {}, body):
+        config.update({key: source[key] for key in defaults if key in source})
+    _refuse_options(config["nmap_flags"])
+    config["web_options"] = normalize_options(body.get("web_options", {}), (existing or {}).get("web_options", {}))
+    if config["vulnerability_source"] not in ("auto", "online", "offline"):
+        raise ValueError("'vulnerability_source' must be auto, online, or offline")
+    if config["mode"] not in ("normal", "evade", "noise"):
+        raise ValueError("'mode' must be 'normal', 'evade', or 'noise'")
+    config["speed"] = _integer_option(config["speed"], "speed", 0, 5)
+    config["host_timeout"] = _integer_option(config["host_timeout"], "host_timeout", 1)
+    if config["scan_type"] is not None and not isinstance(config["scan_type"], str):
+        raise ValueError("'scan_type' must be 'arp', 'ping', or null")
+    config["scan_type"] = config["scan_type"] or None
+    if config["scan_type"] not in (None, "arp", "ping"):
+        raise ValueError("'scan_type' must be 'arp', 'ping', or null")
+    for key in ("scan_ports", "scan_vulns", "skip_discovery", "os_detection", "scan_web"):
+        if not isinstance(config[key], bool):
+            raise ValueError(f"'{key}' must be a boolean")
+    if config["scan_web"] and not any(config["web_options"]["checks"].values()):
+        raise ValueError("Select at least one web check")
+    if config["scan_web"] and not config["scan_ports"]:
+        config.update(scan_vulns=False, skip_discovery=True)
+    config["nmap_flags"] = ""
+    for key in ("scan_technique", "ports"):
+        if not isinstance(config[key], str):
+            raise ValueError(f"'{key}' must be a string")
+    if config["scan_technique"] not in _SCAN_TECHNIQUES:
+        raise ValueError("'scan_technique' must be one of the techniques the dashboard offers")
+    config["ports"] = _checked_ports(config["ports"])
+    intensity = config["version_intensity"]
+    config["version_intensity"] = None if intensity is None or intensity == "" else _integer_option(intensity, "version_intensity", 0, 9)
+    return config
+
+
+def _schedule_data(body, existing=None):
+    """Validate the full merged record before changing a saved schedule."""
+    if not isinstance(body, dict):
+        raise ValueError("Schedule must be an object")
+    for record in (existing or {}, body):  # a schedule uses its profile's settings and carries no Nmap options of its own
+        if "nmap_flags" in record:
+            _refuse_options(record["nmap_flags"])
+    fields = ("name", "target", "profile_id", "enabled", "type", "interval_value",
+              "interval_unit", "time_utc", "weekday")
+    result = {"name": "", "target": "", "profile_id": None, "enabled": True,
+              "type": "interval", "interval_value": 24, "interval_unit": "hours",
+              "time_utc": "00:00", "weekday": 0, **(existing or {})}
+    result.update({key: body[key] for key in fields if key in body})
+    if not isinstance(result["name"], str):
+        raise ValueError("'name' must be a string")
+    if not isinstance(result["target"], str):
+        raise ValueError("'target' must be a string")
+    result["target"] = result["target"].strip()
+    profile_id = result.get("profile_id")
+    profile = _profiles.get(profile_id, {}) if isinstance(profile_id, str) else {}
+    target_error = _validate_job_target(result["target"], profile.get("config", {}))
+    if target_error:
+        raise ValueError(target_error)
+    if not isinstance(result["profile_id"], str) or not result["profile_id"]:
+        raise ValueError("A profile is required for scheduled scans")
+    if not isinstance(result["enabled"], bool):
+        raise ValueError("'enabled' must be a boolean")
+    if result["type"] not in ("interval", "daily", "weekly"):
+        raise ValueError("'type' must be 'interval', 'daily', or 'weekly'")
+    if result["interval_unit"] not in ("minutes", "hours", "days"):
+        raise ValueError("'interval_unit' must be 'minutes', 'hours', or 'days'")
+    result["interval_value"] = _integer_option(result["interval_value"], "interval_value", 1)
+    result["weekday"] = _integer_option(result["weekday"], "weekday", 0, 6)
+    if not isinstance(result["time_utc"], str) or not _re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", result["time_utc"]):
+        raise ValueError("'time_utc' must be a valid HH:MM UTC time")
+    return result
+
+
+def _parse_interval_minutes(schedule: dict) -> Optional[int]:
+    """
+    Returns the interval in minutes based on schedule type.
+    schedule types: 'interval', 'daily', 'weekly'
+    """
+    if not isinstance(schedule, dict):
+        return None
+    stype = schedule.get("type", "interval")
+    if stype == "interval":
+        unit  = schedule.get("interval_unit", "hours")
+        try:
+            value = _integer_option(schedule.get("interval_value", 1), "interval_value", 1)
+        except ValueError:
+            return None
+        if unit == "minutes":
+            return value
+        if unit == "hours":
+            return value * 60
+        if unit == "days":
+            return value * 1440
+    elif stype == "daily":
+        return 1440   # checked daily; time matching done separately
+    elif stype == "weekly":
+        return 10080
+    return None
+
+
+# A daily or weekly slot that was missed (a restart, a suspend, a slow tick) still runs for this long.
+_SCHEDULE_CATCH_UP = timedelta(hours=1)
+
+
+def _parse_utc(value):
+    """An ISO timestamp as an aware UTC datetime, or None."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+    except (ValueError, OverflowError):  # the converted time is outside what datetime can hold
+        return None
+
+
+def _slot_due(schedule: dict, last, slot, now) -> bool:
+    """Whether the daily or weekly slot at or before now still has to run: once, within the catch-up
+    window, and never for a slot that passed before the schedule was created, enabled again or retimed."""
+    if now - slot > _SCHEDULE_CATCH_UP:
+        return False
+    marks = (last, _parse_utc(schedule.get("created_at")), _parse_utc(schedule.get("armed_at")))
+    since = max((mark for mark in marks if mark is not None), default=None)
+    return since is None or since < slot
+
+
+def _should_fire(schedule: dict) -> bool:
+    """Check whether a schedule should fire right now."""
+    if not isinstance(schedule, dict) or schedule.get("enabled", True) is not True:
+        return False
+
+    now = datetime.now(timezone.utc)
+    sid = schedule.get("id")
+    if not isinstance(sid, str) or not sid:
+        return False
+
+    with _schedule_last_run_lock:
+        last = _schedule_last_run.get(sid)
+    if last is not None:
+        if not isinstance(last, datetime):
+            return False
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+
+    stype = schedule.get("type", "interval")
+
+    if stype == "interval":
+        minutes = _parse_interval_minutes(schedule)
+        if minutes is None:
+            return False
+        if last is None:
+            return True
+        return (now - last).total_seconds() >= minutes * 60
+
+    elif stype == "daily":
+        # Fire once per day at the specified UTC time
+        fire_time = schedule.get("time_utc", "00:00")  # "HH:MM"
+        try:
+            fh, fm = (int(x) for x in fire_time.split(":"))
+            slot = now.replace(hour=fh, minute=fm, second=0, microsecond=0)
+        except Exception:
+            return False
+        if slot > now:
+            slot -= timedelta(days=1)
+        return _slot_due(schedule, last, slot, now)
+
+    elif stype == "weekly":
+        # Fire once per week on the specified weekday (0=Mon) and UTC time
+        try:
+            fire_day = _integer_option(schedule.get("weekday", 0), "weekday", 0, 6)
+        except ValueError:
+            return False
+        fire_time = schedule.get("time_utc", "00:00")
+        try:
+            fh, fm = (int(x) for x in fire_time.split(":"))
+            slot = now.replace(hour=fh, minute=fm, second=0, microsecond=0)
+        except Exception:
+            return False
+        slot -= timedelta(days=(now.weekday() - fire_day) % 7)
+        if slot > now:
+            slot -= timedelta(days=7)
+        return _slot_due(schedule, last, slot, now)
+
+    return False
+
+
+def _scheduler_note(level: str, message: str) -> None:
+    _broadcast({"scan_id": "", "level": level, "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"), "msg": message})
+
+
+def _previous_run_active(schedule: dict) -> bool:
+    """Whether this schedule's last scan is still running or stopping; the skip is logged once per overlap."""
+    sid = schedule["id"]
+    previous = _get_scan(_schedule_jobs.get(sid, ""))
+    if previous is None or previous.status not in ("running", "stopping"):
+        _schedule_overlap_logged.discard(sid)
+        return False
+    if sid not in _schedule_overlap_logged:
+        _schedule_overlap_logged.add(sid)
+        _scheduler_note("warning", f"[*] Scheduled scan skipped ({schedule.get('name') or sid[:8]}): "
+                        "its previous scan is still running; it starts when that one ends (a daily or weekly "
+                        "schedule only within an hour of its time, otherwise at its next time).")
+    return True
+
+
+def _skip_scheduled_run(schedule: dict, reason: str) -> None:
+    """Skip a due run and wait for the next interval or slot, so the skip is logged once rather than every minute."""
+    with _schedule_last_run_lock:
+        _schedule_last_run[schedule["id"]] = datetime.now(timezone.utc)
+    _scheduler_note("warning", f"[*] Scheduled scan skipped ({schedule.get('name') or schedule['id'][:8]}): {reason}")
+
+
+def _log_schedule_disabled(schedule: dict, cause: str) -> None:
+    """The dashboard log lives in memory; leave a trace for an operator reading the journal. Fixed text and the id."""
+    logging.warning("Scheduled scan disabled after %s (schedule %r)", cause, str(schedule.get("id", ""))[:40])
+
+
+def _disable_invalid_schedule(schedule: dict, error: ValueError) -> None:
+    """Validation fails the same way until the schedule or its profile is edited, so stop retrying each minute."""
+    with _schedules_lock:
+        stored = _schedules.get(schedule["id"])
+        if stored != schedule:  # edited since the snapshot; the edit was validated by the API
+            return
+        stored["enabled"] = False
+    _save_schedules()
+    refused = isinstance(error, _OptionsRefused)
+    _log_schedule_disabled(schedule, "stored Nmap options" if refused else "a validation failure")
+    reason = "the schedule or its profile holds Nmap options, which the dashboard no longer accepts" if refused else error
+    _scheduler_note("error", f"[!] Scheduled scan disabled ({schedule.get('name') or schedule['id'][:8]}): {reason}. "
+                    "Edit the schedule or its profile and enable it again.")
+
+
+def _scheduler_loop() -> None:
+    """Background thread: checks schedules every 60 seconds."""
+    while True:
+        time.sleep(60)
+        try:
+            with _schedules_lock:
+                all_schedules = [dict(value) if isinstance(value, dict) else value
+                                 for value in _schedules.values()]
+        except Exception:
+            logging.exception("Could not read scheduled scans")
+            continue
+
+        for schedule in all_schedules:
+            try:
+                if not _should_fire(schedule):
+                    continue
+                if _previous_run_active(schedule):
+                    continue
+                # Keep the profile and schedule stable until launch. Deleting,
+                # disabling, or editing either cannot start the stale snapshot.
+                with _profiles_lock:
+                    try:  # only a validation failure disables the schedule, not a ValueError from launching
+                        checked = _schedule_data(schedule)
+                        profile = _profiles.get(checked["profile_id"])
+                        if not isinstance(profile, dict):
+                            raise ValueError("Linked profile no longer exists")
+                        config = _profile_config({}, profile.get("config", {}))
+                        config["target"] = checked["target"]
+                        config["nmap_flags"] = _build_nmap_flags(config)
+                    except ValueError as exc:
+                        _disable_invalid_schedule(schedule, exc)
+                        continue
+                    if config["scan_web"] and (_offline_enabled() or config["vulnerability_source"] == "offline"):
+                        # A manual start is refused with 409 here; a scheduled one must not become a
+                        # "completed" scan that skipped all of its work.
+                        _skip_scheduled_run(schedule, "web checks are disabled in offline mode.")
+                        continue
+                    with _schedules_lock:
+                        if _schedules.get(schedule["id"]) != schedule:
+                            continue
+                        job = _launch_scan(config)
+                        _schedule_jobs[schedule["id"]] = job.id
+                        now = datetime.now(timezone.utc)
+                        with _schedule_last_run_lock:
+                            _schedule_last_run[schedule["id"]] = now
+                        _schedules[schedule["id"]]["last_run"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+                _broadcast({
+                    "scan_id": job.id, "level": "info",
+                    "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
+                    "msg": f"[*] Scheduled scan fired: {schedule.get('name', schedule['id'][:8])} → {redact_target(config['target'])}",
+                })
+                _save_schedules()
+            except Exception as exc:
+                logging.exception("Scheduled scan failed")
+                label = schedule.get("name") or schedule.get("id", "unknown") if isinstance(schedule, dict) else "unknown"
+                _broadcast({
+                    "scan_id": "", "level": "error",
+                    "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
+                    "msg": f"[!] Scheduled scan skipped ({label}): {exc}",
+                })
+
+
+# ── Flask application ─────────────────────────────────────────────────────────
+
+def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
+    app = Flask(__name__, static_folder=str(static_dir), static_url_path="")
+    auth = install_auth(app, static_dir, account_path or _DATA_DIR / ACCOUNT_FILE)
+
+    @app.before_request
+    def require_json_object():
+        if request.method in ("POST", "PUT"):
+            body = request.get_json(silent=True)
+            if body is not None and not isinstance(body, dict):
+                return jsonify({"error": "JSON body must be an object", "code": "invalid_json_body"}), 400
+
+    # ── Static ──
+
+    @app.route("/")
+    def index():
+        return send_from_directory(str(static_dir), "index.html")
+
+    @app.route("/favicon.ico")
+    def favicon():
+        return send_from_directory(str(static_dir), "favicon.ico", mimetype="image/vnd.microsoft.icon")
+
+    @app.route("/api/version")
+    def api_version():
+        return jsonify({"version": __version__})
+
+    # ── Scans ──
+
+    @app.route("/api/scans")
+    def api_scans():
+        return jsonify([j.to_dict() for j in _all_scans()])
+
+    @app.route("/api/scans/<scan_id>")
+    def api_scan_detail(scan_id):
+        job = _get_scan(scan_id)
+        if not job:
+            return jsonify({"error": "Scan not found", "code": "scan_not_found"}), 404
+        return jsonify(job.to_dict())
+
+    @app.route("/api/scans/<scan_id>/download")
+    def api_scan_download(scan_id):
+        job = _get_scan(scan_id)
+        if not job:
+            return jsonify({"error": "Scan not found", "code": "scan_not_found"}), 404
+        return Response(
+            json.dumps(job.to_full_dict(), indent=2),
+            mimetype="application/json",
+            headers={"Content-Disposition": f"attachment; filename=autopwn_scan_{scan_id[:8]}.json"}
+        )
+
+    @app.route("/api/scans/<scan_id>/resume", methods=["POST"])
+    def api_scan_resume(scan_id):
+        job = _get_scan(scan_id)
+        if not job:
+            return jsonify({"error": "Scan not found", "code": "scan_not_found"}), 404
+        body = request.get_json(silent=True) or {}
+        if set(body) - {"web_options"}:
+            return jsonify({"error": "Only web limits and speed may be changed when resuming.", "code": "resume_fields_restricted"}), 400
+        # Reserve the existing job before launching to prevent double resumes.
+        with _mode_lock, job._lock:
+            if job.status not in ("partial", "stopped", "error"):
+                return jsonify({"error": "Only incomplete or stopped scans can be resumed.", "code": "resume_invalid_status"}), 409
+            if job.config.get("scan_web") and (_offline_enabled() or job.config.get("vulnerability_source") == "offline"):
+                return jsonify({"error": "Web checks are disabled in offline mode.", "code": "web_checks_offline"}), 409
+            if job.config.get("scan_vulns") and (_offline_enabled() or job.config.get("vulnerability_source") == "offline") and not database_status(_VULNERABILITY_DB)["ready"]:
+                return jsonify({"error": "Offline database unavailable.", "code": "offline_db_unavailable"}), 409
+            try:
+                controls = normalize_options(body.get("web_options", {}), _resume_web_options(job))
+                original_checks = normalize_options(job.config.get("web_options"))["checks"]
+            except ValueError:
+                return jsonify({"error": "Invalid web scan configuration", "code": "invalid_web_config"}), 400
+            if controls["checks"] != original_checks:
+                return jsonify({"error": "Keep the original check selection when resuming; start a new scan to change it.", "code": "resume_checks_changed"}), 400
+            job.config["web_options"] = controls
+            job.resume_count += 1
+            job._stop_flag.clear()
+            job.status = "running"
+            job.finished_at = ""
+            job.error = ""
+            job._progress.update(phase="preparing", detail="Resuming unfinished work", percent=None,
+                                 completed=None, total=None, targets_completed=0)
+            job._progress["revision"] += 1
+            threading.Thread(target=_run_scan, args=(job,), daemon=True).start()
+        job._publish_progress()
+        return jsonify({"ok": True, "scan_id": job.id, "resume_count": job.resume_count})
+
+    @app.route("/api/scan/start", methods=["POST"])
+    def api_scan_start():
+        body   = request.get_json(force=True, silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"error": "Scan configuration must be an object", "code": "invalid_scan_config_type"}), 400
+        target = body.get("target", "")
+
+        try:
+            config = _profile_config(body)
+        except ValueError as error:
+            return jsonify(_refusal_body(error, "Invalid scan configuration", "invalid_scan_config")), 400
+        target_err = _validate_job_target(target, config)
+        if target_err:
+            return jsonify({"error": target_err, "code": "invalid_target"}), 400
+        target = target.strip()
+        api_key = body.get("api_key", "")
+        if api_key is not None and not isinstance(api_key, str):
+            return jsonify({"error": "api_key must be a string", "code": "invalid_api_key_type"}), 400
+        config.update(target=target, api_key=api_key,
+                      nmap_flags=_build_nmap_flags(config))
+        if _offline_enabled():
+            config["vulnerability_source"] = "offline"
+        if config["scan_web"] and config["vulnerability_source"] == "offline":
+            return jsonify({"error": "Web checks are disabled in offline mode.", "code": "web_checks_offline"}), 409
+        if config["scan_vulns"] and config["vulnerability_source"] == "offline" and not database_status(_VULNERABILITY_DB)["ready"]:
+            return jsonify({"error": "Offline database unavailable. Download it in Settings while connected, "
+                            "or copy vulnerabilities.sqlite3 from a connected system.",
+                            "code": "offline_db_unavailable"}), 409
+        job = _launch_scan(config)
+        return jsonify({"ok": True, "scan_id": job.id, "message": f"Scan started for {redact_target(target)}", "code": "scan_started", "target": redact_target(target)})
+
+    @app.route("/api/web/catalog")
+    def api_web_catalog():
+        from autopwn_suite.web.options import LIMITS
+        return jsonify({"checks": WEB_CHECKS, "defaults": normalize_options(), "limits": LIMITS,
+                        "offline": _offline_enabled()})
+
+    @app.route("/api/web/findings")
+    def api_web_findings():
+        return jsonify([row for job in _all_scans() for row in job.web_findings()])
+
+    @app.route("/api/web/findings/<scan_id>/<finding_id>")
+    def api_web_finding(scan_id, finding_id):
+        job = _get_scan(scan_id)
+        result = job.web_finding(finding_id) if job else None
+        if not result:
+            return jsonify({"error": "Web finding not found", "code": "web_finding_not_found"}), 404
+        return jsonify(result)
+
+    @app.route("/api/web/findings/<scan_id>/<finding_id>/poc")
+    def api_web_poc(scan_id, finding_id):
+        from autopwn_suite.web.poc import browser_poc, build_plan, curl_poc, python_poc
+        job = _get_scan(scan_id)
+        result = job.web_finding(finding_id) if job else None
+        if not result:
+            return jsonify({"error": "Web finding not found", "code": "web_finding_not_found"}), 404
+        form = request.args.get("format", "python")
+        formats = {"python": (python_poc, "py"), "curl": (curl_poc, "sh"), "html": (browser_poc, "html"),
+                   "json": (lambda row: json.dumps(build_plan(row), indent=2), "json")}
+        if form not in formats:
+            return jsonify({"error": "Unknown PoC format", "code": "unknown_poc_format"}), 400
+        generate, extension = formats[form]
+        code = generate(result)
+        if code is None:
+            return jsonify({"error": "Browser PoCs are available for XSS and CORS findings.", "code": "poc_unsupported_type"}), 400
+        safe_id = _re.sub(r"[^A-Za-z0-9_-]", "", finding_id)[:40]
+        response = Response(code, mimetype="application/octet-stream")
+        response.headers["Content-Disposition"] = f'attachment; filename="autopwn-poc-{safe_id}.{extension}"'
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @app.route("/api/web/findings/<scan_id>/<finding_id>/verify", methods=["POST"])
+    def api_web_verify(scan_id, finding_id):
+        global _web_verifications_running
+        from autopwn_suite.web.poc import build_plan
+        from autopwn_suite.web.poc_runtime import validate_plan, verify_plan
+        job = _get_scan(scan_id)
+        result = job.web_finding(finding_id) if job else None
+        if not result:
+            return jsonify({"error": "Web finding not found", "code": "web_finding_not_found"}), 404
+        body = request.get_json(silent=True)
+        if body is None:
+            body = {}
+        if not isinstance(body, dict) or body:
+            return jsonify({"error": "Verification uses the stored request plan; custom requests are not accepted.", "code": "verification_no_custom_body"}), 400
+        plan = build_plan(result)
+        try:
+            validate_plan(plan)
+        except (ValueError, KeyError):
+            return jsonify({"error": "This finding needs local inputs or cannot be replayed automatically. Download its PoC to review.", "code": "verification_unsupported"}), 409
+        with _mode_lock:
+            if _notifications_offline(job):
+                return jsonify({"error": "Verification is disabled in offline mode.", "code": "verification_offline"}), 409
+            with job._lock:
+                if job._web_findings[finding_id].get("verification", {}).get("status") == "running":
+                    return jsonify({"error": "Verification is already running.", "code": "verification_already_running"}), 409
+                if _web_verifications_running >= 4:
+                    return jsonify({"error": "Four verifications are already running. Wait for one to finish.", "code": "verification_limit_reached"}), 409
+                _web_verifications_running += 1
+                job.set_web_verification(finding_id, {"status": "running", "summary": "Replaying recorded evidence"})
+            def run():
+                global _web_verifications_running
+                try:
+                    verified = verify_plan(plan)
+                    job.set_web_verification(finding_id, verified)
+                except Exception as exc:
+                    logging.error("Web evidence verification failed (%s)", type(exc).__name__)
+                    job.set_web_verification(finding_id, {"status": "inconclusive", "summary": "Verification failed; see server logs."})
+                finally:
+                    with _mode_lock:
+                        _web_verifications_running -= 1
+            try:
+                threading.Thread(target=run, daemon=True).start()
+            except Exception:
+                _web_verifications_running -= 1
+                job.set_web_verification(finding_id, {"status": "inconclusive", "summary": "Could not start verification."})
+                return jsonify({"error": "Could not start verification.", "code": "verification_start_failed"}), 500
+        return jsonify({"ok": True, "status": "running"}), 202
+
+    @app.route("/api/scan/stop", methods=["POST"])
+    def api_scan_stop():
+        body    = request.get_json(force=True, silent=True) or {}
+        scan_id = body.get("scan_id", "")
+        if not isinstance(scan_id, str):
+            return jsonify({"error": "scan_id must be a string", "code": "invalid_scan_id_type"}), 400
+        scan_id = scan_id.strip()
+        job     = _get_scan(scan_id)
+        if not job:
+            return jsonify({"error": "Scan not found", "code": "scan_not_found"}), 404
+        if job.status not in ("running", "stopping"):
+            return jsonify({"ok": False, "message": "Scan is not running", "code": "scan_not_running"}), 400
+        job.request_stop()
+        return jsonify({"ok": True})
+
+    # ── Local vulnerability database (updates are explicit, never scheduled) ──
+
+    @app.route("/api/vulnerability-database")
+    def api_vulnerability_database():
+        status = database_status(_VULNERABILITY_DB)
+        with _database_update_lock:
+            status["update"] = dict(_database_update)
+        status["offline_only"] = _offline_enabled()
+        status["offline_locked"] = _OFFLINE_ONLY
+        return jsonify(status)
+
+    @app.route("/api/vulnerability-database/update", methods=["POST"])
+    def api_update_vulnerability_database():
+        with _mode_lock:
+            if _offline_enabled():
+                message = ("Restart without --offline to download updates." if _OFFLINE_ONLY
+                           else "Turn off Offline mode in Settings to download updates.")
+                return jsonify({"error": "This server is in offline mode. " + message, "code": "db_update_offline"}), 409
+            with _database_update_lock:
+                if _database_update["running"]:
+                    return jsonify({"error": "A database update is already running.", "code": "db_update_already_running"}), 409
+                _database_update.update(running=True, message="Starting download", current=0, total=0, error=None)
+            try:
+                threading.Thread(target=_update_vulnerability_database, daemon=True).start()
+            except Exception:
+                with _database_update_lock:
+                    _database_update["running"] = False
+                logging.exception("Could not start vulnerability database update")
+                return jsonify({"error": "Could not start database update.", "code": "db_update_start_failed"}), 500
+        return jsonify({"ok": True}), 202
+
+    @app.route("/api/vulnerability-database/download")
+    def api_download_vulnerability_database():
+        if not database_status(_VULNERABILITY_DB)["ready"]:
+            return jsonify({"error": "Download the vulnerability database first.", "code": "offline_db_missing"}), 409
+        path = database_path(_VULNERABILITY_DB)
+        return send_from_directory(path.parent, path.name, as_attachment=True,
+                                   download_name="vulnerabilities.sqlite3")
+
+    # ── Hosts / log / events ──
+
+    @app.route("/api/hosts")
+    def api_hosts():
+        observations = {}
+        attempts = {}
+        for job in _all_scans():
+            for host in job.hosts_list():
+                actual = bool(host.get("observed_at")) or bool(host.get("ports"))
+                timestamp = host.get("observed_at") or job.finished_at or job.started_at
+                when = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).timestamp()
+                previous = attempts.get(host["ip"])
+                if previous is None or when >= previous[0]:
+                    attempts[host["ip"]] = (when, host)
+                if actual:
+                    previous = observations.get(host["ip"])
+                    if previous is None or when >= previous[0]:
+                        observations[host["ip"]] = (when, host)
+        latest = []
+        for ip, attempt in attempts.items():
+            observed = observations.get(ip)
+            host = observed[1] if observed else attempt[1]
+            if observed and attempt[0] >= observed[0] and attempt[1]["scan_id"] != host["scan_id"]:
+                host["latest_attempt"] = {key: attempt[1].get(key) for key in ("scan_id", "scan_status", "lookup_status")}
+            latest.append(host)
+        return jsonify(latest)
+
+    @app.route("/api/log")
+    def api_log():
+        with _log_history_lock:
+            return jsonify(list(_log_history))
+
+    @app.route("/api/events")
+    def api_events():
+        stream_headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        if request.method == "HEAD":
+            # Nothing iterates a HEAD response, so its generator never runs its cleanup; a subscriber
+            # added below would stay registered, and queue every event, for the life of the process.
+            return Response(mimetype="text/event-stream", headers=stream_headers)
+        session_token = request.cookies.get(COOKIE)
+        # Without a resume point only later entries are sent: the page reads the history from /api/log, and
+        # replaying it here would show every line twice. A page that reconnects (the browser sends
+        # Last-Event-ID) or connects after /api/log (?after=<id of its last entry>) gets what it missed.
+        resume = _resume_point(request.headers.get("Last-Event-ID"), request.args.get("after"))
+        def generate():
+            client_q = queue.Queue(maxsize=_MAX_LOG_HISTORY)
+            # _broadcast numbers and queues an entry under this lock, so each entry reaches the stream once:
+            # in the replay if it was logged before this point, in the queue if after. Subscribing here, not
+            # in the view, also means a HEAD request (never iterated) cannot leave a subscriber behind.
+            with _log_history_lock:
+                missed = []
+                if resume is not None:
+                    # An id this process never issued comes from before a restart; send what it holds.
+                    after = 0 if resume > _log_seq else resume
+                    missed = [entry for entry in _log_history if entry["id"] > after]
+                with _sse_subscribers_lock:
+                    _sse_subscribers.append(client_q)
+            try:
+                for entry in missed:
+                    if not auth.stream_valid(session_token):
+                        return
+                    yield _sse_frame(entry)
+                while True:
+                    if not auth.stream_valid(session_token):
+                        return
+                    try:
+                        entry = client_q.get(timeout=1)
+                        if not auth.stream_valid(session_token):
+                            return
+                        yield _sse_frame(entry)
+                    except queue.Empty:
+                        if not auth.stream_valid(session_token):
+                            return
+                        yield ": ping\n\n"
+            finally:
+                with _sse_subscribers_lock:
+                    _sse_subscribers.remove(client_q)
+        return Response(generate(), mimetype="text/event-stream", headers=stream_headers)
+
+    # ── Settings ──
+
+    @app.route("/api/settings", methods=["GET"])
+    def api_settings_get():
+        with _settings_lock:
+            # Return a copy with password masked for display
+            data = json.loads(json.dumps(_settings))
+        if data.get("email", {}).get("password"):
+            data["email"]["password"] = "••••••••"
+        for key in ("auth", "account", "username", "password", "password_hash", "revision", "session_secret"):
+            data.pop(key, None)
+        return jsonify(data)
+
+    @app.route("/api/settings", methods=["PUT"])
+    def api_settings_put():
+        body = request.get_json(force=True, silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"error": "Settings must be an object", "code": "invalid_settings_type"}), 400
+        if set(body) & {"auth", "account", "username", "password", "password_hash", "revision", "session_secret"}:
+            return jsonify({"error": "Use the account settings to change dashboard credentials.", "code": "settings_account_fields_forbidden"}), 400
+        if any(k in body and not isinstance(body[k], dict) for k in ("email", "webhook")):
+            return jsonify({"error": "email and webhook must be objects", "code": "invalid_notification_config_type"}), 400
+        if "language" in body and body["language"] not in ("", *i18n.SUPPORTED_LANGUAGES):
+            return jsonify({"error": "language must be empty or a supported language", "code": "invalid_language"}), 400
+        if "offline_mode" in body and not isinstance(body["offline_mode"], bool):
+            return jsonify({"error": "offline_mode must be a boolean", "code": "invalid_offline_mode_type"}), 400
+        with _mode_lock:
+            if body.get("offline_mode") is True and not _offline_enabled():
+                if _web_verifications_running:
+                    return jsonify({"error": "Wait for active web verifications to finish before enabling offline mode.", "code": "offline_blocked_verifications"}), 409
+                if _notification_operations:
+                    return jsonify({"error": "Wait for active notifications to finish before enabling offline mode.", "code": "offline_blocked_notifications"}), 409
+                with _database_update_lock:
+                    if _database_update["running"]:
+                        return jsonify({"error": "Wait for the database update to finish before enabling offline mode.", "code": "offline_blocked_db_update"}), 409
+                if any(job.status in ("running", "stopping") and job.config.get("vulnerability_source") != "offline"
+                       for job in _all_scans()):
+                    return jsonify({"error": "Stop or finish active online scans before enabling offline mode.", "code": "offline_blocked_scans"}), 409
+            with _settings_lock:
+                # Persist before publishing the new setting to running requests.
+                if body.get("email", {}).get("password") == "••••••••":
+                    body["email"]["password"] = _settings.get("email", {}).get("password", "")
+                updated = _deep_merge(_settings, body)
+                _write_json(_SETTINGS_FILE, updated)
+                _settings.clear()
+                _settings.update(updated)
+        return jsonify({"ok": True})
+
+    @app.route("/api/settings/test_email", methods=["POST"])
+    @_online_notification_route
+    def api_test_email():
+        """Send a test email using current settings."""
+        if _offline_enabled():
+            return jsonify({"error": "Notifications are disabled in offline mode.", "code": "notifications_offline"}), 409
+        cfg = _get_setting("email")
+        if not cfg or not cfg.get("enabled"):
+            return jsonify({"error": "Email notifications are disabled", "code": "email_notifications_disabled"}), 400
+        try:
+            msg = MIMEMultipart()
+            msg["From"]    = cfg.get("from_addr") or cfg.get("username", "")
+            msg["To"]      = cfg["to_addr"]
+            msg["Subject"] = "[AutoPWN] Test notification"
+            msg.attach(MIMEText("AutoPWN Suite email notifications are working.", "plain"))
+            with _smtp_connection(cfg) as srv:
+                srv.sendmail(msg["From"], [cfg["to_addr"]], msg.as_string())
+            return jsonify({"ok": True})
+        except Exception as error:
+            logging.error("Failed to send test email: %s", delivery_error_summary(error))
+            return jsonify({"error": "Failed to send test email", "code": "test_email_failed"}), 500
+
+    @app.route("/api/settings/test_webhook", methods=["POST"])
+    @_online_notification_route
+    def api_test_webhook():
+        """Send a test webhook ping."""
+        if _offline_enabled():
+            return jsonify({"error": "Notifications are disabled in offline mode.", "code": "notifications_offline"}), 409
+        cfg = _get_setting("webhook")
+        if not cfg or not cfg.get("enabled") or not cfg.get("url"):
+            return jsonify({"error": "Webhook is disabled or URL not set", "code": "webhook_not_configured"}), 400
+        if not REQUESTS_AVAILABLE:
+            return jsonify({"error": "requests library not installed", "code": "requests_not_installed"}), 500
+        try:
+            r = _post_webhook(cfg["url"], {
+                "event": "test", "message": "AutoPWN Suite webhook test",
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            })
+            return jsonify({"ok": True, "status_code": r.status_code})
+        except Exception as error:
+            logging.error("Failed to send test webhook: %s", delivery_error_summary(error))
+            return jsonify({"error": "Failed to send test webhook", "code": "test_webhook_failed"}), 500
+
+    # ── Profiles ──
+
+    @app.route("/api/profiles", methods=["GET"])
+    def api_profiles_get():
+        with _profiles_lock:
+            return jsonify(list(_profiles.values()))
+
+    @app.route("/api/profiles", methods=["POST"])
+    def api_profiles_post():
+        body = request.get_json(force=True, silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"error": "Profile must be an object", "code": "invalid_profile_type"}), 400
+        name = body.get("name", "")
+        if not isinstance(name, str) or not name.strip():
+            return jsonify({"error": "'name' is required", "code": "name_required"}), 400
+        description = body.get("description", "")
+        if not isinstance(description, str):
+            return jsonify({"error": "'description' must be a string", "code": "invalid_description_type"}), 400
+        try:
+            config = _profile_config(body)
+        except ValueError as error:
+            return jsonify(_refusal_body(error, "Invalid scan configuration", "invalid_scan_config")), 400
+        pid = str(uuid.uuid4())
+        profile = {
+            "id":         pid,
+            "name":       name.strip(),
+            "description":description,
+            "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "config": config,
+        }
+        with _profiles_lock:
+            _profiles[pid] = profile
+        _save_profiles()
+        return jsonify(profile), 201
+
+    @app.route("/api/profiles/<pid>", methods=["PUT"])
+    def api_profiles_put(pid):
+        body = request.get_json(force=True, silent=True)
+        with _profiles_lock:
+            if pid not in _profiles:
+                return jsonify({"error": "Profile not found", "code": "profile_not_found"}), 404
+            if not isinstance(body, dict):
+                return jsonify({"error": "Profile must be an object", "code": "invalid_profile_type"}), 400
+            p = dict(_profiles[pid])
+            if "name" in body:
+                if not isinstance(body["name"], str) or not body["name"].strip():
+                    return jsonify({"error": "'name' is required", "code": "name_required"}), 400
+                p["name"] = body["name"].strip()
+            if "description" in body:
+                if not isinstance(body["description"], str):
+                    return jsonify({"error": "'description' must be a string", "code": "invalid_description_type"}), 400
+                p["description"] = body["description"]
+            stored = p.get("config", {})
+            dropped = isinstance(stored, dict) and _holds_options(stored)
+            if isinstance(stored, dict):  # saving replaces what an earlier release stored as Nmap options
+                stored = {key: value for key, value in stored.items() if key != "nmap_flags"}
+            try:
+                p["config"] = _profile_config(body, stored)
+            except ValueError as error:
+                return jsonify(_refusal_body(error, "Invalid scan configuration", "invalid_scan_config")), 400
+            _profiles[pid] = p
+            # A schedule that no longer validates against the edited profile (a CIDR target on a
+            # web-only profile, say) would fail every minute; turn it off now, as a delete does. So is
+            # every schedule of a profile that lost stored Nmap options: it would run without them.
+            cause = "a profile edit that removed its stored Nmap options" if dropped else "a profile edit"
+            disabled = []
+            with _schedules_lock:
+                for schedule in _schedules.values():
+                    if not (isinstance(schedule, dict) and schedule.get("profile_id") == pid and schedule.get("enabled") is True):
+                        continue
+                    if not dropped:
+                        try:
+                            _schedule_data(schedule)
+                            continue
+                        except ValueError:
+                            pass
+                    schedule["enabled"] = False
+                    disabled.append(str(schedule.get("name") or str(schedule.get("id", ""))[:8]))
+                    _log_schedule_disabled(schedule, cause)
+        _save_profiles()
+        if disabled:
+            _save_schedules()
+            _scheduler_note("warning", f"[*] Disabled after {cause}: {', '.join(disabled)}. "
+                            + ("Check the profile's settings, then enable the schedule again." if dropped
+                               else "Edit the schedule and enable it again."))
+        return jsonify(p)
+
+    @app.route("/api/profiles/<pid>", methods=["DELETE"])
+    def api_profiles_delete(pid):
+        disabled = False
+        with _profiles_lock:
+            if pid not in _profiles:
+                return jsonify({"error": "Profile not found", "code": "profile_not_found"}), 404
+            del _profiles[pid]
+            with _schedules_lock:
+                for schedule in _schedules.values():
+                    if isinstance(schedule, dict) and schedule.get("profile_id") == pid:
+                        schedule["enabled"] = False
+                        disabled = True
+        _save_profiles()
+        if disabled:
+            _save_schedules()
+        return jsonify({"ok": True})
+
+    # ── Schedules ──
+
+    @app.route("/api/schedules", methods=["GET"])
+    def api_schedules_get():
+        with _schedules_lock:
+            return jsonify(list(_schedules.values()))
+
+    @app.route("/api/schedules", methods=["POST"])
+    def api_schedules_post():
+        body = request.get_json(force=True, silent=True)
+        try:
+            schedule = _schedule_data(body)
+        except ValueError as error:
+            return jsonify(_refusal_body(error, "Invalid schedule configuration", "invalid_schedule_config")), 400
+        sid = str(uuid.uuid4())
+        schedule.update({
+            "id": sid, "name": body.get("name", f"Schedule {sid[:8]}"),
+            "created_at":     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "last_run":       "",
+        })
+        with _profiles_lock:
+            if schedule["profile_id"] not in _profiles:
+                return jsonify({"error": "Profile not found", "code": "profile_not_found"}), 400
+            with _schedules_lock:
+                _schedules[sid] = schedule
+        _save_schedules()
+        return jsonify(schedule), 201
+
+    @app.route("/api/schedules/<sid>", methods=["PUT"])
+    def api_schedules_put(sid):
+        body = request.get_json(force=True, silent=True)
+        with _profiles_lock:
+            with _schedules_lock:
+                if sid not in _schedules:
+                    return jsonify({"error": "Schedule not found", "code": "schedule_not_found"}), 404
+                if isinstance(body, dict) and body.keys() == {"enabled"} and body["enabled"] is False:
+                    s = dict(_schedules[sid], enabled=False)  # turning a schedule off needs no valid record
+                else:
+                    stored = {key: value for key, value in _schedules[sid].items() if key != "nmap_flags"}
+                    try:
+                        s = _schedule_data(body, stored)
+                    except ValueError as error:
+                        return jsonify(_refusal_body(error, "Invalid schedule configuration", "invalid_schedule_config")), 400
+                    if s["profile_id"] not in _profiles:
+                        return jsonify({"error": "Profile not found", "code": "profile_not_found"}), 400
+                old = _schedules[sid]
+                if s["enabled"] is True and (old.get("enabled", True) is not True or any(
+                        old.get(key) != s.get(key) for key in ("type", "time_utc", "weekday"))):
+                    # A slot that passed before this change is not owed a catch-up run (see _slot_due).
+                    s["armed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                _schedules[sid] = s
+        _save_schedules()
+        return jsonify(s)
+
+    @app.route("/api/schedules/<sid>", methods=["DELETE"])
+    def api_schedules_delete(sid):
+        with _schedules_lock:
+            if sid not in _schedules:
+                return jsonify({"error": "Schedule not found", "code": "schedule_not_found"}), 404
+            del _schedules[sid]
+        with _schedule_last_run_lock:
+            _schedule_last_run.pop(sid, None)
+        _save_schedules()
+        return jsonify({"ok": True})
+
+    return app
+
+
+# ── Public entry point ────────────────────────────────────────────────────────
+
+def reset_web_account():
+    """Local recovery only; rotate credentials and invalidate active sessions."""
+    store = AccountStore(data_dir() / ACCOUNT_FILE)
+    credentials = store.reset()
+    show_credentials(credentials, store.path)
+
+
+def _quiet_request_handler():
+    """Request handler that does not advertise the Werkzeug and Python versions in the Server header."""
+    from werkzeug.serving import WSGIRequestHandler
+
+    class QuietRequestHandler(WSGIRequestHandler):
+        def version_string(self):
+            return "AutoPWN-Suite"
+
+    return QuietRequestHandler
+
+
+def start_server(host: str = "127.0.0.1", port: int = 8080, version: str = "Unkown", *, offline=False, database=None) -> None:
+    """Start the web UI server and block until Ctrl+C."""
+    global __version__, _OFFLINE_ONLY, _VULNERABILITY_DB
+    __version__ = version
+    _OFFLINE_ONLY = offline
+    _VULNERABILITY_DB = database
+    if not FLASK_AVAILABLE:
+        raise RuntimeError("Flask is not installed. Run:  pip install flask flask-cors")
+
+    _STATIC_DIR.mkdir(exist_ok=True)
+
+    if not (_STATIC_DIR / "index.html").exists():
+        raise FileNotFoundError(
+            f"index.html not found at: {_STATIC_DIR / 'index.html'}\n"
+            "Make sure autopwn_suite/web_ui_static/index.html exists."
+        )
+
+    # Load persisted data, after restricting the files that an earlier release wrote with the process umask
+    _tighten_data_files()
+    _load_settings()
+    _load_profiles()
+    _load_schedules()
+
+    app = _build_app(_STATIC_DIR)
+
+    # Authentication must initialize successfully before scheduled work starts.
+    threading.Thread(target=_scheduler_loop, daemon=True).start()
+
+    import logging as _logging
+    _logging.getLogger("werkzeug").setLevel(_logging.ERROR)
+
+    display_host = "localhost" if host in ("0.0.0.0", "127.0.0.1") else host
+    print("\n  AutoPWN Suite — Web UI")
+    print(f"  http://{display_host}:{port}\n")
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        print("  Listening beyond localhost: remote clients must use HTTPS (terminate TLS in a reverse proxy\n"
+              "  and set AUTOPWN_WEB_SECURE_COOKIE=1) and the service should be firewalled.\n")
+
+    # An explicit debug=False keeps FLASK_DEBUG (or a .env file) from adding Werkzeug's debugger outside sign-in.
+    app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False, request_handler=_quiet_request_handler())

@@ -96,15 +96,18 @@ See [support lifecycle](SUPPORT.md) for scope, duration and end-of-life rules,
 [automated security policy](docs/SECURITY_TESTING.md) for SCA/SAST thresholds and
 non-exploitability decisions.
 
-The dashboard is an administrative interface. **v2.6.0 has no built-in login.**
-The unreleased development version requires sign-in: on first launch it creates an
+The dashboard is an administrative interface. **v2.6.0 and earlier have no built-in login.**
+From v2.6.1 it requires sign-in: on first launch it creates an
 `admin` account with a random password shown once in the server terminal, stores
 only a scrypt hash, and lets the operator change the credentials under
-Settings -> Account or reset them with `python autopwn.py --web-reset-account`.
+Settings -> Account or reset them with `autopwn-suite --web-reset-account`.
 Remote access requires HTTPS. Regardless of version, restrict access to trusted
 operators, bind to loopback when possible, and use authenticated ingress/firewall
 controls for remote access. Protect the data directory and backups: settings contain
-integration credentials in plaintext JSON. Use a dedicated scanner account and do not
+integration credentials in plaintext JSON (since v2.7.0 the dashboard writes them
+owner-only, mode 0600, on POSIX and restricts files an earlier release left readable when it starts; earlier
+releases used the process umask, see
+AUTOPWN-SA-2026-007). Use a dedicated scanner account and do not
 expose the dashboard to the public internet. Do not rely on the login as the only
 control for an internet-facing deployment.
 

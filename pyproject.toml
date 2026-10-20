@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autopwn-suite"
-version = "2.6.1"
+version = "2.7.0"
 requires-poetry = "==2.5.1"
 description = "AutoPWN Suite - Automated Vulnerability Scanning and Exploitation Tool"
 authors = ["AutoPWN Suite Contributors"]
@@ -25,10 +25,7 @@ classifiers = [
     "Topic :: Security",
 ]
 packages = [
-    { include = "modules" },
-    { include = "api.py" },
-    { include = "autopwn.py" },
-    { include = "__init__.py" }
+    { include = "autopwn_suite" }
 ]
 
 [tool.poetry.dependencies]
@@ -38,7 +35,7 @@ rich = "*"
 beautifulsoup4 = "*"
 distro = "*"
 urllib3 = "^2.8.0"
-cryptography = ">=46.0.0"
+cryptography = ">=50.0.0"
 flask = "^3.1.3"
 flask-cors = "^6.0.2"
 werkzeug = "^3.1.9"
@@ -50,8 +47,7 @@ pytest-mock = "^3.11.0"
 ruff = "==0.17.1"
 
 [tool.poetry.scripts]
-test = "pytest:main"
-tests = "pytest:main"
+autopwn-suite = "autopwn_suite.cli:run"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -59,9 +55,7 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
-    "--cov=modules",
-    "--cov=api",
-    "--cov=autopwn",
+    "--cov=autopwn_suite",
     "--cov-branch",
     "--cov-report=term-missing:skip-covered",
     "--cov-report=html:htmlcov",
@@ -77,8 +71,8 @@ python_functions = ["test_*"]
 # Python version) fail unrelated changes: warnings raised by this project's own code are errors.
 filterwarnings = [
     "error::SyntaxWarning",
-    'error::DeprecationWarning:(modules|autopwn|api)(\..*)?$',
-    'error::FutureWarning:(modules|autopwn|api)(\..*)?$',
+    'error::DeprecationWarning:autopwn_suite(\..*)?$',
+    'error::FutureWarning:autopwn_suite(\..*)?$',
 ]
 markers = [
     "unit: Unit tests",
@@ -87,7 +81,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["modules", "api", "autopwn"]
+source = ["autopwn_suite"]
 branch = true
 omit = [
     "*/tests/*",
@@ -123,7 +117,7 @@ directory = "htmlcov"
 output = "coverage.xml"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core==2.5.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
@@ -131,6 +125,8 @@ target-version = "py310"
 force-exclude = true
 # PEP 8 with a 200-column limit; see docs/CODING_STANDARDS.md for the rationale.
 line-length = 200
+# `_` and `ngettext` are installed into builtins by autopwn_suite.i18n (gettext), so they are not undefined names.
+builtins = ["_", "ngettext"]
 
 [tool.ruff.lint]
 # E/W: PEP 8 (pycodestyle), F: Pyflakes, B: flake8-bugbear, I: sorted imports.
@@ -138,13 +134,13 @@ select = ["E", "W", "F", "B", "I"]
 
 [tool.ruff.lint.per-file-ignores]
 # Long user-facing explanations and generated-HTML templates are kept as single literals.
-"modules/web/details.py" = ["E501"]
-"modules/web/poc.py" = ["E501"]
+"autopwn_suite/web/details.py" = ["E501"]
+"autopwn_suite/web/poc.py" = ["E501"]
 # Actions passed to run_task()/probe helpers execute inside the same loop iteration,
 # so the late-binding hazard B023 warns about cannot occur.
-"modules/web/additional.py" = ["B023"]
-"modules/web/dirbust.py" = ["B023"]
-"modules/web/webvuln.py" = ["B023"]
-"modules/web_ui.py" = ["B023"]
+"autopwn_suite/web/additional.py" = ["B023"]
+"autopwn_suite/web/dirbust.py" = ["B023"]
+"autopwn_suite/web/webvuln.py" = ["B023"]
+"autopwn_suite/web_ui.py" = ["B023"]
 # Test fixtures embed long HTML, header and JSON literals.
 "tests/**" = ["B023", "E501"]

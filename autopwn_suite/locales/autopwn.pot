@@ -1,0 +1,1591 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR Kaan Gültekin
+# This file is distributed under the same license as the AutoPWN Suite package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: AutoPWN Suite\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-20 19:40+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: autopwn_suite/daemon/daemon_installer.py:42
+#, python-brace-format
+msgid "  [cyan]{key}[/cyan]. {value}"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:43
+#, python-brace-format
+msgid "Enter your choice ({choices}): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:48
+#, python-brace-format
+msgid "[red]Invalid choice. Please enter one of {choices}.[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:60
+msgid "[red]Invalid input. Please enter a whole number.[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:65
+#, python-brace-format
+msgid "[red]Out of range. Please enter a whole number that is {value1}.[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:77
+msgid "[red]Invalid email format. Please enter a valid email address.[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:85
+msgid "[red]This field cannot be empty.[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:113
+msgid "Welcome to AutoPWN Suite Config Creator!"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:115
+msgid ""
+"Enter the scan interval in [cyan]seconds[/cyan] (Set to 0 for no interval - "
+"if not using as daemon): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:119
+msgid "Would you like to enable email or webhook notifications?"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:120
+msgid "Email"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:120
+msgid "Webhook"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:120
+msgid "None"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:125
+msgid "Enter your [cyan]email address[/cyan]: "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:126
+msgid "Enter your [cyan]email password[/cyan]: "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:127
+msgid "Enter the email address to [cyan]send the report to[/cyan]: "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:128
+msgid ""
+"Enter the email address to [cyan]send from[/cyan] (leave empty to use login "
+"email): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:129
+msgid "Enter the [cyan]email server[/cyan] to send the report from: "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:130
+msgid "Enter the [cyan]email port[/cyan] to send the report from: "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:131
+msgid "[green]Email notifications enabled.[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:134
+msgid "Enter your [cyan]webhook URL[/cyan]: "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:135
+msgid "[green]Webhook notifications enabled.[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:138
+msgid "[yellow]No notifications enabled.[/yellow]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:140
+msgid "Enter your [cyan]target[/cyan] (Leave empty for auto detection): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:141
+msgid ""
+"Enter [cyan]host file[/cyan] (Leave empty for none - will override target): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:146
+msgid "Would you like to [cyan]skip discovery[/cyan]? (y/n) "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:149
+msgid "Enter [cyan]API key[/cyan] (Leave empty for none): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:150
+msgid "Enter [cyan]nmap flags[/cyan] (Leave empty for none): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:151
+msgid "Enter [cyan]speed[/cyan] (0-5, Leave empty for default): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:156
+msgid "Pick [cyan]scan type[/cyan] for host discovery (Leave empty for ARP): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:157
+msgid "ARP"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:157
+msgid "Ping"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:162
+msgid "Enter [cyan]host timeout[/cyan] (Leave empty for default): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:166
+msgid "Enter [cyan]Scan Method[/cyan] (Leave empty for Normal): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:167
+msgid "Normal"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:167
+msgid "Evade"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:172
+msgid "Enter [cyan]output folder[/cyan] (Leave empty for default): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:177
+msgid "Enter [cyan]output type[/cyan] (Leave empty for html): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:178
+msgid "HTML report"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:178
+msgid "Plain text"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:178
+msgid "SVG image"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:182
+msgid "Creating config file..."
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:219
+msgid "Enter [cyan]config file name[/cyan] (Leave empty for autopwn.conf): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:227
+#, python-brace-format
+msgid ""
+"[yellow]Config file '{config_file}' already exists. Would you like to "
+"overwrite it?[/yellow] (y/n): "
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:229
+#, python-brace-format
+msgid "[red]Config file '{config_file}' not overwritten.[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:238
+#, python-brace-format
+msgid "[green]Config file '{config_file}' created successfully![/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:293
+#, python-brace-format
+msgid "Creating install directory: {path}"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:297
+#, python-brace-format
+msgid "[red]Failed to create install directory {path}: {error}[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:302
+#, python-brace-format
+msgid ""
+"[red]Refusing to install the daemon: it runs as root, but the interpreter, "
+"the package or {install_path} can be modified by another user.[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:304
+msgid ""
+"[yellow]Install AutoPWN Suite as root (for example with 'sudo bash install."
+"sh' or a standalone binary kept in a root-owned directory) and run --daemon-"
+"install from that installation.[/yellow]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:311
+#, python-brace-format
+msgid ""
+"[red]Refusing to install the daemon: the service would run '{command}' from "
+"{install_path}, but this interpreter cannot import autopwn_suite from there."
+"[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:315
+msgid ""
+"[yellow]A source checkout started with 'python autopwn.py' is not enough. "
+"Install AutoPWN Suite as root (for example with 'sudo bash install.sh' or a "
+"standalone binary kept in a root-owned directory) and run --daemon-install "
+"from that installation.[/yellow]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:344
+#, python-brace-format
+msgid "[red]Configuration file {src} does not exist.[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:351
+#, python-brace-format
+msgid "[green]Configuration available at {dst}[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:353
+#, python-brace-format
+msgid "[red]Error copying {src} -> {dst}: {error}[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:362
+#, python-brace-format
+msgid "[green]Created log file: {path}[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:364
+#, python-brace-format
+msgid "[yellow]Warning: could not create log file {path}: {error}[/yellow]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:392
+#, python-brace-format
+msgid "Writing systemd service file to {path} ..."
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:395
+#, python-brace-format
+msgid "[green]Service file written to {path}[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:397
+#, python-brace-format
+msgid ""
+"[red]Permission denied writing {path}. Run this script as root or use sudo.[/"
+"red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:398
+msgid "[yellow]Here’s the unit content to save manually:[/yellow]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:405
+msgid "Reloading systemd daemon ..."
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:407
+msgid "Enabling and starting service ..."
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:410
+msgid "[green]Service enabled and started successfully.[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:411
+msgid ""
+"[blue]Check status with: sudo systemctl status autopwn-daemon.service[/blue]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:413
+#, python-brace-format
+msgid "[red]Systemctl command failed: {error}[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:414
+msgid ""
+"[yellow]You may need to run manually: sudo systemctl daemon-reload && sudo "
+"systemctl enable autopwn-daemon.service && sudo systemctl restart autopwn-"
+"daemon.service[/yellow]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:417
+msgid "[green]AutoPWN daemon installation complete.[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:424
+msgid ""
+"Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:440
+msgid "[yellow]systemctl could not be run.[/yellow]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:449
+msgid ""
+"Daemon can only be removed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:455
+msgid "Stopping and disabling the service ..."
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:457
+msgid ""
+"[yellow]The service could not be stopped and disabled; it may not be "
+"installed. Continuing.[/yellow]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:464
+#, python-brace-format
+msgid "[red]Could not remove {service_path}: {error}[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:467
+#, python-brace-format
+msgid "[green]Removed {service_path}[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:469
+msgid ""
+"[yellow]systemd was not told about the removal; run: sudo systemctl daemon-"
+"reload[/yellow]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:471
+#, python-brace-format
+msgid "No service file at {service_path}."
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:477
+#, python-brace-format
+msgid "[red]Could not remove {config_path}: {error}[/red]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:480
+#, python-brace-format
+msgid "[green]Removed {config_path}[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:482
+msgid "[green]AutoPWN daemon removed.[/green]"
+msgstr ""
+
+#: autopwn_suite/daemon/daemon_installer.py:483
+#, python-brace-format
+msgid ""
+"[blue]Left in place: the program, the log file /var/log/autopwn-daemon.log "
+"and the files in {install_dir}. Remove the program with 'sudo bash uninstall."
+"sh', 'pipx uninstall autopwn-suite' or by deleting the binary.[/blue]"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:49
+#, python-brace-format
+msgid ""
+"Connection error raised while trying to fetch information about: {cve_id}"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:55
+msgid "An error occurred while parsing API response."
+msgstr ""
+
+#: autopwn_suite/getexploits.py:75
+msgid "Skipping a malformed exploit record."
+msgstr ""
+
+#: autopwn_suite/getexploits.py:106
+#, python-brace-format
+msgid "Connection error raised while trying to fetch: {link}"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:110
+#, python-brace-format
+msgid "Unable to download {link}: {error}"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:115
+#, python-brace-format
+msgid "Unable to retrieve contents of {link} {user_agent}"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:150
+#, python-brace-format
+msgid ""
+"┌─[yellow]{name}[/yellow]\n"
+"│"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:153
+#, python-brace-format
+msgid ""
+"│\n"
+"├─────┤ [red]{cve}[/red]\n"
+"│"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:171
+#, python-brace-format
+msgid ""
+"├──────────# [white]exploits/{path}[/white]\n"
+"│\t\t [cyan]Platform: [/cyan] {platform}\n"
+"│\t\t [cyan]Type: [/cyan] {type}\n"
+"│\t\t [cyan]Author: [/cyan] {author}\n"
+"│\t\t [cyan]Date: [/cyan] [bright_cyan]{date}[/bright_cyan]\n"
+"│\t\t [cyan]Metasploit: [/cyan] {metasploit}\n"
+"│\t\t [cyan]Verified: [/cyan]{verified}\n"
+"│\t\t [cyan]Link: [/cyan] {link}\n"
+"│"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:198
+#, python-brace-format
+msgid "Downloading exploits for {target}..."
+msgstr ""
+
+#: autopwn_suite/getexploits.py:200
+msgid "Downloading exploits..."
+msgstr ""
+
+#: autopwn_suite/getexploits.py:203
+msgid "[red]Downloading exploits ...[/red]"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:208
+#, python-brace-format
+msgid ""
+"[white]Downloading exploits for[/white] [red]{title}[/red] [white]...[/white]"
+msgstr ""
+
+#: autopwn_suite/getexploits.py:215
+#, python-brace-format
+msgid "Skipping exploits for {title}"
+msgstr ""
+
+#: autopwn_suite/nist_search.py:129
+msgid "Vulnerability source must be auto, online, or offline"
+msgstr ""
+
+#: autopwn_suite/nist_search.py:148
+#, python-brace-format
+msgid "Using local NVD database: {count} CVEs; updated {updated_at}."
+msgstr ""
+
+#: autopwn_suite/nist_search.py:163
+msgid ""
+"NVD lookup failed and no local vulnerability database is available. Retry "
+"later, use an NVD API key to avoid rate limits, or download the database "
+"with --update-vuln-db while connected."
+msgstr ""
+
+#: autopwn_suite/nist_search.py:167
+#, python-brace-format
+msgid ""
+"NVD unavailable; using the local vulnerability database updated {updated_at} "
+"for this scan."
+msgstr ""
+
+#: autopwn_suite/nist_search.py:225
+msgid ""
+"Requests are being rate limited by NIST API, please get a NIST API key to "
+"prevent this."
+msgstr ""
+
+#: autopwn_suite/nist_search.py:233
+#, python-brace-format
+msgid "NVD lookup failed for {keyword}"
+msgstr ""
+
+#: autopwn_suite/nist_search.py:236
+#, python-brace-format
+msgid "NVD lookup failed for {keyword}; vulnerability coverage is incomplete."
+msgstr ""
+
+#: autopwn_suite/report.py:55
+msgid "Sending email report..."
+msgstr ""
+
+#: autopwn_suite/report.py:70 autopwn_suite/report.py:72
+msgid "AutoPWN Report"
+msgstr ""
+
+#: autopwn_suite/report.py:92
+msgid "An error occurred while trying to send email report."
+msgstr ""
+
+#: autopwn_suite/report.py:94
+msgid "Email report sent successfully."
+msgstr ""
+
+#: autopwn_suite/report.py:110
+msgid "Sending webhook report..."
+msgstr ""
+
+#: autopwn_suite/report.py:129
+msgid "Webhook report sent successfully."
+msgstr ""
+
+#: autopwn_suite/report.py:132
+#, python-brace-format
+msgid "Webhook delivery failed: HTTP {status}"
+msgstr ""
+
+#: autopwn_suite/report.py:133 autopwn_suite/report.py:136
+msgid "Webhook report failed to send."
+msgstr ""
+
+#: autopwn_suite/report.py:135
+#, python-brace-format
+msgid "Webhook delivery failed: {reason}"
+msgstr ""
+
+#: autopwn_suite/scanner.py:93
+#, python-brace-format
+msgid "Scanning {target} for open ports ..."
+msgstr ""
+
+#: autopwn_suite/scanner.py:141
+#, python-brace-format
+msgid "Error: {error}"
+msgstr ""
+
+#: autopwn_suite/scanner.py:159
+msgid "Ctr+C, aborting."
+msgstr ""
+
+#: autopwn_suite/scanner.py:170
+msgid "Creating noise..."
+msgstr ""
+
+#: autopwn_suite/scanner.py:178
+msgid "No hosts found for noise scan."
+msgstr ""
+
+#: autopwn_suite/scanner.py:188
+msgid "Creating noise ..."
+msgstr ""
+
+#: autopwn_suite/scanner.py:190
+#, python-brace-format
+msgid "Started creating noise on {host}..."
+msgstr ""
+
+#: autopwn_suite/scanner.py:201
+msgid "Noise scan complete!"
+msgstr ""
+
+#: autopwn_suite/scanner.py:204
+msgid "Noise scan interrupted!"
+msgstr ""
+
+#: autopwn_suite/scanner.py:221
+#, python-brace-format
+msgid "Scanning {count} target(s) using {scantype} scan ..."
+msgstr ""
+
+#: autopwn_suite/scanner.py:229
+#, python-brace-format
+msgid "Scanning {target} using {scantype} scan ..."
+msgstr ""
+
+#: autopwn_suite/scanner.py:315
+#, python-brace-format
+msgid "Target {target} seems to be offline."
+msgstr ""
+
+#: autopwn_suite/scanner.py:330 autopwn_suite/scanner.py:334
+#, python-brace-format
+msgid "Target {target} seems to be us."
+msgstr ""
+
+#: autopwn_suite/scanner.py:353
+#, python-brace-format
+msgid "Target {target} seems to have no open ports."
+msgstr ""
+
+#: autopwn_suite/scanner.py:356
+#, python-brace-format
+msgid "Portscan results for {target}"
+msgstr ""
+
+#: autopwn_suite/scanner.py:363 autopwn_suite/web_ui.py:967
+msgid "Port"
+msgstr ""
+
+#: autopwn_suite/scanner.py:364
+msgid "State"
+msgstr ""
+
+#: autopwn_suite/scanner.py:365 autopwn_suite/web_ui.py:971
+msgid "Service"
+msgstr ""
+
+#: autopwn_suite/scanner.py:366 autopwn_suite/web_ui.py:968
+msgid "Product"
+msgstr ""
+
+#: autopwn_suite/scanner.py:367 autopwn_suite/web_ui.py:977
+msgid "Version"
+msgstr ""
+
+#: autopwn_suite/searchvuln.py:65
+#, python-brace-format
+msgid "Skipped vulnerability detection for {keyword}"
+msgstr ""
+
+#: autopwn_suite/searchvuln.py:89
+#, python-brace-format
+msgid "Insufficient information for {target}"
+msgstr ""
+
+#: autopwn_suite/searchvuln.py:94
+#, python-brace-format
+msgid "Searching vulnerability database for {count} keyword(s) ..."
+msgstr ""
+
+#: autopwn_suite/searchvuln.py:99
+msgid "[white]Searching vulnerabilities ...[/white]"
+msgstr ""
+
+#: autopwn_suite/searchvuln.py:104
+#, python-brace-format
+msgid ""
+"[white]Searching vulnerability database for[/white] [red]{keyword}[/red] "
+"[white]...[/white]"
+msgstr ""
+
+#: autopwn_suite/searchvuln.py:115
+#, python-brace-format
+msgid "Possible vulnerabilities for {target}"
+msgstr ""
+
+#: autopwn_suite/searchvuln.py:118
+#, python-brace-format
+msgid "┌─ [yellow]{label}[/yellow]"
+msgstr ""
+
+#: autopwn_suite/searchvuln.py:126
+msgid "│\t\t[cyan]Description: [/cyan]"
+msgstr ""
+
+#: autopwn_suite/searchvuln.py:131
+#, python-brace-format
+msgid ""
+"│\t\t[cyan]Severity: [/cyan]{severity} - {severity_score}\n"
+"│\t\t[cyan]Exploitability: [/cyan] {exploitability}\n"
+"│\t\t[cyan]Details: [/cyan] {details_url}"
+msgstr ""
+
+#: autopwn_suite/update_checker.py:110
+#, python-brace-format
+msgid "Could not reach GitHub ({error_type})."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:112
+#, python-brace-format
+msgid "Nothing found at {url}."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:114
+msgid "GitHub API rate limit exceeded; try again later."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:116
+#, python-brace-format
+msgid "GitHub API returned HTTP {status}."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:120 autopwn_suite/update_checker.py:122
+msgid "GitHub API returned an unexpected response."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:177
+msgid ""
+"Commit-based update checks require a git checkout of AutoPWN Suite; use --"
+"update-channel release instead."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:203
+#, python-brace-format
+msgid ""
+"Update available ({mode}): {current} -> {latest}\n"
+"{url}"
+msgstr ""
+
+#: autopwn_suite/update_checker.py:206
+#, python-brace-format
+msgid "Up to date ({mode}): {current} (latest: {latest})."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:230
+#, python-brace-format
+msgid "git {command} could not run ({error_type})."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:237
+msgid ""
+"Working tree has uncommitted changes; commit or stash them before applying "
+"an update."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:253
+#, python-brace-format
+msgid "git fetch from {repo} failed (exit status {status})."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:261
+#, python-brace-format
+msgid ""
+"Cannot fast-forward to {onto}: the local branch has diverged. Resolve "
+"manually (e.g. git rebase, or git reset --hard after backing up changes)."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:272 autopwn_suite/update_checker.py:287
+msgid "Applying an update requires a git checkout of AutoPWN Suite."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:274
+msgid ""
+"HEAD is detached; checkout a branch before applying a commit-based update."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:292
+msgid "Latest release has no tag name."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:299
+#, python-brace-format
+msgid "git checkout {tag} failed (exit status {status})."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:315
+#, python-brace-format
+msgid ""
+"Updated ({mode}) {previous} -> {new} ({ref}). Restart AutoPWN Suite to use "
+"the updated code."
+msgstr ""
+
+#: autopwn_suite/utils.py:64
+msgid ""
+"AutoPWN Suite | A project for scanning vulnerabilities and exploiting "
+"systems automatically."
+msgstr ""
+
+#: autopwn_suite/utils.py:69
+msgid "Print version and exit."
+msgstr ""
+
+#: autopwn_suite/utils.py:74
+msgid "Don't ask for anything. (Full automatic mode)"
+msgstr ""
+
+#: autopwn_suite/utils.py:82
+msgid "Specify a config file to use. (Default : None)"
+msgstr ""
+
+#: autopwn_suite/utils.py:91
+msgid "Disable colors."
+msgstr ""
+
+#: autopwn_suite/utils.py:103
+msgid ""
+"Interface language. Setting this explicitly remembers it as the default for "
+"future runs. (Default: the AUTOPWN_LANG environment variable, your last "
+"explicit choice, the system locale, or English.)"
+msgstr ""
+
+#: autopwn_suite/utils.py:111
+msgid "Install the AutoPWN Suite daemon."
+msgstr ""
+
+#: autopwn_suite/utils.py:118
+msgid "Uninstall the AutoPWN Suite daemon."
+msgstr ""
+
+#: autopwn_suite/utils.py:125
+msgid "Create a config file."
+msgstr ""
+
+#: autopwn_suite/utils.py:130
+msgid "Scanning"
+msgstr ""
+
+#: autopwn_suite/utils.py:130
+msgid "Options for scanning"
+msgstr ""
+
+#: autopwn_suite/utils.py:132
+msgid ""
+"Use only the local vulnerability database; disable internet integrations."
+msgstr ""
+
+#: autopwn_suite/utils.py:135
+msgid "CVE lookup source (auto falls back to the local database on failure)."
+msgstr ""
+
+#: autopwn_suite/utils.py:137
+msgid "Path to a portable vulnerabilities.sqlite3 database."
+msgstr ""
+
+#: autopwn_suite/utils.py:138
+msgid "Vulnerability database"
+msgstr ""
+
+#: autopwn_suite/utils.py:140
+msgid ""
+"Download/update the complete NVD database, then exit. Requires internet."
+msgstr ""
+
+#: autopwn_suite/utils.py:142
+msgid "Show local vulnerability database status, then exit."
+msgstr ""
+
+#: autopwn_suite/utils.py:143
+msgid "Self-update"
+msgstr ""
+
+#: autopwn_suite/utils.py:143
+msgid "Check for or apply a newer AutoPWN Suite"
+msgstr ""
+
+#: autopwn_suite/utils.py:145
+msgid "Check GitHub for a newer AutoPWN Suite, then exit. Requires internet."
+msgstr ""
+
+#: autopwn_suite/utils.py:148
+msgid ""
+"Fast-forward this git checkout to the latest release/commit (see --update-"
+"channel), then exit. Requires internet, a git checkout and a clean working "
+"tree."
+msgstr ""
+
+#: autopwn_suite/utils.py:155
+msgid ""
+"Compare/update against the latest GitHub release tag or the latest commit on "
+"--update-branch. Setting this explicitly remembers it as the default for "
+"future runs. (Default: release, or your last explicit choice.)"
+msgstr ""
+
+#: autopwn_suite/utils.py:161
+msgid "Branch to compare against in commit mode. (Default: main)"
+msgstr ""
+
+#: autopwn_suite/utils.py:163
+#, python-brace-format
+msgid "GitHub repo to check for updates. (Default: {repo})"
+msgstr ""
+
+#: autopwn_suite/utils.py:170
+msgid ""
+"Target range to scan. This argument overwrites the hostfile argument. "
+"(192.168.0.1 or 192.168.0.0/24)"
+msgstr ""
+
+#: autopwn_suite/utils.py:180
+msgid "File containing a list of hosts to scan."
+msgstr ""
+
+#: autopwn_suite/utils.py:188
+msgid "Skips the host discovery phase."
+msgstr ""
+
+#: autopwn_suite/utils.py:196
+msgid "Scan type."
+msgstr ""
+
+#: autopwn_suite/utils.py:206
+msgid ""
+"Custom nmap flags to use for portscan. (Has to be specified like : -nf=\"-"
+"O\")"
+msgstr ""
+
+#: autopwn_suite/utils.py:216
+msgid "Scan speed. (Default : 3)"
+msgstr ""
+
+#: autopwn_suite/utils.py:225
+msgid "Timeout for every host. (Default :240)"
+msgstr ""
+
+#: autopwn_suite/utils.py:234
+msgid ""
+"Specify API key for vulnerability detection for faster scanning. (Default : "
+"None)"
+msgstr ""
+
+#: autopwn_suite/utils.py:244
+msgid "Scan mode."
+msgstr ""
+
+#: autopwn_suite/utils.py:253
+msgid "Noise mode timeout."
+msgstr ""
+
+#: autopwn_suite/utils.py:262
+msgid "Skip downloading exploits."
+msgstr ""
+
+#: autopwn_suite/utils.py:268
+msgid "Reporting"
+msgstr ""
+
+#: autopwn_suite/utils.py:268
+msgid "Options for reporting"
+msgstr ""
+
+#: autopwn_suite/utils.py:272
+msgid "Output file name. Overrides output-folder."
+msgstr ""
+
+#: autopwn_suite/utils.py:280
+msgid "Output file type. (Default : html)"
+msgstr ""
+
+#: autopwn_suite/utils.py:289
+msgid "Output file folder. (Default : outputs/)"
+msgstr ""
+
+#: autopwn_suite/utils.py:297
+msgid "Report sending method."
+msgstr ""
+
+#: autopwn_suite/utils.py:306
+msgid "Email address to use for sending report."
+msgstr ""
+
+#: autopwn_suite/utils.py:315
+msgid "Password of the email report is going to be sent from."
+msgstr ""
+
+#: autopwn_suite/utils.py:324
+msgid "Email address to send report to."
+msgstr ""
+
+#: autopwn_suite/utils.py:333
+msgid "Email to send from."
+msgstr ""
+
+#: autopwn_suite/utils.py:342
+msgid "Email server to use for sending report."
+msgstr ""
+
+#: autopwn_suite/utils.py:351
+msgid "Port of the email server."
+msgstr ""
+
+#: autopwn_suite/utils.py:360
+msgid "Webhook to use for sending report."
+msgstr ""
+
+#: autopwn_suite/utils.py:370
+msgid ""
+"Do not verify TLS certificates of scanned websites. Use only for targets you "
+"trust, such as lab systems with self-signed certificates. (Default: verify "
+"certificates)"
+msgstr ""
+
+#: autopwn_suite/utils.py:378
+msgid "Web UI"
+msgstr ""
+
+#: autopwn_suite/utils.py:378
+msgid "Browser-based dashboard for controlling scans"
+msgstr ""
+
+#: autopwn_suite/utils.py:380
+msgid ""
+"Reset the dashboard account to admin with a new random password, print it, "
+"then exit."
+msgstr ""
+
+#: autopwn_suite/utils.py:383
+msgid "Start the web UI dashboard (scans are launched from the browser)."
+msgstr ""
+
+#: autopwn_suite/utils.py:391
+msgid ""
+"Web UI bind address. Use 0.0.0.0 to listen on all interfaces; remote clients "
+"then require HTTPS. (Default: 127.0.0.1, env: AUTOPWN_WEB_HOST)"
+msgstr ""
+
+#: autopwn_suite/utils.py:401
+msgid "Web UI port. (Default: 8080, env: AUTOPWN_WEB_PORT)"
+msgstr ""
+
+#: autopwn_suite/utils.py:528
+msgid ""
+"No API key specified and no api.txt file found. Vulnerability detection is "
+"going to be slower! You can get your own NIST API key from https://nvd.nist."
+"gov/developers/request-an-api-key"
+msgstr ""
+
+#: autopwn_suite/utils.py:535
+msgid "Permission denied while trying to read api.txt!"
+msgstr ""
+
+#: autopwn_suite/utils.py:537
+#, python-brace-format
+msgid "Error reading api.txt: {error}"
+msgstr ""
+
+#: autopwn_suite/utils.py:551
+msgid ""
+"You need to be root in order to run arp scan.\n"
+"Changed scan mode to Ping Scan."
+msgstr ""
+
+#: autopwn_suite/utils.py:573
+msgid "Host file not found!"
+msgstr ""
+
+#: autopwn_suite/utils.py:575
+msgid "Permission denied while trying to read host file!"
+msgstr ""
+
+#: autopwn_suite/utils.py:577
+msgid "Unknown error while trying to read host file!"
+msgstr ""
+
+#: autopwn_suite/utils.py:580
+msgid "Host file contains no targets!"
+msgstr ""
+
+#: autopwn_suite/utils.py:593 autopwn_suite/utils.py:596
+msgid "Enter target range to scan : "
+msgstr ""
+
+#: autopwn_suite/utils.py:598
+msgid "Ctrl+C pressed. Exiting."
+msgstr ""
+
+#: autopwn_suite/utils.py:609
+msgid "Evasion mode enabled!"
+msgstr ""
+
+#: autopwn_suite/utils.py:614
+msgid "You must be root to use evasion mode! Switching back to normal mode ..."
+msgstr ""
+
+#: autopwn_suite/utils.py:620
+msgid "Noise mode enabled!"
+msgstr ""
+
+#: autopwn_suite/utils.py:634
+msgid "Enter your email address : "
+msgstr ""
+
+#: autopwn_suite/utils.py:639
+msgid "Enter your email password : "
+msgstr ""
+
+#: autopwn_suite/utils.py:644
+msgid "Enter the email address to send the report to : "
+msgstr ""
+
+#: autopwn_suite/utils.py:655
+msgid "Enter the email server to send the report from : "
+msgstr ""
+
+#: autopwn_suite/utils.py:659
+msgid "Google no longer supports sending mails via SMTP."
+msgstr ""
+
+#: autopwn_suite/utils.py:668
+msgid "Enter the email port to send the report from : "
+msgstr ""
+
+#: autopwn_suite/utils.py:674
+msgid "Invalid port number!"
+msgstr ""
+
+#: autopwn_suite/utils.py:692
+msgid "Enter your webhook URL : "
+msgstr ""
+
+#: autopwn_suite/utils.py:711
+msgid "Do you want to scan ports? [Y/n] : "
+msgstr ""
+
+#: autopwn_suite/utils.py:715
+msgid "Do you want to scan for vulnerabilities? [Y/n] : "
+msgstr ""
+
+#: autopwn_suite/utils.py:722
+msgid "Do you want to download exploits? [Y/n] : "
+msgstr ""
+
+#: autopwn_suite/utils.py:728
+msgid "Do you want to scan for web vulnerabilities? [Y/n] : "
+msgstr ""
+
+#: autopwn_suite/utils.py:739
+#, python-brace-format
+msgid "No hosts found! {time} - Scan completed."
+msgstr ""
+
+#: autopwn_suite/utils.py:761
+msgid ""
+"Enter the index number of the host you would like to enumurate further.\n"
+"Enter 'all' to enumurate all hosts.\n"
+"Enter 'exit' to exit "
+msgstr ""
+
+#: autopwn_suite/utils.py:768
+msgid "Please enter a valid host number or 'all' or 'exit'"
+msgstr ""
+
+#: autopwn_suite/utils.py:782
+#, python-brace-format
+msgid "{time} - Scan completed."
+msgstr ""
+
+#: autopwn_suite/utils.py:867
+msgid "speed must be between 0 and 5"
+msgstr ""
+
+#: autopwn_suite/utils.py:869
+#, python-brace-format
+msgid "{option} must not be negative"
+msgstr ""
+
+#: autopwn_suite/utils.py:871
+#, python-brace-format
+msgid "{option} must be between 1 and 65535"
+msgstr ""
+
+#: autopwn_suite/utils.py:880
+#, python-brace-format
+msgid "Invalid value for {section}.{option}"
+msgstr ""
+
+#: autopwn_suite/utils.py:886
+msgid "Config file not found!"
+msgstr ""
+
+#: autopwn_suite/utils.py:889
+msgid "Permission denied while trying to read config file!"
+msgstr ""
+
+#: autopwn_suite/utils.py:892
+#, python-brace-format
+msgid "Invalid config file: {error}"
+msgstr ""
+
+#: autopwn_suite/utils.py:948
+#, python-brace-format
+msgid ""
+"Cannot recognize the needed package manager for your system that seems to be "
+"running in: {distro} and {sys_platform}, {platform}, kindly select the "
+"correct package manager below to proceed to the installation, else, select, "
+"n.\n"
+"\t0 Abort installation\n"
+"\t1 apt-get\n"
+"\t2 dnf\n"
+"\t3 yum\n"
+"\t4 pacman\n"
+"\t5 zypper.\n"
+"Select option [0-5] >"
+msgstr ""
+
+#: autopwn_suite/utils.py:968 autopwn_suite/utils.py:971
+msgid "Couldn't install nmap (Linux)"
+msgstr ""
+
+#: autopwn_suite/utils.py:987
+msgid "Nmap is installed but shell restart is required."
+msgstr ""
+
+#: autopwn_suite/utils.py:990
+msgid "Couldn't install nmap! (Windows)"
+msgstr ""
+
+#: autopwn_suite/utils.py:999
+msgid "Couldn't install nmap! (Mac)"
+msgstr ""
+
+#: autopwn_suite/utils.py:1007
+msgid "Nmap is not installed."
+msgstr ""
+
+#: autopwn_suite/utils.py:1009
+msgid "Nmap must be installed before using offline mode."
+msgstr ""
+
+#: autopwn_suite/utils.py:1010
+#, python-brace-format
+msgid "Install Nmap on your system ({system})? [Y/n] : "
+msgstr ""
+
+#: autopwn_suite/utils.py:1019
+msgid "Unknown OS! Auto installation not supported!"
+msgstr ""
+
+#: autopwn_suite/utils.py:1021
+msgid "Denied permission to install Nmap."
+msgstr ""
+
+#: autopwn_suite/utils.py:1039
+msgid ""
+"It is recommended to run this script as root since it is more silent and "
+"accurate."
+msgstr ""
+
+#: autopwn_suite/utils.py:1046
+msgid "Output file"
+msgstr ""
+
+#: autopwn_suite/utils.py:1046
+msgid "Output folder"
+msgstr ""
+
+#: autopwn_suite/utils.py:1049
+msgid "Scanning with the following parameters"
+msgstr ""
+
+#: autopwn_suite/utils.py:1053
+#, python-brace-format
+msgid "│\tTarget : {target}\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1058
+#, python-brace-format
+msgid "│\tAPI Key : {has_key}\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1059
+#, python-brace-format
+msgid "│\tAutomatic : {automatic}\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1063
+msgid "│\tSkip discovery: True\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1066
+#, python-brace-format
+msgid "│\tHostfile: {host_file}\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1069
+#, python-brace-format
+msgid "│\tHost timeout: {host_timeout}\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1073 autopwn_suite/utils.py:1079
+#, python-brace-format
+msgid "│\tScan type : [red]{scan_type}[/red]\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1074 autopwn_suite/utils.py:1080
+#, python-brace-format
+msgid "│\tScan speed : {speed}\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1078 autopwn_suite/utils.py:1083
+#, python-brace-format
+msgid "│\tScan mode : {scan_mode}\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1086
+#, python-brace-format
+msgid "│\tNmap flags : [blue]{nmap_flags}[/blue]\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1089
+#, python-brace-format
+msgid "│\tReporting method : {report}\n"
+msgstr ""
+
+#: autopwn_suite/utils.py:1100
+msgid "Connection failed."
+msgstr ""
+
+#: autopwn_suite/utils.py:1141
+#, python-brace-format
+msgid "Report saved to [cyan]{path}[/cyan]"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:75
+msgid "Unsupported vulnerability database; download it again."
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:78
+msgid "Vulnerability database is incomplete; finish its download first."
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:81
+msgid "Vulnerability database has no usable CVEs."
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:83
+msgid "Vulnerability database has invalid metadata."
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:101
+msgid ""
+"Local vulnerability database is unreadable or incomplete. Download it again."
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:132
+msgid ""
+"Offline vulnerability database unavailable. Download it while connected, or "
+"copy vulnerabilities.sqlite3 from a connected system."
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:165
+msgid "Local vulnerability lookup failed; database coverage is incomplete."
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:197
+msgid "Invalid NVD JSON feed"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:213
+msgid "Truncated or invalid NVD JSON feed"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:226
+msgid "Invalid NVD feed field"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:230
+msgid "Duplicate NVD vulnerabilities array"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:240 autopwn_suite/vulnerability_db.py:250
+msgid "Invalid trailing comma"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:253
+msgid "Incomplete NVD feed"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:259
+msgid "NVD feed metadata has no valid checksum"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:262
+msgid "NVD feed metadata has an invalid size"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:301
+msgid "NVD feed exceeds its advertised size"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:305
+msgid "NVD feed checksum or size mismatch"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:333
+msgid "A vulnerability database update is already running."
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:363
+#, python-brace-format
+msgid "Checking NVD {year}"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:379
+#, python-brace-format
+msgid "Downloading and indexing NVD {year}"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:387
+msgid "NVD feed contains an invalid CVE ID"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:397
+msgid "NVD mirror contains no CVEs"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:408
+#, python-brace-format
+msgid ""
+"Vulnerability database ready, without NVD {unpublished}, which is not "
+"published yet"
+msgstr ""
+
+#: autopwn_suite/vulnerability_db.py:409
+msgid "Vulnerability database ready"
+msgstr ""
+
+#: autopwn_suite/web/additional.py:95
+#, python-brace-format
+msgid "Additional web checks used {used}/{total} HTTP probes."
+msgstr ""
+
+#: autopwn_suite/web/boolean_sqli.py:63
+#, python-brace-format
+msgid "Boolean SQLi skipped: unstable or error baseline on {url}."
+msgstr ""
+
+#: autopwn_suite/web/crawler.py:81
+#, python-brace-format
+msgid "Crawling web application at {url} ..."
+msgstr ""
+
+#: autopwn_suite/web/crawler.py:151
+#, python-brace-format
+msgid "Unable to crawl {url}: HTTP {status}; coverage is incomplete."
+msgstr ""
+
+#: autopwn_suite/web/http.py:35
+msgid ""
+"A web request failed certificate verification; coverage is incomplete. Use --"
+"insecure-tls (or the dashboard's \"Accept untrusted certificates\" control) "
+"only for targets you trust, such as lab systems with self-signed "
+"certificates."
+msgstr ""
+
+#: autopwn_suite/web/http.py:41
+msgid "A web request failed; coverage is incomplete."
+msgstr ""
+
+#: autopwn_suite/web/runtime.py:240
+msgid "Request budget reached; coverage is limited."
+msgstr ""
+
+#: autopwn_suite/web/webvuln.py:79
+msgid "Invalid target for web vulnerability checks."
+msgstr ""
+
+#: autopwn_suite/web/webvuln.py:101
+#, python-brace-format
+msgid ""
+"{target} presented a certificate that could not be verified, so web checks "
+"were skipped. Re-run with --insecure-tls only if you trust this target (for "
+"example a lab system with a self-signed certificate)."
+msgstr ""
+
+#: autopwn_suite/web/webvuln.py:154
+#, python-brace-format
+msgid "Found {count} testable urls."
+msgstr ""
+
+#: autopwn_suite/web/webvuln.py:180
+#, python-brace-format
+msgid ""
+"Web checks completed: {count} findings (candidates, advisories and "
+"observations)."
+msgstr ""
+
+#: autopwn_suite/web/webvuln.py:211
+msgid "Web checks failed; coverage is incomplete."
+msgstr ""
+
+#: autopwn_suite/web_ui.py:954
+msgid "CVE"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:955
+msgid "CVSS"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:956
+msgid "Command:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:957
+msgid "Description"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:958
+msgid "Error:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:959
+msgid "Finished:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:960
+#, python-brace-format
+msgid "Host: {ip}"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:961
+#, python-brace-format
+msgid "Hosts Discovered ({count})"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:962
+msgid "MAC:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:963
+msgid "No hosts were found during this scan."
+msgstr ""
+
+#: autopwn_suite/web_ui.py:964
+msgid "No open ports found."
+msgstr ""
+
+#: autopwn_suite/web_ui.py:965
+msgid "OS:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:966
+msgid "Open Ports"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:969
+msgid "Scan ID:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:970
+msgid "Scan Report"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:972
+msgid "Severity"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:973
+msgid "Started:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:974
+msgid "Status:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:975
+msgid "Target:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:976
+msgid "Vendor:"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:978
+msgid "Vulnerabilities"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:979
+#, python-brace-format
+msgid "[*] Email notification failed: {error}"
+msgstr ""
+
+#: autopwn_suite/web_ui.py:980
+#, python-brace-format
+msgid "[*] Webhook delivery failed: {error}"
+msgstr ""

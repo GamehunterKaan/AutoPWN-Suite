@@ -3,11 +3,14 @@
 """
 Unit tests for the searchvuln module.
 """
+import io
 from unittest.mock import MagicMock, patch
 
 import pytest
+from rich.console import Console
 
-from modules.searchvuln import (
+from autopwn_suite.nist_search import Vulnerability
+from autopwn_suite.searchvuln import (
     GenerateKeyword,
     GenerateKeywords,
     SearchKeyword,
@@ -58,7 +61,7 @@ class TestSearchSploitsFunctions:
 
         assert sorted(keywords) == sorted(expected_keywords)
 
-    @patch("modules.searchvuln.CheckConnection", return_value=False)
+    @patch("autopwn_suite.searchvuln.CheckConnection", return_value=False)
     def test_searchsploits_no_connection(self, mock_check_connection):
         """Verify SearchSploits exits if there is no internet connection."""
         # Provide a non-empty HostArray to prevent an IndexError before the check.
@@ -67,8 +70,8 @@ class TestSearchSploitsFunctions:
         assert result == []
         mock_check_connection.assert_called_once()
 
-    @patch("modules.searchvuln.CheckConnection", return_value=True)
-    @patch("modules.searchvuln.GenerateKeywords", return_value=[])
+    @patch("autopwn_suite.searchvuln.CheckConnection", return_value=True)
+    @patch("autopwn_suite.searchvuln.GenerateKeywords", return_value=[])
     def test_searchsploits_no_keywords(self, mock_gen_keywords, mock_check_connection):
         """Verify SearchSploits logs a warning if no keywords are generated."""
         mock_log = MagicMock()
@@ -79,8 +82,8 @@ class TestSearchSploitsFunctions:
         assert result == []
         mock_log.logger.assert_called_with("warning", "Insufficient information for 192.168.1.1")
 
-    @patch("modules.searchvuln.CheckConnection", return_value=True)
-    @patch("modules.searchvuln.SearchKeyword")
+    @patch("autopwn_suite.searchvuln.CheckConnection", return_value=True)
+    @patch("autopwn_suite.searchvuln.SearchKeyword")
     def test_searchsploits_success_path(self, mock_search_keyword, mock_check_connection):
         """Verify the success path of searching for and printing vulnerabilities."""
         mock_console = MagicMock()
@@ -111,7 +114,7 @@ class TestSearchSploitsFunctions:
 class TestSearchKeyword:
     """Tests for the SearchKeyword function."""
 
-    @patch("modules.searchvuln.searchCVE")
+    @patch("autopwn_suite.searchvuln.searchCVE")
     def test_search_keyword_success(self, mock_search_cve):
         """Verify it returns the result from searchCVE on success."""
         mock_log = MagicMock()
@@ -123,7 +126,7 @@ class TestSearchKeyword:
         assert result == [mock_vulnerability]
         mock_search_cve.assert_called_once_with("test keyword", mock_log, None, strict=True)
 
-    @patch("modules.searchvuln.searchCVE", side_effect=KeyboardInterrupt)
+    @patch("autopwn_suite.searchvuln.searchCVE", side_effect=KeyboardInterrupt)
     def test_search_keyword_keyboard_interrupt(self, mock_search_cve):
         """Verify it handles KeyboardInterrupt gracefully."""
         mock_log = MagicMock()
@@ -134,7 +137,7 @@ class TestSearchKeyword:
         assert result == []
         mock_log.logger.assert_called_once_with("warning", f"Skipped vulnerability detection for {keyword}")
 
-    @patch("modules.searchvuln.searchCVE")
+    @patch("autopwn_suite.searchvuln.searchCVE")
     def test_search_keyword_generic_exception(self, mock_search_cve):
         """Verify it handles generic exceptions gracefully."""
         mock_log = MagicMock()
@@ -145,3 +148,25 @@ class TestSearchKeyword:
 
         assert result == []
         mock_log.logger.assert_called_once_with("error", test_exception)
+
+
+@pytest.mark.unit
+def test_hostile_banner_and_cve_text_is_printed_literally_instead_of_aborting():
+    """Markup-looking text from a banner or an NVD record must not raise MarkupError."""
+    console = Console(file=io.StringIO(), width=200, color_system=None)
+    status_console = Console(file=io.StringIO(), width=200, color_system=None)
+    vuln = Vulnerability("keyword", "CVE-2024-0001[/id]", "Remote flaw [/admin] in the parser", "[/severity]", 9.8,
+                         "https://nvd.test/[/details]", "[/exploitability]")
+    host_array = [["192.0.2.1", 21, "ftp", "vsftpd", "2.3.4[/bold]"]]
+
+    with patch("autopwn_suite.searchvuln.CheckConnection", return_value=True), \
+         patch("autopwn_suite.searchvuln.SearchKeyword", return_value=[vuln]), \
+         patch("autopwn_suite.searchvuln.get_terminal_width", return_value=100):
+        result = SearchSploits(host_array, MagicMock(), console, status_console)
+
+    output = console.file.getvalue()
+    for text in ("vsftpd 2.3.4[/bold]", "CVE-2024-0001[/id]", "Remote flaw [/admin] in the parser",
+                 "[/severity]", "https://nvd.test/[/details]", "[/exploitability]"):
+        assert text in output
+    assert result[0].title == "vsftpd 2.3.4[/bold]"
+    assert result[0].CVEs == ["CVE-2024-0001[/id]"]

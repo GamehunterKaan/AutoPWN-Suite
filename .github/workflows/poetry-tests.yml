@@ -44,20 +44,20 @@ jobs:
     - name: Check coding standards, JavaScript syntax and locked container inputs
       run: |
         poetry run ruff check .
-        node --check modules/web_ui_static/app.js
-        node --check modules/web_ui_static/web_security.js
-        node --check modules/web_ui_static/auth.js
-        node --check modules/web_ui_static/login.js
-        npx --yes eslint@10.12.0 --config eslint.config.mjs modules/web_ui_static
+        node --check autopwn_suite/web_ui_static/app.js
+        node --check autopwn_suite/web_ui_static/web_security.js
+        node --check autopwn_suite/web_ui_static/auth.js
+        node --check autopwn_suite/web_ui_static/login.js
+        npx --yes eslint@10.12.0 --config eslint.config.mjs autopwn_suite/web_ui_static
         poetry run python scripts/export_locked_requirements.py --check
+
+    - name: Install system Nmap and gettext
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y nmap gettext
 
     - name: Check translation catalogs are up to date
       run: poetry run python scripts/i18n_messages.py check --lang tr
 
-    - name: Install system Nmap for loopback integration tests
-      run: |
-        sudo apt-get update
-        sudo apt-get install --no-install-recommends -y nmap
-
     - name: Run tests
-      run: poetry run test
+      run: poetry run pytest

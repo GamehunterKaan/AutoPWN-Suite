@@ -20,13 +20,12 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LOCALES = ROOT / "modules" / "locales"
+LOCALES = ROOT / "autopwn_suite" / "locales"
 POT_FILE = LOCALES / "autopwn.pot"
 
 
 def _sources() -> list[str]:
-    paths = [ROOT / "autopwn.py", ROOT / "api.py"]
-    paths += sorted((ROOT / "modules").rglob("*.py"))
+    paths = sorted((ROOT / "autopwn_suite").rglob("*.py"))
     return [str(p.relative_to(ROOT)) for p in paths if "__pycache__" not in str(p)]
 
 
@@ -38,6 +37,7 @@ def extract() -> None:
             "--language=Python",
             "--from-code=UTF-8",
             "--keyword=_",
+            "--keyword=N_",
             "--keyword=ngettext:1,2",
             "--package-name=AutoPWN Suite",
             "--copyright-holder=Kaan Gültekin",

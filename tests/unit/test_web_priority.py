@@ -7,9 +7,9 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from modules.web.options import CHECKS
-from modules.web.planning import prioritize_urls, skip_discovered_url
-from modules.web.webvuln import webvuln
+from autopwn_suite.web.options import CHECKS
+from autopwn_suite.web.planning import prioritize_urls, skip_discovered_url
+from autopwn_suite.web.webvuln import webvuln
 
 
 def test_file_inputs_and_diverse_endpoint_shapes_precede_query_variations():
@@ -22,8 +22,8 @@ def test_file_inputs_and_diverse_endpoint_shapes_precede_query_variations():
 
 
 def test_file_input_is_not_lost_behind_low_priority_parameters():
-    from modules.web.query import parameter_indexes
-    from modules.web.runtime import ScanContext
+    from autopwn_suite.web.query import parameter_indexes
+    from autopwn_suite.web.runtime import ScanContext
     params = ["sort=name", "limit=10", "offset=0", "view=list", "lang=en", "file=readme.txt"]
     context = ScanContext("http://example.test/", MagicMock(), controls={"max_parameters": 1})
     with context.activate():
@@ -72,9 +72,9 @@ def test_root_scan_finds_lfi_before_crawl_exhausts_request_budget(web_response):
 
     controls = {"request_budget": 20, "max_pages": 100, "max_urls": 1000,
                 "checks": {name: name == "lfi" for name in CHECKS}}
-    with patch("modules.web.webvuln.get", side_effect=respond), \
-         patch("modules.web.crawler.get", side_effect=respond), \
-         patch("modules.web.lfi.get", side_effect=respond):
+    with patch("autopwn_suite.web.webvuln.get", side_effect=respond), \
+         patch("autopwn_suite.web.crawler.get", side_effect=respond), \
+         patch("autopwn_suite.web.lfi.get", side_effect=respond):
         findings = webvuln(root, MagicMock(), MagicMock(), controls=controls,
                            on_finding=lambda result: found_at.append(len(requested)), on_complete=summary.update)
     assert findings and findings[0]["type"] == "LFI"
@@ -89,15 +89,15 @@ def test_root_scan_finds_lfi_before_crawl_exhausts_request_budget(web_response):
 def test_high_impact_classes_finish_before_secondary_checks(web_response):
     events = []
     url = "http://example.test/app?page=home.php"
-    with patch("modules.web.webvuln.get", return_value=web_response(url=url)), \
-         patch("modules.web.webvuln.crawl", return_value={url}), \
-         patch("modules.web.webvuln.LFIScanner") as lfi, \
-         patch("modules.web.webvuln.SQLIScanner") as sql, \
-         patch("modules.web.webvuln.XSSScanner") as xss, \
-         patch("modules.web.webvuln.critical_checks", side_effect=lambda *a: events.append("boolean") or []), \
-         patch("modules.web.webvuln.dirbust", side_effect=lambda *a: events.append("directories") or []), \
-         patch("modules.web.webvuln.additional_checks", side_effect=lambda *a, **k: events.append("advisories") or []), \
-         patch("modules.web.webvuln.inspect_response", return_value=[]):
+    with patch("autopwn_suite.web.webvuln.get", return_value=web_response(url=url)), \
+         patch("autopwn_suite.web.webvuln.crawl", return_value={url}), \
+         patch("autopwn_suite.web.webvuln.LFIScanner") as lfi, \
+         patch("autopwn_suite.web.webvuln.SQLIScanner") as sql, \
+         patch("autopwn_suite.web.webvuln.XSSScanner") as xss, \
+         patch("autopwn_suite.web.webvuln.critical_checks", side_effect=lambda *a: events.append("boolean") or []), \
+         patch("autopwn_suite.web.webvuln.dirbust", side_effect=lambda *a: events.append("directories") or []), \
+         patch("autopwn_suite.web.webvuln.additional_checks", side_effect=lambda *a, **k: events.append("advisories") or []), \
+         patch("autopwn_suite.web.webvuln.inspect_response", return_value=[]):
         lfi.return_value.test_lfi.side_effect = lambda *a: events.append("lfi") or []
         sql.return_value.test_sqli.side_effect = lambda *a: events.append("sqli") or []
         xss.return_value.test_xss.side_effect = lambda *a: events.append("xss") or []

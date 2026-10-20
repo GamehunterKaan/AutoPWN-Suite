@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from requests.exceptions import ConnectionError
 
-from modules.web.xss import XSSScanner
+from autopwn_suite.web.xss import XSSScanner
 
 
 @pytest.mark.unit
@@ -19,7 +19,7 @@ def test_active_reflection_is_candidate(web_response, context):
         value = parse_qs(urlsplit(url).query)["q"][0]
         return web_response(context.format(value), url=url, headers={"Content-Type": "text/html"})
 
-    with patch("modules.web.xss.get", side_effect=respond):
+    with patch("autopwn_suite.web.xss.get", side_effect=respond):
         found = scanner.test_xss("http://example.com/search?q=hello")
     assert len(found) == 1
     assert found[0]["confidence"] == "candidate"
@@ -41,7 +41,7 @@ def test_raw_reflection_in_inactive_context_is_not_xss(web_response, context, mi
         value = parse_qs(urlsplit(url).query)["q"][0]
         return web_response(context.format(value), url=url, headers={"Content-Type": mime})
 
-    with patch("modules.web.xss.get", side_effect=respond):
+    with patch("autopwn_suite.web.xss.get", side_effect=respond):
         assert scanner.test_xss("http://example.com/search?q=hello") == []
     scanner.console.print.assert_not_called()
 
@@ -49,7 +49,7 @@ def test_raw_reflection_in_inactive_context_is_not_xss(web_response, context, mi
 @pytest.mark.unit
 def test_html_escaped_reflection_is_not_xss(web_response):
     scanner = XSSScanner(MagicMock(), MagicMock())
-    with patch("modules.web.xss.get", side_effect=lambda url, **kwargs: web_response(html.escape(parse_qs(urlsplit(url).query)["q"][0]))):
+    with patch("autopwn_suite.web.xss.get", side_effect=lambda url, **kwargs: web_response(html.escape(parse_qs(urlsplit(url).query)["q"][0]))):
         assert scanner.test_xss("http://example.com/search?q=hello") == []
 
 
@@ -64,7 +64,7 @@ def test_second_payload_and_query_context_are_preserved(web_response):
         value = params["q"][0]
         return web_response(value if value.startswith("<img") else "safe", url=url)
 
-    with patch("modules.web.xss.get", side_effect=respond) as get:
+    with patch("autopwn_suite.web.xss.get", side_effect=respond) as get:
         found = scanner.test_xss("http://example.com/search?q=original&token=a%26b#fragment")
     assert len(found) == 1
     assert "HTML event handler" in found[0]["evidence"]
@@ -74,7 +74,7 @@ def test_second_payload_and_query_context_are_preserved(web_response):
 @pytest.mark.unit
 def test_connection_error_and_no_query():
     scanner = XSSScanner(MagicMock(), MagicMock())
-    with patch("modules.web.xss.get", side_effect=ConnectionError) as get:
+    with patch("autopwn_suite.web.xss.get", side_effect=ConnectionError) as get:
         assert scanner.test_xss("http://example.com/page") == []
         get.assert_not_called()
         assert scanner.test_xss("http://example.com/page?q=test") == []
