@@ -6,7 +6,7 @@ from typing import Any
 # imported on its own (a library user, a fuzz harness) and never reaches the CLI.
 from autopwn_suite import i18n  # noqa: F401
 
-__version__ = "2.7.0"
+__version__ = "2.8.0"
 
 
 def __getattr__(name: str) -> Any:

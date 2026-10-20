@@ -5,7 +5,7 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
-## [Unreleased]
+## [2.8.0] - 2026-10-21
 
 ### Functional changes
 
@@ -35,6 +35,16 @@ existing release summaries; they do not retroactively claim artifact signing.
   (or `--vuln-source offline`). An explicit `--update-channel` is remembered in `update_channel.txt`
   in the data directory. The repository must be written `OWNER/REPO` and the branch must be a plain git
   branch name.
+- The dashboard's Vulnerabilities tab sorts CVEs into categories: remote code execution, privilege escalation,
+  injection, cross-site scripting, authentication / access control bypass, information disclosure, denial of
+  service, memory corruption and other. A strip of chips above the table counts them ("All (13)", "Denial of
+  service (4)" and so on) and filters the table to one category; a Category column and the PDF export show them,
+  and a polite live region tells a screen reader what pressing a chip did to the table.
+  A CVE can have several categories, so the counts can add up to more than the total. The category comes from the
+  CWE of the NVD record (online or from the local database) and, when no CWE maps, from phrases in the description;
+  the rules are in `autopwn_suite/data/vulnerability_categories.json`. New findings carry a `categories` list;
+  scans saved earlier have none and appear only under "All". The command line, the saved reports and the Python
+  library are unchanged.
 - The release workflows `publish-docker.yml` and `backfill-release-signatures.yml` now retry the image
   `cosign verify` for about two minutes before failing. Docker Hub can list a just-pushed signature late, and
   cosign v3 then reports "no signatures found" (this failed the `sign` job of the v2.7.0 release run once; re-running
@@ -44,6 +54,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   integration stays in `.clusterfuzzlite/`, which ClusterFuzzLite requires at the repository root. The
   `cflite_pr.yml` path filter and `.clusterfuzzlite/build.sh` follow the move, and the harnesses stay out of the
   product image through `.dockerignore`.
+- The ClusterFuzzLite build (`.clusterfuzzlite/build.sh`) no longer runs `pip3 install --no-deps .`: it installs only
+  the hash-pinned `requirements-locked.txt`, and the fuzzers use the package from the checkout on the import path,
+  as the container image does. The fuzzers cover the same code.
+- Update the locked `certifi` from 2025.6.15 to 2026.10.19 (`poetry.lock` and the `requirements-locked.txt` that is
+  exported from it), which the container image and the standalone binaries carry. See the security notes.
 
 ### Security changes
 
@@ -69,6 +84,18 @@ existing release summaries; they do not retroactively claim artifact signing.
   The language comes from an allowlist (`--lang` choices, `AUTOPWN_LANG`, the dashboard
   `language` setting), the `X-App-Language` header is not acted on, and the sanitizers for
   scanned text and credentials wrap the values inside translated messages.
+- Vulnerability categories add no network access, dependency or setting. The CWE IDs and the description come from
+  the NVD or from a copied database, so they are untrusted: a CWE ID must match `CWE-` and up to five digits, the
+  description is only searched for fixed phrases (no regular expression), and the page ignores any category ID that
+  is not in its fixed list.
+- Every install in the fuzz build now comes from a hash-pinned file (no pip install of an unhashed directory),
+  which clears the OpenSSF Scorecard "Pinned-Dependencies" finding for `.clusterfuzzlite/build.sh`. No security
+  impact otherwise.
+- `certifi` 2026.10.19 fixes GHSA-6q48-6c7w-9gw2: earlier versions bundle emSign root CAs whose intermediate CA keys
+  are compromised, and `certifi` is the CA bundle that `requests` uses to verify HTTPS certificates (the NVD and
+  GitHub lookups, notification webhooks and the certificate check of web scans). The lock files, the container image
+  and the standalone binaries of this release carry the fixed version. A `pip` or `pipx` install resolves its own
+  `certifi`: upgrade it (`pip install --upgrade certifi`) if your environment kept an older one.
 - Release signing: no security impact. The image signature is still verified against the same identity, issuer and
   digest, and a verification that never succeeds still fails the step. The retry adds no permission, secret or
   network destination.

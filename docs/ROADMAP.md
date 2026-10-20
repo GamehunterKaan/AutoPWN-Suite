@@ -19,7 +19,9 @@ below before starting large work.
 
 ## Where the project is today
 
-- **v2.7.0** (2026-10-19) is the supported stable release ([support policy](../SUPPORT.md)).
+- **v2.8.0** (2026-10-21) is the supported stable release ([support policy](../SUPPORT.md)).
+- v2.7.0 (2026-10-19) added the PyPI package and the standalone binaries; v2.8.0 adds Turkish
+  localization, `--check-update` and `--apply-update`, and vulnerability categories in the dashboard.
 - v2.6.1 (2026-10-16) shipped fixes for AUTOPWN-SA-2026-002 through 005, a
   required dashboard login, signed-release tooling and expanded documentation.
   v2.6.0 and earlier do not have these changes.

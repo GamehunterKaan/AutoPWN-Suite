@@ -1241,3 +1241,66 @@ routes['/api/settings']=500;
 await assert.rejects(loadSettingsIntoForm());
 assert.equal(nodes.get('s-webhook-url').value,'typed by the operator');
 """)
+
+
+def test_vulnerability_tab_counts_categories_and_filters_by_one():
+    run_js(r"""
+const sel=id=>document.getElementById(id);
+const row=(cve,severity,cvss,categories)=>({cve,severity,cvss,description:'Some flaw',keyword:'kw',port:80,categories});
+hosts={'192.0.2.1':{ip:'192.0.2.1',scan_id:'s1',vulns:[
+  row('CVE-1','critical',9.8,['rce','memory_corruption']),
+  row('CVE-2','high',7.5,['dos']),
+  row('CVE-3','medium',5,['dos','info_disclosure']),
+  row('CVE-4','low',3,undefined),                      // saved before categories existed: only under All
+  row('CVE-5','high',8,['<img src=x>','nope','xss'])]}};  // anything but the fixed words is ignored
+const bar=sel('vuln-cats'), table=sel('vtb');
+const chips=()=>[...bar.innerHTML.matchAll(/data-cat="([^"]*)" aria-pressed="(\w+)">([^<]*)</g)]
+  .map(m=>`${m[1]}|${m[2]==='true'?'*':''}${m[3]}`).join(';');
+const shown=()=>(table.innerHTML.match(/CVE-\d/g)||[]).join(',');
+renderVulnTable();
+assert.equal(bar.hidden,false);
+assert.equal(chips(),'|*All (5);rce|Remote code execution (1);xss|Cross-site scripting (1);info_disclosure|Information disclosure (1);'
+  +'dos|Denial of service (2);memory_corruption|Memory corruption (1)');
+assert.match(bar.innerHTML,/more than one category/);
+assert.doesNotMatch(bar.innerHTML+table.innerHTML,/<img|nope/);
+assert.equal(shown(),'CVE-1,CVE-5,CVE-2,CVE-3,CVE-4');
+
+const focused=[];
+document.querySelector=selector=>({focus(){focused.push(selector)}});
+const click=cat=>pickVulnCategory({target:{closest:()=>({dataset:{cat}})}});
+click('dos');                                           // one category at a time
+assert.equal(shown(),'CVE-2,CVE-3');
+assert.equal(sel('vuln-cat-status').textContent,'Denial of service: showing 2 of 5 vulnerabilities');   // announced politely
+assert.match(chips(),/dos\|\*Denial of service \(2\)/);
+assert.deepEqual(focused,['#vuln-cats [data-cat="dos"]']);   // the clicked chip keeps the keyboard focus
+assert.match(table.innerHTML,/<span class="cat">Denial of service<\/span>/);
+
+sel('vuln-sev').value='high';                            // the counts follow the other filters
+renderVulnTable();
+assert.equal(chips(),'|All (2);xss|Cross-site scripting (1);dos|*Denial of service (1)');
+assert.equal(shown(),'CVE-2');
+sel('vuln-sev').value='critical';                        // a category without rows ends its filter
+renderVulnTable();
+assert.equal(chips(),'|*All (1);rce|Remote code execution (1);memory_corruption|Memory corruption (1)');
+assert.equal(shown(),'CVE-1');
+sel('vuln-sev').value='';
+click('xss'); click('xss');                              // the same chip again clears it
+assert.equal(shown(),'CVE-1,CVE-5,CVE-2,CVE-3,CVE-4');
+assert.equal(sel('vuln-cat-status').textContent,'Showing all 5 vulnerabilities');
+click('rce'); click('');                                 // and so does All
+assert.equal(shown().split(',').length,5);
+
+click('dos');
+let report='';
+window.open=()=>({document:{write(html){report=html},close(){}},print(){}});
+printAllVulns();
+assert.match(report,/<th>Category<\/th>/);
+assert.match(report,/Category: Denial of service/);
+assert.match(report,/Vulnerability categories:<\/strong> Information disclosure: 1 &nbsp;\|&nbsp; Denial of service: 2/);
+assert.equal((report.match(/<td style="white-space:nowrap;">CVE-/g)||[]).length,2);
+
+hosts={};
+renderVulnTable();
+assert.equal(bar.hidden,true);
+assert.equal(bar.innerHTML,'');
+""")

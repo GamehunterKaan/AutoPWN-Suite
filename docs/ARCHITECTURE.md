@@ -60,6 +60,10 @@ flowchart LR
 3. `autopwn_suite/nist_search.py` and `autopwn_suite/searchvuln.py` map service/version
    observations to candidate CVEs. `autopwn_suite/vulnerability_db.py` reads a local
    mirror or explicitly updates it using validated official annual feeds.
+   `autopwn_suite/vulnerability_categories.py` sorts each CVE into fixed categories (remote
+   code execution, denial of service, information disclosure and the like) from the CWE IDs of its
+   NVD record, or from phrases in its description when no CWE maps; the dashboard's Vulnerabilities
+   tab counts and filters by them. The rules are `autopwn_suite/data/vulnerability_categories.json`.
 4. `autopwn_suite/web/` discovers same-origin URLs and GET forms, applies bounded
    checks, compares evidence, redacts sensitive fields and produces findings.
    Detection is not proof of full exploitation. `poc.py` generates text/downloads;

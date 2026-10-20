@@ -33,6 +33,7 @@ from autopwn_suite import i18n, update_checker
 from autopwn_suite.logger import markup_safe
 from autopwn_suite.nmap_backend import parse_nmap_xml
 from autopwn_suite.utils import _port, _report_name
+from autopwn_suite.vulnerability_categories import CATEGORIES, categorize, find_weaknesses
 from autopwn_suite.vulnerability_db import SCHEMA_VERSION, DatabaseUnavailable, OfflineDatabase
 from autopwn_suite.web.options import normalize_options
 from autopwn_suite.web_auth import ACCOUNT_FILE, password_matches, validate_account
@@ -836,3 +837,24 @@ def test_language_selection_only_yields_a_supported_language_and_leaves_the_save
         else:
             assert (language_file.read_bytes() if language_file.exists() else None) == before
         assert i18n.resolve_language(None) in i18n.SUPPORTED_LANGUAGES
+
+
+def test_vulnerability_categories_only_return_the_fixed_ids_for_any_record_or_description():
+    rng = random.Random(SEED + 61)
+    descriptions = ["Allows remote attackers to execute arbitrary code or cause a denial of service (crash).",
+                    "Cross-site scripting (XSS) via the name parameter", "Heap-based buffer overflow", ""]
+    cwes = ["CWE-79", "CWE-787", "CWE-20", "NVD-CWE-Other", "CWE-1", "CWE-99999"]
+    for _ in range(4000):
+        entry = rng.choice([random_value(rng), {"value": random_value(rng)}, {"value": mutate(rng.choice(cwes), rng)},
+                            {"value": rng.choice(cwes)}])
+        weaknesses = rng.choice([random_value(rng), [random_value(rng)], [{"description": [entry, entry]}],
+                                 [{"description": [{"value": rng.choice(cwes)} for _ in range(rng.randint(0, 80))]}]])
+        record = rng.choice([{"cve": {"weaknesses": weaknesses}}, {"cve": random_value(rng)}, random_value(rng)])
+        found = find_weaknesses(record)
+        assert type(found) is tuple and len(found) <= 32 and len(set(found)) == len(found)
+        assert all(re.fullmatch(r"CWE-[0-9]{1,5}", value) for value in found)
+        description = rng.choice([random_value(rng), mutate(rng.choice(descriptions), rng), rng.choice(descriptions)])
+        result = categorize(found, description)
+        assert result and set(result) <= set(CATEGORIES)
+        assert list(result) == sorted(set(result), key=CATEGORIES.index)
+        assert "other" not in result or result == ("other",)

@@ -1559,6 +1559,7 @@ def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, look
             findings.append({"cve": cve.CVEID, "description": cve.description,
                              "severity": severity, "cvss": cve.severity_score or 0,
                              "keyword": keyword, "port": port["port"], "protocol": port["protocol"],
+                             "categories": list(cve.categories),
                              "data_source": cve.data_source, "database_updated_at": cve.database_updated_at})
             _log(job, f"    └─ {cve.CVEID} [{severity.upper()}] CVSS:{cve.severity_score}", "warning")
         with job._lock:
