@@ -42,7 +42,7 @@ Retain copyright/license notices, including MPL file-level obligations.
 
 Fuzzing: the normal suite runs seeded mutation fuzz tests of the parsers, validators and login
 endpoints (`tests/unit/test_fuzz_inputs.py`). In addition, ClusterFuzzLite builds the Atheris harnesses
-in `fuzz/` (Nmap XML parser, dashboard option schema, account validation) and fuzzes the code a pull
+in `fuzz/` (Nmap XML parser, dashboard option schema, account validation, update checker input) and fuzzes the code a pull
 request changes for a few minutes (`.github/workflows/cflite_pr.yml`, `.clusterfuzzlite/`). A crash or an
 undocumented exception fails that job. Seed inputs live in `fuzz/seeds/`; harness behavior is also
 checked in the normal suite (`tests/unit/test_fuzz_harnesses.py`).

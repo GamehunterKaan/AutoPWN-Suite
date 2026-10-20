@@ -88,6 +88,19 @@ def test_the_options_seed_passes_the_schema(harness):
     assert normalize_options(json.loads((ROOT / "fuzz/seeds/fuzz_web_options/valid.json").read_text(encoding="utf-8")))["verify_tls"] is True
 
 
+def test_the_update_harness_drives_each_check_with_real_input(harness):
+    module = harness(ROOT / "fuzz" / "fuzz_update_checker.py")
+    # The first byte picks the check: 0 repository, 1 branch or tag name, 2 GitHub's release response.
+    module.TestOneInput(b"\x00GamehunterKaan/AutoPWN-Suite")
+    module.TestOneInput(b"\x00../etc")  # refused through the documented error
+    module.TestOneInput(b"\x01release/2.7")
+    module.TestOneInput(b"\x01--upload-pack=x")
+    module.TestOneInput(b'\x02{"tag_name": "v9.9.9", "html_url": "https://example.test/r"}')
+    module.TestOneInput(b'\x02["not", "an", "object"]')
+    module.TestOneInput(b'\x02{"tag_name": 7}')
+    module.TestOneInput(b'\x02{"tag_name": "' + b"9" * 5000 + b'"}')  # int() refuses 4300 digits or more
+
+
 def test_the_workflow_and_build_script_cover_the_harnesses():
     build = (ROOT / ".clusterfuzzlite/build.sh").read_text(encoding="utf-8")
     assert "fuzz/fuzz_*.py" in build and "compile_python_fuzzer" in build and "--require-hashes" in build

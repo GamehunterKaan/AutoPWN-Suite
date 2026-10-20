@@ -7,6 +7,36 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ## [Unreleased]
 
+### Functional changes
+
+- Add `--check-update` to check GitHub for a newer AutoPWN Suite and exit, and `--apply-update`
+  to actually fast-forward this git checkout to it. Both support release-based
+  (`--update-channel release`, default: the latest GitHub release tag) and commit-based
+  (`--update-channel commit`: the latest commit on `--update-branch`) comparison. The target
+  repo defaults to the upstream `GamehunterKaan/AutoPWN-Suite` and can be overridden with
+  `--update-repo OWNER/REPO` or
+  `AUTOPWN_UPDATE_REPO`. `--apply-update` requires a git checkout with a clean working tree
+  and only fast-forwards, refusing (without changing anything) on uncommitted changes or a
+  diverged branch. Neither flag runs automatically during a scan, and both refuse with `--offline`
+  (or `--vuln-source offline`). An explicit `--update-channel` is remembered in `update_channel.txt`
+  in the data directory. The repository must be written `OWNER/REPO` and the branch must be a plain git
+  branch name.
+
+### Security changes
+
+- `--check-update` and `--apply-update` are explicit, one-shot commands that never run during a scan
+  and refuse with `--offline` or `--vuln-source offline`. They contact `api.github.com` over HTTPS with
+  certificate verification.
+  `--apply-update` also runs `git fetch` from `https://github.com/OWNER/REPO.git` and
+  `git merge --ff-only` as argument lists without a shell, only in a git checkout of this project
+  (git's top-level directory must be the package's parent, so a copy inside another repository is
+  refused) and on a clean working tree. Text that GitHub returns is printed without control
+  characters, and error messages carry fixed text, not exception or git output. The repository, branch
+  and release tag names are checked against an allowlist before they reach a URL or `git` (git would
+  read a tag that starts with `-` as an option), and a GitHub response of an unexpected shape, such as
+  a tag name of thousands of digits, is an error instead of a crash. Updates are not signature-verified,
+  so point `--update-repo` or `AUTOPWN_UPDATE_REPO` only at a repository you trust.
+
 ## [2.7.0] - 2026-10-19
 
 ### Functional changes
@@ -409,6 +439,7 @@ existing release summaries; they do not retroactively claim artifact signing.
   operator's pending sign-in or use memory (affects v2.6.1); the per-address cap of 16 and the limit of 128
   pending challenges are gone, and a restart of the dashboard or a change of the account ends the sign-in
   challenges that are open, so the page asks for a new one.
+
 ## [2.6.1] - 2026-10-16
 
 ### Functional changes

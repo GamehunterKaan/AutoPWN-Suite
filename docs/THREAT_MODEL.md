@@ -51,6 +51,7 @@ whoever holds it controls every scan, profile, schedule and setting.
 | Native scanning and XML | `autopwn_suite/nmap_backend.py:159`, `autopwn_suite/nmap_progress.py:98` |
 | Web probes and recorded-evidence replay | `autopwn_suite/web/http.py` `bounded_request`, `autopwn_suite/web/poc_runtime.py` `verify_plan` |
 | Providers and database | `autopwn_suite/nist_search.py:124`, `autopwn_suite/vulnerability_db.py:59` |
+| Self-update | `autopwn_suite/update_checker.py` `check_for_updates` and `apply_update`, `autopwn_suite/cli.py` `main` |
 | Notifications, credential files and downloads | `autopwn_suite/report.py:37`, `autopwn_suite/credential_files.py` `read_credential_file`, `autopwn_suite/getexploits.py:130` |
 | Installed/service/container startup | `install.sh` (command link step), `autopwn_suite/daemon/daemon_installer.py` (`_root_controlled`, `CopyFiles`, `UninstallDaemon`), `Dockerfile` (`ENV`/`ENTRYPOINT`), `docker-compose.yml:6` |
 | CI and release | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:24`, `scripts/release_assets.py:97` |
@@ -69,6 +70,7 @@ flowchart LR
   N <--> T[Untrusted selected targets]
   H <--> T
   C <--> V[NVD / local CVE mirror]
+  C <--> UP[GitHub update source]
   W <--> V
   W <--> D[Settings / profiles / schedules]
   C --> R[Reports / notifications]
@@ -144,6 +146,7 @@ absolute path: dashboard resolution does not expand a leading tilde
 | Plain Docker | CVE mirror | Explicit path > runtime env > per-user default | `~/.local/share/autopwn-suite/vulnerabilities.sqlite3` in the container | Container scanner/updater/API download | Runtime permissions + DB controls; `Dockerfile` (`WORKDIR /app`), `autopwn_suite/vulnerability_db.py:59` |
 | Supplied Compose | CVE mirror | Explicit path > `AUTOPWN_DATA_DIR=/data` | `/data/vulnerabilities.sqlite3` | Scanner/updater/API, volume readers | Volume permissions + DB controls; `docker-compose.yml:6`, `autopwn_suite/vulnerability_db.py:59` |
 | Explicit DB updates | Lock/staging/feed files | Derived from resolved DB parent | `<database>.update-lock`, sibling `.nvd-*.sqlite3`, temporary feed files | Updater and authorized file readers | Exclusive update transaction, hash/size validation, fsync/replace/cleanup (the next update also removes the staging files and their SQLite journals, named after a digest of the database file name, that a killed update left behind); `autopwn_suite/vulnerability_db.py:327` (lock), `autopwn_suite/vulnerability_db.py:283` (feed download and verification), `autopwn_suite/vulnerability_db.py:405` (replace) |
+| CLI, any installation | Update channel | Explicit `--update-channel` > saved value > `release` | `<user data dir>/update_channel.txt`: one word, `release` or `commit`; any other content is ignored | Invoking account | Host permissions; a missing data directory is created with mode `0700` on POSIX; `resolve_update_channel` in `autopwn_suite/update_checker.py` |
 | Source/native CLI | NVD key | INI > CLI key > `AUTOPWN_NIST_API_KEY_FILE` file > CWD `api.txt`; offline skips | Credential reference only, optional key file, optional `CWD/api.txt` | Scanner/NVD API header | Host permissions + provider HTTPS; `InitArgsAPI` in `autopwn_suite/utils.py`, `autopwn_suite/credential_files.py`, `autopwn_suite/nist_search.py:172` |
 | Library | Key and export | Explicit caller arguments | In-memory key; default `CWD/autopwn.json` | Calling app, NVD, file readers | Caller authority; no dashboard settings load; `autopwn_suite/api.py:100`, `autopwn_suite/api.py:172` |
 | Dashboard | NVD key | Per-job key > `AUTOPWN_NIST_API_KEY_FILE` file > persisted NVD key | Secret reference in deployment-specific settings, or the key file | NVD; signed-in administrative settings API (stored values only; file values are not returned) | Sign-in/ACL; job serialization removes key; `ScanJob.to_dict`, `_run_scan` and `api_settings_get` in `autopwn_suite/web_ui.py` |
@@ -254,6 +257,19 @@ misleading words, and what a given terminal does with other Unicode characters i
 that a dashboard replay records (`autopwn_suite/web/poc_runtime.py`, also the standalone PoC) are shown JSON-encoded and
 HTML-escaped and are not cleaned.
 
+Self-update (`--check-update`, `--apply-update`) trusts the GitHub repository that the operator names (by default
+`GamehunterKaan/AutoPWN-Suite`; `--update-repo` or `AUTOPWN_UPDATE_REPO` change it) with the authority to change the
+code that runs next: a fast-forward brings in whatever that repository publishes, and the update path verifies no
+signature, so the signed release artifacts in [Releasing](RELEASING.md) remain the way to check authenticity. The
+commands are explicit and one-shot, never run during a scan and refuse with `--offline` or `--vuln-source offline`.
+They send only GET requests
+to `api.github.com` and `git fetch` over HTTPS to `github.com`, and they change a checkout only when git's top-level
+directory is the package's parent, the working tree is clean and the update is a fast-forward. The release tag,
+commit and URL that GitHub returns are printed through `console_safe`, and error messages carry fixed text, not
+exception or git output. The repository (OWNER/REPO in GitHub's character set), the branch and the release tag
+(a plain git name that cannot start with `-`) are checked against an allowlist before they reach a URL or `git`,
+and a GitHub response that is not a JSON object is an unexpected response, not a crash.
+
 Security objectives are: preserve data/code separation; prevent unsolicited
 credential disclosure and target-to-host/browser authority gains; restrict
 dashboard ingress to operators; protect persistent configuration/backups; enforce
@@ -301,6 +317,7 @@ remaining rows are threat scenarios and control analysis, not new findings.
 | Conditional backfill hypothesis | A moved image tag or hidden assessment is incorrectly attested as the original safe release | Altered registry tag, omitted report or operator trusts signature as security clearance | False provenance or unsafe reliance on known-vulnerable bytes | Expected original index digest must match; exact source/platform labels and report inventory validated; signed records deny security clearance | Independently record the original digest, verify the dedicated workflow identity, inspect signed findings and remediate before new releases | `.github/workflows/backfill-release-signatures.yml:44`, `scripts/release_assets.py:60`, `scripts/release_assets.py:153` |
 | Medium hypothesis | Local/backup reader obtains plaintext settings/INI/evidence | Host/volume/file access beyond intended scanner account | Secret/evidence exposure, future schedule changes | Host ACLs/ingress; atomic replacement; the dashboard files are created with mode `0600` on POSIX and a file from an earlier release is restricted to `0600` when the dashboard starts (an existing data directory keeps its mode); the dashboard account file stores a salted scrypt hash, not the password | Owner-only storage, encrypted backups, rotation, dedicated account; supply NVD/SMTP/webhook secrets through `*_FILE` credential files instead of stored settings | `_SETTINGS_FILE` in `autopwn_suite/web_ui.py`, `autopwn_suite/daemon/daemon_installer.py:388`, `docs/SECRETS.md:1` |
 | Conditional parser/provider hypothesis | Malformed target/feed data crosses interpreter/storage boundary | Selected target/provider response | Parser denial of service or data corruption; execution requires further evidence | argv, XML parsing, origin checks, parameterized DB, staged updates, sanitized paths | Preserve limits, review parsers/schema changes and regressions | `autopwn_suite/nmap_backend.py:99`, `autopwn_suite/vulnerability_db.py:215`, `autopwn_suite/vulnerability_db.py:105`, `autopwn_suite/getexploits.py:126` |
+| Medium hypothesis | A hostile or compromised update repository changes the code the operator runs | The operator runs `--apply-update` against a repository whose publisher is malicious or compromised: the default upstream, or one chosen with `--update-repo` or `AUTOPWN_UPDATE_REPO` | Code runs with the scanner account's authority at the next start | Explicit one-shot command, never automatic and refused with `--offline`; HTTPS to GitHub; clean working tree and fast-forward only; a copy that is not a checkout of this project is refused; repository, branch and tag names are checked against an allowlist | Keep the default repository, review `git log` after an update and, where authenticity matters, verify the signed release artifacts ([Releasing](RELEASING.md)); the update path itself verifies no signature | `apply_update` and `_local_commit` in `autopwn_suite/update_checker.py`, `main` in `autopwn_suite/cli.py` |
 | Controlled boundary | Arbitrary replay/write or download execution | Client tries to submit a plan/foreign origin; operator separately executes attachment | No new capability established through reviewed replay/download interface | Empty-body requirement, generated plan validation, origin/header/method limits; downloads not executed | Preserve these independent controls and tests | `api_web_verify` and `api_web_poc` in `autopwn_suite/web_ui.py`, `autopwn_suite/web/poc_runtime.py:34` |
 
 Review new features and breaking changes against this table before release.

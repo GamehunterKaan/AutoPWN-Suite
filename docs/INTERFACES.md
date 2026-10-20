@@ -28,6 +28,7 @@ installer links it. Arguments are parsed in `autopwn_suite/utils.py`.
 | `-sed/--skip-exploit-download` | Suppress optional exploit reference downloads. Downloading does not execute the files. |
 | `--offline`, `--vuln-source`, `--vuln-db` | Force offline integration policy; select `auto`/`online`/`offline` CVE source; choose SQLite database path. Offline mode still sends requested Nmap target traffic. |
 | `--update-vuln-db`, `--vuln-db-status` | Explicitly update the official local NVD mirror or print database readiness/freshness and exit. |
+| `--check-update`, `--apply-update`, `--update-channel`, `--update-branch`, `--update-repo` | Check GitHub for a newer release tag (`--update-channel release`, the default) or for the latest commit on `--update-branch` (`commit`, branch `main` by default) and exit, or fast-forward this git checkout to it and exit. The repository is `GamehunterKaan/AutoPWN-Suite` unless `--update-repo OWNER/REPO` or `AUTOPWN_UPDATE_REPO` names another; an explicit `--update-channel` is remembered in `update_channel.txt` in the data directory. Both refuse with `--offline` or `--vuln-source offline` and never run during a scan. `--apply-update` works only in a git checkout of this project (git's top-level directory must be the one that holds the `autopwn_suite` package, so an installed package, a standalone binary and a copy inside another repository are refused), with a clean working tree, and only fast-forwards; it verifies no signature. `--update-repo` must be `OWNER/REPO` and `--update-branch` a plain git branch name that does not start with `-`; anything else, and a release tag that is not a plain name, ends the command with status 1. Text that GitHub returns is printed without control characters. |
 | `-o/--output`, `-of/--output-folder`, `-ot/--output-type` | Explicit output path or generated file under an output directory; `html`, `txt`, or `svg`. Output defaults to `outputs/` relative to the working directory. A generated name is the date and the target with every character other than letters, digits, `.`, `_` and `-` replaced by `_` (at most 100 characters), so `192.168.*.*` or an IPv6 address also saves on Windows. The query values of a URL target are redacted first. |
 | `-rp/--report`, `-rpw/--report-webhook` | Select `email`/`webhook` notification and webhook destination. When no destination is given, `AUTOPWN_WEBHOOK_URL_FILE` (since v2.6.1) names a one-line file holding it, before the interactive prompt. |
 | `-rpe/--report-email`, `-rpep/--report-email-password` | SMTP username and password. When no password is given, `AUTOPWN_SMTP_PASSWORD_FILE` (since v2.6.1) names a one-line password file, before the interactive prompt. |
@@ -238,7 +239,9 @@ log as a fixed-text warning with the schedule ID (no exception text).
 
 - Environment: `AUTOPWN_WEB_HOST` (default `127.0.0.1`), `AUTOPWN_WEB_PORT` (default 8080;
   like `--web-port`, a number from 1 to 65535, otherwise the command exits with a usage error),
-  `AUTOPWN_DATA_DIR`, and (since v2.6.1) `AUTOPWN_WEB_SECURE_COOKIE=1` for a
+  `AUTOPWN_DATA_DIR`, `AUTOPWN_UPDATE_REPO` (the GitHub repository for `--check-update` and
+  `--apply-update`; default `GamehunterKaan/AutoPWN-Suite`), and (since v2.6.1)
+  `AUTOPWN_WEB_SECURE_COOKIE=1` for a
   TLS-terminating proxy plus `AUTOPWN_NIST_API_KEY_FILE`,
   `AUTOPWN_SMTP_PASSWORD_FILE` and `AUTOPWN_WEBHOOK_URL_FILE`, each naming a
   one-line UTF-8 file of at most 4096 bytes. See [Secrets](SECRETS.md).
@@ -263,6 +266,10 @@ log as a fixed-text warning with the schedule ID (no exception text).
   keywords and optional API key over HTTPS; Exploit-DB supplies references and
   optional downloaded bytes. Explicit NVD mirror maintenance uses annual
   JSON/gzip feeds with metadata checksums.
+- `--check-update` and `--apply-update` send GET requests to `api.github.com`; `--apply-update` also runs
+  `git fetch` from `https://github.com/OWNER/REPO.git` and a fast-forward-only `git merge` (or `git checkout`
+  of the release tag on a detached HEAD) in the checkout, as argument lists without a shell. The only state
+  they keep is `update_channel.txt` (one word, `release` or `commit`) in the data directory.
 - Web checks send bounded HTTP probes and TLS diagnostic handshakes to selected
   targets. Releases since v2.6.1 verify target certificates for the HTTP probes and
   replay unless `verify_tls` is false; diagnostic handshakes deliberately inspect

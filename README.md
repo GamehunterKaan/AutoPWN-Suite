@@ -409,6 +409,36 @@ It is portable between platforms. Configuration files also support `offline`, `v
 and `vuln_db` in `[AUTOPWN]`. Python callers can use
 `AutoScanner().scan("192.168.1.10", offline=True, vuln_db="/path/vulnerabilities.sqlite3")`.
 
+## Checking for updates and self-updating
+
+```bash
+python autopwn.py --check-update
+python autopwn.py --check-update --update-channel commit --update-branch main
+
+python autopwn.py --apply-update
+python autopwn.py --apply-update --update-channel commit --update-branch main
+```
+
+`--check-update` asks GitHub for a newer AutoPWN Suite, prints the result, then exits.
+`--apply-update` goes further and fast-forwards this git checkout to that newer release/commit,
+then exits. Neither runs automatically during a scan — both are explicit, one-shot commands.
+
+By default both compare against the repo's latest GitHub release tag (`--update-channel
+release`, the default). Pass `--update-channel commit` to instead target the latest commit on
+`--update-branch` (default `main`). Use `--update-repo OWNER/REPO` (or the `AUTOPWN_UPDATE_REPO`
+environment variable) to point at a different fork. The repository must be written `OWNER/REPO` and the branch
+must be a plain git branch name; anything else is refused. An explicit `--update-channel` is remembered in
+`update_channel.txt` in the data directory. Both need internet access and refuse to run with `--offline`
+(or `--vuln-source offline`).
+
+`--apply-update` requires a git checkout of AutoPWN Suite (a pip or pipx install, a standalone binary and a
+copy inside another git repository are refused) with a clean
+working tree, and only fast-forwards — it refuses and leaves your checkout untouched if the
+working tree has uncommitted changes or the local branch has diverged from the target (resolve
+that manually, e.g. with `git rebase` or by committing/stashing first). It does not verify signatures: it
+trusts the repository named by `--update-repo`, so keep the default unless you trust another. Restart
+AutoPWN Suite after it reports success so the updated code takes effect.
+
 ## Demo
 
 AutoPWN Suite has a very user friendly easy to read output.

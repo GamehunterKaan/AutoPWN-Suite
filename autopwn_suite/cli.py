@@ -16,6 +16,14 @@ from autopwn_suite.nist_search import VulnerabilityLookup
 from autopwn_suite.report import InitializeReport
 from autopwn_suite.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, ResolveScanHosts
 from autopwn_suite.searchvuln import SearchSploits
+from autopwn_suite.update_checker import (
+    UpdateCheckError,
+    apply_update,
+    check_for_updates,
+    format_result,
+    format_status,
+    resolve_update_channel,
+)
 from autopwn_suite.utils import (
     CheckConnection as CheckConnection,
 )
@@ -158,6 +166,23 @@ def main() -> None:
         return
     if getattr(args, "vuln_db_status", False) is True:
         console.print(database_status(db_path))
+        return
+    apply = getattr(args, "apply_update", False) is True
+    if apply or getattr(args, "check_update", False) is True:
+        if offline:
+            raise SystemExit("Updates require internet. Run --check-update or --apply-update without --offline.")
+        channel = resolve_update_channel(args.update_channel)
+        try:
+            if apply:
+                result = apply_update(channel=channel, branch=args.update_branch, repo=args.update_repo)
+                console.print(console_safe(format_result(result)))
+            else:
+                status = check_for_updates(__version__, channel=channel, branch=args.update_branch,
+                                           repo=args.update_repo)
+                console.print(console_safe(format_status(status)))
+        except UpdateCheckError as exc:
+            log.logger("error", console_safe(exc))
+            raise SystemExit(1) from exc
         return
 
     # ── Web UI mode: server only, scans are launched from the browser ───────────

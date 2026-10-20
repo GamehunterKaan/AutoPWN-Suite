@@ -179,6 +179,21 @@ def test_database_management_commands_do_not_start_a_scan(local_database, monkey
     updater.assert_called_once()
 
 
+@pytest.mark.parametrize("flag", ["--check-update", "--apply-update"])
+@pytest.mark.parametrize("offline_flags", [["--offline"], ["--vuln-source", "offline"]])
+def test_update_commands_refuse_offline_and_never_reach_github(monkeypatch, flag, offline_flags):
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    monkeypatch.setattr("requests.sessions.Session.request", lambda *a, **k: pytest.fail("Offline update tried HTTP"))
+    for name in ("check_for_updates", "apply_update", "resolve_update_channel"):
+        monkeypatch.setattr(autopwn, name, lambda *a, **k: pytest.fail("Offline CLI invoked " + name))
+    monkeypatch.setattr("sys.argv", ["autopwn.py", *offline_flags, flag])
+    with pytest.raises(SystemExit, match="require internet"):
+        autopwn.main()
+
+
 def test_offline_discovery_disables_reverse_dns(monkeypatch):
     from autopwn_suite.scanner import DiscoverHosts, TestArp, TestPing
     from autopwn_suite.utils import ScanType

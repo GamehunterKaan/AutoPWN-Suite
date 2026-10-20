@@ -73,7 +73,8 @@ options schema, the target allowlist, the dashboard's structured scan fields and
 of any free-text Nmap options (every spelling of an Nmap file option and NSE option included),
 the web port and generated report names, the event-stream resume point, account
 validation, the login endpoints, the schedule time fields, the profiles and schedules
-loaders, the stored records of a copied vulnerability database and the text a scanned
+loaders, the stored records of a copied vulnerability database, the update checker's names and GitHub
+responses, and the text a scanned
 target controls (terminal sanitizing, URL redaction and body comparison), and require
 that only documented errors occur.
 

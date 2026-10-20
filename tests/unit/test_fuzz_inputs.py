@@ -10,11 +10,13 @@ something it must reject. Seeds are fixed so a failure is reproducible.
 import importlib
 import itertools
 import json
+import posixpath
 import random
 import re
 import shlex
 import sqlite3
 import string
+import subprocess
 import sys
 import zlib
 from argparse import ArgumentTypeError
@@ -22,10 +24,12 @@ from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlsplit
 
 import pytest
 from rich.text import Text
 
+from autopwn_suite import update_checker
 from autopwn_suite.logger import markup_safe
 from autopwn_suite.nmap_backend import parse_nmap_xml
 from autopwn_suite.utils import _port, _report_name
@@ -686,3 +690,122 @@ def test_random_unicode_never_leaves_a_line_break_a_control_or_a_layout_characte
         xml = VALID_XML.replace('name="http"', f'name="{valid}"').replace("</service>", f'</service><script id="s" output="{valid}"/>')
         port = parse_nmap_xml(xml)["scan"]["192.0.2.10"]["tcp"][80]
         assert not FORBIDDEN.search(port["name"]) and not FORBIDDEN_EXCEPT_NEWLINE.search(port["script"]["s"])
+
+
+UPDATE_NAMES = ["main", "v2.7.0", "release/1.0", "x/y", "GamehunterKaan/AutoPWN-Suite", "--abort", "a..b", "a//b", "a.lock", "a/.b"]
+UPDATE_PIECES = ["feature", "v1", "2", "a-b", "c_d", "x.y", "1+b", ".lock", "x.lock", ".", "..", ""]
+
+
+def update_name(rng):
+    roll = rng.random()
+    if roll < .35:
+        return mutate(rng.choice(UPDATE_NAMES), rng)
+    if roll < .7:
+        return "".join(rng.choice(UPDATE_PIECES) + rng.choice(["/", "/", ".", "-", ""]) for _ in range(rng.randint(1, 4)))
+    if roll < .92:
+        alphabet = string.ascii_letters + string.digits + "./-_+:~^?*[\\@{} \n\t\x00\u00e9\u0663\u2028"
+        return "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 24)))
+    return rng.choice([None, 0, 5, b"x/y", ["x/y"], {}, 2.5, True])
+
+
+def test_update_repository_and_ref_validators_only_raise_their_documented_error():
+    rng = random.Random(SEED + 60)
+    accepted_repos, accepted_refs, rejected, to_check_with_git = 0, 0, 0, []
+    for _ in range(6000):
+        text = update_name(rng)
+        try:
+            repo = update_checker._checked_repo(text)
+        except update_checker.UpdateCheckError:
+            rejected += 1
+        else:
+            accepted_repos += 1
+            owner, name = repo.split("/")
+            assert owner not in (".", "..") and name not in (".", "..")
+            assert repo.isascii() and repo.isprintable() and " " not in repo
+            # The repository can only extend the path of the two fixed GitHub URLs.
+            for url, host in ((f"https://github.com/{repo}.git", "github.com"),
+                              (update_checker.API_ROOT.format(repo=repo) + "/releases/latest", "api.github.com")):
+                parts = urlsplit(url)
+                assert parts.netloc == host and not parts.query and not parts.fragment
+                assert posixpath.normpath(parts.path) == parts.path
+        try:
+            ref = update_checker._checked_ref(text, "branch")
+        except update_checker.UpdateCheckError:
+            rejected += 1
+        else:
+            accepted_refs += 1
+            assert 1 <= len(ref) <= 255 and not ref.startswith("-")
+            assert ".." not in ref and "//" not in ref and ref.isascii() and ref.isprintable()
+            assert not set(ref) & set(" ~^:?*[\\@{}")
+            if len(to_check_with_git) < 100:
+                to_check_with_git.append(ref)
+    assert accepted_repos > 50 and accepted_refs > 50 and rejected > 1000  # the corpus exercises both outcomes
+    # Everything the allowlist accepts is also a name git accepts, so a refused name is the only way to a git error.
+    for ref in to_check_with_git:
+        assert subprocess.run(["git", "check-ref-format", f"refs/heads/{ref}"], capture_output=True).returncode == 0, ref
+
+
+UPDATE_FIELDS = ["v9.9.9", "", "9" * 5000, "v" + "9" * 5000, "-", "\x1b[2J", "a" * 40, "[bold]", 7, None, ["x"], {"a": 1}, True, 1.5]
+
+
+def test_github_responses_only_produce_a_status_or_the_documented_error(monkeypatch):
+    rng = random.Random(SEED + 61)
+    monkeypatch.setattr(update_checker, "_local_commit", lambda: "a" * 40)
+    statuses = errors = 0
+    for _ in range(3000):
+        if rng.random() < .6:
+            body = {key: rng.choice(UPDATE_FIELDS) if rng.random() < .8 else random_value(rng)
+                    for key in ("tag_name", "html_url", "sha") if rng.random() < .85}
+        else:
+            body = random_value(rng)
+        reply = MagicMock(status_code=rng.choice([200, 200, 200, 403, 404, 500]))
+        reply.ok = reply.status_code < 400
+        reply.json.return_value = body
+        monkeypatch.setattr(update_checker.requests, "get", lambda *a, _reply=reply, **k: _reply)
+        for check in (lambda: update_checker.check_release("2.7.0", repo="x/y"), lambda: update_checker.check_commit(repo="x/y")):
+            try:
+                status = check()
+            except update_checker.UpdateCheckError:
+                errors += 1
+                continue
+            statuses += 1
+            assert all(isinstance(getattr(status, name), str) for name in ("mode", "repo", "current", "latest", "url"))
+            assert isinstance(status.update_available, bool)
+            assert isinstance(update_checker.format_status(status), str)
+    assert statuses and errors
+
+
+def test_a_release_tag_reaches_git_only_as_a_plain_name_in_the_expected_arguments(monkeypatch):
+    rng = random.Random(SEED + 62)
+    calls = []
+
+    def run_git(args, check=True):
+        calls.append(list(args))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    on_branch = []
+    monkeypatch.setattr(update_checker, "_run_git", run_git)
+    monkeypatch.setattr(update_checker, "_local_commit", lambda: "a" * 40)
+    monkeypatch.setattr(update_checker, "_ensure_clean_worktree", lambda: None)
+    monkeypatch.setattr(update_checker, "_current_branch", lambda: "main" if on_branch[-1] else None)
+    reached = refused = 0
+    for _ in range(2500):
+        tag = update_name(rng)
+        on_branch.append(rng.random() < .5)
+        calls.clear()
+        reply = MagicMock(status_code=200, ok=True)
+        reply.json.return_value = {"tag_name": tag}
+        monkeypatch.setattr(update_checker.requests, "get", lambda *a, _reply=reply, **k: _reply)
+        try:
+            update_checker.apply_update(channel="release", repo="x/y")
+        except update_checker.UpdateCheckError:
+            refused += 1
+            assert not calls  # nothing ran before the refusal
+            continue
+        reached += 1
+        assert not tag.startswith("-") and ".." not in tag and not set(tag) & set(" ~^:?*[\\@{}\n")
+        fetch, last = calls[0], calls[-1]
+        assert fetch[0] == "fetch" and fetch[2] == f"refs/tags/{tag}:refs/tags/{tag}"
+        assert last == (["merge", "--ff-only", tag] if on_branch[-1] else ["checkout", tag])
+        assert all(not arg.startswith("-") for args in calls for arg in args[2:] if tag in arg)
+    assert reached and refused
