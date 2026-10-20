@@ -164,6 +164,14 @@ tbody td{padding:8px 10px;color:var(--text);vertical-align:top}
 .sev.medium{background:rgba(255,208,0,.15);color:var(--yellow)}
 .sev.low{background:rgba(0,200,255,.1);color:var(--accent)}
 .sev.unknown{background:rgba(100,100,100,.15);color:var(--text2)}
+.cat-bar{padding:12px 16px 0 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cat-bar[hidden]{display:none}
+.cat-chip{background:var(--bg3);border:1px solid var(--text2);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:11px;padding:4px 10px;cursor:pointer}
+.cat-chip:hover{border-color:var(--accent2)}
+.cat-chip[aria-pressed="true"]{background:rgba(0,200,255,.15);border-color:var(--accent);color:var(--accent);font-weight:700;text-decoration:underline}
+.cat-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cat-note{font-family:var(--mono);font-size:11px;color:var(--text2)}
+.cat{display:inline-block;margin:0 4px 4px 0;padding:1px 6px;border:1px solid var(--text3);border-radius:3px;font-size:10px;color:var(--text2)}
 
 /* ── Terminal ── */
 #tc-term{overflow:hidden}

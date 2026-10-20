@@ -46,6 +46,9 @@ Turkish** as the first translated language. Localization covers:
   carry the stable `"code"` field above for the frontend to localize).
   `index.html`/`login.html` declare a static `lang="en"` attribute that
   `i18n.js` updates to the active language at load and on every switch.
+- The vulnerability categories of the Vulnerabilities tab (`vuln.cat_*` in `i18n.js`) are a fixed vocabulary that
+  the page translates: the server saves only category IDs, never a label, and the PDF export uses the dictionary
+  of the language the page is in.
 - Documentation, issues and pull-request discussion stay in English
   (OpenSSF criterion `english`).
 

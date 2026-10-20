@@ -88,6 +88,38 @@ function shortId(id){ return id ? id.slice(0,8) : ''; }
 const SEVERITIES = ['critical','high','medium','low','unknown'];
 function sevClass(s){ const k = String(s ?? '').toLowerCase(); return SEVERITIES.includes(k) ? k : 'unknown'; }
 function cvssText(c){ return c ? esc(c) : '—'; }
+// The same rule for the categories of a finding: they are saved with the scan, and only these words ever reach the page.
+// A finding saved before categories existed has none, so it appears only under "All".
+const VULN_CATEGORIES = ['rce','privilege_escalation','injection','xss','auth_bypass','info_disclosure','dos','memory_corruption','other'];
+let vulnCategoryFilter = '';
+function vulnCategories(v){ return Array.isArray(v.categories) ? VULN_CATEGORIES.filter(c => v.categories.includes(c)) : []; }
+function categoryLabel(c){ return window.i18n.t('vuln.cat_' + c); }
+function categoryBadges(v){ return vulnCategories(v).map(c => `<span class="cat">${esc(categoryLabel(c))}</span>`).join(' '); }
+function categoryCounts(rows){
+  const counts = {};
+  rows.forEach(v => vulnCategories(v).forEach(c => { counts[c] = (counts[c] || 0) + 1; }));
+  return counts;
+}
+function renderCategoryBar(rows){
+  const bar = document.getElementById('vuln-cats');
+  const counts = categoryCounts(rows);
+  if(vulnCategoryFilter && !counts[vulnCategoryFilter]) vulnCategoryFilter = '';
+  bar.hidden = !rows.length;
+  if(!rows.length){ bar.innerHTML = ''; return; }
+  const chip = (cat, label, n) => `<button type="button" class="cat-chip" data-cat="${cat}" aria-pressed="${vulnCategoryFilter === cat}">${esc(label)} (${n})</button>`;
+  bar.innerHTML = chip('', window.i18n.t('vuln.cat_all'), rows.length)
+    + VULN_CATEGORIES.filter(c => counts[c]).map(c => chip(c, categoryLabel(c), counts[c])).join('')
+    + `<span class="cat-note">${esc(window.i18n.t('vuln.cat_note'))}</span>`;
+}
+function pickVulnCategory(event){
+  const button = event.target.closest('button[data-cat]');
+  if(!button) return;
+  const cat = button.dataset.cat;
+  vulnCategoryFilter = cat && cat !== vulnCategoryFilter ? cat : '';
+  renderVulnTable();
+  const again = document.querySelector(`#vuln-cats [data-cat="${cat}"]`);
+  if(again) again.focus();
+}
 function openReportWindow(){
   const win = window.open('', '_blank');
   if(!win) toast(window.i18n.t('toast.popup_blocked'), false);
@@ -287,7 +319,7 @@ function printAllVulns() {
   const fScan = document.getElementById('vuln-scanid').value;
   const fSev = document.getElementById('vuln-sev').value;
 
-  const filtered = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || sevClass(v.severity) === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
+  const filtered = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || sevClass(v.severity) === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch))).filter(v => !vulnCategoryFilter || vulnCategories(v).includes(vulnCategoryFilter));
   filtered.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
 
   if(!filtered.length) {
@@ -295,6 +327,8 @@ function printAllVulns() {
     return;
   }
 
+  const catCounts = categoryCounts(filtered);
+  const catSummary = VULN_CATEGORIES.filter(c => catCounts[c]).map(c => `${esc(categoryLabel(c))}: ${catCounts[c]}`).join(' &nbsp;|&nbsp; ') || '—';
   let html = `<!DOCTYPE html><html><head><title>Vulnerabilities Report</title>
   <style>
     body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; line-height: 1.5;}
@@ -318,10 +352,11 @@ function printAllVulns() {
   </div>
   <div class="meta">
     <p><strong>Total Vulnerabilities:</strong> ${filtered.length}</p>
-    <p><strong>Filters Applied:</strong> Host: ${esc(fHost||'All')} &nbsp;|&nbsp; Scan: ${esc(fScan||'All')} &nbsp;|&nbsp; Severity: ${esc(fSev?fSev.toUpperCase():'All')} &nbsp;|&nbsp; Search: ${esc(fSearch||'None')}</p>
+    <p><strong>Filters Applied:</strong> Host: ${esc(fHost||'All')} &nbsp;|&nbsp; Scan: ${esc(fScan||'All')} &nbsp;|&nbsp; Severity: ${esc(fSev?fSev.toUpperCase():'All')} &nbsp;|&nbsp; ${esc(window.i18n.t('vuln.col_category'))}: ${esc(vulnCategoryFilter ? categoryLabel(vulnCategoryFilter) : window.i18n.t('vuln.cat_all'))} &nbsp;|&nbsp; Search: ${esc(fSearch||'None')}</p>
+    <p><strong>${esc(window.i18n.t('vuln.categories_label'))}:</strong> ${catSummary}</p>
   </div>
   <table>
-    <tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Host</th><th>Keyword</th><th>Description</th></tr>
+    <tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Host</th><th>Keyword</th><th>${esc(window.i18n.t('vuln.col_category'))}</th><th>Description</th></tr>
   `;
   filtered.forEach(v => {
     const sev = sevClass(v.severity);
@@ -331,6 +366,7 @@ function printAllVulns() {
       <td>${cvssText(v.cvss)}</td>
       <td style="white-space:nowrap;">${esc(v.host)}</td>
       <td>${esc(v.keyword || '')}</td>
+      <td>${categoryBadges(v)}</td>
       <td>${esc(v.description)}</td>
     </tr>`;
   });
@@ -903,12 +939,14 @@ function renderVulnTable(){
   const fScan = document.getElementById('vuln-scanid').value;
   const fSev = document.getElementById('vuln-sev').value;
 
-  const filtered = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || sevClass(v.severity) === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
+  const base = all.filter(v => (!fHost || v.hostBase === fHost) && (!fScan || v.scan_id === fScan) && (!fSev || sevClass(v.severity) === fSev) && (!fSearch || `${v.cve} ${v.keyword} ${v.description} ${v.host}`.toLowerCase().includes(fSearch)));
+  renderCategoryBar(base);
+  const filtered = vulnCategoryFilter ? base.filter(v => vulnCategories(v).includes(vulnCategoryFilter)) : base;
 
   filtered.sort((a,b)=>(b.cvss||0)-(a.cvss||0));
   const tb=document.getElementById('vtb');
-  if(!filtered.length){tb.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px;font-family:var(--mono);font-size:12px">${esc(window.i18n.t('vuln.no_matches'))}</td></tr>`;return;}
-  tb.innerHTML=filtered.map(v=>{const sev=sevClass(v.severity);return `<tr><td style="font-family:var(--mono)">${esc(v.cve)}</td><td><span class="sev ${sev}">${sev.toUpperCase()}</span></td><td style="font-family:var(--mono);color:${cvssColor(v.cvss)}">${cvssText(v.cvss)}</td><td style="font-family:var(--mono)">${esc(v.host)}</td><td style="font-family:var(--mono);color:var(--text2)">${esc(v.keyword||'')}</td><td style="color:var(--text2)">${esc(v.description)}</td></tr>`;}).join('');
+  if(!filtered.length){tb.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:40px;font-family:var(--mono);font-size:12px">${esc(window.i18n.t('vuln.no_matches'))}</td></tr>`;return;}
+  tb.innerHTML=filtered.map(v=>{const sev=sevClass(v.severity);return `<tr><td style="font-family:var(--mono)">${esc(v.cve)}</td><td><span class="sev ${sev}">${sev.toUpperCase()}</span></td><td style="font-family:var(--mono);color:${cvssColor(v.cvss)}">${cvssText(v.cvss)}</td><td style="font-family:var(--mono)">${esc(v.host)}</td><td style="font-family:var(--mono);color:var(--text2)">${esc(v.keyword||'')}</td><td>${categoryBadges(v)}</td><td style="color:var(--text2)">${esc(v.description)}</td></tr>`;}).join('');
 }
 
 // ── Badges ────────────────────────────────────────────────────────────────────

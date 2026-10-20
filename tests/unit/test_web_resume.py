@@ -356,7 +356,7 @@ def test_resume_network_reuses_nmap_and_only_retries_failed_cve_lookups(dashboar
     job = wu.ScanJob("job", config["target"], config)
     wu._register_scan(job)
     cve = SimpleNamespace(CVEID="CVE-2026-0001", severity="medium", description="Example", severity_score=5,
-                          data_source="test", database_updated_at="")
+                          data_source="test", database_updated_at="", categories=("other",))
     with patch.object(wu.shutil, "which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm) as scan, \
          patch("autopwn_suite.nist_search.searchCVE", side_effect=[RuntimeError("Unavailable"), [cve], [cve]]) as lookup, \
          patch.object(wu, "_notify"), patch.object(wu.threading, "Thread"):
@@ -378,7 +378,7 @@ def test_finished_scan_keeps_nmap_data_only_while_it_can_resume(dashboard, looku
     config = wu._profile_config({"skip_discovery": True}) | {"target": "192.0.2.1"}
     job = wu.ScanJob("job", config["target"], config)
     cve = SimpleNamespace(CVEID="CVE-2026-0001", severity="medium", description="Example", severity_score=5,
-                          data_source="test", database_updated_at="")
+                          data_source="test", database_updated_at="", categories=("other",))
     outcome = RuntimeError("Unavailable") if lookup_fails else [cve]
     with patch.object(wu.shutil, "which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm), \
          patch("autopwn_suite.nist_search.searchCVE", side_effect=[outcome]), patch.object(wu, "_notify"):

@@ -7,6 +7,7 @@ from time import monotonic, sleep
 from requests import get
 
 from autopwn_suite.text import printable
+from autopwn_suite.vulnerability_categories import categorize, find_weaknesses
 
 # Dashboard and scheduled scans are long-lived and run concurrently. A successful NVD answer is
 # reused for CACHE_LIFETIME seconds, so CVEs published later are seen; the lock guards both
@@ -50,12 +51,18 @@ class Vulnerability:
     exploitability: float
     data_source: str = "online"
     database_updated_at: str = None
+    weaknesses: tuple = ()
 
     def __post_init__(self):
         # The NVD, or a database copied from another machine, controls these texts, and they reach the console, the
         # dashboard and the API: one line each, without control or layout characters.
         for name in ("CVEID", "description", "severity", "details_url"):
             setattr(self, name, printable(getattr(self, name)))
+
+    @property
+    def categories(self) -> tuple:
+        """The kinds of vulnerability this CVE is (see autopwn_suite.vulnerability_categories)."""
+        return categorize(self.weaknesses, self.description)
 
     def __str__(self) -> str:
         return (
@@ -215,7 +222,8 @@ def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=Fal
                     (CVE_ID, description, severity, severity_score,
                      details_url, exploitability) = FindVars(vuln)
                     parsed.append(Vulnerability(keyword, CVE_ID, description, severity,
-                                                severity_score, details_url, exploitability))
+                                                severity_score, details_url, exploitability,
+                                                weaknesses=find_weaknesses(vuln)))
                 page = parsed
             except Exception as error:
                 last_error = error

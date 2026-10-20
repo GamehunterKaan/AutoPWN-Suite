@@ -35,6 +35,15 @@ existing release summaries; they do not retroactively claim artifact signing.
   (or `--vuln-source offline`). An explicit `--update-channel` is remembered in `update_channel.txt`
   in the data directory. The repository must be written `OWNER/REPO` and the branch must be a plain git
   branch name.
+- The dashboard's Vulnerabilities tab sorts CVEs into categories: remote code execution, privilege escalation,
+  injection, cross-site scripting, authentication / access control bypass, information disclosure, denial of
+  service, memory corruption and other. A strip of chips above the table counts them ("All (13)", "Denial of
+  service (4)" and so on) and filters the table to one category; a Category column and the PDF export show them.
+  A CVE can have several categories, so the counts can add up to more than the total. The category comes from the
+  CWE of the NVD record (online or from the local database) and, when no CWE maps, from phrases in the description;
+  the rules are in `autopwn_suite/data/vulnerability_categories.json`. New findings carry a `categories` list;
+  scans saved earlier have none and appear only under "All". The command line, the saved reports and the Python
+  library are unchanged.
 
 ### Security changes
 
@@ -60,6 +69,10 @@ existing release summaries; they do not retroactively claim artifact signing.
   The language comes from an allowlist (`--lang` choices, `AUTOPWN_LANG`, the dashboard
   `language` setting), the `X-App-Language` header is not acted on, and the sanitizers for
   scanned text and credentials wrap the values inside translated messages.
+- Vulnerability categories add no network access, dependency or setting. The CWE IDs and the description come from
+  the NVD or from a copied database, so they are untrusted: a CWE ID must match `CWE-` and up to five digits, the
+  description is only searched for fixed phrases (no regular expression), and the page ignores any category ID that
+  is not in its fixed list.
 
 ## [2.7.0] - 2026-10-19
 

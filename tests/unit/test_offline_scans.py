@@ -252,6 +252,7 @@ def test_web_offline_job_uses_database_and_skips_notifications(web, local_databa
     assert job.status == "completed"
     findings = job.hosts_list()[0]["vulns"]
     assert findings[0]["cve"] == "CVE-2025-1234" and findings[0]["data_source"] == "offline"
+    assert findings[0]["categories"] == ["other"]  # no CWE and no impact words in the sample record
     assert job.config["vulnerability_source_used"] == "offline"
     assert job.config["vulnerability_database_updated_at"]
     notifications.assert_not_called()

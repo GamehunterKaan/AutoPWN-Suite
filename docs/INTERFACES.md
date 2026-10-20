@@ -188,6 +188,16 @@ the options they had, and each is enabled again by hand. Boolean fields require 
 falls back to normal in the dashboard. Job statuses are `running`, `stopping`,
 `completed`, `partial`, `stopped` or `error`; progress can have a null percentage.
 
+Each CVE finding that a dashboard scan saves (the `vulns` of a host in `/api/scans`, `/api/hosts` and the job
+download) has `categories`: a list of the fixed IDs `rce`, `privilege_escalation`, `injection`, `xss`,
+`auth_bypass`, `info_disclosure`, `dos`, `memory_corruption` and `other`, in that order. A CVE can have several
+(`other` only alone). They come from the CWE weaknesses of the NVD record, online or from the local database, and
+only when none of them maps to a category from keywords in the description
+(`autopwn_suite/vulnerability_categories.py`, rules in `autopwn_suite/data/vulnerability_categories.json`). The
+Vulnerabilities tab counts them as filter chips, shows them in a Category column and puts them in its PDF export. A
+scan saved before this field existed has no `categories`; its findings appear only under "All". The Python
+library's `scan()` results, the command line and the saved reports do not carry categories.
+
 `web_options.checks` maps catalog check names to booleans. Other controls are
 `speed`, `min_delay_ms`, `timeout`, `request_budget`, `max_pages`, `max_urls`,
 `max_depth`, `max_endpoints`, `max_parameters`, and `max_response_kb`. Since v2.6.1
