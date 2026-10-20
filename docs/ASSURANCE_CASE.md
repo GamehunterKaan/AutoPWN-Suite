@@ -96,7 +96,8 @@ Each row argues the principle is applied, with inspectable evidence.
   with a coverage floor of 80%, Ruff and ESLint ([coding standards](CODING_STANDARDS.md)),
   Bandit (SAST) and OSV-Scanner (SCA) through `scripts/security_policy.py`, and a
   check that the hash-locked container requirements match `poetry.lock`. GitHub
-  CodeQL code scanning and Dependabot alerts run as repository settings.
+  CodeQL code scanning runs from `codeql.yml` (including for pull requests from forks, through
+  `codeql-upload.yml`) and Dependabot alerts run as a repository setting.
 - **Review:** changes that touch authentication, transport, persistence, native
   execution or release workflows must be checked against the
   [threat model](THREAT_MODEL.md) table, and that table updated in the same change.

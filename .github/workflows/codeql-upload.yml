@@ -1,0 +1,115 @@
+name: CodeQL upload
+
+# Uploads the CodeQL results of a pull request, including one from a fork, to code scanning.
+# codeql.yml analyzes the pull request with a read-only token and leaves the SARIF file as an
+# artifact; this handler runs from `main` with the write permission. The pull request, the
+# commit and the category are resolved here from the GitHub API and fixed values. The artifact is
+# data only: it is checked, never executed, and this workflow checks out no code of the pull request.
+
+on:
+  workflow_run:
+    workflows: [CodeQL]
+    types: [completed]
+
+permissions:
+  actions: read
+
+concurrency:
+  group: codeql-upload-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Upload CodeQL results (${{ matrix.language }})
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, javascript-typescript, python]
+    steps:
+      - name: Download the analysis results
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sarif-${{ matrix.language }}
+          path: sarif
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Check the results and find the pull request
+        id: target
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        with:
+          script: |
+            const fs = require('fs');
+            const language = process.env.LANGUAGE;
+            const run = context.payload.workflow_run;
+            const hex40 = /^[0-9a-f]{40}$/;
+            if (run.event !== 'pull_request' || !hex40.test(run.head_sha)) {
+              throw new Error('Expected a pull request analysis with a commit SHA');
+            }
+            // The artifact comes from the pull request's workflow: treat every byte as data.
+            const names = fs.readdirSync('sarif').sort();
+            if (names.join(',') !== 'analysis.json,upload.sarif') {
+              throw new Error('Unexpected files in the analysis artifact');
+            }
+            for (const name of names) {
+              const info = fs.lstatSync(`sarif/${name}`);
+              if (!info.isFile() || info.size > 200 * 1024 * 1024) throw new Error(`Refusing ${name}`);
+            }
+            const analyzed = JSON.parse(fs.readFileSync('sarif/analysis.json', 'utf8')).sha;
+            if (typeof analyzed !== 'string' || !hex40.test(analyzed)) throw new Error('Invalid analysis metadata');
+            const sarif = JSON.parse(fs.readFileSync('sarif/upload.sarif', 'utf8'));
+            if (sarif.version !== '2.1.0' || !Array.isArray(sarif.runs) || !sarif.runs.length) {
+              throw new Error('The results are not a SARIF 2.1.0 log');
+            }
+            for (const entry of sarif.runs) {
+              if (entry?.tool?.driver?.name !== 'CodeQL' || entry.automationDetails?.id !== `/language:${language}/`) {
+                throw new Error('The results do not belong to this language');
+              }
+            }
+            // Fork runs can omit pull_requests; resolve through GitHub's commit association API, then
+            // validate every candidate's live state. Only a pull request that is open, targets main, still
+            // has the analyzed head and whose test merge commit is the analyzed commit gets the results.
+            const candidates = run.pull_requests?.length ? run.pull_requests :
+              await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,
+                {...context.repo, commit_sha: run.head_sha});
+            const matching = [];
+            for (const candidate of candidates) {
+              let pr;
+              for (let attempt = 0; attempt < 6; attempt++) {
+                ({data: pr} = await github.rest.pulls.get({...context.repo, pull_number: candidate.number}));
+                if (pr.mergeable !== null || pr.state !== 'open') break;
+                await new Promise(resolve => setTimeout(resolve, 5000));
+              }
+              if (pr.state !== 'open' || pr.base.ref !== 'main' || pr.head.sha !== run.head_sha) continue;
+              if (pr.head.ref !== run.head_branch || pr.head.repo?.full_name !== run.head_repository?.full_name) continue;
+              if (pr.merge_commit_sha !== analyzed) continue;
+              matching.push(pr.number);
+            }
+            if (matching.length > 1) throw new Error('More than one pull request matches the analyzed commit');
+            if (!matching.length) {
+              core.notice('No open pull request has this analysis as its current test merge; nothing to upload');
+              core.setOutput('upload', 'false');
+              return;
+            }
+            core.setOutput('upload', 'true');
+            core.setOutput('number', String(matching[0]));
+            core.setOutput('sha', analyzed);
+
+      - name: Upload to code scanning
+        if: steps.target.outputs.upload == 'true'
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: sarif/upload.sarif
+          category: /language:${{ matrix.language }}
+          ref: refs/pull/${{ steps.target.outputs.number }}/merge
+          sha: ${{ steps.target.outputs.sha }}

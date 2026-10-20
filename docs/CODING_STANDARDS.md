@@ -60,7 +60,7 @@ The aim is the strictest setting that is practical for each tool:
   loopback server) must mark the specific expected warning with
   `pytest.mark.filterwarnings`, never silence warnings broadly.
 - **Security analysis:** Bandit (SAST) and OSV-Scanner (SCA) run in the required
-  `security.yml` job; GitHub CodeQL code scanning is enabled on the repository.
+  `security.yml` job; GitHub CodeQL code scanning runs from `codeql.yml`.
 
 ## Assertions and input checking
 
