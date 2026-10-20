@@ -34,6 +34,11 @@ Dependabot proposes dependency updates; it does not approve or merge them.
 The separate authenticity-backfill workflow inventories existing image digests
 and adds signatures/reports to an existing release without rebuilding images or
 moving their tags; it uses the same isolated signing and upload authorities.
+CodeQL (`codeql.yml`) analyzes with read-only access to the contents; only a push or the weekly
+run uses its `security-events: write` to upload. For pull requests, including those from forks,
+the results travel as an artifact and a handler from protected main (`codeql-upload.yml`) holds
+`security-events: write` to upload them to code scanning; it holds no secret, never checks out
+pull request code and validates the artifact as data.
 Review events use a credential-free notification workflow. A handler from
 protected main has Actions-write access only to rerun the original approval
 checks for the PR's current revision; it never checks out PR code or consumes

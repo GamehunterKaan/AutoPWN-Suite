@@ -9,6 +9,10 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Functional changes
 
+- CodeQL now runs from workflows (`codeql.yml` and `codeql-upload.yml`) instead of GitHub's default setup,
+  which never scans a pull request from a fork, so the required `Analyze (...)` and `CodeQL` checks
+  could not report on one. The job names and categories are unchanged. See
+  [docs/SECURITY_TESTING.md](docs/SECURITY_TESTING.md#codeql-for-pull-requests-from-forks).
 - Add `--check-update` to check GitHub for a newer AutoPWN Suite and exit, and `--apply-update`
   to actually fast-forward this git checkout to it. Both support release-based
   (`--update-channel release`, default: the latest GitHub release tag) and commit-based
@@ -24,6 +28,11 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Security changes
 
+- CodeQL's analysis of a pull request runs with a read-only token and `build-mode: none`, so no code of the
+  pull request runs. A handler from `main` (`codeql-upload.yml`, `security-events: write`) uploads the results
+  from an artifact that it checks as data: the file set, a SARIF 2.1.0 log of CodeQL with the expected category,
+  and a pull request found through the API whose current test merge commit was analyzed. It checks out no pull
+  request code and takes no number, ref or path from the artifact. No new secret, dependency or network access.
 - `--check-update` and `--apply-update` are explicit, one-shot commands that never run during a scan
   and refuse with `--offline` or `--vuln-source offline`. They contact `api.github.com` over HTTPS with
   certificate verification.

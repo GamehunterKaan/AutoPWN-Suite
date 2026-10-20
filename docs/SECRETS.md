@@ -17,6 +17,8 @@ quarterly, on role changes, and immediately after a suspected compromise.
   OpenSSF Scorecard workflow publishes its results with its OIDC token; the
   optional personal access token its template offers (`SCORECARD_TOKEN`) is not
   configured and must not be added.
+  The CodeQL workflows use only their job token: `codeql-upload.yml` holds `security-events: write` to
+  upload a pull request's results and holds no secret; it never checks out pull request code.
 - Never commit secrets, recovery codes, private keys, `.env` values, scanner
   configuration or credential-bearing scan evidence. Secret scanning and push
   protection are enabled on the authoritative repository. Do not bypass an alert
