@@ -5,6 +5,24 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
+## [Unreleased]
+
+### Functional changes
+
+- `--apply-update` reports `Already up to date` instead of `Updated X -> X` when nothing changed, and
+  `--check-update --update-channel commit` no longer reports an update for a checkout that already contains the
+  branch's latest commit (a branch with local commits on top). When an update changes `pyproject.toml`,
+  `poetry.lock`, `requirements.txt` or `requirements-locked.txt`, it says to install the dependencies again before
+  restarting.
+
+### Security changes
+
+- `--apply-update` on a detached HEAD no longer moves the checkout back to an older release: it checked out the
+  latest release tag even when HEAD was newer than it. Like an update on a branch, it now only moves forward and
+  refuses a HEAD that diverged from the tag.
+- The commit ID that GitHub returns reaches `git` only as a full hexadecimal object name. No new dependency,
+  secret, permission or workflow.
+
 ## [2.8.0] - 2026-10-21
 
 ### Functional changes

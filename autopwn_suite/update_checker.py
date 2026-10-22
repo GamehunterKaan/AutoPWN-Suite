@@ -49,7 +49,12 @@ def resolve_update_channel(explicit_channel):
 
 
 class UpdateCheckError(RuntimeError):
-    pass
+    """A refused or failed check or update. ``code`` names the reason for callers, such as the dashboard, that
+    show their own fixed text instead of the message."""
+
+    def __init__(self, message, code="update_failed"):
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass
@@ -64,6 +69,7 @@ class UpdateStatus:
 
 _REPO_PART = re.compile(r"[A-Za-z0-9_.-]{1,100}")
 _REF_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/+-]{0,254}")
+_COMMIT_ID = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 
 
 def _checked_repo(repo):
@@ -76,7 +82,8 @@ def _checked_repo(repo):
             _(
                 "The repository (--update-repo or AUTOPWN_UPDATE_REPO) must be written OWNER/REPO, "
                 "using letters, digits, '.', '_' and '-'."
-            )
+            ),
+            "update_invalid_repo",
         )
     return repo
 
@@ -96,7 +103,8 @@ def _checked_ref(name, what):
         raise UpdateCheckError(
             _("The release tag name is not a plain git name.")
             if what == "release tag"
-            else _("The branch name is not a plain git name.")
+            else _("The branch name is not a plain git name."),
+            "update_invalid_ref",
         )
     return name
 
@@ -113,19 +121,21 @@ def _get_json(url):
             url, timeout=REQUEST_TIMEOUT, headers={"Accept": "application/vnd.github+json"}
         )
     except requests.RequestException as exc:
-        raise UpdateCheckError(_("Could not reach GitHub ({error_type}).").format(error_type=type(exc).__name__)) from exc
+        raise UpdateCheckError(_("Could not reach GitHub ({error_type}).").format(error_type=type(exc).__name__),
+                               "update_unreachable") from exc
     if response.status_code == 404:
-        raise UpdateCheckError(_("Nothing found at {url}.").format(url=url))
+        raise UpdateCheckError(_("Nothing found at {url}.").format(url=url), "update_not_found")
     if response.status_code == 403:
-        raise UpdateCheckError(_("GitHub API rate limit exceeded; try again later."))
+        raise UpdateCheckError(_("GitHub API rate limit exceeded; try again later."), "update_rate_limited")
     if not response.ok:
-        raise UpdateCheckError(_("GitHub API returned HTTP {status}.").format(status=response.status_code))
+        raise UpdateCheckError(_("GitHub API returned HTTP {status}.").format(status=response.status_code),
+                               "update_http_error")
     try:
         payload = response.json()
     except (ValueError, RecursionError) as exc:
-        raise UpdateCheckError(_("GitHub API returned an unexpected response.")) from exc
+        raise UpdateCheckError(_("GitHub API returned an unexpected response."), "update_bad_response") from exc
     if not isinstance(payload, dict):
-        raise UpdateCheckError(_("GitHub API returned an unexpected response."))
+        raise UpdateCheckError(_("GitHub API returned an unexpected response."), "update_bad_response")
     return payload
 
 
@@ -182,11 +192,15 @@ def check_commit(branch="main", repo=None):
             _(
                 "Commit-based update checks require a git checkout of AutoPWN Suite; "
                 "use --update-channel release instead."
-            )
+            ),
+            "update_not_checkout",
         )
     data = _get_json(f"{API_ROOT.format(repo=repo)}/commits/{branch}")
     latest_sha = _text(data, "sha")
-    update_available = bool(latest_sha) and latest_sha != local
+    # A checkout that already contains the branch's commit (it is ahead of the branch) has nothing to update.
+    # Only a commit ID reaches git; one the checkout lacks counts as new.
+    update_available = bool(latest_sha) and latest_sha != local and not (
+        _COMMIT_ID.fullmatch(latest_sha) and _is_ancestor(latest_sha, local))
     return UpdateStatus(
         mode="commit",
         repo=repo,
@@ -221,6 +235,15 @@ class UpdateResult:
     previous: str
     new: str
     ref: str
+    dependencies_changed: bool = False
+
+    @property
+    def changed(self):
+        return self.previous != self.new
+
+
+# An update that changes one of these needs its dependencies installed again before the restart.
+_DEPENDENCY_FILES = ("pyproject.toml", "poetry.lock", "requirements.txt", "requirements-locked.txt")
 
 
 def _repo_root():
@@ -233,20 +256,26 @@ def _run_git(args, check=True):
             ["git", *args], cwd=_repo_root(), capture_output=True, text=True, timeout=30, check=check
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise UpdateCheckError(_("git {command} could not run ({error_type}).").format(command=args[0], error_type=type(exc).__name__)) from exc
+        raise UpdateCheckError(_("git {command} could not run ({error_type}).").format(command=args[0], error_type=type(exc).__name__),
+                               "update_git_failed") from exc
 
 
 def _ensure_clean_worktree():
     status = _run_git(["status", "--porcelain"])
     if status.stdout.strip():
         raise UpdateCheckError(
-            _("Working tree has uncommitted changes; commit or stash them before applying an update.")
+            _("Working tree has uncommitted changes; commit or stash them before applying an update."),
+            "update_dirty_worktree",
         )
 
 
 def _current_branch():
     result = _run_git(["symbolic-ref", "--short", "-q", "HEAD"], check=False)
     return result.stdout.strip() or None
+
+
+def _is_ancestor(ancestor, descendant):
+    return _run_git(["merge-base", "--is-ancestor", ancestor, descendant], check=False).returncode == 0
 
 
 def _remote_url(repo):
@@ -256,18 +285,42 @@ def _remote_url(repo):
 def _fetch(repo, refspec):
     result = _run_git(["fetch", _remote_url(repo), refspec], check=False)
     if result.returncode != 0:
-        raise UpdateCheckError(_("git fetch from {repo} failed (exit status {status}).").format(repo=repo, status=result.returncode))
+        raise UpdateCheckError(_("git fetch from {repo} failed (exit status {status}).").format(repo=repo, status=result.returncode),
+                               "update_fetch_failed")
+
+
+def _diverged(onto_description):
+    return UpdateCheckError(
+        _(
+            "Cannot fast-forward to {onto}: the local branch has diverged. "
+            "Resolve manually (e.g. git rebase, or git reset --hard after backing up changes)."
+        ).format(onto=onto_description),
+        "update_diverged",
+    )
 
 
 def _fast_forward_to(ref, onto_description):
     result = _run_git(["merge", "--ff-only", ref], check=False)
     if result.returncode != 0:
-        raise UpdateCheckError(
-            _(
-                "Cannot fast-forward to {onto}: the local branch has diverged. "
-                "Resolve manually (e.g. git rebase, or git reset --hard after backing up changes)."
-            ).format(onto=onto_description)
-        )
+        raise _diverged(onto_description)
+
+
+def current_commit():
+    """The commit of the git checkout this copy runs from, which :func:`apply_update` can move, or None."""
+    return _local_commit()
+
+
+def _dependencies_changed(previous, new):
+    """Whether the update between two commits changed a dependency file; a diff that fails counts as a change."""
+    if previous == new:
+        return False
+    result = _run_git(["diff", "--name-only", previous, new, "--", *_DEPENDENCY_FILES], check=False)
+    return result.returncode != 0 or bool(result.stdout.strip())
+
+
+def _result(mode, repo, previous, new, ref):
+    return UpdateResult(mode=mode, repo=repo, previous=previous[:12], new=new[:12], ref=ref,
+                        dependencies_changed=_dependencies_changed(previous, new))
 
 
 def apply_commit_update(branch="main", repo=None):
@@ -275,38 +328,45 @@ def apply_commit_update(branch="main", repo=None):
     repo = _checked_repo(repo)
     branch = _checked_ref(branch, "branch")
     if not _local_commit():
-        raise UpdateCheckError(_("Applying an update requires a git checkout of AutoPWN Suite."))
+        raise UpdateCheckError(_("Applying an update requires a git checkout of AutoPWN Suite."), "update_not_checkout")
     if _current_branch() is None:
-        raise UpdateCheckError(_("HEAD is detached; checkout a branch before applying a commit-based update."))
+        raise UpdateCheckError(_("HEAD is detached; checkout a branch before applying a commit-based update."),
+                               "update_detached_head")
     _ensure_clean_worktree()
     previous = _local_commit()
     _fetch(repo, branch)
     _fast_forward_to("FETCH_HEAD", f"{repo}@{branch}")
     new = _local_commit()
-    return UpdateResult(mode="commit", repo=repo, previous=previous[:12], new=new[:12], ref=branch)
+    return _result("commit", repo, previous, new, branch)
 
 
 def apply_release_update(repo=None):
     """Fast-forward (or checkout, if detached) to ``repo``'s latest release tag."""
     repo = _checked_repo(repo)
     if not _local_commit():
-        raise UpdateCheckError(_("Applying an update requires a git checkout of AutoPWN Suite."))
+        raise UpdateCheckError(_("Applying an update requires a git checkout of AutoPWN Suite."), "update_not_checkout")
     _ensure_clean_worktree()
     data = _get_json(f"{API_ROOT.format(repo=repo)}/releases/latest")
     tag = _text(data, "tag_name")
     if not tag:
-        raise UpdateCheckError(_("Latest release has no tag name."))
+        raise UpdateCheckError(_("Latest release has no tag name."), "update_bad_response")
     _checked_ref(tag, "release tag")
     previous = _local_commit()
     _fetch(repo, f"refs/tags/{tag}:refs/tags/{tag}")
     if _current_branch() is None:
-        result = _run_git(["checkout", tag], check=False)
-        if result.returncode != 0:
-            raise UpdateCheckError(_("git checkout {tag} failed (exit status {status}).").format(tag=tag, status=result.returncode))
+        # The same rule as the fast-forward on a branch: move only forward, so a detached HEAD that is newer
+        # than the release stays where it is instead of going back to the tag.
+        if _is_ancestor("HEAD", f"refs/tags/{tag}"):
+            result = _run_git(["checkout", tag], check=False)
+            if result.returncode != 0:
+                raise UpdateCheckError(_("git checkout {tag} failed (exit status {status}).").format(tag=tag, status=result.returncode),
+                                       "update_git_failed")
+        elif not _is_ancestor(f"refs/tags/{tag}", "HEAD"):
+            raise _diverged(tag)
     else:
         _fast_forward_to(tag, tag)
     new = _local_commit()
-    return UpdateResult(mode="release", repo=repo, previous=previous[:12], new=new[:12], ref=tag)
+    return _result("release", repo, previous, new, tag)
 
 
 def apply_update(channel="release", branch="main", repo=None):
@@ -317,6 +377,15 @@ def apply_update(channel="release", branch="main", repo=None):
 
 
 def format_result(result: UpdateResult) -> str:
-    return _(
+    if not result.changed:
+        return _("Already up to date ({mode}): {current} ({ref}).").format(
+            mode=result.mode, current=result.new, ref=result.ref)
+    text = _(
         "Updated ({mode}) {previous} -> {new} ({ref}). Restart AutoPWN Suite to use the updated code."
     ).format(mode=result.mode, previous=result.previous, new=result.new, ref=result.ref)
+    if result.dependencies_changed:
+        text += " " + _(
+            "This update changes the dependencies: install them again as the README's \"From source\" "
+            "installation describes before restarting."
+        )
+    return text

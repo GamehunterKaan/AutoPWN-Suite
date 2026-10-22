@@ -776,6 +776,33 @@ def test_github_responses_only_produce_a_status_or_the_documented_error(monkeypa
     assert statuses and errors
 
 
+def test_a_commit_id_from_github_reaches_git_only_as_a_full_hex_object_name(monkeypatch):
+    rng = random.Random(SEED + 63)
+    calls = []
+
+    def run_git(args, check=True):
+        calls.append(list(args))
+        return SimpleNamespace(returncode=rng.choice([0, 1, 128]), stdout="", stderr="")
+
+    monkeypatch.setattr(update_checker, "_run_git", run_git)
+    monkeypatch.setattr(update_checker, "_local_commit", lambda: "a" * 40)
+    pieces = ["b" * 40, "c" * 64, "B" * 40, "b" * 39, "b" * 41, "-", "--all", "HEAD", "\n", " ", "g", "^", "~1", ":"]
+    asked = 0
+    for _ in range(3000):
+        sha = "".join(rng.choice(pieces) for _ in range(rng.randint(0, 3))) if rng.random() < .8 else random_value(rng)
+        reply = MagicMock(status_code=200, ok=True)
+        reply.json.return_value = {"sha": sha}
+        monkeypatch.setattr(update_checker.requests, "get", lambda *a, _reply=reply, **k: _reply)
+        calls.clear()
+        status = update_checker.check_commit(repo="x/y")
+        assert isinstance(status.update_available, bool)
+        for args in calls:
+            asked += 1
+            assert args == ["merge-base", "--is-ancestor", sha, "a" * 40]
+            assert re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", sha)
+    assert asked
+
+
 def test_a_release_tag_reaches_git_only_as_a_plain_name_in_the_expected_arguments(monkeypatch):
     rng = random.Random(SEED + 62)
     calls = []

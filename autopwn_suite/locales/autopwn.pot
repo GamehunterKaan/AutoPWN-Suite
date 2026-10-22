@@ -904,11 +904,20 @@ msgstr ""
 msgid "git checkout {tag} failed (exit status {status})."
 msgstr ""
 
+#: autopwn_suite/update_checker.py:381
+#, python-brace-format
+msgid "Already up to date ({mode}): {current} ({ref})."
+msgstr ""
+
 #: autopwn_suite/update_checker.py:321
 #, python-brace-format
 msgid ""
 "Updated ({mode}) {previous} -> {new} ({ref}). Restart AutoPWN Suite to use "
 "the updated code."
+msgstr ""
+
+#: autopwn_suite/update_checker.py:387
+msgid "This update changes the dependencies: install them again as the README's \"From source\" installation describes before restarting."
 msgstr ""
 
 #: autopwn_suite/utils.py:64

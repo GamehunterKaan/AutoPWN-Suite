@@ -1116,6 +1116,11 @@ msgstr "En son sürümün (release) bir etiket (tag) adı yok."
 msgid "git checkout {tag} failed (exit status {status})."
 msgstr "git checkout {tag} başarısız oldu (çıkış durumu {status})."
 
+#: autopwn_suite/update_checker.py:381
+#, fuzzy, python-brace-format
+msgid "Already up to date ({mode}): {current} ({ref})."
+msgstr "Zaten güncel ({mode}): {current} ({ref})."
+
 #: autopwn_suite/update_checker.py:321
 #, fuzzy, python-brace-format
 msgid ""
@@ -1124,6 +1129,11 @@ msgid ""
 msgstr ""
 "Güncellendi ({mode}) {previous} -> {new} ({ref}). Güncellenen kodu kullanmak "
 "için AutoPWN Suite'i yeniden başlatın."
+
+#: autopwn_suite/update_checker.py:387
+#, fuzzy
+msgid "This update changes the dependencies: install them again as the README's \"From source\" installation describes before restarting."
+msgstr "Bu güncelleme bağımlılıkları değiştiriyor: yeniden başlatmadan önce onları README'deki \"From source\" kurulumunda anlatıldığı gibi yeniden kurun."
 
 #: autopwn_suite/utils.py:64
 #, fuzzy
