@@ -170,14 +170,15 @@ def _local_commit():
             ["git", "rev-parse", "--show-toplevel", "HEAD"],
             cwd=root,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="surrogateescape",
             timeout=5,
             check=True,
         )
         lines = result.stdout.splitlines()
         if len(lines) != 2 or not os.path.samefile(lines[0], root):
             return None
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, ValueError, subprocess.SubprocessError):
         return None
     return lines[1].strip() or None
 
@@ -253,7 +254,8 @@ def _repo_root():
 def _run_git(args, check=True):
     try:
         return subprocess.run(
-            ["git", *args], cwd=_repo_root(), capture_output=True, text=True, timeout=30, check=check
+            ["git", *args], cwd=_repo_root(), capture_output=True, encoding="utf-8", errors="replace", timeout=30,
+            check=check,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise UpdateCheckError(_("git {command} could not run ({error_type}).").format(command=args[0], error_type=type(exc).__name__),
@@ -302,6 +304,14 @@ def _diverged(onto_description):
 def _fast_forward_to(ref, onto_description):
     result = _run_git(["merge", "--ff-only", ref], check=False)
     if result.returncode != 0:
+        if _is_ancestor("HEAD", ref):
+            raise UpdateCheckError(
+                _(
+                    "git merge could not fast-forward to {onto} (exit status {status}), although nothing diverged. "
+                    "Check for another running git command or a stale .git/index.lock, then try again."
+                ).format(onto=onto_description, status=result.returncode),
+                "update_git_failed",
+            )
         raise _diverged(onto_description)
 
 
@@ -357,7 +367,7 @@ def apply_release_update(repo=None):
         # The same rule as the fast-forward on a branch: move only forward, so a detached HEAD that is newer
         # than the release stays where it is instead of going back to the tag.
         if _is_ancestor("HEAD", f"refs/tags/{tag}"):
-            result = _run_git(["checkout", tag], check=False)
+            result = _run_git(["checkout", "--detach", f"refs/tags/{tag}"], check=False)
             if result.returncode != 0:
                 raise UpdateCheckError(_("git checkout {tag} failed (exit status {status}).").format(tag=tag, status=result.returncode),
                                        "update_git_failed")

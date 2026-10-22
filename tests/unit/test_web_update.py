@@ -2,6 +2,8 @@
 # Copyright 2022-2026 Kaan Gültekin
 """The dashboard's update check and self-update routes, with GitHub and git mocked."""
 import importlib
+import threading
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -222,6 +224,12 @@ def test_the_dependency_flag_of_an_applied_update_reaches_the_page(web, monkeypa
     assert client.post("/api/update/apply").get_json()["result"]["dependencies_changed"] is True
 
 
+def _stub_replayable_plan(monkeypatch):
+    """Patch the modules the verify route imports at call time (sys.modules), not a stale package attribute."""
+    monkeypatch.setattr(importlib.import_module("autopwn_suite.web.poc"), "build_plan", lambda finding: {"replayable": True})
+    monkeypatch.setattr(importlib.import_module("autopwn_suite.web.poc_runtime"), "validate_plan", lambda plan: None)
+
+
 def _start_scan(client):
     return client.post("/api/scan/start", json={"target": "192.0.2.10"})
 
@@ -243,7 +251,8 @@ def test_new_runs_wait_for_an_update_to_finish_and_for_the_restart(web, monkeypa
     else:
         wu._app_update["running"] = "apply"
     wu._scans["held"] = MagicMock(status="stopped", web_finding=lambda finding_id: {"id": finding_id})
-    monkeypatch.setattr(wu, "_launch_scan", lambda *a, **k: pytest.fail("started a scan"))
+    _stub_replayable_plan(monkeypatch)
+    monkeypatch.setattr(wu, "_register_scan", lambda job: pytest.fail("started a scan"))
     monkeypatch.setattr(wu.threading, "Thread", lambda *a, **k: pytest.fail("started a run"))
     response = request_run(client)
     assert response.status_code == 409
@@ -273,18 +282,81 @@ def test_scheduled_scans_are_postponed_with_one_log_line_until_the_hold_ends(web
     assert len(notes) == 2
 
 
-def test_a_postponed_schedule_stays_due(web, monkeypatch):
+def test_the_scheduler_logs_again_when_an_applied_update_turns_into_a_pending_restart(web, monkeypatch):
     wu, _client = web
+    notes = []
+    monkeypatch.setattr(wu, "_scheduler_note", lambda level, message: notes.append(message))
+    wu._app_update["running"] = "apply"
+    assert wu._scheduler_update_hold() and wu._scheduler_update_hold()
+    wu._app_update["running"] = None
     monkeypatch.setattr(uc, "current_commit", lambda: "b" * 40)
+    assert wu._scheduler_update_hold()
+    assert len(notes) == 2 and "Wait for the update" in notes[0] and "Restart the dashboard" in notes[1]
+
+
+def test_a_scan_cannot_start_once_an_apply_holds_the_mode_lock(web, monkeypatch):
+    wu, _client = web
+    monkeypatch.setattr(wu, "_register_scan", lambda job: pytest.fail("registered a scan during an apply"))
+    wu._app_update["running"] = "apply"
+    with pytest.raises(wu._UpdateHeld) as held:
+        wu._launch_scan({"target": "192.0.2.10"})
+    assert held.value.args[0] == "update_in_progress"
+
+
+def test_a_settings_file_with_a_non_boolean_auto_check_is_set_aside(web, monkeypatch):
+    wu, _client = web
+    wu._SETTINGS_FILE.write_text('{"update_auto_check": 0}', encoding="utf-8")
+    wu._load_settings()
+    assert wu._settings.get("update_auto_check") is True  # the defaults, not the hand-edited 0
+
+
+def _run_scheduler_once(wu, monkeypatch):
+    """One pass of the scheduler over a schedule that is due and valid; returns the scans it launched."""
+    launched = []
     monkeypatch.setattr(wu, "_scheduler_note", lambda *a: None)
     monkeypatch.setattr(wu, "_should_fire", lambda s: True)
-    monkeypatch.setattr(wu, "_launch_scan", lambda *a, **k: pytest.fail("started a scheduled scan"))
-    monkeypatch.setattr(wu, "_schedules", {"s1": {"id": "s1", "enabled": True}})
+    monkeypatch.setattr(wu, "_profiles", {"p1": {"id": "p1", "name": "Quick", "config": {}}})
+    monkeypatch.setattr(wu, "_schedules", {"s1": {"id": "s1", "name": "Nightly", "target": "192.0.2.10",
+                                                   "profile_id": "p1", "enabled": True, "type": "interval",
+                                                   "interval_value": 1, "interval_unit": "hours"}})
     monkeypatch.setattr(wu, "_schedule_last_run", {})
+    monkeypatch.setattr(wu, "_schedule_jobs", {})
+    monkeypatch.setattr(wu, "_save_schedules", lambda: None)
+    monkeypatch.setattr(wu, "_register_scan", lambda job: launched.append(job))
+    monkeypatch.setattr(wu.threading, "Thread", MagicMock())
     monkeypatch.setattr(wu.time, "sleep", MagicMock(side_effect=[None, SystemExit]))
     with pytest.raises(SystemExit):
         wu._scheduler_loop()
+    return launched
+
+
+def test_a_due_schedule_runs_when_nothing_holds_it(web, monkeypatch):
+    wu, _client = web
+    assert len(_run_scheduler_once(wu, monkeypatch)) == 1
+    assert "s1" in wu._schedule_last_run
+
+
+@pytest.mark.parametrize("state", ["restart", "applying"])
+def test_a_postponed_schedule_stays_due(web, monkeypatch, state):
+    wu, _client = web
+    if state == "restart":
+        monkeypatch.setattr(uc, "current_commit", lambda: "b" * 40)
+    else:
+        wu._app_update["running"] = "apply"
+    assert _run_scheduler_once(wu, monkeypatch) == []
+    assert "s1" not in wu._schedule_last_run and wu._schedules["s1"]["enabled"] is True
+
+
+def test_a_schedule_is_not_launched_when_an_apply_starts_after_the_scheduler_looked(web, monkeypatch):
+    wu, _client = web
+    checks = iter([None, ("update_in_progress", "Wait for the update to finish before starting scans or verifications.")])
+    monkeypatch.setattr(wu, "_update_hold", lambda: next(checks, None))
+    logged = []
+    monkeypatch.setattr(wu, "_broadcast", lambda entry: logged.append(entry))
+    monkeypatch.setattr(wu.logging, "exception", lambda *a, **k: pytest.fail("the hold was handled as a failed scheduled scan"))
+    assert _run_scheduler_once(wu, monkeypatch) == []
     assert "s1" not in wu._schedule_last_run
+    assert not [entry for entry in logged if entry.get("level") == "error"]
 
 
 def test_automatic_checks_follow_the_setting_and_manual_checks_always_work(web, monkeypatch):
@@ -320,3 +392,69 @@ def test_an_apply_cannot_be_automatic(web):
     _wu, client = web
     response = client.post("/api/update/apply", json={"automatic": True})
     assert response.status_code == 400 and response.get_json()["code"] == "invalid_update_channel"
+
+
+class _ApplyClaimedWhileWaiting:
+    """Stands in for _mode_lock: an apply is claimed by the time the request gets the lock, as when the request
+    waited for it, so only a hold read inside the lock sees it."""
+
+    def __init__(self, wu):
+        self.wu, self.lock = wu, threading.RLock()
+
+    def __enter__(self):
+        self.lock.acquire()
+        self.wu._app_update["running"] = "apply"
+        return self
+
+    def __exit__(self, *exc):
+        self.lock.release()
+
+
+@pytest.mark.parametrize("request_run", [_resume_scan, _verify_finding])
+def test_resume_and_verify_read_the_hold_inside_the_mode_lock(web, monkeypatch, request_run):
+    wu, client = web
+    wu._scans["held"] = MagicMock(status="stopped", web_finding=lambda finding_id: {"id": finding_id},
+                                  _lock=threading.RLock(), _web_findings={"f1": {}})
+    _stub_replayable_plan(monkeypatch)
+    monkeypatch.setattr(wu, "_mode_lock", _ApplyClaimedWhileWaiting(wu))
+    monkeypatch.setattr(wu.threading, "Thread", lambda *a, **k: pytest.fail("started a run during an apply"))
+    response = request_run(client)
+    assert response.status_code == 409 and response.get_json()["code"] == "update_in_progress"
+
+
+def test_an_automatic_check_is_due_only_six_hours_after_the_last_by_the_server_clock(web, monkeypatch):
+    wu, client = web
+    check = MagicMock(return_value=STATUS)
+    monkeypatch.setattr(uc, "check_for_updates", check)
+    assert client.get("/api/update").get_json()["check_due"] is True
+    assert client.post("/api/update/check", json={"automatic": True}).status_code == 200
+    assert client.get("/api/update").get_json()["check_due"] is False
+    response = client.post("/api/update/check", json={"automatic": True})
+    assert response.status_code == 409 and response.get_json()["code"] == "update_not_due"
+    assert check.call_count == 1
+    assert client.post("/api/update/check", json={"channel": "release"}).status_code == 200  # a click always checks
+    wu._app_update["checked_at"] = (datetime.now(timezone.utc) - timedelta(hours=6, minutes=1)).isoformat()
+    assert client.get("/api/update").get_json()["check_due"] is True
+    assert client.post("/api/update/check", json={"automatic": True}).status_code == 200
+    assert check.call_count == 3
+
+
+def test_no_check_is_due_while_automatic_checks_are_off(web):
+    _wu, client = web
+    assert client.put("/api/settings", json={"update_auto_check": False}).status_code == 200
+    assert client.get("/api/update").get_json()["check_due"] is False
+
+
+def test_an_automatic_check_that_another_finished_meanwhile_is_not_run_again(web, monkeypatch):
+    wu, client = web
+    calls = []
+
+    def finish_another_check_first(*args, **kwargs):
+        # Another tab's check ran between this request's early due test and its claim.
+        wu._app_update["checked_at"] = datetime.now(timezone.utc).isoformat()
+        return True
+    monkeypatch.setattr(wu, "_auto_check_due", finish_another_check_first)
+    monkeypatch.setattr(uc, "check_for_updates", lambda *a, **k: calls.append(k) or STATUS)
+    response = client.post("/api/update/check", json={"automatic": True})
+    assert response.status_code == 409 and response.get_json()["code"] == "update_not_due"
+    assert not calls and wu._app_update["running"] is None

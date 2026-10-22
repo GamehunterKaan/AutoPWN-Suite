@@ -183,7 +183,7 @@ assert.equal(nodes.get('database-update').disabled,false);
 assert.equal(nodes.get('f-vuln-source').disabled,false);
 assert.equal(nodes.get('f-vuln-source').value,'online');
 assert.equal(nodes.get('s-offline-mode').checked,false);
-assert.equal(calls.length,4);
+assert.equal(calls.filter(([url])=>url!=='/api/update').length,4);  // the update section is re-read too
 """)
 
 
@@ -1372,14 +1372,15 @@ fetch=async (url,opts)=>{
   if(opts){ posts.push([url,JSON.parse(opts.body)]); return {ok:true,json:async()=>state}; }
   return {ok:true,json:async()=>state};
 };
+// The server says when a check is due (its own clock); the page never compares the browser's clock with checked_at.
 const cases=[
-  [{checked_at:null},1],
-  [{checked_at:new Date(Date.now()-7*3600*1000).toISOString()},1],
-  [{checked_at:new Date(Date.now()-60*1000).toISOString()},0],
-  [{checked_at:null,offline_only:true},0],
-  [{checked_at:null,restart_required:true},0],
-  [{checked_at:null,running:'apply'},0],
-  [{checked_at:null,auto_check:false},0],
+  [{check_due:true},1],
+  [{check_due:false,checked_at:new Date(Date.now()-7*3600*1000).toISOString()},0],
+  [{check_due:true,checked_at:new Date(Date.now()+3600*1000).toISOString()},1],
+  [{check_due:true,offline_only:true},0],
+  [{check_due:true,restart_required:true},0],
+  [{check_due:true,running:'apply'},0],
+  [{check_due:false,auto_check:false},0],
 ];
 for(const [extra,expected] of cases){
   posts=[]; state=updateState(extra);
@@ -1493,4 +1494,41 @@ fetch=async ()=>({ok:false,status:409,json:async()=>({error:'Restart the dashboa
 document.getElementById('f-target').value='192.0.2.10';
 await startScan();
 assert.equal(nodes.get('toast-el').textContent,'Restart the dashboard to finish the update first.');
+""")
+
+
+def test_update_buttons_recover_when_the_status_reload_after_an_action_fails():
+    run_js(UPDATE_STATE + r"""
+let posted=false;
+fetch=async (url,opts)=>{
+  if(opts){ posted=true; return {ok:true,json:async()=>updateState({status:available})}; }
+  if(posted) return {ok:false,status:502,json:async()=>({})};
+  return {ok:true,json:async()=>updateState({status:available})};
+};
+renderUpdateStatus(updateState({status:available}));
+await checkForUpdates(true);
+assert.equal(nodes.get('update-check').disabled,false);
+assert.equal(nodes.get('update-apply').disabled,false);
+confirm=()=>true;
+await applyUpdate();
+assert.equal(nodes.get('update-check').disabled,false);
+""")
+
+
+def test_switching_offline_mode_refreshes_the_update_section_at_once():
+    run_js(UPDATE_STATE + r"""
+let offline=false;
+const reads=[];
+fetch=async (url,opts)=>{
+  if(opts){ offline=JSON.parse(opts.body).offline_mode; return {ok:true,json:async()=>({ok:true})}; }
+  reads.push(url);
+  if(url==='/api/update') return {ok:true,json:async()=>updateState({status:available,offline_only:offline})};
+  return {ok:true,json:async()=>({ready:false,offline_only:offline,offline_locked:false,update:{}})};
+};
+renderUpdateStatus(updateState({status:available}));
+document.getElementById('s-offline-mode').checked=true;
+await saveOfflineMode();
+assert.ok(reads.includes('/api/update'));
+assert.equal(nodes.get('update-apply').disabled,true);
+assert.match(nodes.get('update-status').textContent,/Offline mode is on/);
 """)

@@ -17,7 +17,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   `GET /api/update`, `POST /api/update/check` and `POST /api/update/apply`.
 - While an update is applied, and once the dashboard's checkout has moved to another commit (from the dashboard,
   `--apply-update` or git) until it is restarted, the dashboard refuses new scans, resumes and web verifications
-  (409 `update_in_progress` or `update_restart_required`) and postpones scheduled scans. Running scans continue.
+  (409 `update_in_progress` or `update_restart_required`) and postpones scheduled scans: an interval schedule
+  runs after the restart, a daily or weekly one only within an hour of its time. Running scans continue.
 - `--apply-update` reports `Already up to date` instead of `Updated X -> X` when nothing changed, and
   `--check-update --update-channel commit` no longer reports an update for a checkout that already contains the
   branch's latest commit (a branch with local commits on top). When an update changes `pyproject.toml`,
@@ -33,7 +34,7 @@ existing release summaries; they do not retroactively claim artifact signing.
   channel (`release` or `commit`); the repository stays the server's `AUTOPWN_UPDATE_REPO` or the default and the
   commit channel follows `main`, so a signed-in session cannot make the server fetch another repository or a
   fork's pull-request ref. Both routes refuse in offline mode (and offline mode cannot be switched on while one
-  runs), an apply waits for running scans, web verifications and database downloads, and responses carry a
+  runs), an apply is refused while scans, web verifications or database downloads run, and responses carry a
   stable code and fixed text, never the error's message. The page shows GitHub's text as text and links only to
   `https://github.com/` URLs. The dashboard now contacts `api.github.com` (through the server, over HTTPS with
   certificate verification) without a click, when a page opens and every 6 hours, unless offline mode is on or

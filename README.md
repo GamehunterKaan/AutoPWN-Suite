@@ -450,9 +450,10 @@ most every 6 hours, never in offline mode; turn the switch off to check only whe
 **Check for updates**. When a newer version exists it shows an **Update** badge on the Settings tab. It
 applies the update only when you click **Apply update** and confirm. Only the channel can be chosen there: the
 repository is `AUTOPWN_UPDATE_REPO` (or the default), and the commit channel always follows `main`. Applying
-needs a git checkout, and it waits until no scan, web verification or database download is running. While an
-update is applied, and afterwards until you restart the dashboard, new scans, resumes and web verifications are
-refused and scheduled scans wait. The dashboard notices any change to its checkout, including
+needs a git checkout, and it is refused while a scan, web verification or database download is running. While
+an update is applied, and afterwards until you restart the dashboard, new scans, resumes and web verifications are
+refused and scheduled scans wait for the restart: an interval schedule then runs at once, a daily or weekly one
+only within an hour of its time (otherwise at its next time). The dashboard notices any change to its checkout, including
 `--apply-update` or a `git pull` while it runs, because it compares the commit on disk with the one it
 started from. Restart the dashboard, then reload the page.
 

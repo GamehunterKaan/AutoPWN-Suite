@@ -551,3 +551,39 @@ def test_a_tag_of_thousands_of_digits_is_compared_without_error(monkeypatch):
     # int() refuses more than 4300 digits on Python 3.11 and later; a tag is text that the repository's publisher chooses.
     monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="9" * 5000))
     assert uc.check_release("2.7.0", repo="x/y").update_available
+
+
+def test_a_detached_release_update_checks_out_the_tag_not_a_branch_of_the_same_name(repos, monkeypatch):
+    upstream, local = repos
+    old = _git(local, "rev-parse", "HEAD").stdout.strip()
+    _commit(upstream, "two.txt", "two")
+    _git(upstream, "tag", "v2.7.0")
+    _git(local, "branch", "v2.7.0", old)  # a local branch named like the release, at an older commit
+    _git(local, "checkout", "--detach")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+
+    result = uc.apply_release_update(repo="x/y")
+
+    assert _git(local, "rev-parse", "HEAD").stdout.strip() == _git(upstream, "rev-parse", "v2.7.0").stdout.strip()
+    assert uc._current_branch() is None
+    assert result.changed
+
+
+def test_a_merge_blocked_by_a_lock_file_is_a_git_failure_not_a_divergence(repos, monkeypatch):
+    upstream, local = repos
+    _commit(upstream, "two.txt", "two")
+    (local / ".git" / "index.lock").write_text("")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    with pytest.raises(uc.UpdateCheckError, match="index.lock") as caught:
+        uc.apply_update(channel="commit", branch="main", repo="x/y")
+    assert caught.value.code == "update_git_failed"
+
+
+def test_output_git_prints_that_the_locale_cannot_decode_means_no_checkout(monkeypatch):
+    def undecodable(*a, **k):
+        raise UnicodeDecodeError("cp1252", b"\x81", 0, 1, "character maps to <undefined>")
+    monkeypatch.setattr(uc.subprocess, "run", undecodable)
+    assert uc.current_commit() is None

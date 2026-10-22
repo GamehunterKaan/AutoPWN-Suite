@@ -1047,6 +1047,7 @@ async function saveOfflineMode(){
   }finally{
     savingOfflineMode = false;
     await loadDatabaseStatus().catch(()=>{ toggle.disabled = false; });
+    await loadUpdateStatus().catch(()=>{});
   }
 }
 async function updateVulnerabilityDatabase(){
@@ -1062,10 +1063,9 @@ async function updateVulnerabilityDatabase(){
 }
 
 // ── Settings: updates ─────────────────────────────────────────────────────────
-// With automatic checks on, GitHub is asked when the page opens and then every 6 hours (the server remembers the
-// last check, so other tabs and reloads do not ask again sooner), never in offline mode. Applying is always the
-// operator's click.
-const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+// With automatic checks on, GitHub is asked when the page opens and then every 6 hours, never in offline mode. The
+// server decides when a check is due (check_due, by its own clock), so other tabs, reloads and a browser clock that
+// is wrong do not make it ask sooner. Applying is always the operator's click.
 let updateState = null;
 let updateBusy = false;
 let savingUpdateAutoCheck = false;
@@ -1126,13 +1126,13 @@ async function checkForUpdates(manual){
     if(manual) toast(error.message, false);
   }finally{
     updateBusy = false;
-    await loadUpdateStatus().catch(()=>{});
+    await loadUpdateStatus().catch(()=>{ if(updateState) renderUpdateStatus(updateState); else document.getElementById('update-check').disabled = false; });
   }
 }
 async function maybeCheckForUpdates(){
   const state = await loadUpdateStatus();
-  if(state.auto_check === false || state.offline_only || state.running || state.restart_required) return;
-  if(!state.checked_at || Date.now() - Date.parse(state.checked_at) >= UPDATE_CHECK_INTERVAL_MS) await checkForUpdates(false);
+  if(!state.check_due || state.offline_only || state.running || state.restart_required) return;
+  await checkForUpdates(false);
 }
 async function applyUpdate(){
   const status = updateState && updateState.status;
@@ -1151,7 +1151,7 @@ async function applyUpdate(){
     toast(error.message, false);
   }finally{
     updateBusy = false;
-    await loadUpdateStatus().catch(()=>{});
+    await loadUpdateStatus().catch(()=>{ if(updateState) renderUpdateStatus(updateState); else document.getElementById('update-check').disabled = false; });
   }
 }
 async function saveUpdateAutoCheck(){
@@ -1541,8 +1541,9 @@ async function startDashboard(){
   connectSSE();
   schedulePoll();
   setInterval(()=>loadDatabaseStatus().catch(()=>{}), 5000);
+  // Reads the status every minute (offline mode, a restart); GitHub is still asked only every 6 hours.
   maybeCheckForUpdates().catch(()=>{});
-  setInterval(()=>maybeCheckForUpdates().catch(()=>{}), 30 * 60 * 1000);
+  setInterval(()=>maybeCheckForUpdates().catch(()=>{}), 60 * 1000);
 }
 
 (async()=>{

@@ -824,8 +824,10 @@ def test_update_routes_only_pass_a_known_channel_and_the_fixed_branch(web_ui, mo
         route = rng.choice(["/api/update/check", "/api/update/apply"])
         seen.clear()
         response = client.post(route, json=body)
-        assert response.status_code in {200, 400}, (body, response.status_code)
-        if response.status_code == 400:
+        assert response.status_code in {200, 400, 409}, (body, response.status_code)
+        if response.status_code == 409:  # an automatic check before the last one is 6 hours old
+            assert not seen and response.json["code"] == "update_not_due" and body.get("automatic") is True
+        elif response.status_code == 400:
             assert not seen and response.json["code"] in {"invalid_update_channel", "invalid_json_body"}
         else:
             assert seen == [{"channel": seen[0]["channel"], "branch": "main"}]
@@ -865,7 +867,7 @@ def test_a_release_tag_reaches_git_only_as_a_plain_name_in_the_expected_argument
         assert not tag.startswith("-") and ".." not in tag and not set(tag) & set(" ~^:?*[\\@{}\n")
         fetch, last = calls[0], calls[-1]
         assert fetch[0] == "fetch" and fetch[2] == f"refs/tags/{tag}:refs/tags/{tag}"
-        assert last == (["merge", "--ff-only", tag] if on_branch[-1] else ["checkout", tag])
+        assert last == (["merge", "--ff-only", tag] if on_branch[-1] else ["checkout", "--detach", f"refs/tags/{tag}"])
         assert all(not arg.startswith("-") for args in calls for arg in args[2:] if tag in arg)
     assert reached and refused
 
