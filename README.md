@@ -437,7 +437,24 @@ working tree, and only fast-forwards — it refuses and leaves your checkout unt
 working tree has uncommitted changes or the local branch has diverged from the target (resolve
 that manually, e.g. with `git rebase` or by committing/stashing first). It does not verify signatures: it
 trusts the repository named by `--update-repo`, so keep the default unless you trust another. Restart
-AutoPWN Suite after it reports success so the updated code takes effect.
+AutoPWN Suite after it reports success so the updated code takes effect. When nothing is newer it changes
+nothing and reports `Already up to date`. It never moves a checkout back: a branch or detached HEAD that is
+already ahead of the target stays where it is, and the commit channel reports such a checkout as up to date.
+When an update changes `pyproject.toml`, `poetry.lock`, `requirements.txt` or `requirements-locked.txt`, it
+also tells you to install the dependencies again, as **From source** under Installation describes, before
+restarting.
+
+The dashboard offers the same check and update under **Settings → AutoPWN Suite updates**. With
+**Check for updates automatically** on (the default), it asks GitHub when a dashboard page opens and then at
+most every 6 hours, never in offline mode; turn the switch off to check only when you click
+**Check for updates**. When a newer version exists it shows an **Update** badge on the Settings tab. It
+applies the update only when you click **Apply update** and confirm. Only the channel can be chosen there: the
+repository is `AUTOPWN_UPDATE_REPO` (or the default), and the commit channel always follows `main`. Applying
+needs a git checkout, and it waits until no scan, web verification or database download is running. While an
+update is applied, and afterwards until you restart the dashboard, new scans, resumes and web verifications are
+refused and scheduled scans wait. The dashboard notices any change to its checkout, including
+`--apply-update` or a `git pull` while it runs, because it compares the commit on disk with the one it
+started from. Restart the dashboard, then reload the page.
 
 ## Interface language
 
@@ -659,6 +676,9 @@ The web UI exposes a full REST API:
 | `POST` | `/api/web/findings/<scan_id>/<finding_id>/verify` | Explicitly replay the stored plan; send an empty JSON object |
 | `GET` | `/api/settings` | Get all settings |
 | `PUT` | `/api/settings` | Update settings |
+| `GET` | `/api/update` | Update channel, last check result and whether a restart is needed |
+| `POST` | `/api/update/check` | Check GitHub for a newer version now; optional `{"channel": "release"}` or `"commit"` |
+| `POST` | `/api/update/apply` | Fast-forward this git checkout to the newer release or commit |
 | `GET` | `/api/profiles` | List scan profiles |
 | `POST` | `/api/profiles` | Create a profile |
 | `PUT` | `/api/profiles/<id>` | Update a profile |

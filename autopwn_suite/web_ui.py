@@ -63,6 +63,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -70,7 +71,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Optional
 
-from autopwn_suite import i18n
+from autopwn_suite import i18n, update_checker
 from autopwn_suite.credential_files import (
     NIST_API_KEY,
     SMTP_PASSWORD,
@@ -217,11 +218,112 @@ def _update_vulnerability_database():
             _database_update["running"] = False
 
 
+# ── Self-update (checks GitHub and fast-forwards a git checkout; explicit or periodic, never offline) ──
+
+_UPDATE_BRANCH = "main"
+_app_update_lock = threading.Lock()
+_app_update = {"running": None, "checked_at": None, "status": None, "error": None, "error_code": None,
+               "result": None}
+_start_commit = None  # the checkout's commit when the server started; None when it does not run from a checkout
+_update_hold_logged = False
+# Fixed text for each UpdateCheckError code: the error's own message is never sent.
+_APP_UPDATE_ERRORS = {
+    "update_unreachable": "Could not reach GitHub. Check the connection and try again.",
+    "update_not_found": "GitHub has no release or branch to compare against.",
+    "update_rate_limited": "GitHub API rate limit exceeded; try again later.",
+    "update_http_error": "GitHub returned an error; try again later.",
+    "update_bad_response": "GitHub returned an unexpected response.",
+    "update_invalid_repo": "AUTOPWN_UPDATE_REPO must be written OWNER/REPO.",
+    "update_invalid_ref": "The latest release tag is not a plain git name.",
+    "update_not_checkout": "This copy is not a git checkout, so it cannot update itself. Update it the way it was installed.",
+    "update_git_failed": "git could not complete the update. Check that git is installed and works in this checkout.",
+    "update_dirty_worktree": "The checkout has uncommitted or untracked changes; commit or stash them before updating.",
+    "update_fetch_failed": "git fetch from GitHub failed. Check the connection and try again.",
+    "update_diverged": "The checkout has diverged from the update, so it cannot be fast-forwarded. Resolve it with git.",
+    "update_detached_head": "HEAD is detached; check out a branch before updating from the commit channel.",
+}
+
+
+def _app_update_error(error, generic):
+    """The stable code and fixed text for a refused or failed check or update."""
+    if error.code in _APP_UPDATE_ERRORS:
+        return error.code, _APP_UPDATE_ERRORS[error.code]
+    return "update_failed", generic
+
+
+def _restart_required(commit=None):
+    """Whether the checkout moved since the server started (an update from here, the CLI or git), so the code on
+    disk is no longer the code this process runs."""
+    if _start_commit is None:
+        return False
+    commit = commit or update_checker.current_commit()
+    return commit is not None and commit != _start_commit
+
+
+def _update_hold():
+    """The code and fixed text that make new scans and verifications wait for an update, or None."""
+    with _app_update_lock:
+        applying = _app_update["running"] == "apply"
+    if applying:
+        return "update_in_progress", "Wait for the update to finish before starting scans or verifications."
+    if _restart_required():
+        # A run would mix the loaded code with the files the update changed on disk.
+        return "update_restart_required", "Restart the dashboard to finish the update first."
+    return None
+
+
+def _app_update_snapshot():
+    with _app_update_lock:
+        state = deepcopy(_app_update)
+    commit = update_checker.current_commit()
+    return {**state, "channel": update_checker.resolve_update_channel(None), "repo": update_checker.DEFAULT_REPO,
+            "version": __version__, "checkout": commit is not None, "restart_required": _restart_required(commit),
+            "auto_check": _get_setting("update_auto_check") is not False,
+            "offline_only": _offline_enabled(), "offline_locked": _OFFLINE_ONLY}
+
+
+def _requested_update(automatic_allowed=False):
+    """The channel a check or apply request names (None keeps the saved one) and whether the page asked on its own,
+    or raise ValueError."""
+    body = request.get_json(force=True, silent=True) or {}
+    if not isinstance(body, dict):
+        raise ValueError("Update request must be an object")
+    channel = body.get("channel")
+    if channel is not None and channel not in ("release", "commit"):
+        raise ValueError("channel must be 'release' or 'commit'")
+    automatic = body.get("automatic", False)
+    if not isinstance(automatic, bool) or (automatic and not automatic_allowed):
+        raise ValueError("automatic must be a boolean, and only a check can be automatic")
+    return channel, automatic
+
+
+def _claim_app_update(kind):
+    """Mark a check or apply as running, or return the refusal when it may not start now."""
+    with _mode_lock:
+        if _offline_enabled():
+            return jsonify({"error": "This server is in offline mode, so it does not contact GitHub.", "code": "update_offline"}), 409
+        if kind == "apply":
+            # A running job keeps using the code it loaded; the checkout must not change underneath it.
+            if any(job.status in ("running", "stopping") for job in _all_scans()):
+                return jsonify({"error": "Stop or finish active scans before applying an update.", "code": "update_blocked_scans"}), 409
+            if _web_verifications_running:
+                return jsonify({"error": "Wait for active web verifications to finish before applying an update.", "code": "update_blocked_verifications"}), 409
+            with _database_update_lock:
+                if _database_update["running"]:
+                    return jsonify({"error": "Wait for the database update to finish before applying an update.", "code": "update_blocked_db_update"}), 409
+        with _app_update_lock:
+            if _app_update["running"]:
+                return jsonify({"error": "An update check or update is already running.", "code": "update_already_running"}), 409
+            _app_update["running"] = kind
+    return None
+
+
 # ── Settings persistence ──────────────────────────────────────────────────────
 
 _DEFAULT_SETTINGS = {
     "nist_api_key": "",
     "offline_mode": False,
+    "update_auto_check": True,
     "language": "",
     "email": {
         "enabled":  False,
@@ -1865,6 +1967,16 @@ def _disable_invalid_schedule(schedule: dict, error: ValueError) -> None:
                     "Edit the schedule or its profile and enable it again.")
 
 
+def _scheduler_update_hold() -> bool:
+    """Whether scheduled scans wait for an update this minute; the wait is logged once, not every minute."""
+    global _update_hold_logged
+    hold = _update_hold()
+    if hold and not _update_hold_logged:
+        _scheduler_note("warning", "[*] Scheduled scans are postponed: " + hold[1])
+    _update_hold_logged = bool(hold)
+    return bool(hold)
+
+
 def _scheduler_loop() -> None:
     """Background thread: checks schedules every 60 seconds."""
     while True:
@@ -1877,10 +1989,13 @@ def _scheduler_loop() -> None:
             logging.exception("Could not read scheduled scans")
             continue
 
+        hold = _scheduler_update_hold()
         for schedule in all_schedules:
             try:
                 if not _should_fire(schedule):
                     continue
+                if hold:
+                    continue  # still due, so it runs once the update is finished or the dashboard restarted
                 if _previous_run_active(schedule):
                     continue
                 # Keep the profile and schedule stable until launch. Deleting,
@@ -1987,6 +2102,9 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         body = request.get_json(silent=True) or {}
         if set(body) - {"web_options"}:
             return jsonify({"error": "Only web limits and speed may be changed when resuming.", "code": "resume_fields_restricted"}), 400
+        hold = _update_hold()
+        if hold:
+            return jsonify({"error": hold[1], "code": hold[0]}), 409
         # Reserve the existing job before launching to prevent double resumes.
         with _mode_lock, job._lock:
             if job.status not in ("partial", "stopped", "error"):
@@ -2037,6 +2155,9 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                       nmap_flags=_build_nmap_flags(config))
         if _offline_enabled():
             config["vulnerability_source"] = "offline"
+        hold = _update_hold()
+        if hold:
+            return jsonify({"error": hold[1], "code": hold[0]}), 409
         if config["scan_web"] and config["vulnerability_source"] == "offline":
             return jsonify({"error": "Web checks are disabled in offline mode.", "code": "web_checks_offline"}), 409
         if config["scan_vulns"] and config["vulnerability_source"] == "offline" and not database_status(_VULNERABILITY_DB)["ready"]:
@@ -2095,6 +2216,9 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         result = job.web_finding(finding_id) if job else None
         if not result:
             return jsonify({"error": "Web finding not found", "code": "web_finding_not_found"}), 404
+        hold = _update_hold()
+        if hold:
+            return jsonify({"error": hold[1], "code": hold[0]}), 409
         body = request.get_json(silent=True)
         if body is None:
             body = {}
@@ -2187,6 +2311,59 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
         path = database_path(_VULNERABILITY_DB)
         return send_from_directory(path.parent, path.name, as_attachment=True,
                                    download_name="vulnerabilities.sqlite3")
+
+    # ── Self-update ──
+
+    @app.route("/api/update")
+    def api_app_update():
+        return jsonify(_app_update_snapshot())
+
+    @app.route("/api/update/check", methods=["POST"])
+    def api_app_update_check():
+        try:
+            channel, automatic = _requested_update(automatic_allowed=True)
+        except ValueError:
+            return jsonify({"error": "channel must be 'release' or 'commit'; automatic must be a boolean.", "code": "invalid_update_channel"}), 400
+        if automatic and _get_setting("update_auto_check") is False:
+            return jsonify({"error": "Automatic update checks are turned off in Settings.", "code": "update_auto_check_off"}), 409
+        refusal = _claim_app_update("check")
+        if refusal:
+            return refusal
+        status, code, error = None, None, None
+        try:
+            channel = update_checker.resolve_update_channel(channel)
+            status = asdict(update_checker.check_for_updates(__version__, channel=channel, branch=_UPDATE_BRANCH))
+        except update_checker.UpdateCheckError as exc:
+            code, error = _app_update_error(exc, "Could not check for updates.")
+        finally:
+            # A failed check counts too: the page waits for the next interval instead of asking again at once.
+            with _app_update_lock:
+                _app_update.update(running=None, checked_at=datetime.now(timezone.utc).isoformat(),
+                                   status=status, error=error, error_code=code)
+        return jsonify(_app_update_snapshot())
+
+    @app.route("/api/update/apply", methods=["POST"])
+    def api_app_update_apply():
+        try:
+            channel, _automatic = _requested_update()
+        except ValueError:
+            return jsonify({"error": "channel must be 'release' or 'commit'; automatic must be a boolean.", "code": "invalid_update_channel"}), 400
+        refusal = _claim_app_update("apply")
+        if refusal:
+            return refusal
+        try:
+            channel = update_checker.resolve_update_channel(channel)
+            result = update_checker.apply_update(channel=channel, branch=_UPDATE_BRANCH)
+        except update_checker.UpdateCheckError as exc:
+            code, error = _app_update_error(exc, "Could not apply the update.")
+            return jsonify({"error": error, "code": code}), 409
+        finally:
+            with _app_update_lock:
+                _app_update["running"] = None
+        logging.info("Self-update (%s): %s -> %s (%s)", result.mode, result.previous, result.new, result.ref)
+        with _app_update_lock:
+            _app_update["result"] = {**asdict(result), "changed": result.changed}
+        return jsonify(_app_update_snapshot())
 
     # ── Hosts / log / events ──
 
@@ -2293,6 +2470,8 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             return jsonify({"error": "language must be empty or a supported language", "code": "invalid_language"}), 400
         if "offline_mode" in body and not isinstance(body["offline_mode"], bool):
             return jsonify({"error": "offline_mode must be a boolean", "code": "invalid_offline_mode_type"}), 400
+        if "update_auto_check" in body and not isinstance(body["update_auto_check"], bool):
+            return jsonify({"error": "update_auto_check must be a boolean", "code": "invalid_update_auto_check_type"}), 400
         with _mode_lock:
             if body.get("offline_mode") is True and not _offline_enabled():
                 if _web_verifications_running:
@@ -2302,6 +2481,9 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                 with _database_update_lock:
                     if _database_update["running"]:
                         return jsonify({"error": "Wait for the database update to finish before enabling offline mode.", "code": "offline_blocked_db_update"}), 409
+                with _app_update_lock:
+                    if _app_update["running"]:
+                        return jsonify({"error": "Wait for the update check or update to finish before enabling offline mode.", "code": "offline_blocked_app_update"}), 409
                 if any(job.status in ("running", "stopping") and job.config.get("vulnerability_source") != "offline"
                        for job in _all_scans()):
                     return jsonify({"error": "Stop or finish active online scans before enabling offline mode.", "code": "offline_blocked_scans"}), 409
@@ -2552,8 +2734,9 @@ def _quiet_request_handler():
 
 def start_server(host: str = "127.0.0.1", port: int = 8080, version: str = "Unkown", *, offline=False, database=None) -> None:
     """Start the web UI server and block until Ctrl+C."""
-    global __version__, _OFFLINE_ONLY, _VULNERABILITY_DB
+    global __version__, _OFFLINE_ONLY, _VULNERABILITY_DB, _start_commit
     __version__ = version
+    _start_commit = update_checker.current_commit()
     _OFFLINE_ONLY = offline
     _VULNERABILITY_DB = database
     if not FLASK_AVAILABLE:

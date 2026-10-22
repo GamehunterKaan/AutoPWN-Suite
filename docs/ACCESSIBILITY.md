@@ -27,7 +27,9 @@ Only features that exist in the source are listed.
   single `<h1>` for the Web Security page; the sign-in page uses `<main>` and `<h1>`.
 - The sign-in form associates `<label for>` with both inputs, sets `autocomplete`
   attributes and announces status messages with `role="status" aria-live="polite"`.
-  The Account form in Settings and the local-database status use the same pattern.
+  The Account form in Settings, the local-database status and the update status use the same pattern; the
+  update channel selector and the automatic-check switch (`role="switch"`, like the offline-mode switch) have a
+  `<label for>`, and the notices that a restart is needed and that dependencies changed use `role="alert"`. The Settings tab's **Update** badge is text, so it is read with the tab's name.
 - Web finding details and the resume settings use the native `<dialog>` element
   opened with `showModal()`, which provides focus containment and Escape-to-close
   in browsers. Dialogs are labelled through `aria-labelledby`, and their close

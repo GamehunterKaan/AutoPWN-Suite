@@ -37,6 +37,7 @@ from autopwn_suite.vulnerability_categories import CATEGORIES, categorize, find_
 from autopwn_suite.vulnerability_db import SCHEMA_VERSION, DatabaseUnavailable, OfflineDatabase
 from autopwn_suite.web.options import normalize_options
 from autopwn_suite.web_auth import ACCOUNT_FILE, password_matches, validate_account
+from tests.auth_helpers import authenticated_app
 
 SEED = 20261016
 VALID_XML = (
@@ -801,6 +802,36 @@ def test_a_commit_id_from_github_reaches_git_only_as_a_full_hex_object_name(monk
             assert args == ["merge-base", "--is-ancestor", sha, "a" * 40]
             assert re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", sha)
     assert asked
+
+
+def test_update_routes_only_pass_a_known_channel_and_the_fixed_branch(web_ui, monkeypatch):
+    rng = random.Random(SEED + 64)
+    seen = []
+    status = update_checker.UpdateStatus("release", "x/y", "1", "2", "https://github.com/x/y", True)
+    result = update_checker.UpdateResult("release", "x/y", "a", "a", "v2")
+    monkeypatch.setattr(web_ui.module, "__version__", "2.8.0", raising=False)
+    monkeypatch.setattr(update_checker, "current_commit", lambda: None)
+    monkeypatch.setattr(update_checker, "check_for_updates", lambda *a, **k: seen.append(k) or status)
+    monkeypatch.setattr(update_checker, "apply_update", lambda *a, **k: seen.append(k) or result)
+    client = authenticated_app(web_ui.module).test_client()
+    channels = ["release", "commit", "Release", "nightly", "", " release", "commit\n", None, 1, True, [], {}]
+    for _ in range(400):
+        body = {"channel": rng.choice(channels)} if rng.random() < .7 else random_value(rng)
+        if isinstance(body, dict) and rng.random() < .3:
+            body.update(repo=random_value(rng), branch=update_name(rng))
+        if isinstance(body, dict) and rng.random() < .4:
+            body["automatic"] = rng.choice([True, False, "true", 1, 0, None, []])
+        route = rng.choice(["/api/update/check", "/api/update/apply"])
+        seen.clear()
+        response = client.post(route, json=body)
+        assert response.status_code in {200, 400}, (body, response.status_code)
+        if response.status_code == 400:
+            assert not seen and response.json["code"] in {"invalid_update_channel", "invalid_json_body"}
+        else:
+            assert seen == [{"channel": seen[0]["channel"], "branch": "main"}]
+            assert seen[0]["channel"] in ("release", "commit")
+            automatic = body.get("automatic", False) if isinstance(body, dict) else False
+            assert automatic is False or (automatic is True and route == "/api/update/check")
 
 
 def test_a_release_tag_reaches_git_only_as_a_plain_name_in_the_expected_arguments(monkeypatch):
