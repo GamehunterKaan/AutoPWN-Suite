@@ -25,6 +25,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   branch's latest commit (a branch with local commits on top). When an update changes `pyproject.toml`,
   `poetry.lock`, `requirements.txt` or `requirements-locked.txt`, the CLI and the dashboard say to install the
   dependencies again before restarting.
+- Update `setuptools` from 84.0.0 to 84.1.0 in the hash-pinned build tools of the standalone binaries
+  (`packaging/requirements-build.txt`). It is a dependency of PyInstaller and is installed only in the
+  binary build environment; it is not a dependency of the package.
 
 ### Security changes
 
@@ -43,6 +46,12 @@ existing release summaries; they do not retroactively claim artifact signing.
   process loaded with data files the update changed on disk; the dashboard now refuses such runs until the restart.
 - The commit ID that GitHub returns reaches `git` only as a full hexadecimal object name. No new dependency,
   secret, permission or workflow.
+- `setuptools` 84.1.0 fixes GHSA-xmj3-9gf7-h52w (low severity: a Windows path escape through
+  `namespace_packages.txt` when a wheel is installed as an egg) and a path traversal in
+  `setuptools.archive_util` that setuptools' own changelog names GHSA-grgh-hr87-3jpw. The pinned 84.0.0 is in the
+  affected range of the first. The project does not use either code path, and a build never installs
+  wheels as eggs or extracts untrusted archives, so there is no known impact on the released files; the
+  update keeps the pinned build tools free of known advisories, which the release's security policy checks.
 
 ## [2.8.0] - 2026-10-21
 
