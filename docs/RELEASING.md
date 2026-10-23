@@ -83,7 +83,8 @@ code 10); the v2.7.0 release run hit this once, and re-running its failed jobs r
 The step therefore asks again, up to seven times over about two minutes, and fails only if
 no attempt verifies. Only `cosign verify` is retried: `cosign sign` runs once, because
 every run attaches another bundle, and the identity, issuer and digest never change. The
-backfill workflow does the same. The first real run of this retry is the next release.
+backfill workflow does the same. The v2.8.0 release was the first real run of this retry, and its
+run succeeded.
 
 `publish-pypi.yml` runs on the same release event. It validates the tag with the
 same `release_assets.py` checks, calls the same security and dynamic-analysis

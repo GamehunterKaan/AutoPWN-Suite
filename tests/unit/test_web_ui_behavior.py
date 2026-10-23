@@ -183,7 +183,7 @@ assert.equal(nodes.get('database-update').disabled,false);
 assert.equal(nodes.get('f-vuln-source').disabled,false);
 assert.equal(nodes.get('f-vuln-source').value,'online');
 assert.equal(nodes.get('s-offline-mode').checked,false);
-assert.equal(calls.length,4);
+assert.equal(calls.filter(([url])=>url!=='/api/update').length,4);  // the update section is re-read too
 """)
 
 
@@ -1157,9 +1157,10 @@ const started=[];
 initDashboard=async()=>{throw new TypeError('a host without a field')};
 connectSSE=()=>started.push('stream');
 schedulePoll=()=>started.push('poll');
-setInterval=()=>started.push('database status');
+setInterval=(handler,ms)=>started.push(ms===5000?'database status':'update interval');
+maybeCheckForUpdates=async()=>started.push('update check');
 await startDashboard();
-assert.deepEqual(started,['stream','poll','database status']);
+assert.deepEqual(started,['stream','poll','database status','update check','update interval']);
 assert.ok(nodes.get('term').children.some(line=>line.innerHTML.includes('Refresh to retry.')));
 """)
 
@@ -1303,4 +1304,260 @@ hosts={};
 renderVulnTable();
 assert.equal(bar.hidden,true);
 assert.equal(bar.innerHTML,'');
+""")
+
+
+UPDATE_STATE = r"""
+const updateState=(extra={})=>({running:null,checked_at:null,status:null,error:null,error_code:null,result:null,
+  restart_required:false,channel:'release',repo:'x/y',version:'2.8.0',checkout:true,offline_only:false,
+  offline_locked:false,...extra});
+const available={mode:'release',repo:'x/y',current:'2.8.0',latest:'v2.9.0',
+  url:'https://github.com/x/y/releases/tag/v2.9.0',update_available:true};
+const badge=new Set();
+document.getElementById('badge-settings').classList={toggle(name,on){ if(on) badge.add(name); else badge.delete(name); }};
+"""
+
+
+def test_an_available_update_enables_apply_and_shows_the_badge_and_link():
+    run_js(UPDATE_STATE + r"""
+renderUpdateStatus(updateState({status:available,checked_at:'2026-10-22T08:00:00Z'}));
+assert.equal(nodes.get('update-apply').disabled,false);
+assert.equal(nodes.get('update-link').hidden,false);
+assert.equal(nodes.get('update-link').href,available.url);
+assert.match(nodes.get('update-status').textContent,/Update available: 2\.8\.0 → v2\.9\.0/);
+assert.ok(badge.has('show'));
+renderUpdateStatus(updateState({status:{...available,update_available:false}}));
+assert.equal(nodes.get('update-apply').disabled,true);
+assert.equal(nodes.get('update-link').hidden,true);
+assert.ok(!badge.has('show'));
+""")
+
+
+def test_update_text_and_links_from_github_stay_text_and_on_github():
+    run_js(UPDATE_STATE + r"""
+const hostile={...available,latest:'<img src=x onerror=alert(1)>',url:'javascript:alert(1)'};
+renderUpdateStatus(updateState({status:hostile}));
+assert.match(nodes.get('update-status').textContent,/<img src=x/);
+assert.equal(nodes.get('update-status').innerHTML,'');
+assert.equal(nodes.get('update-link').hidden,true);
+renderUpdateStatus(updateState({status:{...available,url:'https://github.com.evil.test/x'}}));
+assert.equal(nodes.get('update-link').hidden,true);
+""")
+
+
+def test_apply_is_unavailable_offline_without_a_checkout_and_while_a_restart_is_pending():
+    run_js(UPDATE_STATE + r"""
+for(const extra of [{offline_only:true},{checkout:false},{restart_required:true},{running:'check'}]){
+  renderUpdateStatus(updateState({status:available,...extra}));
+  assert.equal(nodes.get('update-apply').disabled,true,JSON.stringify(extra));
+}
+renderUpdateStatus(updateState({checkout:false}));
+assert.equal(nodes.get('s-update-channel-commit').disabled,true);
+assert.match(nodes.get('update-status').textContent,/not a git checkout/);
+renderUpdateStatus(updateState({restart_required:true}));
+assert.equal(nodes.get('update-restart').hidden,false);
+assert.ok(badge.has('show'));
+// The process still reports its old version until the restart, so the line shows what was applied, not the offer.
+renderUpdateStatus(updateState({status:available,restart_required:true,
+  result:{mode:'release',repo:'x/y',previous:'aaaaaaaaaaaa',new:'bbbbbbbbbbbb',ref:'v2.9.0',changed:true}}));
+assert.match(nodes.get('update-status').textContent,/^Updated aaaaaaaaaaaa → bbbbbbbbbbbb \(v2\.9\.0\)\./);
+assert.doesNotMatch(nodes.get('update-status').textContent,/Update available/);
+""")
+
+
+def test_the_dashboard_checks_github_only_when_the_last_check_is_old_and_never_offline():
+    run_js(UPDATE_STATE + r"""
+let state, posts;
+fetch=async (url,opts)=>{
+  if(opts){ posts.push([url,JSON.parse(opts.body)]); return {ok:true,json:async()=>state}; }
+  return {ok:true,json:async()=>state};
+};
+// The server says when a check is due (its own clock); the page never compares the browser's clock with checked_at.
+const cases=[
+  [{check_due:true},1],
+  [{check_due:false,checked_at:new Date(Date.now()-7*3600*1000).toISOString()},0],
+  [{check_due:true,checked_at:new Date(Date.now()+3600*1000).toISOString()},1],
+  [{check_due:true,offline_only:true},0],
+  [{check_due:true,restart_required:true},0],
+  [{check_due:true,running:'apply'},0],
+  [{check_due:false,auto_check:false},0],
+];
+for(const [extra,expected] of cases){
+  posts=[]; state=updateState(extra);
+  await maybeCheckForUpdates();
+  assert.equal(posts.length,expected,JSON.stringify(extra));
+  if(expected) assert.deepEqual(posts[0],['/api/update/check',{automatic:true}]);
+}
+""")
+
+
+def test_a_manual_check_sends_the_selected_channel_and_reports_a_failed_check():
+    run_js(UPDATE_STATE + r"""
+const posts=[];
+fetch=async (url,opts)=>{
+  if(opts) posts.push(JSON.parse(opts.body));
+  return {ok:true,json:async()=>updateState({error:'Could not reach GitHub.',error_code:'update_unreachable',checked_at:'2026-10-22T08:00:00Z'})};
+};
+document.getElementById('s-update-channel').value='commit';
+await checkForUpdates(true);
+assert.deepEqual(posts,[{channel:'commit'}]);
+assert.equal(nodes.get('toast-el').textContent,'Could not reach GitHub. Check the connection and try again.');
+assert.match(nodes.get('update-status').textContent,/Could not reach GitHub/);
+assert.equal(nodes.get('update-check').disabled,false);
+""")
+
+
+def test_apply_asks_first_and_applies_the_channel_that_was_checked():
+    run_js(UPDATE_STATE + r"""
+const posts=[];
+let after=updateState({status:available});
+fetch=async (url,opts)=>{
+  if(opts){ posts.push([url,JSON.parse(opts.body)]);
+    after=updateState({restart_required:true,result:{changed:true}});
+    return {ok:true,json:async()=>({...after})}; }
+  return {ok:true,json:async()=>after};
+};
+renderUpdateStatus(updateState({status:available}));
+confirm=()=>false;
+await applyUpdate();
+assert.equal(posts.length,0);
+confirm=()=>true;
+document.getElementById('s-update-channel').value='commit';
+await applyUpdate();
+assert.deepEqual(posts,[['/api/update/apply',{channel:'release'}]]);
+assert.equal(nodes.get('toast-el').textContent,'Update applied. Restart the dashboard, then reload this page.');
+assert.equal(nodes.get('update-restart').hidden,false);
+assert.equal(nodes.get('update-apply').disabled,true);
+""")
+
+
+def test_a_refused_apply_is_toasted_with_the_translated_reason():
+    run_js(UPDATE_STATE + r"""
+fetch=async (url,opts)=>opts
+  ? {ok:false,json:async()=>({error:'Stop or finish active scans before applying an update.',code:'update_blocked_scans'})}
+  : {ok:true,json:async()=>updateState({status:available})};
+renderUpdateStatus(updateState({status:available}));
+confirm=()=>true;
+await applyUpdate();
+assert.equal(nodes.get('toast-el').textContent,'Stop or finish active scans before applying an update.');
+assert.equal(nodes.get('update-apply').disabled,false);
+""")
+
+
+def test_the_auto_check_toggle_shows_the_setting_and_saves_it():
+    run_js(UPDATE_STATE + r"""
+const puts=[];
+let auto=true;
+fetch=async (url,opts)=>{
+  if(opts){ puts.push([url,opts.method,JSON.parse(opts.body)]); auto=JSON.parse(opts.body).update_auto_check;
+    return {ok:true,json:async()=>({ok:true})}; }
+  return {ok:true,json:async()=>updateState({auto_check:auto})};
+};
+renderUpdateStatus(updateState({auto_check:false}));
+assert.equal(nodes.get('s-update-auto').checked,false);
+document.getElementById('s-update-auto').checked=true;
+await saveUpdateAutoCheck();
+assert.deepEqual(puts,[['/api/settings','PUT',{update_auto_check:true}]]);
+assert.equal(nodes.get('toast-el').textContent,'Automatic update checks turned on.');
+assert.equal(nodes.get('s-update-auto').checked,true);
+assert.equal(nodes.get('s-update-auto').disabled,false);
+""")
+
+
+def test_a_failed_auto_check_save_restores_the_toggle():
+    run_js(UPDATE_STATE + r"""
+fetch=async (url,opts)=>opts
+  ? {ok:false,json:async()=>({error:'update_auto_check must be a boolean',code:'invalid_update_auto_check_type'})}
+  : {ok:true,json:async()=>updateState({auto_check:true})};
+document.getElementById('s-update-auto').checked=false;
+await saveUpdateAutoCheck();
+assert.equal(nodes.get('s-update-auto').checked,true);
+assert.equal(nodes.get('toast-el').textContent,'The automatic update check setting must be on or off.');
+""")
+
+
+def test_the_dependency_notice_shows_only_for_an_applied_update_that_changed_them():
+    run_js(UPDATE_STATE + r"""
+const result={mode:'release',repo:'x/y',previous:'a',new:'b',ref:'v2.9.0',changed:true,dependencies_changed:true};
+renderUpdateStatus(updateState({restart_required:true,result}));
+assert.equal(nodes.get('update-dependencies').hidden,false);
+renderUpdateStatus(updateState({restart_required:true,result:{...result,dependencies_changed:false}}));
+assert.equal(nodes.get('update-dependencies').hidden,true);
+renderUpdateStatus(updateState({restart_required:false,result}));
+assert.equal(nodes.get('update-dependencies').hidden,true);
+""")
+
+
+def test_a_scan_held_for_the_restart_is_reported_with_the_translated_reason():
+    run_js(r"""
+fetch=async ()=>({ok:false,status:409,json:async()=>({error:'Restart the dashboard to finish the update first.',code:'update_restart_required'})});
+document.getElementById('f-target').value='192.0.2.10';
+await startScan();
+assert.equal(nodes.get('toast-el').textContent,'Restart the dashboard to finish the update first.');
+""")
+
+
+def test_update_buttons_recover_when_the_status_reload_after_an_action_fails():
+    run_js(UPDATE_STATE + r"""
+let posted=false;
+fetch=async (url,opts)=>{
+  if(opts){ posted=true; return {ok:true,json:async()=>updateState({status:available})}; }
+  if(posted) return {ok:false,status:502,json:async()=>({})};
+  return {ok:true,json:async()=>updateState({status:available})};
+};
+renderUpdateStatus(updateState({status:available}));
+await checkForUpdates(true);
+assert.equal(nodes.get('update-check').disabled,false);
+assert.equal(nodes.get('update-apply').disabled,false);
+confirm=()=>true;
+await applyUpdate();
+assert.equal(nodes.get('update-check').disabled,false);
+""")
+
+
+def test_switching_offline_mode_refreshes_the_update_section_at_once():
+    run_js(UPDATE_STATE + r"""
+let offline=false;
+const reads=[];
+fetch=async (url,opts)=>{
+  if(opts){ offline=JSON.parse(opts.body).offline_mode; return {ok:true,json:async()=>({ok:true})}; }
+  reads.push(url);
+  if(url==='/api/update') return {ok:true,json:async()=>updateState({status:available,offline_only:offline})};
+  return {ok:true,json:async()=>({ready:false,offline_only:offline,offline_locked:false,update:{}})};
+};
+renderUpdateStatus(updateState({status:available}));
+document.getElementById('s-offline-mode').checked=true;
+await saveOfflineMode();
+assert.ok(reads.includes('/api/update'));
+assert.equal(nodes.get('update-apply').disabled,true);
+assert.match(nodes.get('update-status').textContent,/Offline mode is on/);
+""")
+
+
+def test_update_controls_get_keyboard_focus_back_after_their_request():
+    run_js(UPDATE_STATE + r"""
+// A control that is disabled while its request runs loses keyboard focus; the page hands it back.
+fetch=async (url,opts)=>{
+  if(opts) return {ok:true,json:async()=>({ok:true,result:{changed:true}})};
+  return {ok:true,json:async()=>updateState({status:available})};
+};
+renderUpdateStatus(updateState({status:available}));
+confirm=()=>true;
+for(const [id,run] of [['s-update-auto',()=>saveUpdateAutoCheck()],['update-check',()=>checkForUpdates(true)]]){
+  const control=document.getElementById(id);
+  control.id=id;  // the harness's nodes carry no id of their own
+  let focusedAgain=0;
+  control.focus=()=>{ focusedAgain++; };
+  document.activeElement=control;
+  await run();
+  assert.equal(focusedAgain,1,id);
+}
+// Focus that was somewhere else is not taken.
+const other=document.getElementById('f-target');
+let stolen=0;
+document.getElementById('update-check').focus=()=>{ stolen++; };
+other.id='f-target';
+document.activeElement=other;
+await checkForUpdates(true);
+assert.equal(stolen,0);
 """)

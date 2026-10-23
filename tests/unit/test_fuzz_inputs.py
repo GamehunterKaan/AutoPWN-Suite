@@ -37,6 +37,7 @@ from autopwn_suite.vulnerability_categories import CATEGORIES, categorize, find_
 from autopwn_suite.vulnerability_db import SCHEMA_VERSION, DatabaseUnavailable, OfflineDatabase
 from autopwn_suite.web.options import normalize_options
 from autopwn_suite.web_auth import ACCOUNT_FILE, password_matches, validate_account
+from tests.auth_helpers import authenticated_app
 
 SEED = 20261016
 VALID_XML = (
@@ -776,6 +777,65 @@ def test_github_responses_only_produce_a_status_or_the_documented_error(monkeypa
     assert statuses and errors
 
 
+def test_a_commit_id_from_github_reaches_git_only_as_a_full_hex_object_name(monkeypatch):
+    rng = random.Random(SEED + 63)
+    calls = []
+
+    def run_git(args, check=True):
+        calls.append(list(args))
+        return SimpleNamespace(returncode=rng.choice([0, 1, 128]), stdout="", stderr="")
+
+    monkeypatch.setattr(update_checker, "_run_git", run_git)
+    monkeypatch.setattr(update_checker, "_local_commit", lambda: "a" * 40)
+    pieces = ["b" * 40, "c" * 64, "B" * 40, "b" * 39, "b" * 41, "-", "--all", "HEAD", "\n", " ", "g", "^", "~1", ":"]
+    asked = 0
+    for _ in range(3000):
+        sha = "".join(rng.choice(pieces) for _ in range(rng.randint(0, 3))) if rng.random() < .8 else random_value(rng)
+        reply = MagicMock(status_code=200, ok=True)
+        reply.json.return_value = {"sha": sha}
+        monkeypatch.setattr(update_checker.requests, "get", lambda *a, _reply=reply, **k: _reply)
+        calls.clear()
+        status = update_checker.check_commit(repo="x/y")
+        assert isinstance(status.update_available, bool)
+        for args in calls:
+            asked += 1
+            assert args == ["merge-base", "--is-ancestor", sha, "a" * 40]
+            assert re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", sha)
+    assert asked
+
+
+def test_update_routes_only_pass_a_known_channel_and_the_fixed_branch(web_ui, monkeypatch):
+    rng = random.Random(SEED + 64)
+    seen = []
+    status = update_checker.UpdateStatus("release", "x/y", "1", "2", "https://github.com/x/y", True)
+    result = update_checker.UpdateResult("release", "x/y", "a", "a", "v2")
+    monkeypatch.setattr(web_ui.module, "__version__", "2.8.0", raising=False)
+    monkeypatch.setattr(update_checker, "current_commit", lambda: None)
+    monkeypatch.setattr(update_checker, "check_for_updates", lambda *a, **k: seen.append(k) or status)
+    monkeypatch.setattr(update_checker, "apply_update", lambda *a, **k: seen.append(k) or result)
+    client = authenticated_app(web_ui.module).test_client()
+    channels = ["release", "commit", "Release", "nightly", "", " release", "commit\n", None, 1, True, [], {}]
+    for _ in range(400):
+        body = {"channel": rng.choice(channels)} if rng.random() < .7 else random_value(rng)
+        if isinstance(body, dict) and rng.random() < .3:
+            body.update(repo=random_value(rng), branch=update_name(rng))
+        if isinstance(body, dict) and rng.random() < .4:
+            body["automatic"] = rng.choice([True, False, "true", 1, 0, None, []])
+        route = rng.choice(["/api/update/check", "/api/update/apply"])
+        seen.clear()
+        response = client.post(route, json=body)
+        assert response.status_code in {200, 400, 409}, (body, response.status_code)
+        if response.status_code == 409:  # an automatic check before the last one is 6 hours old
+            assert not seen and response.json["code"] == "update_not_due" and body.get("automatic") is True
+        elif response.status_code == 400:
+            assert not seen and response.json["code"] in {"invalid_update_channel", "invalid_json_body"}
+        else:
+            assert seen == [{"channel": seen[0]["channel"], "branch": "main"}]
+            assert seen[0]["channel"] in ("release", "commit")
+            automatic = body.get("automatic", False) if isinstance(body, dict) else False
+            assert automatic is False or (automatic is True and route == "/api/update/check")
+
+
 def test_a_release_tag_reaches_git_only_as_a_plain_name_in_the_expected_arguments(monkeypatch):
     rng = random.Random(SEED + 62)
     calls = []
@@ -807,7 +867,7 @@ def test_a_release_tag_reaches_git_only_as_a_plain_name_in_the_expected_argument
         assert not tag.startswith("-") and ".." not in tag and not set(tag) & set(" ~^:?*[\\@{}\n")
         fetch, last = calls[0], calls[-1]
         assert fetch[0] == "fetch" and fetch[2] == f"refs/tags/{tag}:refs/tags/{tag}"
-        assert last == (["merge", "--ff-only", tag] if on_branch[-1] else ["checkout", tag])
+        assert last == (["merge", "--ff-only", tag] if on_branch[-1] else ["checkout", "--detach", f"refs/tags/{tag}"])
         assert all(not arg.startswith("-") for args in calls for arg in args[2:] if tag in arg)
     assert reached and refused
 

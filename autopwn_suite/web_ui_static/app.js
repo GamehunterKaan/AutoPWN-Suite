@@ -1047,6 +1047,7 @@ async function saveOfflineMode(){
   }finally{
     savingOfflineMode = false;
     await loadDatabaseStatus().catch(()=>{ toggle.disabled = false; });
+    await loadUpdateStatus().catch(()=>{});
   }
 }
 async function updateVulnerabilityDatabase(){
@@ -1059,6 +1060,135 @@ async function updateVulnerabilityDatabase(){
     toast(window.i18n.t('toast.database_download_started'));
   }catch(error){ toast(error.message, false); }
   await loadDatabaseStatus().catch(()=>{ button.disabled = false; });
+}
+
+// ── Settings: updates ─────────────────────────────────────────────────────────
+// With automatic checks on, GitHub is asked when the page opens and then every 6 hours, never in offline mode. The
+// server decides when a check is due (check_due, by its own clock), so other tabs, reloads and a browser clock that
+// is wrong do not make it ask sooner. Applying is always the operator's click.
+let updateState = null;
+let updateBusy = false;
+let savingUpdateAutoCheck = false;
+// Disabling a control that has keyboard focus drops the focus, so the next key press goes nowhere. The update
+// controls are disabled while their request runs; hand the focus back afterwards.
+function focusedUpdateControl(){
+  const id = document.activeElement && document.activeElement.id;
+  return ['s-update-auto','update-check','update-apply'].includes(id) ? id : '';
+}
+function restoreFocus(id){
+  const control = id ? document.getElementById(id) : null;
+  if(control && !control.disabled) control.focus();
+}
+function renderUpdateStatus(state){
+  updateState = state;
+  const t = window.i18n.t;
+  const offline = !!state.offline_only;
+  const status = state.status;
+  let message;
+  if(state.running === 'check') message = t('settings.update_checking');
+  else if(state.running === 'apply') message = t('settings.update_applying');
+  // Until the restart this process still reports its old version, so a fresh check would offer the same update.
+  else if(state.restart_required && state.result && state.result.changed) message = t('settings.update_applied_status', {previous: state.result.previous, new: state.result.new, ref: state.result.ref});
+  else if(state.error_code) message = window.i18n.tErrorCode(state.error_code, state.error);
+  else if(status) message = t(status.update_available ? 'settings.update_available' : 'settings.update_up_to_date', {current: status.current, latest: status.latest});
+  else message = t('settings.update_not_checked');
+  if(state.checked_at && !state.running) message += t('settings.update_checked_at', {time: new Date(state.checked_at).toLocaleString()});
+  if(offline) message += t('settings.update_server_offline');
+  if(!state.checkout) message += t('settings.update_not_checkout');
+  document.getElementById('update-status').textContent = message;
+  const available = !!(status && status.update_available);
+  const channel = document.getElementById('s-update-channel');
+  if(!updateBusy) channel.value = state.channel;
+  channel.disabled = updateBusy || offline || !!state.running;
+  document.getElementById('s-update-channel-commit').disabled = !state.checkout;
+  document.getElementById('update-check').disabled = updateBusy || offline || !!state.running;
+  document.getElementById('update-apply').disabled = updateBusy || offline || !!state.running || !state.checkout || !!state.restart_required || !available;
+  document.getElementById('update-restart').hidden = !state.restart_required;
+  document.getElementById('update-dependencies').hidden = !(state.restart_required && state.result && state.result.dependencies_changed);
+  const autoCheck = document.getElementById('s-update-auto');
+  if(!savingUpdateAutoCheck) autoCheck.checked = state.auto_check !== false;
+  autoCheck.disabled = savingUpdateAutoCheck;
+  // The URL comes from GitHub's response: only a github.com page becomes a link.
+  const link = document.getElementById('update-link');
+  const url = available && typeof status.url === 'string' && status.url.startsWith('https://github.com/') ? status.url : '';
+  link.hidden = !url;
+  if(url) link.href = url;
+  document.getElementById('badge-settings').classList.toggle('show', available || !!state.restart_required);
+}
+async function loadUpdateStatus(){
+  const state = await fetchJson('/api/update');
+  renderUpdateStatus(state);
+  return state;
+}
+async function checkForUpdates(manual){
+  const focused = focusedUpdateControl();
+  updateBusy = true;
+  document.getElementById('update-check').disabled = true;
+  document.getElementById('update-apply').disabled = true;
+  try{
+    // Only the operator's choice is remembered; a periodic check uses the saved channel, and says it is automatic
+    // so that the server refuses it when automatic checks are turned off.
+    const body = manual ? {channel: document.getElementById('s-update-channel').value} : {automatic: true};
+    const response = await fetch('/api/update/check', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const result = await response.json();
+    if(!response.ok) throw new Error(window.i18n.tErrorCode(result.code, result.error || window.i18n.t('toast.could_not_check_updates')));
+    if(manual && result.error_code) toast(window.i18n.tErrorCode(result.error_code, result.error), false);
+  }catch(error){
+    if(manual) toast(error.message, false);
+  }finally{
+    updateBusy = false;
+    await loadUpdateStatus().catch(()=>{ if(updateState) renderUpdateStatus(updateState); else document.getElementById('update-check').disabled = false; });
+    restoreFocus(focused);
+  }
+}
+async function maybeCheckForUpdates(){
+  const state = await loadUpdateStatus();
+  if(!state.check_due || state.offline_only || state.running || state.restart_required) return;
+  await checkForUpdates(false);
+}
+async function applyUpdate(){
+  const status = updateState && updateState.status;
+  if(!status || !status.update_available) return;
+  if(!confirm(window.i18n.t('settings.update_apply_confirm', {latest: status.latest}))) return;
+  const focused = focusedUpdateControl();
+  updateBusy = true;
+  document.getElementById('update-check').disabled = true;
+  document.getElementById('update-apply').disabled = true;
+  try{
+    // Apply the channel whose result the operator saw, not whatever the selector shows now.
+    const response = await fetch('/api/update/apply', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({channel: status.mode})});
+    const result = await response.json();
+    if(!response.ok) throw new Error(window.i18n.tErrorCode(result.code, result.error || window.i18n.t('toast.could_not_apply_update')));
+    toast(window.i18n.t(result.result.changed ? 'toast.update_applied' : 'toast.update_already_current'));
+  }catch(error){
+    toast(error.message, false);
+  }finally{
+    updateBusy = false;
+    await loadUpdateStatus().catch(()=>{ if(updateState) renderUpdateStatus(updateState); else document.getElementById('update-check').disabled = false; });
+    restoreFocus(focused);
+  }
+}
+async function saveUpdateAutoCheck(){
+  const toggle = document.getElementById('s-update-auto');
+  const enabled = toggle.checked;
+  const focused = focusedUpdateControl();
+  savingUpdateAutoCheck = true;
+  toggle.disabled = true;
+  try{
+    const response = await fetch('/api/settings', {method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({update_auto_check:enabled})});
+    const result = await response.json();
+    if(!response.ok) throw new Error(window.i18n.tErrorCode(result.code, result.error || window.i18n.t('toast.could_not_save_update_auto_check')));
+    toast(window.i18n.t(enabled ? 'toast.update_auto_check_on' : 'toast.update_auto_check_off'));
+  }catch(error){
+    toggle.checked = !enabled;
+    toast(error.message, false);
+  }finally{
+    savingUpdateAutoCheck = false;
+    toggle.disabled = false;
+    await loadUpdateStatus().catch(()=>{});
+    restoreFocus(focused);
+  }
 }
 // Settings forms are only saved after the stored values were read into them: saving a form that is
 // blank because loading failed would replace the stored webhook URL, SMTP password and NVD key.
@@ -1427,6 +1557,9 @@ async function startDashboard(){
   connectSSE();
   schedulePoll();
   setInterval(()=>loadDatabaseStatus().catch(()=>{}), 5000);
+  // Reads the status every minute (offline mode, a restart); GitHub is still asked only every 6 hours.
+  maybeCheckForUpdates().catch(()=>{});
+  setInterval(()=>maybeCheckForUpdates().catch(()=>{}), 60 * 1000);
 }
 
 (async()=>{

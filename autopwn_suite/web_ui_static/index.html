@@ -148,7 +148,7 @@
     <div class="tab" onclick="switchTab('vulns',this)"><span data-i18n="nav.vulns">Vulnerabilities</span> <span class="tab-badge" id="badge-vulns">0</span></div>
     <button class="tab" id="web-tab-button" onclick="switchTab('web',this)"><span data-i18n="nav.web">Web Security</span> <span class="tab-badge" id="badge-web">0</span></button>
     <div class="tab" onclick="switchTab('term',this)" data-i18n="nav.terminal">Terminal</div>
-    <div class="tab" onclick="switchTab('settings',this)" data-i18n="nav.settings">Settings</div>
+    <div class="tab" onclick="switchTab('settings',this)"><span data-i18n="nav.settings">Settings</span> <span class="tab-badge" id="badge-settings" data-i18n="nav.update_badge">Update</span></div>
   </div>
 
   <!-- Active Scans -->
@@ -254,6 +254,30 @@
             <p id="account-message" role="status" aria-live="polite"></p>
           </div>
         </form>
+      </div>
+
+      <div class="s-section" id="updates-section">
+        <div class="s-section-title" data-i18n="settings.updates_title">AutoPWN Suite updates</div>
+        <div class="toggle-row">
+          <label class="toggle-label" for="s-update-auto" data-i18n="settings.update_auto_check">Check for updates automatically</label>
+          <label class="toggle"><input type="checkbox" id="s-update-auto" role="switch" checked onchange="saveUpdateAutoCheck()"/><span class="toggle-slider"></span></label>
+        </div>
+        <div class="s-row">
+          <div class="s-row-label"><label for="s-update-channel" data-i18n="settings.update_channel">Update channel</label></div>
+          <select id="s-update-channel" onchange="checkForUpdates(true)">
+            <option value="release" data-i18n="settings.update_channel_release">Latest release</option>
+            <option value="commit" id="s-update-channel-commit" data-i18n="settings.update_channel_commit">Latest commit on main</option>
+          </select>
+          <div class="s-row-hint" data-i18n="settings.update_hint">With automatic checks on, the dashboard asks GitHub for a newer version when it opens and every 6 hours, never in offline mode. Applying an update fast-forwards this git checkout; restart the dashboard afterwards to run the new version.</div>
+        </div>
+        <div id="update-status" role="status" aria-live="polite" data-i18n="settings.update_not_checked">Not checked yet.</div>
+        <div id="update-restart" class="web-notice" role="alert" hidden data-i18n="settings.update_restart_required">The code on disk changed since the dashboard started. Restart the dashboard, then reload this page. New scans and verifications wait until then.</div>
+        <div id="update-dependencies" class="web-notice" role="alert" hidden data-i18n="settings.update_dependencies_changed">This update changes the dependencies: install them again as the README's "From source" installation describes, then restart.</div>
+        <div class="s-actions">
+          <button id="update-check" class="btn btn-ghost btn-sm" onclick="checkForUpdates(true)" data-i18n="settings.check_updates">Check for updates</button>
+          <button id="update-apply" class="btn btn-primary btn-sm" onclick="applyUpdate()" disabled data-i18n="settings.apply_update">Apply update</button>
+          <a id="update-link" class="btn btn-ghost btn-sm" href="https://github.com/" target="_blank" rel="noopener noreferrer" hidden data-i18n="settings.view_on_github">View on GitHub</a>
+        </div>
       </div>
 
       <!-- NIST API Key -->

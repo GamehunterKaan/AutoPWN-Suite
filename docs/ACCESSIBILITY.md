@@ -27,7 +27,9 @@ Only features that exist in the source are listed.
   single `<h1>` for the Web Security page; the sign-in page uses `<main>` and `<h1>`.
 - The sign-in form associates `<label for>` with both inputs, sets `autocomplete`
   attributes and announces status messages with `role="status" aria-live="polite"`.
-  The Account form in Settings and the local-database status use the same pattern.
+  The Account form in Settings, the local-database status and the update status use the same pattern; the
+  update channel selector and the automatic-check switch (`role="switch"`, like the offline-mode switch) have a
+  `<label for>`, and the notices that a restart is needed and that dependencies changed use `role="alert"`. The Settings tab's **Update** badge is text, so it is read with the tab's name.
 - Web finding details and the resume settings use the native `<dialog>` element
   opened with `showModal()`, which provides focus containment and Escape-to-close
   in browsers. Dialogs are labelled through `aria-labelledby`, and their close
@@ -61,8 +63,8 @@ contributors at any time.
 | --- | --- | --- | --- |
 | High | The main tabs (Active Scans, Hosts, Vulnerabilities, Terminal, Settings) and several controls such as the advanced-options toggle are `<div>` elements with `onclick`, so they are not reachable or operable by keyboard and expose no role or selected state. | `index.html` (`#tabs`, `#adv-toggle`, host and scan cards in `app.js`) | Use `<button>` or `role="tab"` with `aria-selected`, `tablist`/`tabpanel` relationships and arrow-key support. |
 | High | Most scan-form fields use a `<div class="fl">` caption instead of a `<label>`, so screen readers do not announce a name for them (the file has far fewer `<label>` elements than `<input>`/`<select>` controls). | `index.html` scan form | Associate each caption with its control using `<label for>` or `aria-labelledby`. |
-| High | Text input, select and textarea focus is shown only by a border-color change after `outline:none`; the focus color against its background is about 4:1 and the unfocused border is nearly invisible. Buttons, toggles and tabs lack a custom focus indicator. | `styles.css` | Restore a high-contrast `:focus-visible` outline for all interactive elements. |
-| High | Secondary text colors fail contrast: the "muted" tab, caption and footer color (`--text3`) is about 2.8:1 to 2.9:1 on the panel backgrounds, below the 4.5:1 normal-text minimum. Many labels are 10-11 px uppercase monospace. | `styles.css` | Raise muted text contrast to at least 4.5:1 and avoid text smaller than about 12 px. |
+| High | Text input, select and textarea focus is shown only by a border-color change after `outline:none`; the focus color against its background is about 4:1 and the unfocused border is nearly invisible. Buttons keep the browser's default focus ring (checked in Edge); the on/off switches and `<select>` boxes now get a `:focus-visible` outline; tabs and text fields still lack one. | `styles.css` | Restore a high-contrast `:focus-visible` outline for all interactive elements. |
+| High | Secondary text colors fail contrast: the "muted" tab, caption and footer color (`--text3`) is about 2.8:1 to 2.9:1 on the panel backgrounds, below the 4.5:1 normal-text minimum (the update section uses `--text2`, 6.8:1, for its own label and hint). The off position of the on/off switches (`--border2` on the panel) is about 1.7:1, below the 3:1 minimum for a control. Many labels are 10-11 px uppercase monospace. | `styles.css` | Raise muted text contrast to at least 4.5:1 and avoid text smaller than about 12 px. |
 | Medium | Live scan output is not in an `aria-live` region, so scan progress changes and completed scans are not announced (toast messages are, see above). | `app.js` (terminal view, scan cards) | Add polite live regions for scan status and completion (avoid announcing every terminal line). |
 | Medium | Status is communicated mostly by color (severity, scan state pills, progress). Text labels exist for many but not all states. | `styles.css`, `app.js` | Ensure every color-coded state has a text or icon equivalent. |
 | Medium | No skip link, and keyboard focus order across the three-panel layout has not been tested. | `index.html` | Add a skip-to-main link; verify tab order. |

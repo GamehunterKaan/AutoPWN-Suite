@@ -377,6 +377,25 @@ def test_server_offline_policy_blocks_downloads_and_test_notifications(web, monk
     thread.assert_not_called()
 
 
+@pytest.mark.parametrize("cli_only", [True, False])
+def test_offline_dashboard_never_checks_for_or_applies_updates(web, monkeypatch, cli_only):
+    from autopwn_suite import update_checker
+    wu, client = web
+    monkeypatch.setattr(wu, "__version__", "2.8.0", raising=False)  # set when the dashboard starts
+    if cli_only:
+        monkeypatch.setattr(wu, "_OFFLINE_ONLY", True)
+    else:
+        wu._settings["offline_mode"] = True
+    monkeypatch.setattr("requests.sessions.Session.request", lambda *a, **k: pytest.fail("Offline update tried HTTP"))
+    for name in ("check_for_updates", "apply_update"):
+        monkeypatch.setattr(update_checker, name, lambda *a, **k: pytest.fail("Offline dashboard invoked " + name))
+    for route in ("/api/update/check", "/api/update/apply"):
+        response = client.post(route, json={"channel": "release"})
+        assert response.status_code == 409
+        assert response.json["code"] == "update_offline"
+    assert client.get("/api/update").json["offline_only"] is True
+
+
 def test_server_offline_policy_overrides_online_request(web, local_database, monkeypatch):
     wu, client = web
     monkeypatch.setattr(wu, "_OFFLINE_ONLY", True)

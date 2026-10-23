@@ -34,6 +34,16 @@ def TestOneInput(data):
                 status = update_checker.check_release("2.7.0", repo="x/y")
             assert isinstance(status.latest, str) and isinstance(status.url, str)
             assert isinstance(status.update_available, bool)
+            # The commit ID that GitHub names reaches git only as a full hexadecimal object name.
+            ran = []
+            with patch.object(update_checker.requests, "get", lambda *args, **kwargs: reply), \
+                    patch.object(update_checker, "_local_commit", lambda: "a" * 40), \
+                    patch.object(update_checker, "_run_git",
+                                 lambda args, check=True: ran.append(args) or SimpleNamespace(returncode=1)):
+                status = update_checker.check_commit(repo="x/y")
+            assert isinstance(status.update_available, bool)
+            for args in ran:
+                assert args[:2] == ["merge-base", "--is-ancestor"] and update_checker._COMMIT_ID.fullmatch(args[2])
     except update_checker.UpdateCheckError:
         return  # the documented rejection
 

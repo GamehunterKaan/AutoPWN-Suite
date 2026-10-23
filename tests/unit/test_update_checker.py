@@ -217,6 +217,103 @@ def test_apply_release_update_checks_out_tag_when_detached(repos, monkeypatch):
     assert uc._current_branch() is None
 
 
+def test_apply_release_update_never_moves_a_detached_head_back_to_an_older_tag(repos, monkeypatch):
+    upstream, local = repos
+    _git(upstream, "tag", "v2.7.0")
+    _commit(local, "newer.txt", "a commit after the release")
+    _git(local, "checkout", "--detach")
+    newer = _git(local, "rev-parse", "HEAD").stdout.strip()
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+
+    result = uc.apply_release_update(repo="x/y")
+
+    assert _git(local, "rev-parse", "HEAD").stdout.strip() == newer
+    assert not result.changed
+    assert "Already up to date" in uc.format_result(result)
+
+
+def test_apply_release_update_refuses_a_detached_head_that_diverged_from_the_tag(repos, monkeypatch):
+    upstream, local = repos
+    _commit(upstream, "two.txt", "two")
+    _git(upstream, "tag", "v2.7.0")
+    _commit(local, "local-only.txt", "diverging local commit")
+    _git(local, "checkout", "--detach")
+    detached = _git(local, "rev-parse", "HEAD").stdout.strip()
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+
+    with pytest.raises(uc.UpdateCheckError, match="diverged"):
+        uc.apply_release_update(repo="x/y")
+    assert _git(local, "rev-parse", "HEAD").stdout.strip() == detached
+
+
+def test_apply_reports_already_up_to_date_when_nothing_moved(repos, monkeypatch):
+    upstream, local = repos
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+
+    result = uc.apply_update(channel="commit", branch="main", repo="x/y")
+
+    assert not result.changed
+    assert result.previous == result.new
+    assert "Already up to date (commit)" in uc.format_result(result)
+    assert "Restart" not in uc.format_result(result)
+
+
+@pytest.mark.parametrize("name, changed", [
+    ("requirements.txt", True), ("pyproject.toml", True), ("poetry.lock", True), ("requirements-locked.txt", True),
+    ("README.md", False), ("autopwn_suite_module.py", False)])
+def test_an_update_that_changes_dependencies_says_to_install_them_again(repos, monkeypatch, name, changed):
+    upstream, local = repos
+    _commit(upstream, name, "changed by the update")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+
+    result = uc.apply_update(channel="commit", branch="main", repo="x/y")
+
+    assert result.changed and result.dependencies_changed is changed
+    assert ("install them again" in uc.format_result(result)) is changed
+
+
+def test_a_dependency_diff_that_fails_counts_as_changed(monkeypatch):
+    monkeypatch.setattr(uc, "_run_git", lambda *a, **k: SimpleNamespace(returncode=128, stdout=""))
+    assert uc._dependencies_changed("a" * 40, "b" * 40)
+    assert not uc._dependencies_changed("a" * 40, "a" * 40)
+
+
+def test_commit_check_is_up_to_date_when_the_checkout_is_ahead_of_the_branch(repos, monkeypatch):
+    upstream, local = repos
+    remote_head = _git(upstream, "rev-parse", "HEAD").stdout.strip()
+    _commit(local, "unpushed.txt", "a local commit the branch does not have yet")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(sha=remote_head))
+
+    status = uc.check_commit(repo="x/y")
+
+    assert not status.update_available
+    assert "Up to date" in uc.format_status(status)
+
+
+def test_commit_check_reports_a_branch_commit_the_checkout_does_not_have(repos, monkeypatch):
+    upstream, local = repos
+    _commit(upstream, "two.txt", "two")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(
+        sha=_git(upstream, "rev-parse", "HEAD").stdout.strip()))
+    assert uc.check_commit(repo="x/y").update_available
+
+
+@pytest.mark.parametrize("sha", ["--all", "HEAD", "main", "b" * 39, "B" * 40, "b" * 40 + "\n"])
+def test_a_commit_id_that_is_not_hex_never_reaches_git(monkeypatch, sha):
+    monkeypatch.setattr(uc, "_local_commit", lambda: "a" * 40)
+    monkeypatch.setattr(uc, "_run_git", lambda *a, **k: pytest.fail("ran git with " + repr(sha)))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(sha=sha))
+    assert uc.check_commit(repo="x/y").update_available
+
+
 def test_apply_release_update_requires_tag_name(repos, monkeypatch):
     _upstream, local = repos
     monkeypatch.setattr(uc, "_repo_root", lambda: local)
@@ -454,3 +551,39 @@ def test_a_tag_of_thousands_of_digits_is_compared_without_error(monkeypatch):
     # int() refuses more than 4300 digits on Python 3.11 and later; a tag is text that the repository's publisher chooses.
     monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="9" * 5000))
     assert uc.check_release("2.7.0", repo="x/y").update_available
+
+
+def test_a_detached_release_update_checks_out_the_tag_not_a_branch_of_the_same_name(repos, monkeypatch):
+    upstream, local = repos
+    old = _git(local, "rev-parse", "HEAD").stdout.strip()
+    _commit(upstream, "two.txt", "two")
+    _git(upstream, "tag", "v2.7.0")
+    _git(local, "branch", "v2.7.0", old)  # a local branch named like the release, at an older commit
+    _git(local, "checkout", "--detach")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+
+    result = uc.apply_release_update(repo="x/y")
+
+    assert _git(local, "rev-parse", "HEAD").stdout.strip() == _git(upstream, "rev-parse", "v2.7.0").stdout.strip()
+    assert uc._current_branch() is None
+    assert result.changed
+
+
+def test_a_merge_blocked_by_a_lock_file_is_a_git_failure_not_a_divergence(repos, monkeypatch):
+    upstream, local = repos
+    _commit(upstream, "two.txt", "two")
+    (local / ".git" / "index.lock").write_text("")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    with pytest.raises(uc.UpdateCheckError, match="index.lock") as caught:
+        uc.apply_update(channel="commit", branch="main", repo="x/y")
+    assert caught.value.code == "update_git_failed"
+
+
+def test_output_git_prints_that_the_locale_cannot_decode_means_no_checkout(monkeypatch):
+    def undecodable(*a, **k):
+        raise UnicodeDecodeError("cp1252", b"\x81", 0, 1, "character maps to <undefined>")
+    monkeypatch.setattr(uc.subprocess, "run", undecodable)
+    assert uc.current_commit() is None
