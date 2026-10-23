@@ -1532,3 +1532,32 @@ assert.ok(reads.includes('/api/update'));
 assert.equal(nodes.get('update-apply').disabled,true);
 assert.match(nodes.get('update-status').textContent,/Offline mode is on/);
 """)
+
+
+def test_update_controls_get_keyboard_focus_back_after_their_request():
+    run_js(UPDATE_STATE + r"""
+// A control that is disabled while its request runs loses keyboard focus; the page hands it back.
+fetch=async (url,opts)=>{
+  if(opts) return {ok:true,json:async()=>({ok:true,result:{changed:true}})};
+  return {ok:true,json:async()=>updateState({status:available})};
+};
+renderUpdateStatus(updateState({status:available}));
+confirm=()=>true;
+for(const [id,run] of [['s-update-auto',()=>saveUpdateAutoCheck()],['update-check',()=>checkForUpdates(true)]]){
+  const control=document.getElementById(id);
+  control.id=id;  // the harness's nodes carry no id of their own
+  let focusedAgain=0;
+  control.focus=()=>{ focusedAgain++; };
+  document.activeElement=control;
+  await run();
+  assert.equal(focusedAgain,1,id);
+}
+// Focus that was somewhere else is not taken.
+const other=document.getElementById('f-target');
+let stolen=0;
+document.getElementById('update-check').focus=()=>{ stolen++; };
+other.id='f-target';
+document.activeElement=other;
+await checkForUpdates(true);
+assert.equal(stolen,0);
+""")

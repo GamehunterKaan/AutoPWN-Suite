@@ -58,6 +58,10 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px}
 .toggle-slider{position:absolute;inset:0;background:var(--border2);border-radius:10px;cursor:pointer;transition:.2s}
 .toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:var(--text3);border-radius:50%;transition:.2s}
 .toggle input:checked+.toggle-slider{background:var(--accent2)}
+/* The switch's real input is invisible and selects drop the browser outline, so keyboard focus is drawn here. */
+.toggle input:focus-visible+.toggle-slider,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* The update section's own text is the muted color that passes 4.5:1 (--text3 is about 2.9:1). */
+#updates-section .s-row-label,#updates-section .s-row-hint{color:var(--text2)}
 .toggle input:checked+.toggle-slider::before{transform:translateX(18px);background:var(--accent)}
 
 /* ── Buttons ── */

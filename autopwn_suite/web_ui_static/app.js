@@ -1069,6 +1069,16 @@ async function updateVulnerabilityDatabase(){
 let updateState = null;
 let updateBusy = false;
 let savingUpdateAutoCheck = false;
+// Disabling a control that has keyboard focus drops the focus, so the next key press goes nowhere. The update
+// controls are disabled while their request runs; hand the focus back afterwards.
+function focusedUpdateControl(){
+  const id = document.activeElement && document.activeElement.id;
+  return ['s-update-auto','update-check','update-apply'].includes(id) ? id : '';
+}
+function restoreFocus(id){
+  const control = id ? document.getElementById(id) : null;
+  if(control && !control.disabled) control.focus();
+}
 function renderUpdateStatus(state){
   updateState = state;
   const t = window.i18n.t;
@@ -1111,6 +1121,7 @@ async function loadUpdateStatus(){
   return state;
 }
 async function checkForUpdates(manual){
+  const focused = focusedUpdateControl();
   updateBusy = true;
   document.getElementById('update-check').disabled = true;
   document.getElementById('update-apply').disabled = true;
@@ -1127,6 +1138,7 @@ async function checkForUpdates(manual){
   }finally{
     updateBusy = false;
     await loadUpdateStatus().catch(()=>{ if(updateState) renderUpdateStatus(updateState); else document.getElementById('update-check').disabled = false; });
+    restoreFocus(focused);
   }
 }
 async function maybeCheckForUpdates(){
@@ -1138,6 +1150,7 @@ async function applyUpdate(){
   const status = updateState && updateState.status;
   if(!status || !status.update_available) return;
   if(!confirm(window.i18n.t('settings.update_apply_confirm', {latest: status.latest}))) return;
+  const focused = focusedUpdateControl();
   updateBusy = true;
   document.getElementById('update-check').disabled = true;
   document.getElementById('update-apply').disabled = true;
@@ -1152,11 +1165,13 @@ async function applyUpdate(){
   }finally{
     updateBusy = false;
     await loadUpdateStatus().catch(()=>{ if(updateState) renderUpdateStatus(updateState); else document.getElementById('update-check').disabled = false; });
+    restoreFocus(focused);
   }
 }
 async function saveUpdateAutoCheck(){
   const toggle = document.getElementById('s-update-auto');
   const enabled = toggle.checked;
+  const focused = focusedUpdateControl();
   savingUpdateAutoCheck = true;
   toggle.disabled = true;
   try{
@@ -1172,6 +1187,7 @@ async function saveUpdateAutoCheck(){
     savingUpdateAutoCheck = false;
     toggle.disabled = false;
     await loadUpdateStatus().catch(()=>{});
+    restoreFocus(focused);
   }
 }
 // Settings forms are only saved after the stored values were read into them: saving a form that is

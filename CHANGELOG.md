@@ -14,7 +14,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   **Update** badge on the Settings tab when one exists, and on request (after a confirmation) applies it to a
   git checkout, then asks for a restart. A selector chooses the channel, and a **Check for updates
   automatically** switch (setting `update_auto_check`, on by default) turns the automatic checks off. New routes:
-  `GET /api/update`, `POST /api/update/check` and `POST /api/update/apply`.
+  `GET /api/update`, `POST /api/update/check` and `POST /api/update/apply`. The on/off switches and select
+  boxes show a keyboard focus outline.
 - While an update is applied, and once the dashboard's checkout has moved to another commit (from the dashboard,
   `--apply-update` or git) until it is restarted, the dashboard refuses new scans, resumes and web verifications
   (409 `update_in_progress` or `update_restart_required`) and postpones scheduled scans: an interval schedule
