@@ -147,8 +147,9 @@ AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the versio
 A keyword names the product the way NVD does (Nmap's `Apache httpd` becomes `Apache HTTP Server` and `Samba smbd`
 becomes `Samba`) with its upstream release (`8.2p1 Ubuntu 4ubuntu0.5` becomes `8.2p1`). The product is searched,
 and a CVE is reported when NVD's applicability data (the CPE configurations of the CVE) marks that release
-vulnerable, or, for a CVE that NVD has not analyzed yet, when its description names the release. A version that
-names no single release, such as `3.X - 4.X` or `protocol 3.3`, is not searched.
+vulnerable. A CVE whose applicability says nothing about versions (not analyzed yet, or only "every version" of
+the product) is reported when its description names the release. A version that names no single release, such
+as `3.X - 4.X`, a bare major version like `4` or `protocol 3.3`, is not searched.
 
 The CLI, Python API and dashboard use the project's `autopwn_suite/nmap_backend.py` adapter
 to run the system Nmap executable directly and parse its

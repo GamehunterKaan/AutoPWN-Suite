@@ -59,19 +59,28 @@ def _covers(entry, version):
 
 
 def affects(affected, name, version):
-    """Whether the CPE matches for the product called `name` cover `version`: None when none names it.
+    """Whether the CPE matches for the product called `name` cover `version`.
+
+    None when they say nothing about versions: there are no matches (NVD has not analyzed the record) or the
+    product's only matches are unbounded ("every version", mostly in old records, which would otherwise apply
+    to every release ever made). False when the matches name only other products.
 
     A CPE names the product when its product words, plus any of its vendor words, are the words of `name`
     (apache:http_server is "Apache HTTP Server", openbsd:openssh is "OpenSSH"; apache:tomcat is neither)."""
+    if not affected:
+        return None
     words = _words(name)
     version = version.casefold()
-    named = False
+    bounded = unbounded = False
     for entry in affected:
         vendor, product = entry[0], _PRODUCT_ALIASES.get(entry[1], entry[1])
         product_words = _words(product)
         if not product_words <= words or not words <= product_words | _words(vendor):
             continue
-        named = True
+        if entry[2] == "*" and not any(entry[4:]):
+            unbounded = True
+            continue
+        bounded = True
         if _covers(entry, version):
             return True
-    return False if named else None
+    return None if unbounded and not bounded else False

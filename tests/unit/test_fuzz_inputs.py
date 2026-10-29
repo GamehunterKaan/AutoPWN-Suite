@@ -952,7 +952,7 @@ def test_service_keywords_and_cpe_applicability_never_raise_for_banner_or_record
         keyword = GenerateKeyword(product, version)
         release = keyword.rpartition(" ")[2]
         assert not keyword or product.lower() == "unrealircd" or re.fullmatch(
-            r"[0-9]+(?:\.[0-9]+)*(?:[a-z]+[0-9]*)?", release, re.IGNORECASE)
+            r"[0-9]+(?:\.[0-9]+)+(?:[a-z]+[0-9]*)?", release, re.IGNORECASE)
         found = find_affected(rng.choice([corrupt(base), random_value(rng)]))
         assert type(found) is tuple and all(
             len(entry) == 8 and all(part is None or isinstance(part, str) for part in entry) for entry in found)

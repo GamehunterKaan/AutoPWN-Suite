@@ -25,8 +25,9 @@ _PRODUCT_NAMES = {
 }
 _ROLE_SUFFIX = re.compile(r"\s+(?:httpd|smtpd|sshd|smbd|imapd|pop3d|ftpd|db|http proxy|key-value store|rest api)$",
                           re.IGNORECASE)
-# One release: digits and dots with an optional suffix such as p1, c or rc2. Not "3.X", "protocol 3.3" or "v1".
-_VERSION = re.compile(r"[0-9]+(?:\.[0-9]+)*(?:[a-z]+[0-9]*)?", re.IGNORECASE)
+# One release: dotted digits with an optional suffix such as p1, c or rc2. Not "3.X", "protocol 3.3", "v1" or a
+# bare major version such as Samba's "4", which every "before 4.x.y" range would cover.
+_VERSION = re.compile(r"[0-9]+(?:\.[0-9]+)+(?:[a-z]+[0-9]*)?", re.IGNORECASE)
 
 
 def _release(version: str) -> str:
@@ -35,7 +36,7 @@ def _release(version: str) -> str:
         return ""
     # Keep ISC's patch level (BIND 9.11.5-P4 is NVD's 9.11.5 update p4); drop distribution suffixes.
     release = re.sub(r"^([0-9.]+)-(P[0-9]+)\b", r"\1\2", version.split(" ")[0], flags=re.IGNORECASE)
-    release = release.split("-")[0].split("/")[0].rstrip(";,")
+    release = release.split("-")[0].split("/")[0].split("+")[0].rstrip(";,")  # dnsmasq's 2.93+30
     release = re.sub(r"\.v[0-9]{8}.*$", "", release)  # Jetty's 9.4.18.v20190429
     return release if _VERSION.fullmatch(release) else ""
 
@@ -80,7 +81,8 @@ def FindVulnerabilities(keyword: str, search) -> list:
 
     `search` takes a search term and returns Vulnerability objects. Most CVE descriptions give a range
     ("before 2.4.52") rather than each version, so search for the product and keep the CVEs whose NVD
-    applicability covers the version; a CVE NVD has not analyzed must name the version in its description.
+    applicability covers the version. A CVE whose applicability says nothing about versions (not analyzed, or
+    only "every version") must name the version in its description.
     """
     name, _space, version = keyword.rpartition(" ")
     if not name or not _VERSION.fullmatch(version):
@@ -89,7 +91,7 @@ def FindVulnerabilities(keyword: str, search) -> list:
     found = []
     for vulnerability in search(name):
         verdict = affects(vulnerability.affected, name, version)
-        if verdict or (not vulnerability.affected and mentioned.search(vulnerability.description)):
+        if verdict or (verdict is None and mentioned.search(vulnerability.description)):
             found.append(vulnerability)
     return found
 

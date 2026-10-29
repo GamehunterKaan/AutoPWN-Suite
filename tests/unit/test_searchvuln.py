@@ -52,9 +52,11 @@ class TestGenerateKeyword:
             ("Werkzeug httpd", "2.0.2 (Python 3.8.10)", "Werkzeug 2.0.2"),
             ("Jetty", "9.4.18.v20190429", "Jetty 9.4.18"),
             ("Sendmail", "8.14.4/8.14.4", "Sendmail 8.14.4"),
+            ("dnsmasq", "2.93+30", "dnsmasq 2.93"),
             ("Microsoft SQL Server 2008 R2", "10.50.1600.00; RTM", "Microsoft SQL Server 2008 R2 10.50.1600.00"),
             # A range, a wildcard or a protocol version names no release to search.
             ("Samba smbd", "3.X - 4.X", ""),
+            ("Samba smbd", "4", ""),  # only the major version
             ("PostgreSQL DB", "8.3.0 - 8.3.7", ""),
             ("VNC", "protocol 3.3", ""),
             ("distccd", "v1 ((GNU) 4.2.4 (Ubuntu 4.2.4-1ubuntu4))", ""),
@@ -223,13 +225,16 @@ class TestFindVulnerabilities:
             # Not analyzed yet: kept only when the description names the version.
             _cve("CVE-4", "OpenSSH 8.2p1 crashes on a long banner"),
             _cve("CVE-5", "OpenSSH 8.2 crashes on a short banner"),
+            # "Every version" says nothing about 8.2p1, so the description must name it.
+            _cve("CVE-6", "OpenSSH packages signed in 2008 were modified", (_entry("openbsd", "openssh"),)),
+            _cve("CVE-7", "OpenSSH 8.2p1 and others leak a banner", (_entry("openbsd", "openssh"),)),
         ]
         search = MagicMock(return_value=results)
 
         found = FindVulnerabilities("OpenSSH 8.2p1", search)
 
         search.assert_called_once_with("OpenSSH")
-        assert [vuln.CVEID for vuln in found] == ["CVE-1", "CVE-4"]
+        assert [vuln.CVEID for vuln in found] == ["CVE-1", "CVE-4", "CVE-7"]
 
     def test_keyword_without_a_version_is_searched_as_is_and_not_filtered(self):
         results = [_cve("CVE-1", "Backdoor in UnrealIRCd", (_entry("unrealircd", "unrealircd", "3.2.8.1", "-"),))]
@@ -249,7 +254,7 @@ class TestCpeApplicability:
         (_entry("openbsd", "openssh", start_in="8.5p1", end_ex="9.8p1"), "8.2p1", False),
         (_entry("openbsd", "openssh", start_ex="8.2p1", end_in="9.0"), "8.2p1", False),
         (_entry("openbsd", "openssh", start_in="8.2p1", end_in="8.2p1"), "8.2p1", True),
-        (_entry("openbsd", "openssh"), "8.2p1", True),  # every version
+        (_entry("openbsd", "openssh"), "8.2p1", None),  # "every version" says nothing about this one
         (_entry("openbsd", "openssh", "8.2", "p1"), "8.2p1", True),
         (_entry("openbsd", "openssh", "8.2", "p2"), "8.2p1", False),
         (_entry("openbsd", "openssh", "8.2p1", "-"), "8.2p1", True),
@@ -277,7 +282,7 @@ class TestCpeApplicability:
         ("example", "openssh_plugin", "OpenSSH", False),
     ])
     def test_a_cpe_names_the_product_by_its_words(self, vendor, product, name, named):
-        assert (affects((_entry(vendor, product),), name, "1.0") is not None) is named
+        assert affects((_entry(vendor, product, end_ex="9.9"),), name, "1.0") is named
 
     def test_vulnerable_matches_are_read_and_others_ignored(self):
         record = {"cve": {"configurations": [{"nodes": [{"cpeMatch": [

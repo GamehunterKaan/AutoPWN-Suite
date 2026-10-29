@@ -13,15 +13,17 @@ existing release summaries; they do not retroactively claim artifact signing.
   A keyword now names the product the way NVD does (Nmap's `Apache httpd`, `Samba smbd`, `Exim smtpd`,
   `PostgreSQL DB`, `Redis key-value store`, `MiniServ` and the like become `Apache HTTP Server`, `Samba`,
   `Exim`, `PostgreSQL`, `Redis`, `Webmin`) with its upstream release (`9.4.18.v20190429` becomes `9.4.18`,
-  `8.14.4/8.14.4` becomes `8.14.4`, BIND's `9.11.5-P4` keeps its patch level, and a MariaDB server that answers
-  as MySQL is searched as MariaDB). The product is searched, and a CVE is kept when NVD's CPE applicability marks
-  the detected release vulnerable, or, for a CVE NVD has not analyzed, when its description names the release.
-  Before, a CVE was found only when its description contained the exact release, so most CVEs described with a
-  range ("before 2.4.52") were missed. A version that names no single release (`3.X - 4.X`, `protocol 3.3`,
-  Tomcat's Coyote `1.1`) is no longer searched. On a simulated set of 51 Nmap fingerprints scored against NVD's
-  applicability data, the share of affecting CVEs found rose from 2% to 91% and the share of reported CVEs that
-  affect the version from 37% to 99.9%; 23 of 25 well-known exploited CVEs (from 6) are reported for affected
-  versions and not for fixed ones. Older releases now list many more CVEs, and a distribution package with a
+  `8.14.4/8.14.4` becomes `8.14.4`, dnsmasq's `2.93+30` becomes `2.93`, BIND's `9.11.5-P4` keeps its patch
+  level, and a MariaDB server that answers as MySQL is searched as MariaDB). The product is searched, and a CVE is
+  kept when NVD's CPE applicability marks the detected release vulnerable. A CVE whose applicability says nothing
+  about versions (NVD has not analyzed it, or lists only "every version" of the product, as many old records do)
+  is kept only when its description names the release, so a 2008 advisory no longer appears for every later
+  release. Before, a CVE was found only when its description contained the exact release, so most CVEs described
+  with a range ("before 2.4.52") were missed. A version that names no single release (`3.X - 4.X`, a bare major
+  version such as Samba's `4`, `protocol 3.3`, Tomcat's Coyote `1.1`) is no longer searched. On a simulated set
+  of 51 Nmap fingerprints scored against NVD's applicability data, the share of affecting CVEs found rose from 2%
+  to 90% and the share of reported CVEs that affect the version from 37% to 99.9%; 23 of 25 well-known exploited
+  CVEs (from 6) are reported for affected versions and not for fixed ones. Older releases now list many more CVEs, and a distribution package with a
   backported fix is still reported for its upstream release.
 
 ### Security changes

@@ -2242,7 +2242,7 @@ class TestRunScan:
         mock_cve = MagicMock()
         mock_cve.CVEID = "CVE-2024-0001"
         mock_cve.description = "Test vuln"
-        mock_cve.affected = (("nginx", "nginx", "*", "*", None, None, None, None),)
+        mock_cve.affected = (("nginx", "nginx", "*", "*", None, None, None, "1.25.0"),)
         mock_cve.severity = "HIGH"
         mock_cve.severity_score = 7.5
 

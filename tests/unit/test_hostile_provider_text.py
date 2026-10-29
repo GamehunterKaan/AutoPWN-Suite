@@ -70,7 +70,7 @@ def test_an_unpaired_surrogate_in_provider_text_cannot_abort_the_listing():
     the console print raised UnicodeEncodeError and ended the scan."""
     surrogate = json.loads('"bad \\ud800 text"')
     vulnerability = Vulnerability("keyword", "CVE-2024-0001", "Flaw " + surrogate, "HIGH", 9.8, "https://nvd.test/x", 3.9,
-                                  affected=(("openbsd", "openssh", "*", "*", None, None, None, None),))
+                                  affected=(("openbsd", "openssh", "*", "*", None, None, None, "9.0"),))
     stream = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", write_through=True)
     lookup = SimpleNamespace(search=lambda keyword, log, key: [vulnerability])
     with patch("autopwn_suite.searchvuln.CheckConnection", return_value=True), \
