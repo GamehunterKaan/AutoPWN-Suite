@@ -81,9 +81,10 @@ class AutoScanner:
     ) -> JSON:
         product = port_key.get("product", "")
         version = port_key.get("version", "")
+        cpes = port_key.get("cpes") if isinstance(port_key.get("cpes"), list) else []
         log = fake_logger()
 
-        keyword = GenerateKeyword(product, version)
+        keyword = GenerateKeyword(product, version, cpes)
         if keyword == "":
             return
 
@@ -92,7 +93,7 @@ class AutoScanner:
 
         Vulnerablities = FindVulnerabilities(
             keyword, lambda term: lookup.search(term, log, apiKey) if lookup is not None
-            else searchCVE(term, log, apiKey, strict=True))
+            else searchCVE(term, log, apiKey, strict=True), cpes)
         if len(Vulnerablities) == 0:
             return
 

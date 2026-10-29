@@ -79,7 +79,12 @@ applicability says nothing about versions (not analyzed, or only "every version"
 release other than as the one that fixed it; a CVE whose description says the detected release, or an earlier
 build of it, fixed that product is not kept (a release that starts a range, belongs to another product or is
 followed by a vendor's build is not read as the fix). A version with fewer numbers than the product's releases
-(Apache's `2.4`) is kept only for CVEs that affect every release it may be. `Vulnerability.affected` holds the
+(Apache's `2.4`) is kept only for CVEs that affect every release it may be. When Nmap reports CPEs for the
+service (the port's `cpes`, from Nmap's XML), the CLI, the dashboard and `AutoScanner.scan` count only the
+applicability entries of the product they identify: its application CPEs, or without one, an operating system or
+device CPE that the service's name names (`VxWorks ftpd` and `cpe:/o:windriver:vxworks`, which is searched as
+`VxWorks`); the README's "How Does It Work?" lists the spellings that count. When no search result names that
+product, or there is no CPE, the product's name decides as above. `Vulnerability.affected` holds the
 record's vulnerable CPE matches as (part, vendor, product, version, update, start including, start excluding,
 end including, end excluding) tuples. Failures may raise scanner/database exceptions;
 callers must handle them and protect output paths and sensitive results.

@@ -290,6 +290,67 @@ def test_dashboard_nvd_fallback_does_not_make_the_scan_offline(web, local_databa
     assert notifications.call_count == 2  # webhook and email
 
 
+@pytest.fixture
+def filezilla_feeds(feed_server):
+    """The local database holds a FileZilla client and a FileZilla Server CVE, both covering release 0.9.41.
+    Request it before local_database, which downloads these feeds."""
+    from tests.unit.test_searchvuln import _filezilla_records
+    feeds = feed_server[0]
+    feeds[min(feeds)] = _filezilla_records()
+    return feed_server
+
+
+def filezilla_observation():
+    """Nmap's answer for FileZilla Server, with the CPEs its version detection reports."""
+    result = MagicMock()
+    result.all_hosts.return_value = ["192.168.1.10"]
+    result.__getitem__.return_value = {"addresses": {"ipv4": "192.168.1.10"},
+                                       "tcp": {21: {"state": "open", "name": "ftp", "product": "FileZilla ftpd",
+                                                    "version": "0.9.41 beta",
+                                                    "cpe": "cpe:/a:filezilla-project:filezilla_server:0.9.41",
+                                                    "cpes": ["cpe:/a:filezilla-project:filezilla_server:0.9.41",
+                                                             "cpe:/o:microsoft:windows"]}}}
+    return result
+
+
+def test_python_api_offline_scan_matches_nmaps_service_cpe(filezilla_feeds, local_database, monkeypatch):
+    import autopwn_suite.api as api
+    monkeypatch.setattr(api, "PortScanner", filezilla_observation)
+    result = api.AutoScanner().scan("192.168.1.10", offline=True, vuln_db=local_database)
+    assert list(result["192.168.1.10"]["vulns"]["FileZilla ftpd"]) == ["CVE-2009-0884"]  # not the client's
+
+
+def test_cli_offline_scan_matches_nmaps_service_cpe(filezilla_feeds, local_database, monkeypatch):
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    stream = io.StringIO()
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=stream, width=200, **kwargs))
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(local_database),
+                                    "-t", "192.168.1.10", "-y", "--skip-discovery"])
+    monkeypatch.setattr(autopwn, "check_nmap", MagicMock())
+    monkeypatch.setattr(autopwn, "PortScan", MagicMock(return_value=filezilla_observation()))
+    monkeypatch.setattr(autopwn, "AnalyseScanResults", lambda *a: [["192.168.1.10", 21, "ftp", "FileZilla ftpd", "0.9.41 beta"]])
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock())
+    autopwn.main()
+    assert "CVE-2009-0884" in stream.getvalue() and "CVE-2007-0315" not in stream.getvalue()
+
+
+def test_web_offline_job_matches_nmaps_service_cpe(web, filezilla_feeds, local_database, monkeypatch):
+    wu, _ = web
+    monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
+    monkeypatch.setattr(wu.shutil, "which", lambda name: "nmap")
+    scanner = importlib.import_module("autopwn_suite.scanner")
+    monkeypatch.setattr(scanner, "PortScan", MagicMock(return_value=filezilla_observation()))
+    monkeypatch.setattr(scanner, "AnalyseScanResults",
+                        lambda *a: [["192.168.1.10", 21, "ftp", "FileZilla ftpd", "0.9.41 beta", "tcp"]])
+    monkeypatch.setattr(wu, "_notify", MagicMock())
+    job = wu.ScanJob("offline", "192.168.1.10", {"target": "192.168.1.10", "skip_discovery": True,
+                                                 "vulnerability_source": "offline"})
+    wu._run_scan(job)
+    assert [finding["cve"] for finding in job.hosts_list()[0]["vulns"]] == ["CVE-2009-0884"]
+
+
 @pytest.mark.parametrize("config, cli_only, toggle, offline", [
     ({"vulnerability_source": "auto", "vulnerability_source_used": "offline"}, False, False, False),  # fallback only
     ({"vulnerability_source": "online", "vulnerability_source_used": "offline"}, False, False, False),

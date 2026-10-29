@@ -30,7 +30,7 @@ import pytest
 from rich.text import Text
 
 from autopwn_suite import i18n, update_checker
-from autopwn_suite.cpe_match import affects, find_affected
+from autopwn_suite.cpe_match import affects, find_affected, service_products
 from autopwn_suite.logger import markup_safe
 from autopwn_suite.nist_search import Vulnerability
 from autopwn_suite.nmap_backend import parse_nmap_xml
@@ -961,10 +961,18 @@ def test_service_keywords_and_cpe_applicability_never_raise_for_banner_or_record
             return [corrupt(value) for value in node]
         return mutate(node, rng) if isinstance(node, str) and rng.random() < .2 else node
 
+    # Nmap reports these with the service; version detection fills some of their fields from the service's answer.
+    service_cpes = ["cpe:/a:openbsd:openssh:8.2p1", "cpe:/o:windriver:vxworks", "cpe:/a:netapp:data_ontap",
+                    "cpe:/o:microsoft:windows", "cpe:/h:crestron:mc3", "cpe:/a:microsoft:internet_information_services::::de",
+                    "cpe:/a:filezilla-project:filezilla_server:0.9.41"]
+
     for _ in range(3000):
         product = str(rng.choice([random_value(rng), mutate(rng.choice(products), rng), rng.choice(products)]))
         version = str(rng.choice([random_value(rng), mutate(rng.choice(versions), rng), rng.choice(versions)]))
-        keyword = GenerateKeyword(product, version)
+        cpes = rng.choice([[], rng.sample(service_cpes, 2), [mutate(rng.choice(service_cpes), rng)],
+                           [random_value(rng), random_value(rng)], ["cpe:/a:" + "a" * 5000 + ":b"]])
+        assert all(isinstance(vendor, str) and isinstance(name, str) for vendor, name in service_products(cpes, product))
+        keyword = GenerateKeyword(product, version, cpes)
         release = keyword.rpartition(" ")[2]
         assert not keyword or product.lower() == "unrealircd" or re.fullmatch(
             r"[0-9]+(?:\.[0-9]+)+(?:[a-z]+[0-9]*)?", release, re.IGNORECASE)
@@ -975,4 +983,4 @@ def test_service_keywords_and_cpe_applicability_never_raise_for_banner_or_record
         description = rng.choice(descriptions).format(rng.choice([release, version, product + " " + version]))
         candidate = Vulnerability("term", "CVE-2026-0001", mutate(description, rng), "HIGH", 7.5,
                                   "https://nvd.test/", 3.9, affected=found)
-        assert FindVulnerabilities(keyword or product, lambda term: [candidate]) in ([], [candidate])
+        assert FindVulnerabilities(keyword or product, lambda term: [candidate], cpes) in ([], [candidate])

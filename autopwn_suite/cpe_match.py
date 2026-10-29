@@ -17,10 +17,51 @@ _OTHER_PRODUCTS = frozenset({("docmosis", "tornado"), ("mongodb", "node.js"), ("
 # (1.3.3c > 1.3.3), and these name the release itself (4.0.0.Final is 4.0.0).
 _PRE_RELEASE = {"dev": 0, "snapshot": 0, "alpha": 1, "beta": 2, "m": 3, "milestone": 3, "pre": 4, "preview": 4, "rc": 5}
 _FINAL = frozenset({"final", "ga", "release"})
+# A CPE name Nmap reports for a service (cpe:/a:openbsd:openssh:8.2p1). Version detection fills some probes' fields
+# from the service's answer, so only a part, vendor and product of these characters are read.
+_SERVICE_CPE = re.compile(r"cpe:/([aho]):([a-z0-9._~%-]{1,100}):([a-z0-9._~%-]{1,100})(?=:|$)", re.IGNORECASE)
 
 
 def _words(text):
     return frozenset(re.findall(r"[a-z0-9]+", text.casefold()))
+
+
+def _service_cpes(cpes):
+    """The (part, vendor, product) of each well-formed CPE among those Nmap reported for a service."""
+    found = []
+    for cpe in cpes or ():
+        match = _SERVICE_CPE.match(cpe) if isinstance(cpe, str) else None
+        if match:
+            found.append(tuple(group.casefold() for group in match.groups()))
+    return found
+
+
+def service_products(cpes, name) -> frozenset:
+    """The (vendor, product) pairs that Nmap's CPEs for a service called `name` identify it by: its application
+    CPEs, or without one, the operating system or device CPEs that its name names (VxWorks ftpd is
+    windriver:vxworks, but KarjaSoft Sami ftpd, which Nmap gives only microsoft:windows, is not Windows)."""
+    found = _service_cpes(cpes)
+    applications = frozenset((vendor, product) for part, vendor, product in found if part == "a")
+    if applications:
+        return applications
+    words = _words(name)
+    return frozenset((vendor, product) for _part, vendor, product in found
+                     if _words(product) and (_words(product) - _GENERIC_WORDS or _words(product)) <= words)
+
+
+def is_system(cpes, name) -> bool:
+    """Whether a service called `name` is the operating system or device that Nmap's CPEs for it name, as VxWorks
+    is cpe:/o:windriver:vxworks; NVD files the CVEs of such a service under the system."""
+    found = _service_cpes(cpes)
+    return not any(part == "a" for part, _vendor, _product in found) and any(
+        _words(product) and _words(product) == _words(name) for _part, _vendor, product in found)
+
+
+def _identity(vendor, product):
+    """A vendor and product as NVD's spellings of them compare: aol:aol_server is aol:aolserver, and
+    microsoft:internet_information_services is microsoft:iis."""
+    product = _PRODUCT_ALIASES.get(product, product)
+    return re.sub(r"[^a-z0-9]", "", vendor.casefold()), re.sub(r"[^a-z0-9]", "", product.casefold())
 
 
 def find_affected(record) -> tuple:
@@ -137,9 +178,22 @@ def _covers(entry, version, shortened, portable):
     return True
 
 
-def _names(entry, words):
+def _names(entry, words, identities=frozenset()):
     """Whether a CPE names the application called by `words`: its product words, less the generic ones, plus
-    any of its vendor words (apache:http_server is "Apache HTTP Server", openbsd:openssh is "OpenSSH")."""
+    any of its vendor words (apache:http_server is "Apache HTTP Server", openbsd:openssh is "OpenSSH").
+
+    Given the `identities` of the service's Nmap CPEs (see `_identities`), only a CPE of that vendor and product,
+    of any part (Nmap's netapp:data_ontap application is NVD's operating system), or of that product, possibly
+    with generic words, under a vendor the words also give (NVD's f5:nginx_open_source for Nmap's
+    igor_sysoev:nginx, but neither mit:kerberos for Heimdal Kerberos nor filezilla:filezilla, the client, for
+    filezilla-project:filezilla_server)."""
+    if identities:
+        identity, product_words = _identity(entry[1], entry[2]), _words(_PRODUCT_ALIASES.get(entry[2], entry[2]))
+        if any(identity == (vendor, product) for vendor, product, _theirs in identities):
+            return True
+        if not any(theirs <= product_words and product_words - _GENERIC_WORDS <= theirs
+                   for _vendor, _product, theirs in identities):
+            return False
     part, vendor, product = entry[0], entry[1], _PRODUCT_ALIASES.get(entry[2], entry[2])
     if part != "a" or (vendor, entry[2]) in _OTHER_PRODUCTS:  # An operating system is not its own ftpd.
         return False
@@ -147,16 +201,32 @@ def _names(entry, words):
     return (product_words - _GENERIC_WORDS or product_words) <= words <= product_words | _words(vendor)
 
 
-def cut_short(records, name, version):
+def _identities(products):
+    """Each (vendor, product) pair as its `_identity` and the words of its product."""
+    return frozenset(_identity(vendor, product) + (_words(_PRODUCT_ALIASES.get(product, product)),)
+                     for vendor, product in products)
+
+
+def known_products(records, products, name) -> frozenset:
+    """`products` (from `service_products`) when a CPE in `records`, the affected matches of each search
+    result, names them, else none: NVD may not know the name Nmap's CPE dictionary gives a product
+    (matt_johnston:dropbear_ssh_server), and the product's name is then matched as without a CPE."""
+    words, identities = _words(name), _identities(products)
+    if identities and any(_names(entry, words, identities) for affected in records for entry in affected):
+        return products
+    return frozenset()
+
+
+def cut_short(records, name, version, products=frozenset()):
     """Whether `version` has fewer release numbers than the product's releases almost always have, judged by
     the versions NVD gives for it in `records` (the affected matches of each search result): Apache's "2.4"
     is some 2.4.x, while Exim's 4.92 is a release of its own (4.92.1 fixed it). A version with a suffix
     (8.5beta2, 7.9p1) names its release."""
-    words, length = _words(name), len(_release(_parts(version)))
+    words, length, identities = _words(name), len(_release(_parts(version))), _identities(products)
     if len(_parts(version)) > length:
         return False
-    lengths = [len(_release(_parts(text))) for affected in records for entry in affected if _names(entry, words)
-               for text in (entry[3],) + entry[5:] if text and text[0].isdigit()]
+    lengths = [len(_release(_parts(text))) for affected in records for entry in affected
+               if _names(entry, words, identities) for text in (entry[3],) + entry[5:] if text and text[0].isdigit()]
     return sum(found <= length for found in lengths) < 0.15 * len(lengths)
 
 
@@ -170,8 +240,9 @@ def reaches(version, fixed):
         re.fullmatch(r"(?:p[0-9]+|[a-z])?", build) is not None or build.rstrip("0123456789") == fixed_build.rstrip("0123456789")))
 
 
-def affects(affected, name, version, shortened=False):
-    """Whether the CPE matches for the application called `name` cover `version`.
+def affects(affected, name, version, shortened=False, products=frozenset()):
+    """Whether the CPE matches for the application called `name`, or with `products` (from `known_products`)
+    for the product Nmap's CPEs identify, cover `version`.
 
     None when they say nothing about versions: there are no matches (NVD has not analyzed the record) or the
     product's only matches are unbounded ("every version", mostly in old records, which would otherwise apply
@@ -179,13 +250,13 @@ def affects(affected, name, version, shortened=False):
     any release that starts with it, so a bound or release with more numbers does not cover it."""
     if not affected:
         return None
-    words = _words(name)
+    words, identities = _words(name), _identities(products)
     # The last portable OpenSSH release (8.5p1) the record lists itself, if any.
     portable = max((_key(entry[3]) for entry in affected if entry[2] == "openssh" and re.fullmatch(r"p[0-9]+", entry[4])),
                    default=None)
     bounded = unbounded = False
     for entry in affected:
-        if not _names(entry, words):
+        if not _names(entry, words, identities):
             continue
         if entry[3] == "*" and not any(entry[5:]):
             unbounded = True

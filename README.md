@@ -147,8 +147,17 @@ AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the versio
 A keyword names the product the way NVD does (Nmap's `Apache httpd` becomes `Apache HTTP Server` and `Samba smbd`
 becomes `Samba`) with its upstream release (`8.2p1 Ubuntu 4ubuntu0.5` becomes `8.2p1`). The product is searched,
 and a CVE is reported when NVD's applicability data (the CPE configurations of the CVE) marks that release of
-the application vulnerable; an operating system's entries do not count for a service named after it, such as
-`OpenBSD ftpd`. A version with fewer numbers than the product's releases (Apache's `2.4`) gets only the CVEs
+the application vulnerable. When Nmap reports CPEs for the service (`cpe:/a:filezilla-project:filezilla_server:0.9.41`),
+only the entries for the product they name count: that vendor and product in any of NVD's spellings
+(`aol:aol_server` for `aol:aolserver`), also as an operating system (NVD's `netapp:data_ontap`), or that product,
+possibly with generic words, under a vendor the product's name also gives (`f5:nginx_open_source` for Nmap's
+`igor_sysoev:nginx`). So FileZilla Server no longer gets FileZilla client CVEs, nor Sun iPlanet Messaging Server
+the Web Server's. Nmap's operating system and device CPEs count only for a service without an application CPE
+whose name names that system: `VxWorks ftpd` with `cpe:/o:windriver:vxworks` is searched as `VxWorks` and gets
+the CVEs NVD files under VxWorks, while `KarjaSoft Sami ftpd`, which Nmap gives only `cpe:/o:microsoft:windows`,
+gets no Windows CVEs. Without a CPE, or when no search result names its product (Nmap's
+`matt_johnston:dropbear_ssh_server`), the product's name decides, and an operating system's entries do not count
+for a service named after it, such as `OpenBSD ftpd`. A version with fewer numbers than the product's releases (Apache's `2.4`) gets only the CVEs
 that affect every release it may be. A CVE whose applicability says nothing about versions (not analyzed yet, or
 only "every version" of the product) is reported when its description names the release other than as the fix
 ("before 2.4.52"), and no CVE is reported whose description says the detected release, or an earlier build of
@@ -395,8 +404,10 @@ the CVEs whose NVD applicability covers the detected release. Findings are possi
 proof of exploitability: NVD's version ranges describe upstream releases, so a distribution package with a
 backported fix is still reported, a CVE in a bundled library whose description does not name the
 product is not found, a CVE that NVD has not analyzed is found only when its description names the release,
-a product of another vendor with the same name, or a same-vendor product that Nmap's name does not tell apart,
-can match, and a CVE that NVD files under an operating system or device is not reported for a service on it.
+and for a service without a usable CPE from Nmap, a product of another vendor with the same name, or a
+same-vendor product that Nmap's name does not tell apart, can match (`KarjaSoft Sami ftpd`, which Nmap gives
+only the Windows CPE, gets Sami HTTP Server CVEs). A CVE that NVD files under an operating system or device is
+reported only for a service whose Nmap CPE names that system (not for `Contiki httpd`, which Nmap gives none).
 
 In the dashboard, **Settings → Offline vulnerability database** provides manual Download/Update,
 progress, CVE count, update time and an **Export for airgapped system** link. Select the vulnerability

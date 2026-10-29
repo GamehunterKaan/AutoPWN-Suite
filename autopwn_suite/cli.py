@@ -98,8 +98,10 @@ def StartScanning(
                     host_ports = [row for row in PortArray if row[0] == resolved_host]
                     if not host_ports:
                         continue
-                    VulnsArray = (SearchSploits(host_ports, log, console, console2, apiKey, lookup=lookup)
-                                  if lookup is not None else SearchSploits(host_ports, log, console, console2, apiKey))
+                    VulnsArray = (SearchSploits(host_ports, log, console, console2, apiKey, lookup=lookup,
+                                                scan_result=PortScanResults)
+                                  if lookup is not None else SearchSploits(host_ports, log, console, console2, apiKey,
+                                                                           scan_result=PortScanResults))
                     if DownloadExploits and VulnsArray and (lookup is None or lookup.source != "offline"):
                         GetExploitsFromArray(VulnsArray, log, console, console2, resolved_host)
 
