@@ -73,7 +73,15 @@ the newest version that has one. CVSS v4 has none, so a record scored only with 
 which means that no sub-score is available, not that the CVE is not exploitable. An older
 version's sub-score keeps its own scale (0 to 3.9 for CVSS v3, up to 10.0 for v2), which can
 differ from the scale of the version that supplies the severity. Vulnerability
-records are version-based candidates. Failures may raise scanner/database exceptions;
+records are version-based candidates: since v2.9.0 the product is searched and a CVE is kept when NVD's
+applicability (its CPE configurations) marks the detected release of the application vulnerable, or, when that
+applicability says nothing about versions (not analyzed, or only "every version"), when its description names the
+release other than as the one that fixed it; a CVE whose description says the detected release, or an earlier
+build of it, fixed that product is not kept (a release that starts a range, belongs to another product or is
+followed by a vendor's build is not read as the fix). A version with fewer numbers than the product's releases
+(Apache's `2.4`) is kept only for CVEs that affect every release it may be. `Vulnerability.affected` holds the
+record's vulnerable CPE matches as (part, vendor, product, version, update, start including, start excluding,
+end including, end excluding) tuples. Failures may raise scanner/database exceptions;
 callers must handle them and protect output paths and sensitive results.
 Text from the scanned host or the vulnerability source (service, product, version, OS and vendor
 names, hostnames, CVE identifiers, descriptions and severities) is one line without control, bidirectional
@@ -280,8 +288,8 @@ log as a fixed-text warning with the schedule ID (no exception text).
   a technique or ports outside the lists in the scan section) keeps every entry and is
   copied the same way. The next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
   versions; never edit an active database directly.
-- Nmap receives argv and returns XML/progress. Online NVD receives service
-  keywords and optional API key over HTTPS; Exploit-DB supplies references and
+- Nmap receives argv and returns XML/progress. Online NVD receives the product
+  names of detected services (without their versions) and optional API key over HTTPS; Exploit-DB supplies references and
   optional downloaded bytes. Explicit NVD mirror maintenance uses annual
   JSON/gzip feeds with metadata checksums.
 - `--check-update` and `--apply-update` send GET requests to `api.github.com`; `--apply-update` also runs

@@ -48,13 +48,15 @@ def test_an_nvd_description_is_one_clean_line_in_every_result(monkeypatch):
 
 
 def test_the_cve_listing_prints_the_clean_text_and_never_starts_a_line_of_its_own():
-    vulnerability = Vulnerability("keyword", "CVE-2024-0001\n[+] FORGED", NVD_DESCRIPTION + " " + "word " * 40,
+    # Not analyzed by NVD, so it is kept because it names the release. A version is searched only when it names a
+    # release, so the forged line rides in the product and the CVE text.
+    vulnerability = Vulnerability("keyword", "CVE-2024-0001\n[+] FORGED", NVD_DESCRIPTION + " 8.9 " + "word " * 40,
                                   "HIGH\x1b[2J", 9.8, "https://nvd.test/\U0000202ex", 3.9)
     console = Console(file=io.StringIO(), width=200, color_system=None)
     lookup = SimpleNamespace(search=lambda keyword, log, key: [vulnerability])
     with patch("autopwn_suite.searchvuln.CheckConnection", return_value=True), \
          patch("autopwn_suite.searchvuln.get_terminal_width", return_value=100):
-        result = SearchSploits([["192.0.2.1", 22, "ssh", "OpenSSH\x1b[2J", "8.9\n[+] FORGED"]], MagicMock(), console,
+        result = SearchSploits([["192.0.2.1", 22, "ssh", "OpenSSH\x1b[2J\n[+] FORGED", "8.9"]], MagicMock(), console,
                                Console(file=io.StringIO()), lookup=lookup)
     output = console.file.getvalue()
     assert not FORBIDDEN_EXCEPT_NEWLINE.search(output)
@@ -67,7 +69,8 @@ def test_an_unpaired_surrogate_in_provider_text_cannot_abort_the_listing():
     """A JSON escape such as the one in this description makes a lone surrogate, which a UTF-8 stream cannot write:
     the console print raised UnicodeEncodeError and ended the scan."""
     surrogate = json.loads('"bad \\ud800 text"')
-    vulnerability = Vulnerability("keyword", "CVE-2024-0001", "Flaw " + surrogate, "HIGH", 9.8, "https://nvd.test/x", 3.9)
+    vulnerability = Vulnerability("keyword", "CVE-2024-0001", "Flaw " + surrogate, "HIGH", 9.8, "https://nvd.test/x", 3.9,
+                                  affected=(("a", "openbsd", "openssh", "*", "*", None, None, None, "9.0"),))
     stream = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", write_through=True)
     lookup = SimpleNamespace(search=lambda keyword, log, key: [vulnerability])
     with patch("autopwn_suite.searchvuln.CheckConnection", return_value=True), \

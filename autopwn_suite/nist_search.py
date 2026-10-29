@@ -6,6 +6,7 @@ from time import monotonic, sleep
 
 from requests import get
 
+from autopwn_suite.cpe_match import find_affected
 from autopwn_suite.text import printable
 from autopwn_suite.vulnerability_categories import categorize, find_weaknesses
 
@@ -52,6 +53,7 @@ class Vulnerability:
     data_source: str = "online"
     database_updated_at: str = None
     weaknesses: tuple = ()
+    affected: tuple = ()  # Vulnerable CPE matches (autopwn_suite.cpe_match.find_affected)
 
     def __post_init__(self):
         # The NVD, or a database copied from another machine, controls these texts, and they reach the console, the
@@ -223,7 +225,8 @@ def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=Fal
                      details_url, exploitability) = FindVars(vuln)
                     parsed.append(Vulnerability(keyword, CVE_ID, description, severity,
                                                 severity_score, details_url, exploitability,
-                                                weaknesses=find_weaknesses(vuln)))
+                                                weaknesses=find_weaknesses(vuln),
+                                                affected=find_affected(vuln)))
                 page = parsed
             except Exception as error:
                 last_error = error

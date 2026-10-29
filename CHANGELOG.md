@@ -5,6 +5,47 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
+## [2.9.0] - 2026-10-29
+
+### Functional changes
+
+- Vulnerability lookups report far more of the CVEs that affect a detected service and far fewer that do not.
+  A keyword now names the product the way NVD does (Nmap's `Apache httpd`, `Samba smbd`, `Exim smtpd`,
+  `PostgreSQL DB`, `Redis key-value store`, `MiniServ` and the like become `Apache HTTP Server`, `Samba`,
+  `Exim`, `PostgreSQL`, `Redis`, `Webmin`) with its upstream release (`9.4.18.v20190429` becomes `9.4.18`,
+  `8.14.4/8.14.4` becomes `8.14.4`, dnsmasq's `2.93+30` becomes `2.93`, BIND's `9.11.5-P4` keeps its patch
+  level, and a MariaDB server that answers as MySQL is searched as MariaDB). The product is searched, and a CVE is
+  kept when NVD's CPE applicability marks the detected release vulnerable. A CVE whose applicability says nothing
+  about versions (NVD has not analyzed it, or lists only "every version" of the product, as many old records do)
+  is kept only when its description names the release, so a 2008 advisory no longer appears for every later
+  release. Before, a CVE was found only when its description contained the exact release, so most CVEs described
+  with a range ("before 2.4.52") were missed. A version that names no single release (`3.X - 4.X`, a bare major
+  version such as Samba's `4`, `2.0.0 or later`, `3.0 or 3.1`, `protocol 3.3`, Tomcat's Coyote `1.1`) is no
+  longer searched. Only application CPEs name a service, so `OpenBSD ftpd` or `Android ftpd` no longer gets the
+  operating system's CVEs, and a role word stays where the bare name would be an operating system, a vendor or
+  another product (`Hydra httpd`, `Microsoft ftpd`). Pre-releases (`9.0.0-M1`, `1.0 beta 2`) sort before their
+  release, and a version cut short (Apache's `2.4`) gets only the CVEs of every release it may be. A CVE whose
+  description says the detected release, or an earlier build of it, fixed that product is not reported (OpenSSH
+  `4.4p1` and CVE-2006-5051, ProFTPD `1.3.3c` and CVE-2010-4221, BIND `9.10.3-P4` and CVE-2015-8000); a release
+  that starts a range ("1.0.2 before 1.0.2e"), belongs to another product ("Tera Term before 5.1") or is followed
+  by a vendor's build ("before 8.0 HP2") is not read as the fix. Portable OpenSSH is matched to the releases a
+  record lists, so `9.8p1` no longer gets CVE-2024-6387. On a simulated set of 51 Nmap
+  fingerprints scored against NVD's applicability data, the share of affecting CVEs found rose from 2% to 90% and
+  the share of reported CVEs that affect the version from 37% to 99.8%; 24 of 25 well-known exploited CVEs (from 6)
+  are reported for affected versions and not for fixed ones. Older releases now list many more CVEs, and a
+  distribution package with a backported fix is still reported for its upstream release. Not yet handled: a
+  same-vendor product that Nmap's name does not tell apart can match (Sami FTP and HTTP), a CVE that NVD files
+  under an operating system or device is not reported for a service on it (VxWorks, NetApp Data ONTAP), and a
+  version a product's banner prints with a date or label (Squid's `2.7.STABLE9`, Jetty's dated releases) is
+  matched without it or not searched.
+
+### Security changes
+
+- More of the vulnerabilities a scan should report are reported, and fewer findings are false alarms. Online NVD
+  lookups now send only product names, not their versions. CPE applicability from NVD or a copied local database
+  is parsed without trusting its shape (`autopwn_suite/cpe_match.py`), and the fixed releases a description names
+  are read with bounded, linear-time patterns, both with seeded fuzz coverage. No other security impact.
+
 ## [2.8.1] - 2026-10-24
 
 ### Functional changes

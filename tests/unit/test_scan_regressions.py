@@ -304,7 +304,7 @@ def test_searchsploits_handles_empty_input_and_narrow_terminal():
     with patch("autopwn_suite.searchvuln.CheckConnection", return_value=True), \
          patch("autopwn_suite.searchvuln.SearchKeyword", return_value=[vuln]), \
          patch("autopwn_suite.searchvuln.get_terminal_width", return_value=40):
-        result = SearchSploits([["192.0.2.1", 53, "domain", "DNS", "1"]],
+        result = SearchSploits([["192.0.2.1", 53, "domain", "DNS", "1.0"]],
                               MagicMock(), MagicMock(), MagicMock())
     assert result[0].CVEs == ["CVE-A"]
 

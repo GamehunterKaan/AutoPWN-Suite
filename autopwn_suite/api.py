@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Type, Union
 from autopwn_suite.nist_search import VulnerabilityLookup, searchCVE
 from autopwn_suite.nmap_backend import PortScanner
 from autopwn_suite.scanner import HostTimedOut, InitHostInfo, ResolveScanHosts
-from autopwn_suite.searchvuln import GenerateKeyword
+from autopwn_suite.searchvuln import FindVulnerabilities, GenerateKeyword
 from autopwn_suite.utils import fake_logger, is_root
 
 JSON = Union[Dict[str, Any], List[Any], int, str, float, bool, Type[None]]
@@ -90,8 +90,9 @@ class AutoScanner:
         if debug:
             print(f"Searching for keyword {keyword} ...")
 
-        Vulnerablities = (lookup.search(keyword, log, apiKey) if lookup is not None
-                          else searchCVE(keyword, log, apiKey, strict=True))
+        Vulnerablities = FindVulnerabilities(
+            keyword, lambda term: lookup.search(term, log, apiKey) if lookup is not None
+            else searchCVE(term, log, apiKey, strict=True))
         if len(Vulnerablities) == 0:
             return
 

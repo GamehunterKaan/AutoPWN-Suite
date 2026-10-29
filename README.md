@@ -144,6 +144,19 @@ through, or sign-in is refused as cross-origin); localhost works over plain HTTP
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of software running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of keywords to search the [NIST vulnerability database.](https://www.nist.gov/)
 
+A keyword names the product the way NVD does (Nmap's `Apache httpd` becomes `Apache HTTP Server` and `Samba smbd`
+becomes `Samba`) with its upstream release (`8.2p1 Ubuntu 4ubuntu0.5` becomes `8.2p1`). The product is searched,
+and a CVE is reported when NVD's applicability data (the CPE configurations of the CVE) marks that release of
+the application vulnerable; an operating system's entries do not count for a service named after it, such as
+`OpenBSD ftpd`. A version with fewer numbers than the product's releases (Apache's `2.4`) gets only the CVEs
+that affect every release it may be. A CVE whose applicability says nothing about versions (not analyzed yet, or
+only "every version" of the product) is reported when its description names the release other than as the fix
+("before 2.4.52"), and no CVE is reported whose description says the detected release, or an earlier build of
+it, fixed that product ("OpenSSH before 4.4" for `4.4p1`). A release that starts a range ("1.0.2 before 1.0.2e"),
+belongs to another product or is followed by a vendor's build ("before 8.0 HP2") is not read as the fix. A
+version that names no single release, such as `3.X - 4.X`, a bare major version like `4`, `2.0.0 or later`,
+`3.0 or 3.1` or `protocol 3.3`, is not searched.
+
 The CLI, Python API and dashboard use the project's `autopwn_suite/nmap_backend.py` adapter
 to run the system Nmap executable directly and parse its
 [XML output](https://nmap.org/book/output-formats-xml-output.html) with Python's standard library.
@@ -376,9 +389,14 @@ saves its output the same way and ends with that error's text; a failed Nmap por
 its error text and saves nothing. A saved partial report goes to the usual output file, so it replaces an
 earlier report with the same name.
 Stored data remains usable without an expiry; its update time is shown in scan logs and dashboard
-results. Offline matching uses description keyword prefixes, with all query terms required,
-and keeps versions such as `10.1.18` distinct from a query for `1.1`. As with online keyword scans,
-findings are possible vulnerabilities, not proof of exploitability or exact version applicability.
+results. Offline searches match description keyword prefixes, with all query terms required,
+and keep versions such as `10.1.18` distinct from a query for `1.1`. Online and offline scans then keep
+the CVEs whose NVD applicability covers the detected release. Findings are possible vulnerabilities, not
+proof of exploitability: NVD's version ranges describe upstream releases, so a distribution package with a
+backported fix is still reported, a CVE in a bundled library whose description does not name the
+product is not found, a CVE that NVD has not analyzed is found only when its description names the release,
+a product of another vendor with the same name, or a same-vendor product that Nmap's name does not tell apart,
+can match, and a CVE that NVD files under an operating system or device is not reported for a service on it.
 
 In the dashboard, **Settings → Offline vulnerability database** provides manual Download/Update,
 progress, CVE count, update time and an **Export for airgapped system** link. Select the vulnerability
@@ -502,8 +520,8 @@ single-file binaries that need no Python installation: `linux-amd64`, `linux-arm
 executable and run it:
 
 ```bash
-chmod +x autopwn-suite-v2.8.1-linux-amd64
-./autopwn-suite-v2.8.1-linux-amd64 --help
+chmod +x autopwn-suite-v2.9.0-linux-amd64
+./autopwn-suite-v2.9.0-linux-amd64 --help
 ```
 
 The binaries are checksum-verified and Sigstore-signed but not code-signed for Windows or
