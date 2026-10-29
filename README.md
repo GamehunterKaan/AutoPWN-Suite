@@ -144,6 +144,12 @@ through, or sign-in is refused as cross-origin); localhost works over plain HTTP
 
 AutoPWN Suite uses nmap TCP-SYN scan to enumerate the host and detect the version of software running on it. After gathering enough information about the host, AutoPWN Suite automatically generates a list of keywords to search the [NIST vulnerability database.](https://www.nist.gov/)
 
+A keyword names the product the way NVD does (Nmap's `Apache httpd` becomes `Apache HTTP Server` and `Samba smbd`
+becomes `Samba`) with its upstream release (`8.2p1 Ubuntu 4ubuntu0.5` becomes `8.2p1`). The product is searched,
+and a CVE is reported when NVD's applicability data (the CPE configurations of the CVE) marks that release
+vulnerable, or, for a CVE that NVD has not analyzed yet, when its description names the release. A version that
+names no single release, such as `3.X - 4.X` or `protocol 3.3`, is not searched.
+
 The CLI, Python API and dashboard use the project's `autopwn_suite/nmap_backend.py` adapter
 to run the system Nmap executable directly and parse its
 [XML output](https://nmap.org/book/output-formats-xml-output.html) with Python's standard library.
@@ -376,9 +382,12 @@ saves its output the same way and ends with that error's text; a failed Nmap por
 its error text and saves nothing. A saved partial report goes to the usual output file, so it replaces an
 earlier report with the same name.
 Stored data remains usable without an expiry; its update time is shown in scan logs and dashboard
-results. Offline matching uses description keyword prefixes, with all query terms required,
-and keeps versions such as `10.1.18` distinct from a query for `1.1`. As with online keyword scans,
-findings are possible vulnerabilities, not proof of exploitability or exact version applicability.
+results. Offline searches match description keyword prefixes, with all query terms required,
+and keep versions such as `10.1.18` distinct from a query for `1.1`. Online and offline scans then keep
+the CVEs whose NVD applicability covers the detected release. Findings are possible vulnerabilities, not
+proof of exploitability: NVD's version ranges describe upstream releases, so a distribution package with a
+backported fix is still reported, and a CVE in a bundled library whose description does not name the
+product is not found.
 
 In the dashboard, **Settings → Offline vulnerability database** provides manual Download/Update,
 progress, CVE count, update time and an **Export for airgapped system** link. Select the vulnerability

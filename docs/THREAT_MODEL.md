@@ -237,7 +237,10 @@ updates validate/stage/replace. A mirror copied from another system is not
 validated again as a whole, so each stored record is inflated with a size limit
 (16 MiB, and 256 MiB for all the records one search reads, so that many matching
 records cannot add up to gigabytes of results) and type-checked when read, and a
-malformed or oversized one fails the lookup as incomplete instead of crashing the scan. Advertised feed hashes and feed bytes share the
+malformed or oversized one fails the lookup as incomplete instead of crashing the scan. The CPE
+applicability of a record (online or local) decides which findings are reported, so it is read without
+trusting its shape: malformed entries are skipped and version numbers are compared in bounded parts
+(`autopwn_suite/cpe_match.py`, fuzzed in `tests/unit/test_fuzz_inputs.py`). Advertised feed hashes and feed bytes share the
 same provider HTTPS boundary, not an independent signature
 (`autopwn_suite/vulnerability_db.py:287`). Downloads save bytes without executing them.
 Replay validates a generated recorded-evidence plan; it does not accept arbitrary

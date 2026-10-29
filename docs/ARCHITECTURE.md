@@ -59,7 +59,8 @@ flowchart LR
    the library path it was launched with, not the one that points into its unpacked bundle
    (`autopwn_suite/subprocess_env.py`).
 3. `autopwn_suite/nist_search.py` and `autopwn_suite/searchvuln.py` map service/version
-   observations to candidate CVEs. `autopwn_suite/vulnerability_db.py` reads a local
+   observations to candidate CVEs: the product is searched, and `autopwn_suite/cpe_match.py` keeps the
+   CVEs whose NVD applicability (CPE configurations) covers the detected version. `autopwn_suite/vulnerability_db.py` reads a local
    mirror or explicitly updates it using validated official annual feeds.
    `autopwn_suite/vulnerability_categories.py` sorts each CVE into fixed categories (remote
    code execution, denial of service, information disclosure and the like) from the CWE IDs of its

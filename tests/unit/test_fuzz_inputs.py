@@ -30,8 +30,11 @@ import pytest
 from rich.text import Text
 
 from autopwn_suite import i18n, update_checker
+from autopwn_suite.cpe_match import affects, find_affected
 from autopwn_suite.logger import markup_safe
+from autopwn_suite.nist_search import Vulnerability
 from autopwn_suite.nmap_backend import parse_nmap_xml
+from autopwn_suite.searchvuln import FindVulnerabilities, GenerateKeyword
 from autopwn_suite.utils import _port, _report_name
 from autopwn_suite.vulnerability_categories import CATEGORIES, categorize, find_weaknesses
 from autopwn_suite.vulnerability_db import SCHEMA_VERSION, DatabaseUnavailable, OfflineDatabase
@@ -918,3 +921,42 @@ def test_vulnerability_categories_only_return_the_fixed_ids_for_any_record_or_de
         assert result and set(result) <= set(CATEGORIES)
         assert list(result) == sorted(set(result), key=CATEGORIES.index)
         assert "other" not in result or result == ("other",)
+
+
+
+def test_service_keywords_and_cpe_applicability_never_raise_for_banner_or_record_text():
+    """Nmap's product and version come from a target's banner, and the CPE matches from NVD or a copied mirror."""
+    rng = random.Random(SEED + 71)
+    products = ["Apache httpd", "OpenSSH", "MySQL", "ISC BIND", "Samba smbd", "Jetty", "UnrealIRCd", "Unknown"]
+    versions = ["2.4.41", "8.2p1 Ubuntu 4ubuntu0.5", "5.5.5-10.3.23-MariaDB-0+deb10u1", "9.11.5-P4-5.1+deb10u5",
+                "3.X - 4.X", "9.4.18.v20190429", "8.14.4/8.14.4", "10.50.1600.00; RTM", "Unknown", "", "9" * 5000]
+    base = {"cve": {"configurations": [{"nodes": [{"cpeMatch": [
+        {"vulnerable": True, "criteria": "cpe:2.3:a:openbsd:openssh:*:p2:*:*:*:*:*:*", "versionEndIncluding": "7.2"},
+        {"vulnerable": True, "criteria": "cpe:2.3:a:isc:bind:9.11.5:p4:*:*:*:*:*:*"},
+        {"vulnerable": True, "criteria": "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*",
+         "versionStartIncluding": "2.4.0", "versionEndExcluding": "2.4.52"}]}]}]}}
+    junk = [None, True, 0, 2**70, 1.5, "", "x", "9" * 5000, [], ["x"], {}, {"a": 1}, "cpe:2.3:a:x", "cpe:2.3:a:x:y:*:*"]
+
+    def corrupt(node):
+        if rng.random() < .1:
+            return rng.choice(junk)
+        if isinstance(node, dict):
+            return {key: corrupt(value) for key, value in node.items()}
+        if isinstance(node, list):
+            return [corrupt(value) for value in node]
+        return mutate(node, rng) if isinstance(node, str) and rng.random() < .2 else node
+
+    for _ in range(3000):
+        product = str(rng.choice([random_value(rng), mutate(rng.choice(products), rng), rng.choice(products)]))
+        version = str(rng.choice([random_value(rng), mutate(rng.choice(versions), rng), rng.choice(versions)]))
+        keyword = GenerateKeyword(product, version)
+        release = keyword.rpartition(" ")[2]
+        assert not keyword or product.lower() == "unrealircd" or re.fullmatch(
+            r"[0-9]+(?:\.[0-9]+)*(?:[a-z]+[0-9]*)?", release, re.IGNORECASE)
+        found = find_affected(rng.choice([corrupt(base), random_value(rng)]))
+        assert type(found) is tuple and all(
+            len(entry) == 8 and all(part is None or isinstance(part, str) for part in entry) for entry in found)
+        assert affects(found, product, release or version) in (True, False, None)
+        candidate = Vulnerability("term", "CVE-2026-0001", mutate(product + " " + version, rng), "HIGH", 7.5,
+                                  "https://nvd.test/", 3.9, affected=found)
+        assert FindVulnerabilities(keyword or product, lambda term: [candidate]) in ([], [candidate])

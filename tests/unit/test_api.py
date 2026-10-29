@@ -89,7 +89,7 @@ class TestAutoScanner:
     @pytest.mark.parametrize(
         "product, version, expected",
         [
-            ("Apache httpd", "2.4.41", "Apache httpd 2.4.41"),
+            ("Apache httpd", "2.4.41", "Apache HTTP Server 2.4.41"),
             ("OpenSSH", "8.2p1", "OpenSSH 8.2p1"),
             ("Product", "Unknown", ""),
             ("Unknown", "1.0", ""),
@@ -113,14 +113,16 @@ class TestAutoScanner:
         mock_vuln.severity_score = 7.5
         mock_vuln.details_url = "http://example.com"
         mock_vuln.exploitability = 8.0
+        mock_vuln.affected = (("apache", "apache", "*", "*", None, None, None, "2.5"),)
         mock_search_cve.return_value = [mock_vuln]
 
         port_key = {"product": "apache", "version": "2.4"}
         results = scanner.SearchVuln(port_key, apiKey="test-key")
 
         mock_gen_keyword.assert_called_once_with("apache", "2.4")
-        # Use ANY to match the fake_logger object created internally
-        mock_search_cve.assert_called_once_with("apache 2.4", ANY, "test-key", strict=True)
+        # Use ANY to match the fake_logger object created internally. The product is searched and the
+        # results kept whose applicability covers 2.4.
+        mock_search_cve.assert_called_once_with("apache", ANY, "test-key", strict=True)
         assert "CVE-2023-1234" in results
         assert results["CVE-2023-1234"]["description"] == "Test vulnerability"
 

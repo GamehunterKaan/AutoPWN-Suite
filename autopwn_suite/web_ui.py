@@ -1633,7 +1633,7 @@ def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, look
     """Record one actual host. Return whether its vulnerability lookup failed."""
     from autopwn_suite.nist_search import searchCVE
     from autopwn_suite.scanner import AnalyseScanResults
-    from autopwn_suite.searchvuln import GenerateKeyword
+    from autopwn_suite.searchvuln import FindVulnerabilities, GenerateKeyword
 
     h = job.get_or_create_host(ip)
     nm_host = nm[ip]
@@ -1673,8 +1673,9 @@ def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, look
             cache_key = (ip, port["port"], port["protocol"], keyword)
             cves = job._lookup_results.get(cache_key)
             if cves is None:
-                cves = (lookup.search(keyword, log, api_key) if lookup is not None
-                        else searchCVE(keyword, log, api_key, strict=True))
+                cves = FindVulnerabilities(
+                    keyword, lambda term: lookup.search(term, log, api_key) if lookup is not None
+                    else searchCVE(term, log, api_key, strict=True))
                 cves = list(cves)
                 job._lookup_results[cache_key] = cves
         except Exception as exc:

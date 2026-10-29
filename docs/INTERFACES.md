@@ -280,8 +280,8 @@ log as a fixed-text warning with the schedule ID (no exception text).
   a technique or ports outside the lists in the scan section) keeps every entry and is
   copied the same way. The next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
   versions; never edit an active database directly.
-- Nmap receives argv and returns XML/progress. Online NVD receives service
-  keywords and optional API key over HTTPS; Exploit-DB supplies references and
+- Nmap receives argv and returns XML/progress. Online NVD receives the product
+  names of detected services (without their versions) and optional API key over HTTPS; Exploit-DB supplies references and
   optional downloaded bytes. Explicit NVD mirror maintenance uses annual
   JSON/gzip feeds with metadata checksums.
 - `--check-update` and `--apply-update` send GET requests to `api.github.com`; `--apply-update` also runs
