@@ -113,7 +113,7 @@ class TestAutoScanner:
         mock_vuln.severity_score = 7.5
         mock_vuln.details_url = "http://example.com"
         mock_vuln.exploitability = 8.0
-        mock_vuln.affected = (("apache", "apache", "*", "*", None, None, None, "2.5"),)
+        mock_vuln.affected = (("a", "apache", "apache", "*", "*", None, None, None, "2.5"),)
         mock_search_cve.return_value = [mock_vuln]
 
         port_key = {"product": "apache", "version": "2.4"}

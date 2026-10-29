@@ -240,7 +240,10 @@ records cannot add up to gigabytes of results) and type-checked when read, and a
 malformed or oversized one fails the lookup as incomplete instead of crashing the scan. The CPE
 applicability of a record (online or local) decides which findings are reported, so it is read without
 trusting its shape: malformed entries are skipped and version numbers are compared in bounded parts
-(`autopwn_suite/cpe_match.py`, fuzzed in `tests/unit/test_fuzz_inputs.py`). Advertised feed hashes and feed bytes share the
+(`autopwn_suite/cpe_match.py`, fuzzed in `tests/unit/test_fuzz_inputs.py`). Its description decides too: a
+CVE whose description says the detected release fixed the product is left out, so whoever controls a copied database
+can hide a finding through either, and the patterns that read the description run in linear time
+(`_named_as_fix` in `autopwn_suite/searchvuln.py`, fuzzed in the same test). Advertised feed hashes and feed bytes share the
 same provider HTTPS boundary, not an independent signature
 (`autopwn_suite/vulnerability_db.py:287`). Downloads save bytes without executing them.
 Replay validates a generated recorded-evidence plan; it does not accept arbitrary
