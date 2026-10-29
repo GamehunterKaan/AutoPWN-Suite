@@ -73,7 +73,9 @@ the newest version that has one. CVSS v4 has none, so a record scored only with 
 which means that no sub-score is available, not that the CVE is not exploitable. An older
 version's sub-score keeps its own scale (0 to 3.9 for CVSS v3, up to 10.0 for v2), which can
 differ from the scale of the version that supplies the severity. Vulnerability
-records are version-based candidates. Failures may raise scanner/database exceptions;
+records are version-based candidates: since v2.9.0 the product is searched and a CVE is kept when NVD's
+applicability (its CPE configurations) marks the detected release vulnerable, or, for a CVE NVD has not
+analyzed, when its description names the release. Failures may raise scanner/database exceptions;
 callers must handle them and protect output paths and sensitive results.
 Text from the scanned host or the vulnerability source (service, product, version, OS and vendor
 names, hostnames, CVE identifiers, descriptions and severities) is one line without control, bidirectional
