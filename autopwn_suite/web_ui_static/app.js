@@ -1103,7 +1103,9 @@ function renderUpdateStatus(state){
   else message = t('settings.update_not_checked');
   if(state.checked_at && !state.running) message += t('settings.update_checked_at', {time: new Date(state.checked_at).toLocaleString()});
   if(offline) message += t('settings.update_server_offline');
-  if(!state.checkout) message += t('settings.update_not_checkout');
+  // An installation the dashboard cannot update says how to: the server sends a fixed command or page, never text from GitHub.
+  const manual = {binary: 'settings.update_manual_binary', docker: 'settings.update_manual_docker'}[state.install_method] || 'settings.update_manual';
+  if(!state.can_apply) message += state.update_command ? t(manual, {command: state.update_command}) : t('settings.update_not_checkout');
   document.getElementById('update-status').textContent = message;
   const available = !!(status && status.update_available);
   const channel = document.getElementById('s-update-channel');
@@ -1111,7 +1113,7 @@ function renderUpdateStatus(state){
   channel.disabled = updateBusy || offline || !!state.running;
   document.getElementById('s-update-channel-commit').disabled = !state.checkout;
   document.getElementById('update-check').disabled = updateBusy || offline || !!state.running;
-  document.getElementById('update-apply').disabled = updateBusy || offline || !!state.running || !state.checkout || !!state.restart_required || !available;
+  document.getElementById('update-apply').disabled = updateBusy || offline || !!state.running || !state.can_apply || !!state.restart_required || !available;
   document.getElementById('update-restart').hidden = !state.restart_required;
   document.getElementById('update-dependencies').hidden = !(state.restart_required && state.result && state.result.dependencies_changed);
   const autoCheck = document.getElementById('s-update-auto');

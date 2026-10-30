@@ -22,7 +22,9 @@ from autopwn_suite.update_checker import (
     check_for_updates,
     format_result,
     format_status,
+    install_method,
     resolve_update_channel,
+    update_hint,
 )
 from autopwn_suite.utils import (
     CheckConnection as CheckConnection,
@@ -191,6 +193,8 @@ def main() -> None:
                 status = check_for_updates(__version__, channel=channel, branch=args.update_branch,
                                            repo=args.update_repo)
                 console.print(console_safe(format_status(status)))
+                if status.update_available:
+                    console.print(console_safe(update_hint(install_method())))
         except UpdateCheckError as exc:
             log.logger("error", console_safe(exc))
             raise SystemExit(1) from exc

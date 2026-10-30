@@ -4,15 +4,20 @@
 
 import os
 import re
+import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
+from importlib import metadata
 from pathlib import Path
 
 import requests
 
 from autopwn_suite.paths import data_dir
 
-DEFAULT_REPO = os.environ.get("AUTOPWN_UPDATE_REPO", "GamehunterKaan/AutoPWN-Suite")
+UPSTREAM_REPO = "GamehunterKaan/AutoPWN-Suite"  # the repository whose releases PyPI's autopwn-suite package holds
+DEFAULT_REPO = os.environ.get("AUTOPWN_UPDATE_REPO", UPSTREAM_REPO)
+PACKAGE = "autopwn-suite"
 API_ROOT = "https://api.github.com/repos/{repo}"
 REQUEST_TIMEOUT = 6
 CHANNEL_FILE_NAME = "update_channel.txt"
@@ -379,10 +384,169 @@ def apply_release_update(repo=None):
     return _result("release", repo, previous, new, tag)
 
 
+# ── Installations other than a git checkout ──
+
+PACKAGE_MANAGERS = ("pipx", "uv", "pip")
+# pipx and uv keep each tool in a virtual environment of its own that holds one of these files.
+_TOOL_MARKERS = (("pipx", "pipx_metadata.json"), ("uv", "uv-receipt.toml"))
+_DOCKER_MARKER = Path("/.dockerenv")  # Docker creates it in every container
+# A release version as PyPI holds it: the only text from GitHub that reaches a package manager.
+_RELEASE_VERSION = re.compile(r"[0-9]{1,6}(?:\.[0-9]{1,6}){1,3}")
+_INSTALL_TIMEOUT = 900
+# Windows locks a running program's files: a package manager that replaces the autopwn-suite.exe launcher this process
+# runs from fails halfway and can leave the environment without the package. There it runs after AutoPWN Suite exits.
+_FILES_LOCKED_WHILE_RUNNING = os.name == "nt"
+
+
+def install_method():
+    """How the running copy was installed, which decides how it updates: "checkout" (a git checkout of this
+    project, which apply_update fast-forwards), "pipx" or "uv" (a tool environment of either), "pip" (another
+    virtual environment that holds the package, as pip or install.sh makes), "binary" (a standalone binary),
+    "docker" (the container image) or "other"."""
+    if getattr(sys, "frozen", False):
+        return "binary"
+    if _local_commit():
+        return "checkout"
+    if _DOCKER_MARKER.exists():
+        return "docker"
+    prefix = Path(sys.prefix)
+    for method, marker in _TOOL_MARKERS:
+        if (prefix / marker).is_file():
+            return method
+    if sys.prefix != sys.base_prefix and _installed_in(prefix):
+        return "pip"
+    return "other"
+
+
+def _installed_in(prefix):
+    """Whether the running code is the autopwn-suite package installed under `prefix`, not a copy run from a folder
+    while the environment holds another."""
+    try:
+        metadata.distribution(PACKAGE)
+        Path(__file__).resolve().relative_to(prefix.resolve())
+    except (metadata.PackageNotFoundError, ValueError, OSError):
+        return False
+    return True
+
+
+def installed_version():
+    """The version of the autopwn-suite package on disk, which a package update changes under the running process;
+    None when no package is installed."""
+    try:
+        return metadata.version(PACKAGE)
+    except (metadata.PackageNotFoundError, OSError, ValueError):
+        return None
+
+
+def can_apply(method):
+    """Whether apply_update can update this copy in place: a checkout, or (except on Windows) a pipx, uv or pip
+    installation that this account may change, with pipx or uv on PATH."""
+    if method == "checkout":
+        return True
+    return (method in PACKAGE_MANAGERS and not _FILES_LOCKED_WHILE_RUNNING and os.access(_repo_root(), os.W_OK)
+            and (method == "pip" or shutil.which(method) is not None))
+
+
+def update_command(method):
+    """The command or page that updates a copy installed this way, for messages; None for an unknown installation."""
+    return {
+        "checkout": "autopwn-suite --apply-update",
+        "pipx": f"pipx upgrade {PACKAGE}",
+        "uv": f"uv tool upgrade {PACKAGE}",
+        "pip": f'"{sys.executable}" -m pip install --upgrade {PACKAGE}' if _FILES_LOCKED_WHILE_RUNNING
+        else "autopwn-suite --apply-update" if os.access(_repo_root(), os.W_OK) else "sudo autopwn-suite --apply-update",
+        "binary": f"https://github.com/{UPSTREAM_REPO}/releases/latest",
+        "docker": "docker compose pull && docker compose up -d",
+    }.get(method)
+
+
+def _package_command(method, version):
+    """The argument vector that updates a pipx, uv or pip installation from PyPI. Wheels only: no package's own build
+    code runs. pipx and uv install the newest release; pip installs `version`."""
+    if method == "pip":
+        return [sys.executable, "-m", "pip", "install", "--upgrade", "--only-binary=:all:", "--no-input",
+                "--disable-pip-version-check", f"{PACKAGE}=={version}"]
+    tool = shutil.which(method)
+    if tool is None:
+        raise UpdateCheckError(_("{tool} is not on PATH; run {command} where it is.").format(
+            tool=method, command=update_command(method)), "update_tool_missing")
+    if method == "pipx":
+        return [tool, "upgrade", PACKAGE, "--pip-args=--only-binary=:all:"]
+    return [tool, "tool", "upgrade", PACKAGE, "--no-build"]
+
+
+def apply_package_update(method, repo=None):
+    """Update an installation that pipx, uv or pip made to the latest release on PyPI; it never moves back."""
+    repo = _checked_repo(repo)
+    if repo != UPSTREAM_REPO:
+        raise UpdateCheckError(
+            _("PyPI holds the releases of {upstream} only; --update-repo and AUTOPWN_UPDATE_REPO apply to git "
+              "checkouts.").format(upstream=UPSTREAM_REPO), "update_repo_not_pypi")
+    if _FILES_LOCKED_WHILE_RUNNING:
+        raise UpdateCheckError(
+            _("Windows locks the files of a running program; close AutoPWN Suite, then run: {command}").format(
+                command=update_command(method)), "update_windows")
+    if not os.access(_repo_root(), os.W_OK):
+        raise UpdateCheckError(
+            _("This installation belongs to another account (install.sh installs it as root); "
+              "run sudo autopwn-suite --apply-update."), "update_needs_root")
+    data = _get_json(f"{API_ROOT.format(repo=repo)}/releases/latest")
+    tag = _text(data, "tag_name")
+    version = tag[1:] if tag[:1] in ("v", "V") else tag
+    if not _RELEASE_VERSION.fullmatch(version):
+        raise UpdateCheckError(_("The latest release names no version that PyPI could hold."), "update_bad_response")
+    previous = installed_version() or "unknown"
+    if _parse_version(version) <= _parse_version(previous):
+        return UpdateResult("release", repo, previous, previous, tag)
+    command = _package_command(method, version)
+    try:
+        completed = subprocess.run(command, capture_output=True, encoding="utf-8", errors="replace",
+                                   timeout=_INSTALL_TIMEOUT, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise UpdateCheckError(_("{tool} could not run ({error_type}).").format(
+            tool=method, error_type=type(exc).__name__), "update_install_failed") from exc
+    if completed.returncode != 0:
+        raise UpdateCheckError(_("{tool} could not update AutoPWN Suite (exit status {status}).").format(
+            tool=method, status=completed.returncode), "update_install_failed")
+    return UpdateResult("release", repo, previous, installed_version() or previous, tag)
+
+
+def _manual_update(method):
+    """The refusal for an installation that cannot update itself, saying how to update it instead."""
+    if method == "binary":
+        return UpdateCheckError(
+            _("A standalone binary cannot replace itself safely; download the new one from {url} and verify it as "
+              "the release notes describe.").format(url=update_command("binary")), "update_binary")
+    if method == "docker":
+        return UpdateCheckError(
+            _("A container cannot update its own image; on the host, run: {command}").format(
+                command=update_command("docker")), "update_docker")
+    return UpdateCheckError(_("Applying an update requires a git checkout of AutoPWN Suite."), "update_not_checkout")
+
+
+def update_hint(method):
+    """One line saying how to apply an available update to a copy installed this way."""
+    if method == "checkout" or method in PACKAGE_MANAGERS and can_apply(method):
+        return _("Run --apply-update to install it.")
+    if method in PACKAGE_MANAGERS and _FILES_LOCKED_WHILE_RUNNING:
+        return _("Close AutoPWN Suite, then update it with: {command}").format(command=update_command(method))
+    if method in PACKAGE_MANAGERS:
+        return _("Update it with: {command}").format(command=update_command(method))
+    return str(_manual_update(method))
+
+
 def apply_update(channel="release", branch="main", repo=None):
-    """Dispatch to :func:`apply_release_update` or :func:`apply_commit_update` by ``channel``."""
+    """Update this copy the way it was installed: :func:`apply_commit_update` or :func:`apply_release_update` for a
+    git checkout, :func:`apply_package_update` for pipx, uv and pip; other installations are refused with how
+    to update them."""
     if channel == "commit":
         return apply_commit_update(branch=branch, repo=repo)
+    repo = _checked_repo(repo)
+    method = install_method()
+    if method in PACKAGE_MANAGERS:
+        return apply_package_update(method, repo=repo)
+    if method != "checkout":
+        raise _manual_update(method)
     return apply_release_update(repo=repo)
 
 

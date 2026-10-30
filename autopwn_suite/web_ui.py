@@ -218,13 +218,14 @@ def _update_vulnerability_database():
             _database_update["running"] = False
 
 
-# ── Self-update (checks GitHub and fast-forwards a git checkout; explicit or periodic, never offline) ──
+# ── Self-update (checks GitHub, then fast-forwards a git checkout or runs pipx, uv or pip; explicit or periodic, never offline) ──
 
 _UPDATE_BRANCH = "main"
 _app_update_lock = threading.Lock()
 _app_update = {"running": None, "checked_at": None, "status": None, "error": None, "error_code": None,
                "result": None}
 _start_commit = None  # the checkout's commit when the server started; None when it does not run from a checkout
+_start_version = None  # the installed package's version when the server started; None when none is installed
 _update_hold_logged = None  # the hold code the scheduler last logged
 # Fixed text for each UpdateCheckError code: the error's own message is never sent.
 _APP_UPDATE_ERRORS = {
@@ -241,6 +242,14 @@ _APP_UPDATE_ERRORS = {
     "update_fetch_failed": "git fetch from GitHub failed. Check the connection and try again.",
     "update_diverged": "The checkout has diverged from the update, so it cannot be fast-forwarded. Resolve it with git.",
     "update_detached_head": "HEAD is detached; check out a branch before updating from the commit channel.",
+    "update_binary": "A standalone binary cannot replace itself; download the new one from the releases page and verify it.",
+    "update_docker": "A container cannot update its own image; on the host, run docker compose pull and docker compose up -d.",
+    "update_tool_missing": "pipx or uv, which installed this copy, is not on the PATH of the dashboard's account.",
+    "update_needs_root": "This installation belongs to another account; update it with sudo autopwn-suite --apply-update.",
+    "update_needs_cli": "The dashboard does not install packages as root; update it with sudo autopwn-suite --apply-update.",
+    "update_install_failed": "The package manager could not install the update. Update it from the command line.",
+    "update_repo_not_pypi": "AUTOPWN_UPDATE_REPO names another repository, and PyPI holds only the upstream releases.",
+    "update_windows": "Windows locks the files of a running program; stop the dashboard, then update it from a terminal.",
 }
 
 
@@ -252,12 +261,25 @@ def _app_update_error(error, generic):
 
 
 def _restart_required(commit=None):
-    """Whether the checkout moved since the server started (an update from here, the CLI or git), so the code on
-    disk is no longer the code this process runs."""
-    if _start_commit is None:
-        return False
-    commit = commit or update_checker.current_commit()
-    return commit is not None and commit != _start_commit
+    """Whether the checkout moved, or the installed package changed version, since the server started (an update
+    from here, the CLI, git or a package manager), so the code on disk is no longer the code this process runs."""
+    if _start_commit is not None:
+        commit = commit or update_checker.current_commit()
+        return commit is not None and commit != _start_commit
+    if _start_version is not None:
+        version = update_checker.installed_version()
+        return version is not None and version != _start_version
+    return False
+
+
+def _as_root():
+    return hasattr(os, "geteuid") and os.geteuid() == 0
+
+
+def _dashboard_can_apply(method):
+    """Whether Apply update can update this copy: as the CLI can, except that the dashboard, which the network reaches,
+    never runs a package manager as root."""
+    return update_checker.can_apply(method) and not (method in update_checker.PACKAGE_MANAGERS and _as_root())
 
 
 class _UpdateHeld(Exception):
@@ -298,8 +320,13 @@ def _app_update_snapshot():
     with _app_update_lock:
         state = deepcopy(_app_update)
     commit = update_checker.current_commit()
+    method = update_checker.install_method()
+    command = update_checker.update_command(method)
+    if method in update_checker.PACKAGE_MANAGERS and _as_root():
+        command = "sudo autopwn-suite --apply-update"
     return {**state, "channel": update_checker.resolve_update_channel(None), "repo": update_checker.DEFAULT_REPO,
             "version": __version__, "checkout": commit is not None, "restart_required": _restart_required(commit),
+            "install_method": method, "can_apply": _dashboard_can_apply(method), "update_command": command,
             "auto_check": _get_setting("update_auto_check") is not False, "check_due": _auto_check_due(),
             "offline_only": _offline_enabled(), "offline_locked": _OFFLINE_ONLY}
 
@@ -2396,6 +2423,8 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             channel, _automatic = _requested_update()
         except ValueError:
             return jsonify({"error": "channel must be 'release' or 'commit'; automatic must be a boolean.", "code": "invalid_update_channel"}), 400
+        if update_checker.install_method() in update_checker.PACKAGE_MANAGERS and _as_root():
+            return jsonify({"error": _APP_UPDATE_ERRORS["update_needs_cli"], "code": "update_needs_cli"}), 409
         refusal = _claim_app_update("apply")
         if refusal:
             return refusal
@@ -2782,9 +2811,10 @@ def _quiet_request_handler():
 
 def start_server(host: str = "127.0.0.1", port: int = 8080, version: str = "Unkown", *, offline=False, database=None) -> None:
     """Start the web UI server and block until Ctrl+C."""
-    global __version__, _OFFLINE_ONLY, _VULNERABILITY_DB, _start_commit
+    global __version__, _OFFLINE_ONLY, _VULNERABILITY_DB, _start_commit, _start_version
     __version__ = version
     _start_commit = update_checker.current_commit()
+    _start_version = update_checker.installed_version()
     _OFFLINE_ONLY = offline
     _VULNERABILITY_DB = database
     if not FLASK_AVAILABLE:

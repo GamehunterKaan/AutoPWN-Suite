@@ -32,6 +32,8 @@ def web(monkeypatch, tmp_path):
     monkeypatch.setattr(wu, "_start_commit", "a" * 40)  # recorded when the dashboard starts
     monkeypatch.setattr(wu, "_update_hold_logged", False)
     monkeypatch.setattr(uc, "current_commit", lambda: "a" * 40)
+    monkeypatch.setattr(wu, "_start_version", None)
+    monkeypatch.setattr(uc, "install_method", lambda: "checkout")
     for name in ("check_for_updates", "apply_update"):
         monkeypatch.setattr(uc, name, lambda *a, **k: pytest.fail("contacted GitHub or ran git"))
     app = authenticated_app(wu)
@@ -458,3 +460,51 @@ def test_an_automatic_check_that_another_finished_meanwhile_is_not_run_again(web
     response = client.post("/api/update/check", json={"automatic": True})
     assert response.status_code == 409 and response.get_json()["code"] == "update_not_due"
     assert not calls and wu._app_update["running"] is None
+
+
+
+def test_the_page_learns_how_this_copy_updates(web, monkeypatch):
+    _wu, client = web
+    status = client.get("/api/update").get_json()
+    assert (status["install_method"], status["can_apply"], status["update_command"]) == (
+        "checkout", True, "autopwn-suite --apply-update")
+    monkeypatch.setattr(uc, "install_method", lambda: "docker")
+    status = client.get("/api/update").get_json()
+    assert (status["install_method"], status["can_apply"], status["update_command"]) == (
+        "docker", False, "docker compose pull && docker compose up -d")
+
+
+def test_a_package_installation_applies_from_the_dashboard(web, monkeypatch):
+    wu, client = web
+    monkeypatch.setattr(uc, "install_method", lambda: "pipx")
+    monkeypatch.setattr(uc, "can_apply", lambda method: True)
+    monkeypatch.setattr(wu, "_as_root", lambda: False)
+    assert client.get("/api/update").get_json()["can_apply"] is True
+    calls = []
+    result = uc.UpdateResult("release", "x/y", "2.8.0", "9.9.9", "v9.9.9")
+    monkeypatch.setattr(uc, "apply_update", lambda **k: calls.append(k) or result)
+    status = client.post("/api/update/apply", json={}).get_json()
+    assert calls and status["result"]["new"] == "9.9.9" and status["result"]["changed"] is True
+
+
+def test_the_dashboard_never_runs_a_package_manager_as_root(web, monkeypatch):
+    wu, client = web
+    monkeypatch.setattr(uc, "install_method", lambda: "pip")
+    monkeypatch.setattr(uc, "can_apply", lambda method: True)
+    monkeypatch.setattr(wu, "_as_root", lambda: True)
+    status = client.get("/api/update").get_json()
+    assert status["can_apply"] is False and status["update_command"] == "sudo autopwn-suite --apply-update"
+    response = client.post("/api/update/apply", json={})
+    assert response.status_code == 409 and response.get_json()["code"] == "update_needs_cli"
+    assert wu._app_update["running"] is None
+
+
+def test_a_package_updated_under_the_dashboard_asks_for_a_restart(web, monkeypatch):
+    wu, client = web
+    monkeypatch.setattr(wu, "_start_commit", None)
+    monkeypatch.setattr(uc, "current_commit", lambda: None)
+    monkeypatch.setattr(wu, "_start_version", "2.8.0")
+    monkeypatch.setattr(uc, "installed_version", lambda: "2.8.0")
+    assert client.get("/api/update").get_json()["restart_required"] is False
+    monkeypatch.setattr(uc, "installed_version", lambda: "9.9.9")  # pipx upgrade from here or a terminal
+    assert client.get("/api/update").get_json()["restart_required"] is True

@@ -875,6 +875,35 @@ def test_a_release_tag_reaches_git_only_as_a_plain_name_in_the_expected_argument
     assert reached and refused
 
 
+def test_a_release_tag_reaches_a_package_manager_only_as_a_plain_version(tmp_path, monkeypatch):
+    rng = random.Random(SEED + 65)
+    runs = []
+    monkeypatch.setattr(update_checker, "_repo_root", lambda: tmp_path)
+    monkeypatch.setattr(update_checker, "installed_version", lambda: "0.1")
+    monkeypatch.setattr(update_checker, "_FILES_LOCKED_WHILE_RUNNING", False)  # as on Linux and macOS
+    monkeypatch.setattr(update_checker.subprocess, "run",
+                        lambda argv, **k: runs.append(argv) or SimpleNamespace(returncode=0, stdout="", stderr=""))
+    versions = ["v2.9.0", "2.9.0", "V10.0.1.2", "v2.9.0rc1", "v2.9", "v2", "v2.9.0 --pre", "v1.2.3.4.5"]
+    reached = refused = 0
+    for _ in range(2500):
+        tag = mutate(rng.choice(versions), rng) if rng.random() < .6 else update_name(rng)
+        runs.clear()
+        reply = MagicMock(status_code=200, ok=True)
+        reply.json.return_value = {"tag_name": tag}
+        monkeypatch.setattr(update_checker.requests, "get", lambda *a, _reply=reply, **k: _reply)
+        try:
+            update_checker.apply_package_update("pip")
+        except update_checker.UpdateCheckError as error:
+            refused += 1
+            assert error.code == "update_bad_response" and not runs
+            continue
+        reached += 1
+        requirement = runs[-1][-1]
+        assert re.fullmatch(r"autopwn-suite==[0-9]{1,6}(?:\.[0-9]{1,6}){1,3}", requirement)
+        assert all(not arg.startswith("autopwn-suite") for arg in runs[-1][:-1])
+    assert reached and refused
+
+
 def test_language_selection_only_yields_a_supported_language_and_leaves_the_saved_one_alone_for_junk(tmp_path, monkeypatch):
     rng = random.Random(SEED + 70)
     monkeypatch.setenv("AUTOPWN_DATA_DIR", str(tmp_path))

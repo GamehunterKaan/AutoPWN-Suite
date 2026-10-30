@@ -454,7 +454,9 @@ def test_text_from_github_cannot_drive_the_terminal(monkeypatch, session):
     assert "\x1b" not in printed
     assert "\x07" not in printed
     assert "[bold red]" in printed  # shown as text, not applied as markup
-    assert printed.count("\n") == 1  # no line of its own for the forged text
+    lines = printed.splitlines()
+    assert len(lines) == 2 and "forged" in lines[0]  # the status, with no line of its own for the forged text
+    assert lines[1] == uc.update_hint(uc.install_method())  # and how to apply the update
 
 
 @pytest.mark.parametrize("repo", ["x/y", "GamehunterKaan/AutoPWN-Suite", "a.b/c_d-e", "x/y.js", "x" * 100 + "/" + "y" * 100])
@@ -587,3 +589,237 @@ def test_output_git_prints_that_the_locale_cannot_decode_means_no_checkout(monke
         raise UnicodeDecodeError("cp1252", b"\x81", 0, 1, "character maps to <undefined>")
     monkeypatch.setattr(uc.subprocess, "run", undecodable)
     assert uc.current_commit() is None
+
+
+# ── Installations other than a git checkout ──
+
+
+@pytest.fixture
+def installed(monkeypatch, tmp_path):
+    """A copy that is not a git checkout, in a virtual environment at tmp_path that this account may change."""
+    monkeypatch.setattr(uc, "_local_commit", lambda: None)
+    monkeypatch.setattr(uc, "_DOCKER_MARKER", tmp_path / "no-dockerenv")
+    monkeypatch.delattr(uc.sys, "frozen", raising=False)
+    monkeypatch.setattr(uc.sys, "prefix", str(tmp_path))
+    monkeypatch.setattr(uc.sys, "base_prefix", str(tmp_path / "base"))
+    monkeypatch.setattr(uc, "_repo_root", lambda: tmp_path)
+    monkeypatch.setattr(uc.shutil, "which", lambda name: f"/tools/{name}")
+    monkeypatch.setattr(uc, "_FILES_LOCKED_WHILE_RUNNING", False)  # as on Linux and macOS
+    return tmp_path
+
+
+@pytest.mark.parametrize("marker, method", [("pipx_metadata.json", "pipx"), ("uv-receipt.toml", "uv")])
+def test_a_pipx_or_uv_tool_environment_is_recognized(installed, marker, method):
+    (installed / marker).write_text("{}")
+    assert uc.install_method() == method
+
+
+def test_a_virtual_environment_holding_the_package_is_a_pip_installation(installed, monkeypatch):
+    monkeypatch.setattr(uc, "_installed_in", lambda prefix: True)
+    assert uc.install_method() == "pip"
+    monkeypatch.setattr(uc, "_installed_in", lambda prefix: False)  # a copy run from a folder
+    assert uc.install_method() == "other"
+    monkeypatch.setattr(uc, "_installed_in", lambda prefix: True)
+    monkeypatch.setattr(uc.sys, "base_prefix", str(installed))  # the system Python, not a virtual environment
+    assert uc.install_method() == "other"
+
+
+def test_a_binary_a_container_and_a_checkout_are_recognized_first(installed, monkeypatch):
+    (installed / "pipx_metadata.json").write_text("{}")
+    marker = installed / ".dockerenv"
+    marker.write_text("")
+    monkeypatch.setattr(uc, "_DOCKER_MARKER", marker)
+    assert uc.install_method() == "docker"
+    monkeypatch.setattr(uc, "_local_commit", lambda: "a" * 40)
+    assert uc.install_method() == "checkout"
+    monkeypatch.setattr(uc.sys, "frozen", True, raising=False)
+    assert uc.install_method() == "binary"
+
+
+def test_only_this_package_installed_in_the_environment_counts(tmp_path, monkeypatch):
+    monkeypatch.setattr(uc.metadata, "distribution", lambda name: object())
+    assert uc._installed_in(uc.Path(uc.__file__).parent.parent) is True
+    assert uc._installed_in(tmp_path) is False
+
+    def missing(name):
+        raise uc.metadata.PackageNotFoundError(name)
+    monkeypatch.setattr(uc.metadata, "distribution", missing)
+    assert uc._installed_in(uc.Path(uc.__file__).parent.parent) is False
+
+
+@pytest.mark.parametrize("method, tool, writable, expected", [
+    ("checkout", None, False, True), ("pip", None, True, True), ("pip", None, False, False),
+    ("pipx", "/tools/pipx", True, True), ("pipx", None, True, False), ("uv", "/tools/uv", False, False),
+    ("binary", "/tools/x", True, False), ("docker", "/tools/x", True, False), ("other", "/tools/x", True, False)])
+def test_only_a_checkout_or_a_package_installation_this_account_may_change_applies(
+        installed, monkeypatch, method, tool, writable, expected):
+    monkeypatch.setattr(uc.shutil, "which", lambda name: tool)
+    monkeypatch.setattr(uc.os, "access", lambda path, mode: writable)
+    assert uc.can_apply(method) is expected
+
+
+def test_each_installation_is_told_how_to_update(installed, monkeypatch):
+    assert uc.update_command("pipx") == "pipx upgrade autopwn-suite"
+    assert uc.update_command("uv") == "uv tool upgrade autopwn-suite"
+    assert uc.update_command("docker") == "docker compose pull && docker compose up -d"
+    assert uc.update_command("binary") == "https://github.com/GamehunterKaan/AutoPWN-Suite/releases/latest"
+    assert uc.update_command("pip") == "autopwn-suite --apply-update"
+    assert uc.update_command("other") is None
+    assert uc.update_hint("pipx") == "Run --apply-update to install it."
+    assert "releases/latest" in uc.update_hint("binary") and "docker compose pull" in uc.update_hint("docker")
+    monkeypatch.setattr(uc.os, "access", lambda path, mode: False)  # install.sh's root-owned environment
+    assert uc.update_command("pip") == "sudo autopwn-suite --apply-update"
+    assert uc.update_hint("pip") == "Update it with: sudo autopwn-suite --apply-update"
+
+
+def _release_tag(monkeypatch, tag="v9.9.9"):
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(
+        tag_name=tag, html_url="https://github.com/GamehunterKaan/AutoPWN-Suite/releases/tag/" + str(tag)))
+
+
+def _installer(monkeypatch, returncode=0, versions=("2.8.0", "9.9.9")):
+    """Record what would run, and have the installed version change once it has run."""
+    runs = []
+    state = {"version": versions[0]}
+
+    def run(argv, **kwargs):
+        runs.append((argv, kwargs))
+        if returncode == 0:
+            state["version"] = versions[1]
+        return SimpleNamespace(returncode=returncode, stdout="secret output", stderr="secret error")
+    monkeypatch.setattr(uc.subprocess, "run", run)
+    monkeypatch.setattr(uc, "installed_version", lambda: state["version"])
+    return runs
+
+
+@pytest.mark.parametrize("method, argv", [
+    ("pip", [uc.sys.executable, "-m", "pip", "install", "--upgrade", "--only-binary=:all:", "--no-input",
+             "--disable-pip-version-check", "autopwn-suite==9.9.9"]),
+    ("pipx", ["/tools/pipx", "upgrade", "autopwn-suite", "--pip-args=--only-binary=:all:"]),
+    ("uv", ["/tools/uv", "tool", "upgrade", "autopwn-suite", "--no-build"])])
+def test_a_package_installation_updates_from_pypi_with_wheels_only(installed, monkeypatch, method, argv):
+    _release_tag(monkeypatch)
+    runs = _installer(monkeypatch)
+    result = uc.apply_package_update(method)
+    assert [run[0] for run in runs] == [argv]
+    assert runs[0][1]["timeout"] and runs[0][1]["check"] is False and "shell" not in runs[0][1]
+    assert (result.mode, result.previous, result.new, result.ref, result.changed) == (
+        "release", "2.8.0", "9.9.9", "v9.9.9", True)
+    assert "Restart AutoPWN Suite" in uc.format_result(result)
+
+
+def test_apply_update_sends_a_package_installation_to_its_package_manager(installed, monkeypatch):
+    (installed / "uv-receipt.toml").write_text("")
+    monkeypatch.setattr(uc, "apply_package_update", lambda method, repo=None: (method, repo))
+    monkeypatch.setattr(uc, "apply_release_update", lambda *a, **k: pytest.fail("ran git"))
+    assert uc.apply_update(repo="GamehunterKaan/AutoPWN-Suite") == ("uv", "GamehunterKaan/AutoPWN-Suite")
+
+
+def test_a_package_installation_never_moves_back(installed, monkeypatch):
+    _release_tag(monkeypatch, "v2.8.0")
+    runs = _installer(monkeypatch, versions=("2.8.1", "2.8.0"))
+    result = uc.apply_package_update("pip")
+    assert not runs and not result.changed and uc.format_result(result).startswith("Already up to date")
+
+
+@pytest.mark.parametrize("tag", ["v9.9.9 --index-url=https://evil.test", "--index-url=x", "9.9.9;x", "v9", "", None,
+                                 "v1.2.3.4.5", "v1.2.3rc1", "v" + "9" * 7 + ".0"])
+def test_a_release_tag_that_is_not_a_plain_version_reaches_no_package_manager(installed, monkeypatch, tag):
+    _release_tag(monkeypatch, tag)
+    runs = _installer(monkeypatch)
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.apply_package_update("pip")
+    assert caught.value.code == "update_bad_response" and not runs
+
+
+def test_a_failed_package_update_reports_the_exit_status_not_the_output(installed, monkeypatch):
+    _release_tag(monkeypatch)
+    _installer(monkeypatch, returncode=2)
+    with pytest.raises(uc.UpdateCheckError, match=r"pip could not update AutoPWN Suite \(exit status 2\)\.$") as caught:
+        uc.apply_package_update("pip")
+    assert caught.value.code == "update_install_failed" and "secret" not in str(caught.value)
+
+
+def test_a_package_manager_that_cannot_run_is_reported(installed, monkeypatch):
+    _release_tag(monkeypatch)
+    monkeypatch.setattr(uc, "installed_version", lambda: "2.8.0")
+
+    def cannot_run(*a, **k):
+        raise OSError("no such file /secret/path")
+    monkeypatch.setattr(uc.subprocess, "run", cannot_run)
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.apply_package_update("pip")
+    assert caught.value.code == "update_install_failed" and "secret" not in str(caught.value)
+
+
+def test_a_missing_pipx_or_uv_is_reported_with_its_command(installed, monkeypatch):
+    _release_tag(monkeypatch)
+    runs = _installer(monkeypatch)
+    monkeypatch.setattr(uc.shutil, "which", lambda name: None)
+    with pytest.raises(uc.UpdateCheckError, match="pipx upgrade autopwn-suite") as caught:
+        uc.apply_package_update("pipx")
+    assert caught.value.code == "update_tool_missing" and not runs
+
+
+def test_a_package_installation_follows_only_the_upstream_releases(installed, monkeypatch):
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: pytest.fail("contacted GitHub"))
+    runs = _installer(monkeypatch)
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.apply_package_update("pip", repo="someone/fork")
+    assert caught.value.code == "update_repo_not_pypi" and not runs
+
+
+def test_an_installation_of_another_account_needs_sudo(installed, monkeypatch):
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: pytest.fail("contacted GitHub"))
+    monkeypatch.setattr(uc.os, "access", lambda path, mode: False)
+    runs = _installer(monkeypatch)
+    with pytest.raises(uc.UpdateCheckError, match="sudo autopwn-suite --apply-update") as caught:
+        uc.apply_package_update("pip")
+    assert caught.value.code == "update_needs_root" and not runs
+
+
+@pytest.mark.parametrize("marker, code, text", [
+    (None, "update_binary", "releases/latest"), (".dockerenv", "update_docker", "docker compose pull"),
+    ("", "update_not_checkout", "git checkout")])
+def test_an_installation_that_cannot_update_itself_says_how_to(installed, monkeypatch, marker, code, text):
+    if marker is None:
+        monkeypatch.setattr(uc.sys, "frozen", True, raising=False)
+    elif marker:
+        (installed / marker).write_text("")
+        monkeypatch.setattr(uc, "_DOCKER_MARKER", installed / marker)
+    monkeypatch.setattr(uc.subprocess, "run", lambda *a, **k: pytest.fail("ran a command"))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: pytest.fail("contacted GitHub"))
+    with pytest.raises(uc.UpdateCheckError, match=text) as caught:
+        uc.apply_update(repo="GamehunterKaan/AutoPWN-Suite")
+    assert caught.value.code == code
+
+
+def test_check_update_says_how_to_apply_an_available_update(monkeypatch, session):
+    status = uc.UpdateStatus("release", "x/y", "2.8.0", "v9.9.9", "https://example.test/r", True)
+    monkeypatch.setattr("autopwn_suite.cli.check_for_updates", MagicMock(return_value=status))
+    monkeypatch.setattr("autopwn_suite.cli.install_method", lambda: "docker")
+    printed = session.run("--check-update")
+    assert "docker compose pull && docker compose up -d" in printed
+
+
+def test_check_update_prints_no_hint_when_nothing_is_newer(monkeypatch, session):
+    status = uc.UpdateStatus("release", "x/y", "9.9.9", "v9.9.9", "https://example.test/r", False)
+    monkeypatch.setattr("autopwn_suite.cli.check_for_updates", MagicMock(return_value=status))
+    monkeypatch.setattr("autopwn_suite.cli.install_method", lambda: pytest.fail("looked at the installation"))
+    assert session.run("--check-update").count("\n") == 1
+
+
+def test_on_windows_a_package_installation_is_updated_after_autopwn_suite_exits(installed, monkeypatch):
+    """Windows locks the running autopwn-suite.exe: pipx upgrade failed halfway with the dashboard running and left
+    the environment without the package."""
+    monkeypatch.setattr(uc, "_FILES_LOCKED_WHILE_RUNNING", True)
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: pytest.fail("contacted GitHub"))
+    runs = _installer(monkeypatch)
+    for method in uc.PACKAGE_MANAGERS:
+        assert uc.can_apply(method) is False
+        with pytest.raises(uc.UpdateCheckError, match="close AutoPWN Suite") as caught:
+            uc.apply_package_update(method)
+        assert caught.value.code == "update_windows" and not runs
+    assert uc.can_apply("checkout") is True
+    assert uc.update_command("pip") == f'"{uc.sys.executable}" -m pip install --upgrade autopwn-suite'
+    assert uc.update_hint("pipx") == "Close AutoPWN Suite, then update it with: pipx upgrade autopwn-suite"
