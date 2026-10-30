@@ -29,7 +29,7 @@ Only features that exist in the source are listed.
   attributes and announces status messages with `role="status" aria-live="polite"`.
   The Account form in Settings, the local-database status and the update status use the same pattern; the
   update channel selector and the automatic-check switch (`role="switch"`, like the offline-mode switch) have a
-  `<label for>`, and the notices that a restart is needed and that dependencies changed use `role="alert"`. The Settings tab's **Update** badge is text, so it is read with the tab's name.
+  `<label for>`, and the notices that a restart is needed and that dependencies changed use `role="alert"`. The Settings tab's **Update** badge is text, so it is read with the tab's name; it shows for an available or applied app update and for a local database that needs an update, whose reason is part of the database status text.
 - Web finding details and the resume settings use the native `<dialog>` element
   opened with `showModal()`, which provides focus containment and Escape-to-close
   in browsers. Dialogs are labelled through `aria-labelledby`, and their close

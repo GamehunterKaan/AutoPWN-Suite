@@ -49,6 +49,16 @@ msgstr "{path} konumunda {count} CVE saklandı; güncelleme: {updated_at}."
 #: autopwn_suite/cli.py:178
 #, fuzzy
 msgid ""
+"The database was built by an earlier version and has no CPE product index, "
+"so scans find fewer CVEs. Run --update-vuln-db while connected to add it."
+msgstr ""
+"Veritabanı eski bir sürümle oluşturulmuş ve CPE ürün dizini yok; bu yüzden "
+"taramalar daha az CVE buluyor. Eklemek için bağlıyken --update-vuln-db "
+"komutunu çalıştırın."
+
+#: autopwn_suite/cli.py:178
+#, fuzzy
+msgid ""
 "Updates require internet. Run --check-update or --apply-update without "
 "--offline."
 msgstr ""
@@ -726,6 +736,17 @@ msgstr "Güvenlik açığı kaynağı auto, online veya offline olmalıdır"
 msgid "Using local NVD database: {count} CVEs; updated {updated_at}."
 msgstr ""
 "Yerel NVD veritabanı kullanılıyor: {count} CVE; güncellendi: {updated_at}."
+
+#: autopwn_suite/nist_search.py:191
+#, fuzzy
+msgid ""
+"The local vulnerability database was built by an earlier version and has no "
+"CPE product index, so scans find fewer CVEs. Update it (--update-vuln-db, or"
+" Settings in the dashboard) to add the index."
+msgstr ""
+"Yerel güvenlik açığı veritabanı eski bir sürümle oluşturulmuş ve CPE ürün "
+"dizini yok; bu yüzden taramalar daha az CVE buluyor. Dizini eklemek için "
+"veritabanını güncelleyin (--update-vuln-db veya panelde Ayarlar)."
 
 #: autopwn_suite/nist_search.py:163
 #, fuzzy

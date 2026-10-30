@@ -119,7 +119,7 @@ class TestAutoScanner:
         port_key = {"product": "apache", "version": "2.4"}
         results = scanner.SearchVuln(port_key, apiKey="test-key")
 
-        mock_gen_keyword.assert_called_once_with("apache", "2.4")
+        mock_gen_keyword.assert_called_once_with("apache", "2.4", [])
         # Use ANY to match the fake_logger object created internally. The product is searched and the
         # results kept whose applicability covers 2.4.
         mock_search_cve.assert_called_once_with("apache", ANY, "test-key", strict=True)

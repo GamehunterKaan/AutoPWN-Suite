@@ -1631,9 +1631,9 @@ def _run_host_web(job, ip, endpoints, log, console, *, offline=False):
 
 def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, lookup=None) -> bool:
     """Record one actual host. Return whether its vulnerability lookup failed."""
-    from autopwn_suite.nist_search import searchCVE
+    from autopwn_suite.nist_search import searchCPE, searchCVE
     from autopwn_suite.scanner import AnalyseScanResults
-    from autopwn_suite.searchvuln import FindVulnerabilities, GenerateKeyword
+    from autopwn_suite.searchvuln import FindVulnerabilities, GenerateKeyword, port_cpes
 
     h = job.get_or_create_host(ip)
     nm_host = nm[ip]
@@ -1658,11 +1658,15 @@ def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, look
 
     findings = []
     failed = False
-    tasks = [(port, GenerateKeyword(str(port["product"]), str(port["version"]))) for port in ports]
-    tasks = [(port, keyword) for port, keyword in tasks if keyword]
+    tasks = []
+    for port in ports:
+        cpes = port_cpes(nm, ip, port["protocol"], port["port"])
+        keyword = GenerateKeyword(str(port["product"]), str(port["version"]), cpes)
+        if keyword:
+            tasks.append((port, keyword, cpes))
     job.set_progress("vulnerabilities", "Searching service vulnerabilities" if tasks else "No searchable service versions",
                      percent=0 if tasks else 100, completed=0, total=len(tasks), host=ip)
-    for lookup_index, (port, keyword) in enumerate(tasks):
+    for lookup_index, (port, keyword, cpes) in enumerate(tasks):
         if job.should_stop():
             break
         provider = "local NVD database" if lookup is not None and lookup.source == "offline" else "NIST"
@@ -1675,7 +1679,9 @@ def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, look
             if cves is None:
                 cves = FindVulnerabilities(
                     keyword, lambda term: lookup.search(term, log, api_key) if lookup is not None
-                    else searchCVE(term, log, api_key, strict=True))
+                    else searchCVE(term, log, api_key, strict=True), cpes,
+                    lambda product: lookup.search_cpe(product, log, api_key) if lookup is not None
+                    else searchCPE(product, log, api_key, strict=True))
                 cves = list(cves)
                 job._lookup_results[cache_key] = cves
         except Exception as exc:

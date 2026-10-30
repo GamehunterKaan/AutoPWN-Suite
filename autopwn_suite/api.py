@@ -5,7 +5,7 @@ import shlex
 from json import dumps
 from typing import Any, Dict, List, Type, Union
 
-from autopwn_suite.nist_search import VulnerabilityLookup, searchCVE
+from autopwn_suite.nist_search import VulnerabilityLookup, searchCPE, searchCVE
 from autopwn_suite.nmap_backend import PortScanner
 from autopwn_suite.scanner import HostTimedOut, InitHostInfo, ResolveScanHosts
 from autopwn_suite.searchvuln import FindVulnerabilities, GenerateKeyword
@@ -81,9 +81,10 @@ class AutoScanner:
     ) -> JSON:
         product = port_key.get("product", "")
         version = port_key.get("version", "")
+        cpes = port_key.get("cpes") if isinstance(port_key.get("cpes"), list) else []
         log = fake_logger()
 
-        keyword = GenerateKeyword(product, version)
+        keyword = GenerateKeyword(product, version, cpes)
         if keyword == "":
             return
 
@@ -92,7 +93,9 @@ class AutoScanner:
 
         Vulnerablities = FindVulnerabilities(
             keyword, lambda term: lookup.search(term, log, apiKey) if lookup is not None
-            else searchCVE(term, log, apiKey, strict=True))
+            else searchCVE(term, log, apiKey, strict=True), cpes,
+            lambda product: lookup.search_cpe(product, log, apiKey) if lookup is not None
+            else searchCPE(product, log, apiKey, strict=True))
         if len(Vulnerablities) == 0:
             return
 

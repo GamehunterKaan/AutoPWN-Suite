@@ -34,17 +34,50 @@ existing release summaries; they do not retroactively claim artifact signing.
   the share of reported CVEs that affect the version from 37% to 99.8%; 24 of 25 well-known exploited CVEs (from 6)
   are reported for affected versions and not for fixed ones. Older releases now list many more CVEs, and a
   distribution package with a backported fix is still reported for its upstream release. Not yet handled: a
-  same-vendor product that Nmap's name does not tell apart can match (Sami FTP and HTTP), a CVE that NVD files
-  under an operating system or device is not reported for a service on it (VxWorks, NetApp Data ONTAP), and a
-  version a product's banner prints with a date or label (Squid's `2.7.STABLE9`, Jetty's dated releases) is
-  matched without it or not searched.
+  same-vendor product that Nmap gives no application CPE can match (Sami FTP and HTTP, see the next entry), a
+  service of an operating system or device that Nmap gives no CPE does not get the system's CVEs
+  (`Contiki httpd`), and a version a product's banner prints with a date or label (Squid's `2.7.STABLE9`, Jetty's
+  dated releases) is matched without it or not searched.
+- Vulnerability lookups use the CPEs Nmap reports for each service (`cpe:/a:openbsd:openssh:8.2p1`) to choose
+  which NVD records apply to it. A CVE counts for the service only through entries for the product those CPEs
+  name: the same vendor and product in any of NVD's spellings (`aol:aol_server` for `aol:aolserver`), also filed
+  as an operating system (NVD's `netapp:data_ontap`), or that product, possibly with generic words, under a
+  vendor the product's name also gives (`f5:nginx_open_source` for Nmap's `igor_sysoev:nginx`, `oracle:mysql` for
+  `mysql:mysql`). FileZilla Server does not get FileZilla client CVEs, Sun iPlanet Messaging Server does not get
+  the Web Server's and does get its own, and AOLserver gets the CVEs NVD files as `aol_server`. An operating
+  system or device CPE counts only for a service without an application CPE whose name names that system:
+  `VxWorks ftpd` with `cpe:/o:windriver:vxworks` is searched as `VxWorks` and gets the CVEs NVD files under VxWorks,
+  and NetApp Data ONTAP services get the ones filed under the operating system, while `KarjaSoft Sami ftpd`,
+  which Nmap gives only `cpe:/o:microsoft:windows`, gets no Windows CVEs. Without a CPE, or when no search result
+  names its product (Nmap's dictionary has names NVD does not use, such as `matt_johnston:dropbear_ssh_server`),
+  the product's name decides as described above. The CVEs whose applicability lists the CPE's product, of any
+  vendor and without a version, are fetched besides the name search, so a CVE whose description does not name
+  the product is found too (HTTP/2 Rapid Reset, CVE-2023-44487, for nginx, Tomcat and Jetty; Zerologon,
+  CVE-2020-1472, for Samba); online this is one more NVD query per product (`virtualMatchString`), offline an
+  index of the local mirror that a database downloaded before this release gets, from its stored records, at its
+  next update; until then a scan that reads it logs a warning once, `--vuln-db-status` advises
+  `--update-vuln-db`, and the dashboard's Settings says so beside the database status and shows the **Update**
+  badge (`GET /api/vulnerability-database` and the status have `update_recommended` and `update_reason`
+  `missing_cpe_index`). A CPE whose product shares no word with the service's name is ignored (`python:python` for
+  Werkzeug, `mysql:mysql` for a MariaDB server that answers as MySQL). On the 51-fingerprint set, Nmap's CPEs
+  raise the share of affecting CVEs found from 90% to 97% at the same 99.8% precision, with 24 of the 25
+  well-known exploited CVEs; on 37 common services checked against a local NVD mirror, the CPE filter alone
+  changes the CVEs reported only for the services named here. The CLI's `SearchSploits` takes the scan as
+  `scan_result`, and `FindVulnerabilities` and `GenerateKeyword` take a service's CPEs as an optional argument.
 
 ### Security changes
 
 - More of the vulnerabilities a scan should report are reported, and fewer findings are false alarms. Online NVD
   lookups now send only product names, not their versions. CPE applicability from NVD or a copied local database
   is parsed without trusting its shape (`autopwn_suite/cpe_match.py`), and the fixed releases a description names
-  are read with bounded, linear-time patterns, both with seeded fuzz coverage. No other security impact.
+  are read with bounded, linear-time patterns, both with seeded fuzz coverage. The CPEs Nmap reports for a
+  service, some of whose fields Nmap fills from the service's answer, choose which product's CVEs count, so a
+  service can steer its findings as its banner already could through the product name; only a part, vendor and
+  product of a bounded allowlisted form are read from them, a malformed one is ignored, and the reading has seeded
+  fuzz coverage (`tests/unit/test_fuzz_inputs.py`, `scripts/fuzz/fuzz_nmap_xml.py`). Online lookups send NVD the
+  product names of detected services and of their Nmap CPEs, never a version, in one more query per product
+  that goes through the name search's client, key, pacing and offline gate; offline lookups still read only the
+  local database. No other security impact.
 
 ## [2.8.1] - 2026-10-24
 
