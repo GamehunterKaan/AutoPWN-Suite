@@ -1310,7 +1310,8 @@ assert.equal(bar.innerHTML,'');
 UPDATE_STATE = r"""
 const updateState=(extra={})=>({running:null,checked_at:null,status:null,error:null,error_code:null,result:null,
   restart_required:false,channel:'release',repo:'x/y',version:'2.8.0',checkout:true,offline_only:false,
-  offline_locked:false,...extra});
+  offline_locked:false,install_method:'checkout',can_apply:true,update_command:'autopwn-suite --apply-update',...extra});
+const notCheckout={checkout:false,install_method:'other',can_apply:false,update_command:null};
 const available={mode:'release',repo:'x/y',current:'2.8.0',latest:'v2.9.0',
   url:'https://github.com/x/y/releases/tag/v2.9.0',update_available:true};
 const badge=new Set();
@@ -1347,11 +1348,11 @@ assert.equal(nodes.get('update-link').hidden,true);
 
 def test_apply_is_unavailable_offline_without_a_checkout_and_while_a_restart_is_pending():
     run_js(UPDATE_STATE + r"""
-for(const extra of [{offline_only:true},{checkout:false},{restart_required:true},{running:'check'}]){
+for(const extra of [{offline_only:true},notCheckout,{restart_required:true},{running:'check'}]){
   renderUpdateStatus(updateState({status:available,...extra}));
   assert.equal(nodes.get('update-apply').disabled,true,JSON.stringify(extra));
 }
-renderUpdateStatus(updateState({checkout:false}));
+renderUpdateStatus(updateState(notCheckout));
 assert.equal(nodes.get('s-update-channel-commit').disabled,true);
 assert.match(nodes.get('update-status').textContent,/not a git checkout/);
 renderUpdateStatus(updateState({restart_required:true}));
@@ -1560,4 +1561,24 @@ other.id='f-target';
 document.activeElement=other;
 await checkForUpdates(true);
 assert.equal(stolen,0);
+""")
+
+
+def test_each_installation_gets_apply_or_the_command_that_updates_it():
+    run_js(UPDATE_STATE + r"""
+const pkg={checkout:false,install_method:'pipx',can_apply:true,update_command:'pipx upgrade autopwn-suite'};
+renderUpdateStatus(updateState({status:available,...pkg}));
+assert.equal(nodes.get('update-apply').disabled,false);  // pipx, uv or pip that this account may change
+assert.equal(nodes.get('s-update-channel-commit').disabled,true);  // the commit channel needs a checkout
+const cases=[
+  [{...pkg,can_apply:false},/stop the dashboard, then run: pipx upgrade autopwn-suite/],
+  [{checkout:false,install_method:'pip',can_apply:false,update_command:'sudo autopwn-suite --apply-update'},/then run: sudo autopwn-suite --apply-update/],
+  [{checkout:false,install_method:'docker',can_apply:false,update_command:'docker compose pull && docker compose up -d'},/on the host, run: docker compose pull && docker compose up -d/],
+  [{checkout:false,install_method:'binary',can_apply:false,update_command:'https://github.com/x/y/releases/latest'},/download the new one from https:\/\/github\.com\/x\/y\/releases\/latest/],
+];
+for(const [extra,text] of cases){
+  renderUpdateStatus(updateState({status:available,...extra}));
+  assert.equal(nodes.get('update-apply').disabled,true,JSON.stringify(extra));
+  assert.match(nodes.get('update-status').textContent,text);
+}
 """)

@@ -449,8 +449,24 @@ must be a plain git branch name; anything else is refused. An explicit `--update
 `update_channel.txt` in the data directory. Both need internet access and refuse to run with `--offline`
 (or `--vuln-source offline`).
 
-`--apply-update` requires a git checkout of AutoPWN Suite (a pip or pipx install, a standalone binary and a
-copy inside another git repository are refused) with a clean
+`--apply-update` updates AutoPWN Suite the way it was installed:
+
+| Installed with | `--apply-update` |
+| --- | --- |
+| A git clone, run as `python autopwn.py` | Fast-forwards the checkout, as described below. |
+| pipx or uv | Runs `pipx upgrade autopwn-suite` or `uv tool upgrade autopwn-suite`. |
+| pip in a virtual environment, or `install.sh` | Runs `python -m pip install --upgrade autopwn-suite==<release>` in that environment. An `install.sh` installation belongs to root, so run `sudo autopwn-suite --apply-update`. |
+| The standalone binary | Refused: download the new binary from the [latest release](https://github.com/GamehunterKaan/AutoPWN-Suite/releases/latest) and verify it. |
+| Docker | Refused: on the host, run `docker compose pull && docker compose up -d`. |
+
+A pipx, uv or pip update installs the latest release from PyPI, wheels only, so no package's build code runs.
+It trusts PyPI as the first installation did, follows only this repository's releases (`--update-repo` and
+`AUTOPWN_UPDATE_REPO` apply to checkouts) and never moves back. On Windows, which locks the files of a running
+program, it is refused and tells you the command to run after closing AutoPWN Suite: a package manager that
+replaced the running `autopwn-suite.exe` would fail halfway and could leave the installation broken.
+`--check-update` prints the same advice under an available update.
+
+For a git checkout (a copy inside another git repository is refused), `--apply-update` needs a clean
 working tree, and only fast-forwards — it refuses and leaves your checkout untouched if the
 working tree has uncommitted changes or the local branch has diverged from the target (resolve
 that manually, e.g. with `git rebase` or by committing/stashing first). It does not verify signatures: it
@@ -468,12 +484,14 @@ most every 6 hours, never in offline mode; turn the switch off to check only whe
 **Check for updates**. When a newer version exists it shows an **Update** badge on the Settings tab. It
 applies the update only when you click **Apply update** and confirm. Only the channel can be chosen there: the
 repository is `AUTOPWN_UPDATE_REPO` (or the default), and the commit channel always follows `main`. Applying
-needs a git checkout, and it is refused while a scan, web verification or database download is running. While
+updates a git checkout, or a pipx, uv or pip installation that the dashboard's account may change, except on
+Windows; the dashboard never runs a package manager as root. For any other installation it shows the command
+to run instead. Applying is refused while a scan, web verification or database download is running. While
 an update is applied, and afterwards until you restart the dashboard, new scans, resumes and web verifications are
 refused and scheduled scans wait for the restart: an interval schedule then runs at once, a daily or weekly one
 only within an hour of its time (otherwise at its next time). The dashboard notices any change to its checkout, including
 `--apply-update` or a `git pull` while it runs, because it compares the commit on disk with the one it
-started from. Restart the dashboard, then reload the page.
+started from, and likewise a package update, by the installed version. Restart the dashboard, then reload the page.
 
 ## Interface language
 
@@ -697,7 +715,7 @@ The web UI exposes a full REST API:
 | `PUT` | `/api/settings` | Update settings |
 | `GET` | `/api/update` | Update channel, last check result and whether a restart is needed |
 | `POST` | `/api/update/check` | Check GitHub for a newer version now; optional `{"channel": "release"}` or `"commit"` |
-| `POST` | `/api/update/apply` | Fast-forward this git checkout to the newer release or commit |
+| `POST` | `/api/update/apply` | Update this copy to the newer release or commit: fast-forward a git checkout, or update a pipx, uv or pip installation |
 | `GET` | `/api/profiles` | List scan profiles |
 | `POST` | `/api/profiles` | Create a profile |
 | `PUT` | `/api/profiles/<id>` | Update a profile |

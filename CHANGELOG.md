@@ -38,6 +38,14 @@ existing release summaries; they do not retroactively claim artifact signing.
   under an operating system or device is not reported for a service on it (VxWorks, NetApp Data ONTAP), and a
   version a product's banner prints with a date or label (Squid's `2.7.STABLE9`, Jetty's dated releases) is
   matched without it or not searched.
+- `--apply-update` and the dashboard's **Apply update** now update AutoPWN Suite the way it was installed, not only
+  a git checkout. A pipx, uv or pip installation (including `install.sh`'s) is updated to the latest release from
+  PyPI with `pipx upgrade`, `uv tool upgrade` or `pip install --upgrade`; `install.sh`'s belongs to root, so it takes
+  `sudo autopwn-suite --apply-update`. A standalone binary or the Docker image is told where to download the new
+  binary or which `docker compose` command to run, and `--check-update` prints that advice under an available
+  update. On Windows a package installation is told the command to run after closing AutoPWN Suite, because
+  Windows locks the running program and an update from inside it failed halfway. The dashboard asks for a restart
+  after a package update too, and `GET /api/update` reports `install_method`, `can_apply` and `update_command`.
 
 ### Security changes
 
@@ -45,6 +53,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   lookups now send only product names, not their versions. CPE applicability from NVD or a copied local database
   is parsed without trusting its shape (`autopwn_suite/cpe_match.py`), and the fixed releases a description names
   are read with bounded, linear-time patterns, both with seeded fuzz coverage. No other security impact.
+- Self-update can now change a pipx, uv or pip installation. It runs the package manager as an argument list
+  without a shell, installs wheels only (no package's build code runs), follows only the upstream releases on
+  PyPI, never moves back, and passes pip the release version only when the tag is plain dotted numbers (seeded
+  fuzz coverage). It trusts PyPI as the first installation did and verifies no signature. The dashboard never runs
+  a package manager as root, and on Windows no installation is changed while AutoPWN Suite runs.
 
 ## [2.8.1] - 2026-10-24
 

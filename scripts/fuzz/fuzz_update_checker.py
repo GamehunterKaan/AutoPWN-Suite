@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-2026 Kaan Gültekin
-"""Coverage-guided fuzzing of the update checker's input checks: the repository, branch and tag names, and the
-JSON that GitHub returns."""
+"""Coverage-guided fuzzing of the update checker's input checks: the repository, branch and tag names, the JSON
+that GitHub returns, and the release version that reaches pip."""
 import json
 import sys
 from types import SimpleNamespace
@@ -34,6 +34,20 @@ def TestOneInput(data):
                 status = update_checker.check_release("2.7.0", repo="x/y")
             assert isinstance(status.latest, str) and isinstance(status.url, str)
             assert isinstance(status.update_available, bool)
+            # The release that GitHub names reaches pip only as a plain version.
+            runs = []
+            try:
+                with patch.object(update_checker.requests, "get", lambda *args, **kwargs: reply), \
+                        patch.object(update_checker.os, "access", lambda path, mode: True), \
+                        patch.object(update_checker, "installed_version", lambda: "0.1"), \
+                        patch.object(update_checker, "_FILES_LOCKED_WHILE_RUNNING", False), \
+                        patch.object(update_checker.subprocess, "run",
+                                     lambda argv, **kwargs: runs.append(argv) or SimpleNamespace(returncode=0)):
+                    update_checker.apply_package_update("pip", repo=update_checker.UPSTREAM_REPO)
+            except update_checker.UpdateCheckError:
+                assert not runs  # refused before pip ran
+            for argv in runs:
+                assert update_checker._RELEASE_VERSION.fullmatch(argv[-1].partition("==")[2])
             # The commit ID that GitHub names reaches git only as a full hexadecimal object name.
             ran = []
             with patch.object(update_checker.requests, "get", lambda *args, **kwargs: reply), \
