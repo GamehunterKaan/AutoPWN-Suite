@@ -405,7 +405,9 @@ Stored data remains usable without an expiry; its update time is shown in scan l
 results. Offline searches match description keyword prefixes, with all query terms required,
 and keep versions such as `10.1.18` distinct from a query for `1.1`; the CPE product search reads an index of
 the products each record lists, which a database downloaded before v2.9.0 gets, from the records it holds,
-at its next update (until then it is skipped). Online and offline scans then keep
+at its next update. Until then that search is skipped, so offline scans find fewer CVEs: a scan that reads such a
+database logs a warning once, `--vuln-db-status` advises running `--update-vuln-db`, and the dashboard says so
+beside the database status in Settings and marks the Settings tab with its **Update** badge. Online and offline scans then keep
 the CVEs whose NVD applicability covers the detected release. Findings are possible vulnerabilities, not
 proof of exploitability: NVD's version ranges describe upstream releases, so a distribution package with a
 backported fix is still reported, a CVE in a bundled library whose description does not name the

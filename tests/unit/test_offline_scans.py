@@ -179,6 +179,23 @@ def test_database_management_commands_do_not_start_a_scan(local_database, monkey
     updater.assert_called_once()
 
 
+def test_the_database_status_command_advises_updating_a_mirror_without_the_cpe_index(local_database, monkeypatch):
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    from tests.unit.test_vulnerability_db import drop_cpe_index
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    logger = MagicMock()
+    monkeypatch.setattr(autopwn, "Logger", lambda console: logger)
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--vuln-db-status", "--vuln-db", str(local_database)])
+    autopwn.main()
+    assert not [call for call in logger.logger.call_args_list if "CPE product index" in str(call)]
+    drop_cpe_index(local_database)
+    autopwn.main()
+    advice = [call.args for call in logger.logger.call_args_list if "CPE product index" in str(call)]
+    assert len(advice) == 1 and advice[0][0] == "warning" and "--update-vuln-db" in advice[0][1]
+
+
 @pytest.mark.parametrize("flag", ["--check-update", "--apply-update"])
 @pytest.mark.parametrize("offline_flags", [["--offline"], ["--vuln-source", "offline"]])
 def test_update_commands_refuse_offline_and_never_reach_github(monkeypatch, flag, offline_flags):
@@ -256,7 +273,8 @@ def test_web_offline_job_uses_database_and_skips_notifications(web, local_databa
     assert job.config["vulnerability_source_used"] == "offline"
     assert job.config["vulnerability_database_updated_at"]
     notifications.assert_not_called()
-    assert client.get("/api/vulnerability-database").json["count"] == 2
+    status = client.get("/api/vulnerability-database").json
+    assert status["count"] == 2 and status["update_recommended"] is False and status["update_reason"] is None
     export = client.get("/api/vulnerability-database/download")
     assert export.status_code == 200 and export.data == local_database.read_bytes()
     export.close()
@@ -614,3 +632,13 @@ def test_failed_toggle_save_does_not_change_runtime_policy(web, monkeypatch):
     with pytest.raises(OSError):
         client.put("/api/settings", json={"offline_mode": True})
     assert not wu._offline_enabled()
+
+
+def test_the_dashboard_reports_a_mirror_without_the_cpe_index(web, local_database, monkeypatch):
+    from tests.unit.test_vulnerability_db import drop_cpe_index
+    wu, client = web
+    monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
+    drop_cpe_index(local_database)
+    status = client.get("/api/vulnerability-database").json
+    assert status["ready"] is True
+    assert status["update_recommended"] is True and status["update_reason"] == "missing_cpe_index"

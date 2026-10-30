@@ -1333,6 +1333,29 @@ assert.ok(!badge.has('show'));
 """)
 
 
+def test_a_database_without_the_cpe_index_asks_for_an_update_and_shows_the_settings_badge():
+    run_js(UPDATE_STATE + r"""
+let db={ready:true,count:123,size_bytes:1048576,updated_at:'2026-10-09T08:00:00Z',offline_only:false,
+  offline_locked:false,update:{running:false},update_recommended:true,update_reason:'missing_cpe_index'};
+fetch=async()=>({ok:true,json:async()=>db});
+await loadDatabaseStatus();
+assert.match(nodes.get('database-status').textContent,/123 CVEs.*without the CPE product index.*Update the database/);
+assert.equal(nodes.get('database-update').disabled,false);
+assert.ok(badge.has('show'));
+// An app update keeps the badge after the database is updated, and the badge goes once neither needs one.
+renderUpdateStatus(updateState({status:available}));
+db={...db,update_recommended:false,update_reason:null};
+await loadDatabaseStatus();
+assert.doesNotMatch(nodes.get('database-status').textContent,/CPE product index/);
+assert.ok(badge.has('show'));
+renderUpdateStatus(updateState({status:{...available,update_available:false}}));
+assert.ok(!badge.has('show'));
+db={...db,update_recommended:true,update:{running:true,message:'Indexing',current:1,total:2}};
+await loadDatabaseStatus();
+assert.doesNotMatch(nodes.get('database-status').textContent,/CPE product index/);
+""")
+
+
 def test_update_text_and_links_from_github_stay_text_and_on_github():
     run_js(UPDATE_STATE + r"""
 const hostile={...available,latest:'<img src=x onerror=alert(1)>',url:'javascript:alert(1)'};

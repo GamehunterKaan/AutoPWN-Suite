@@ -172,7 +172,11 @@ def main() -> None:
             count=status['count'], path=status['path'], updated_at=status['updated_at']))
         return
     if getattr(args, "vuln_db_status", False) is True:
-        console.print(database_status(db_path))
+        status = database_status(db_path)
+        console.print(status)
+        if status["update_recommended"]:
+            log.logger("warning", _("The database was built by an earlier version and has no CPE product index, "
+                                    "so scans find fewer CVEs. Run --update-vuln-db while connected to add it."))
         return
     apply = getattr(args, "apply_update", False) is True
     if apply or getattr(args, "check_update", False) is True:

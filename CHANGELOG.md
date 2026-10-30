@@ -55,7 +55,10 @@ existing release summaries; they do not retroactively claim artifact signing.
   the product is found too (HTTP/2 Rapid Reset, CVE-2023-44487, for nginx, Tomcat and Jetty; Zerologon,
   CVE-2020-1472, for Samba); online this is one more NVD query per product (`virtualMatchString`), offline an
   index of the local mirror that a database downloaded before this release gets, from its stored records, at its
-  next update. A CPE whose product shares no word with the service's name is ignored (`python:python` for
+  next update; until then a scan that reads it logs a warning once, `--vuln-db-status` advises
+  `--update-vuln-db`, and the dashboard's Settings says so beside the database status and shows the **Update**
+  badge (`GET /api/vulnerability-database` and the status have `update_recommended` and `update_reason`
+  `missing_cpe_index`). A CPE whose product shares no word with the service's name is ignored (`python:python` for
   Werkzeug, `mysql:mysql` for a MariaDB server that answers as MySQL). On the 51-fingerprint set, Nmap's CPEs
   raise the share of affecting CVEs found from 90% to 97% at the same 99.8% precision, with 24 of the 25
   well-known exploited CVEs; on 37 common services checked against a local NVD mirror, the CPE filter alone

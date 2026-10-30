@@ -43,6 +43,12 @@ msgstr ""
 
 #: autopwn_suite/cli.py:178
 msgid ""
+"The database was built by an earlier version and has no CPE product index, "
+"so scans find fewer CVEs. Run --update-vuln-db while connected to add it."
+msgstr ""
+
+#: autopwn_suite/cli.py:178
+msgid ""
 "Updates require internet. Run --check-update or --apply-update without --"
 "offline."
 msgstr ""
@@ -577,6 +583,13 @@ msgstr ""
 #: autopwn_suite/nist_search.py:148
 #, python-brace-format
 msgid "Using local NVD database: {count} CVEs; updated {updated_at}."
+msgstr ""
+
+#: autopwn_suite/nist_search.py:191
+msgid ""
+"The local vulnerability database was built by an earlier version and has no "
+"CPE product index, so scans find fewer CVEs. Update it (--update-vuln-db, or"
+" Settings in the dashboard) to add the index."
 msgstr ""
 
 #: autopwn_suite/nist_search.py:163

@@ -139,6 +139,7 @@ class VulnerabilityLookup:
         self.source = source
         self.database = database
         self.local = None
+        self.advised = False  # Whether this scan was told that its local database needs an update
         if source == "offline" and not lazy:
             self._open_local()
 
@@ -165,7 +166,7 @@ class VulnerabilityLookup:
                         count=self.local.metadata["count"], updated_at=self.local.metadata["updated_at"]
                     ),
                 )
-            return getattr(self.local, method)(keyword)
+            return self._search_local(method, keyword, log)
         try:
             return online(keyword, log, api_key, strict=True)
         except Exception:
@@ -182,7 +183,16 @@ class VulnerabilityLookup:
                 ) from unavailable
             log.logger("warning", _("NVD unavailable; using the local vulnerability database "
                        "updated {updated_at} for this scan.").format(updated_at=self.local.metadata['updated_at']))
-            return getattr(self.local, method)(keyword)
+            return self._search_local(method, keyword, log)
+
+    def _search_local(self, method, keyword, log):
+        if not self.local.indexed and not self.advised:
+            self.advised = True
+            log.logger("warning", _(
+                "The local vulnerability database was built by an earlier version and has no CPE product index, "
+                "so scans find fewer CVEs. Update it (--update-vuln-db, or Settings in the dashboard) to add the "
+                "index."))
+        return getattr(self.local, method)(keyword)
 
     def close(self):
         if self.local is not None:
