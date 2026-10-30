@@ -42,7 +42,7 @@ Retain copyright/license notices, including MPL file-level obligations.
 
 Fuzzing: the normal suite runs seeded mutation fuzz tests of the parsers, validators and login
 endpoints (`tests/unit/test_fuzz_inputs.py`). In addition, ClusterFuzzLite builds the Atheris harnesses
-in `scripts/fuzz/` (Nmap XML parser, dashboard option schema, account validation, update checker input) and fuzzes the code a pull
+in `scripts/fuzz/` (Nmap XML parser and the service CPEs it returns, dashboard option schema, account validation, update checker input) and fuzzes the code a pull
 request changes for a few minutes (`.github/workflows/cflite_pr.yml`, `.clusterfuzzlite/`). A crash or an
 undocumented exception fails that job. The fuzz build installs only the hash-pinned `requirements-locked.txt` and uses the
 package from the checkout, as the container image does. Seed inputs live in `scripts/fuzz/seeds/`; harness behavior is also

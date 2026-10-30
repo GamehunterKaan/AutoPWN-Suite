@@ -4,9 +4,17 @@ import re
 from dataclasses import dataclass
 from textwrap import wrap
 
-from autopwn_suite.cpe_match import affects, cut_short, reaches
+from autopwn_suite.cpe_match import (
+    affects,
+    cut_short,
+    is_system,
+    known_products,
+    product_queries,
+    reaches,
+    service_products,
+)
 from autopwn_suite.logger import banner, console_safe
-from autopwn_suite.nist_search import searchCVE
+from autopwn_suite.nist_search import searchCPE, searchCVE
 from autopwn_suite.utils import CheckConnection, get_terminal_width
 
 
@@ -89,7 +97,10 @@ def _release(version: str) -> str:
     return release if _VERSION.fullmatch(release) else ""
 
 
-def GenerateKeyword(product: str, version: str) -> str:
+def GenerateKeyword(product: str, version: str, cpes=()) -> str:
+    """The search keyword for a service: the product as NVD names it and its release. `cpes` are the CPEs Nmap
+    reported for the service; a daemon of an operating system or device they name is searched as the system
+    ("VxWorks ftpd" with cpe:/o:windriver:vxworks as VxWorks)."""
     if product == "Unknown":
         product = ""
 
@@ -128,7 +139,7 @@ def GenerateKeyword(product: str, version: str) -> str:
             stripped_name.lower(), _ROLE_SUFFIX.sub("", stripped_name))
         # "AN httpd" stays "AN httpd" rather than "AN", a search for most of NVD, and "SAS/IntrNet" stays whole.
         if " " not in stripped_name and stripped_name not in _PRODUCT_NAMES.values() and (
-                len(stripped_name) <= 3 or stripped_name.lower() in _NOT_PRODUCTS):
+                len(stripped_name) <= 3 or stripped_name.lower() in _NOT_PRODUCTS and not is_system(cpes, stripped_name)):
             stripped_name = product
         keyword = f"{stripped_name} {release}".rstrip()
 
@@ -160,13 +171,17 @@ def _named_as_fix(description, start, end, name=None):
     return False
 
 
-def FindVulnerabilities(keyword: str, search) -> list:
+def FindVulnerabilities(keyword: str, search, cpes=(), cpe_search=None) -> list:
     """The CVEs that affect the product version a keyword from GenerateKeyword names.
 
     `search` takes a search term and returns Vulnerability objects. Most CVE descriptions give a range
     ("before 2.4.52") rather than each version, so search for the product and keep the CVEs whose NVD
     applicability covers the version; a version with fewer numbers than the product's releases (Apache's "2.4")
-    is covered only where every release it may be is. A CVE whose applicability says nothing about versions
+    is covered only where every release it may be is. Given the CPEs Nmap reported for the service (`cpes`),
+    `cpe_search` also fetches the CVEs whose applicability names the product they identify (it takes an NVD
+    product name, see searchCPE), and the applicability counts only for that product once a result names it;
+    otherwise for the CPEs the product's name matches (see autopwn_suite.cpe_match). A CVE whose applicability
+    says nothing about versions
     (not analyzed, or only "every version") must name the version in its description, other than as the
     release that fixed it. A CVE whose description names the version, or an earlier build of its release, as
     the fix of that product is left out whatever its applicability says ("before 4.4" for OpenSSH 4.4p1).
@@ -185,35 +200,65 @@ def FindVulnerabilities(keyword: str, search) -> list:
                    for match in _NAMED_RELEASE.finditer(description))
 
     results = list(search(name))
-    shortened = cut_short([vulnerability.affected for vulnerability in results], name, version)
+    products = service_products(cpes, name)
+    if cpe_search is not None:
+        # Many records list the product without their description naming it (HTTP/2 Rapid Reset for nginx).
+        seen = {vulnerability.CVEID for vulnerability in results}
+        for product in product_queries(products):
+            for vulnerability in cpe_search(product):
+                if vulnerability.CVEID not in seen:
+                    seen.add(vulnerability.CVEID)
+                    results.append(vulnerability)
+    records = [vulnerability.affected for vulnerability in results]
+    products = known_products(records, products, name)
+    shortened = cut_short(records, name, version, products)
     found = []
     for vulnerability in results:
-        verdict = affects(vulnerability.affected, name, version, shortened)
+        verdict = affects(vulnerability.affected, name, version, shortened, products)
         if (verdict or (verdict is None and mentioned(vulnerability.description))) and not fixed(
                 vulnerability.description):
             found.append(vulnerability)
     return found
 
 
-def GenerateKeywords(HostArray: list) -> list:
-    keywords = []
+def port_cpes(scan_result, host, protocol, port) -> tuple:
+    """The CPEs Nmap reported for the service on a port, from its scan (a PortScanner); empty without them."""
+    if scan_result is None:
+        return ()
+    try:
+        cpes = scan_result[host][protocol][port].get("cpes")
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return ()
+    return tuple(cpes) if isinstance(cpes, list) else ()
+
+
+def _services(HostArray: list, scan_result=None) -> dict:
+    """Each keyword to search and the CPEs Nmap reported for the first service it names."""
+    services = {}
     for port in HostArray:
         product = str(port[3])
         version = str(port[4])
+        cpes = port_cpes(scan_result, port[0], port[5] if len(port) > 5 else "tcp", port[1])
 
-        keyword = GenerateKeyword(product, version)
-        if not keyword == "" and keyword not in keywords:
-            keywords.append(keyword)
+        keyword = GenerateKeyword(product, version, cpes)
+        if not keyword == "" and keyword not in services:
+            services[keyword] = cpes
 
-    return keywords
+    return services
 
 
-def SearchKeyword(keyword: str, log, apiKey=None, *, lookup=None) -> list:
+def GenerateKeywords(HostArray: list, scan_result=None) -> list:
+    return list(_services(HostArray, scan_result))
+
+
+def SearchKeyword(keyword: str, log, apiKey=None, *, lookup=None, cpes=()) -> list:
 
     try:
         ApiResponseCVE = FindVulnerabilities(
             keyword, lambda term: lookup.search(term, log, apiKey) if lookup is not None
-            else searchCVE(term, log, apiKey, strict=True))
+            else searchCVE(term, log, apiKey, strict=True), cpes,
+            lambda product: lookup.search_cpe(product, log, apiKey) if lookup is not None
+            else searchCPE(product, log, apiKey, strict=True))
     except KeyboardInterrupt:
         log.logger("warning", _("Skipped vulnerability detection for {keyword}").format(keyword=keyword))
     except Exception as e:
@@ -226,7 +271,7 @@ def SearchKeyword(keyword: str, log, apiKey=None, *, lookup=None) -> list:
     return []
 
 
-def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, lookup=None) -> list:
+def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, lookup=None, scan_result=None) -> list:
     if not HostArray:
         return []
     VulnsArray = []
@@ -236,7 +281,8 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
     if lookup is None and not CheckConnection(log):
         return []
 
-    keywords = GenerateKeywords(HostArray)
+    services = _services(HostArray, scan_result)
+    keywords = list(services)
 
     if len(keywords) == 0:
         log.logger("warning", _("Insufficient information for {target}").format(target=target))
@@ -258,8 +304,8 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None, *, looku
                     keyword=console_safe(keyword)
                 )
             )
-            ApiResponseCVE = (SearchKeyword(keyword, log, apiKey, lookup=lookup) if lookup is not None
-                              else SearchKeyword(keyword, log, apiKey))
+            ApiResponseCVE = (SearchKeyword(keyword, log, apiKey, lookup=lookup, cpes=services[keyword])
+                              if lookup is not None else SearchKeyword(keyword, log, apiKey, cpes=services[keyword]))
             status.stop()
             if len(ApiResponseCVE) == 0:
                 continue

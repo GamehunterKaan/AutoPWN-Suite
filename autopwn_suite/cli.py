@@ -100,8 +100,10 @@ def StartScanning(
                     host_ports = [row for row in PortArray if row[0] == resolved_host]
                     if not host_ports:
                         continue
-                    VulnsArray = (SearchSploits(host_ports, log, console, console2, apiKey, lookup=lookup)
-                                  if lookup is not None else SearchSploits(host_ports, log, console, console2, apiKey))
+                    VulnsArray = (SearchSploits(host_ports, log, console, console2, apiKey, lookup=lookup,
+                                                scan_result=PortScanResults)
+                                  if lookup is not None else SearchSploits(host_ports, log, console, console2, apiKey,
+                                                                           scan_result=PortScanResults))
                     if DownloadExploits and VulnsArray and (lookup is None or lookup.source != "offline"):
                         GetExploitsFromArray(VulnsArray, log, console, console2, resolved_host)
 
@@ -172,7 +174,11 @@ def main() -> None:
             count=status['count'], path=status['path'], updated_at=status['updated_at']))
         return
     if getattr(args, "vuln_db_status", False) is True:
-        console.print(database_status(db_path))
+        status = database_status(db_path)
+        console.print(status)
+        if status["update_recommended"]:
+            log.logger("warning", _("The database was built by an earlier version and has no CPE product index, "
+                                    "so scans find fewer CVEs. Run --update-vuln-db while connected to add it."))
         return
     apply = getattr(args, "apply_update", False) is True
     if apply or getattr(args, "check_update", False) is True:

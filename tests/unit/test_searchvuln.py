@@ -4,13 +4,14 @@
 Unit tests for the searchvuln module.
 """
 import io
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from rich.console import Console
 
-from autopwn_suite.cpe_match import affects, cut_short, find_affected, reaches
+from autopwn_suite.cpe_match import affects, cut_short, find_affected, product_queries, reaches, service_products
 from autopwn_suite.nist_search import Vulnerability, VulnerabilityLookup, cache, searchCVE
+from autopwn_suite.nmap_backend import parse_nmap_xml
 from autopwn_suite.searchvuln import (
     FindVulnerabilities,
     GenerateKeyword,
@@ -143,7 +144,7 @@ class TestSearchSploitsFunctions:
         mock_check_connection.assert_called_once()
 
     @patch("autopwn_suite.searchvuln.CheckConnection", return_value=True)
-    @patch("autopwn_suite.searchvuln.GenerateKeywords", return_value=[])
+    @patch("autopwn_suite.searchvuln._services", return_value={})
     def test_searchsploits_no_keywords(self, mock_gen_keywords, mock_check_connection):
         """Verify SearchSploits logs a warning if no keywords are generated."""
         mock_log = MagicMock()
@@ -392,6 +393,141 @@ class TestFindVulnerabilities:
         search.assert_called_once_with("UnrealIRCd")
 
 
+def _ids(keyword, results, cpes=()):
+    return [vuln.CVEID for vuln in FindVulnerabilities(keyword, lambda term: results, cpes)]
+
+
+@pytest.mark.unit
+class TestNmapServiceCpe:
+    """With the CPEs Nmap reports for a service, the applicability counts only for the product they identify."""
+
+    def test_a_same_vendor_sibling_is_left_out(self):
+        results = [_cve("CVE-1", "Flaw in Sun iPlanet Web Server", (_entry("sun", "iplanet_web_server", end_ex="6.1"),)),
+                   _cve("CVE-2", "Flaw in Sun iPlanet Messaging Server",
+                        (_entry("sun", "iplanet_messaging_server", end_ex="6.0"),))]
+        cpes = ["cpe:/a:sun:iplanet_messaging_server:5.2"]
+
+        assert _ids("Sun iPlanet 5.2", results) == ["CVE-1"]  # The name says iPlanet, not which one.
+        assert _ids("Sun iPlanet 5.2", results, cpes) == ["CVE-2"]
+
+    def test_an_other_vendor_homonym_is_left_out(self):
+        results = [_cve("CVE-1", "FileZilla client flaw", (_entry("filezilla", "filezilla", end_ex="2.2.30a"),)),
+                   _cve("CVE-2", "FileZilla client flaw", (_entry("filezilla-project", "filezilla_client", end_ex="3.41.0"),)),
+                   _cve("CVE-3", "FileZilla Server flaw", (_entry("filezilla-project", "filezilla_server", end_ex="0.9.42"),)),
+                   _cve("CVE-4", "FileZilla Server flaw", (_entry("filezilla", "filezilla_server", end_in="2.2.22"),))]
+        cpes = ["cpe:/a:filezilla-project:filezilla_server:0.9.41", "cpe:/o:microsoft:windows"]
+
+        # filezilla:filezilla is NVD's old name of the client.
+        assert _ids("FileZilla 0.9.41", results) == ["CVE-1", "CVE-3", "CVE-4"]
+        assert _ids("FileZilla 0.9.41", results, cpes) == ["CVE-3", "CVE-4"]
+
+    def test_nvd_spellings_and_renamed_vendors_of_the_product_count(self):
+        aolserver = [_cve("CVE-1", "Flaw", (_entry("aol", "aol_server", end_in="3.4.2"),)),
+                     _cve("CVE-2", "Flaw", (_entry("aol", "aolserver", end_in="4.5.1"),))]
+        nginx = [_cve("CVE-3", "Flaw", (_entry("f5", "nginx_open_source", end_ex="1.20.1"),)),
+                 _cve("CVE-4", "Flaw", (_entry("f5", "nginx_plus", end_ex="r30"),)),
+                 _cve("CVE-5", "Flaw", (_entry("nginx", "nginx", end_ex="1.19.0"),))]
+        kerberos = [_cve("CVE-6", "Flaw", (_entry("mit", "kerberos", end_ex="1.6"),))]
+        iis = [_cve("CVE-7", "Flaw", (_entry("microsoft", "internet_information_server", "7.5"),))]
+
+        assert _ids("AOLserver 3.4.2", aolserver, ["cpe:/a:aol:aolserver:3.4.2"]) == ["CVE-1", "CVE-2"]
+        assert _ids("nginx 1.18.0", nginx, ["cpe:/a:igor_sysoev:nginx:1.18.0"]) == ["CVE-3", "CVE-5"]
+        assert _ids("Heimdal Kerberos 1.5", kerberos + [_cve("CVE-8", "Flaw", (_entry("heimdal", "kerberos", end_ex="1.6"),))],
+                    ["cpe:/a:heimdal:kerberos"]) == ["CVE-8"]
+        assert _ids("Microsoft IIS 7.5", iis, ["cpe:/a:microsoft:internet_information_services:7.5"]) == ["CVE-7"]
+
+    def test_a_cpe_nvd_does_not_know_leaves_the_matching_to_the_name(self):
+        results = [_cve("CVE-1", "Flaw", (_entry("dropbear_ssh_project", "dropbear_ssh", end_ex="2020.79"),))]
+
+        assert _ids("Dropbear SSH 2019.78", results, ["cpe:/a:matt_johnston:dropbear_ssh_server:2019.78"]) == ["CVE-1"]
+
+    def test_a_service_of_the_operating_system_or_device_its_cpe_names_gets_its_cves(self):
+        vxworks = [_cve("CVE-1", "Flaw in Wind River VxWorks", (_entry("windriver", "vxworks", end_ex="6.9", part="o"),))]
+        ontap = [_cve("CVE-2", "Flaw in NetApp Data ONTAP", (_entry("netapp", "data_ontap", end_ex="8.2.4", part="o"),))]
+
+        assert GenerateKeyword("VxWorks ftpd", "6.8") == "VxWorks ftpd 6.8"
+        assert GenerateKeyword("VxWorks ftpd", "6.8", ["cpe:/o:windriver:vxworks"]) == "VxWorks 6.8"
+        assert _ids("VxWorks 6.8", vxworks) == []
+        assert _ids("VxWorks 6.8", vxworks, ["cpe:/o:windriver:vxworks"]) == ["CVE-1"]
+        # Nmap names Data ONTAP an application; NVD files most of its CVEs under the operating system.
+        assert _ids("NetApp Data ONTAP 8.2.3", ontap) == []
+        assert _ids("NetApp Data ONTAP 8.2.3", ontap, ["cpe:/a:netapp:data_ontap"]) == ["CVE-2"]
+
+    def test_an_operating_system_cpe_names_no_service_beside_an_application_or_another_name(self):
+        windows = [_cve("CVE-1", "Flaw in Windows", (_entry("microsoft", "windows", part="o", end_ex="10"),)),
+                   _cve("CVE-2", "Sami FTP Server flaw", (_entry("karjasoft", "sami_ftp_server", "2.0.2"),))]
+        linux = [_cve("CVE-3", "Linux kernel flaw", (_entry("linux", "linux_kernel", part="o", end_ex="9.0"),)),
+                 _cve("CVE-4", "OpenSSH flaw", (_entry("openbsd", "openssh", end_ex="9.8p1"),))]
+
+        # KarjaSoft Sami ftpd gets only cpe:/o:microsoft:windows from Nmap.
+        assert _ids("KarjaSoft Sami 2.0.2", windows, ["cpe:/o:microsoft:windows"]) == ["CVE-2"]
+        assert _ids("OpenSSH 8.2p1", linux, ["cpe:/a:openbsd:openssh:8.2p1", "cpe:/o:linux:linux_kernel"]) == ["CVE-4"]
+        # Nmap's application CPE for OpenBSD ftpd keeps the role word in the search.
+        assert GenerateKeyword("OpenBSD ftpd", "6.4", ["cpe:/a:openbsd:ftpd:6.4", "cpe:/o:openbsd:openbsd"]) == "OpenBSD ftpd 6.4"
+
+    def test_a_cpe_that_names_another_product_than_the_service_is_ignored(self):
+        werkzeug = [_cve("CVE-1", "Werkzeug flaw", (_entry("palletsprojects", "werkzeug", end_ex="2.2.3"),)),
+                    _cve("CVE-2", "Werkzeug debugger flaw in Python apps", (_entry("python", "python", end_ex="3.12"),))]
+        mariadb = [_cve("CVE-3", "MariaDB flaw", (_entry("mariadb", "mariadb", end_ex="10.3.30"),)),
+                   _cve("CVE-4", "MySQL and MariaDB flaw", (_entry("oracle", "mysql", end_ex="8.0"),
+                                                            _entry("mysql", "mysql", end_ex="5.7"),))]
+        cpe_search = MagicMock(return_value=[])
+
+        # Nmap gives Werkzeug the Python runtime's CPE, and MariaDB answering as MySQL MySQL's.
+        assert service_products(["cpe:/a:python:python:3.8.10"], "Werkzeug") == frozenset()
+        assert FindVulnerabilities("Werkzeug 2.0.2", lambda term: werkzeug, ["cpe:/a:python:python:3.8.10"],
+                                   cpe_search) == werkzeug[:1]
+        assert FindVulnerabilities("MariaDB 10.3.23", lambda term: mariadb, ["cpe:/a:mysql:mysql:5.5.5"],
+                                   cpe_search) == mariadb[:1]
+        cpe_search.assert_not_called()
+
+    def test_the_records_the_cpe_search_adds_are_kept_only_when_they_cover_the_version_and_once(self):
+        named = [_cve("CVE-1", "nginx flaw", (_entry("f5", "nginx", end_ex="1.20.1"),))]
+        listed = [named[0],
+                  _cve("CVE-2", "The HTTP/2 protocol allows a denial of service", (_entry("f5", "nginx", end_ex="1.25.3"),)),
+                  _cve("CVE-3", "A flaw fixed long ago", (_entry("f5", "nginx", end_ex="1.16.0"),)),
+                  _cve("CVE-4", "A plugin flaw", (_entry("example", "nginx_plugin", end_ex="9.0"),))]
+        cpe_search = MagicMock(return_value=listed)
+        cpes = ["cpe:/a:igor_sysoev:nginx:1.18.0"]
+
+        assert _ids("nginx 1.18.0", named, cpes) == ["CVE-1"]
+        found = FindVulnerabilities("nginx 1.18.0", lambda term: named, cpes, cpe_search)
+        assert [vuln.CVEID for vuln in found] == ["CVE-1", "CVE-2"]
+        cpe_search.assert_called_once_with("nginx")  # Without a version, of any vendor
+        assert FindVulnerabilities("nginx 1.18.0", lambda term: named, (), cpe_search) == named
+        cpe_search.assert_called_once()
+
+    def test_the_cpe_search_asks_for_each_nvd_name_of_the_product(self):
+        assert product_queries({("microsoft", "internet_information_services")}) == (
+            "iis", "internet_information_server", "internet_information_services")
+        assert product_queries({("windriver", "vxworks"), ("example", "a%21b")}) == ("vxworks",)
+        assert product_queries(frozenset()) == ()
+
+    @pytest.mark.parametrize("cpes", [[], ["cpe:/a:openbsd"], ["cpe:/x:openbsd:openssh"], ["cpe:/a:open bsd:openssh"],
+                                      ["cpe:/a:openbsd:" + "x" * 101], [None, 7], ["cpe:/o:example:---"]])
+    def test_a_malformed_cpe_identifies_nothing(self, cpes):
+        results = [_cve("CVE-1", "OpenSSH flaw", (_entry("openbsd", "openssh", end_ex="9.8p1"),)),
+                   _cve("CVE-2", "Plugin flaw", (_entry("example", "plugin", end_ex="9.0"),))]
+
+        assert service_products(cpes, "OpenSSH") == frozenset()
+        assert _ids("OpenSSH 8.2p1", results, cpes) == ["CVE-1"]
+
+    def test_searches_carry_each_services_cpes_from_the_nmap_scan(self):
+        xml = ('<nmaprun><host><status state="up"/><address addr="192.0.2.1" addrtype="ipv4"/><ports>'
+               '<port protocol="tcp" portid="21"><state state="open"/><service name="ftp" product="VxWorks ftpd" '
+               'version="6.8"><cpe>cpe:/o:windriver:vxworks</cpe></service></port></ports></host>'
+               '<runstats><finished/><hosts up="1" down="0" total="1"/></runstats></nmaprun>')
+        scan = parse_nmap_xml(xml)["scan"]
+        rows = [["192.0.2.1", 21, "ftp", "VxWorks ftpd", "6.8"]]
+
+        assert GenerateKeywords(rows) == ["VxWorks ftpd 6.8"]
+        assert GenerateKeywords(rows, scan) == ["VxWorks 6.8"]
+        with patch("autopwn_suite.searchvuln.CheckConnection", return_value=True), \
+             patch("autopwn_suite.searchvuln.SearchKeyword", return_value=[]) as search:
+            SearchSploits(rows, MagicMock(), MagicMock(), MagicMock(), scan_result=scan)
+        search.assert_called_once_with("VxWorks 6.8", ANY, None, cpes=("cpe:/o:windriver:vxworks",))
+
+
 @pytest.mark.unit
 class TestCpeApplicability:
     """NVD CPE match semantics, as affects() reads them."""
@@ -534,6 +670,52 @@ def _openssh_record(cve_id, end_excluding):
         {"vulnerable": True, "criteria": "cpe:2.3:a:openbsd:openssh:*:*:*:*:*:*:*:*",
          "versionEndExcluding": end_excluding}]}]}]
     return entry
+
+
+def _filezilla_records():
+    """A FileZilla client and a FileZilla Server CVE that both cover release 0.9.41."""
+    records = []
+    for cve_id, product, end_excluding in (("CVE-2007-0315", "filezilla", "2.2.30a"),
+                                           ("CVE-2009-0884", "filezilla_server", "0.9.42")):
+        entry = record(cve_id, f"FileZilla before {end_excluding} has a flaw")
+        entry["cve"]["configurations"] = [{"nodes": [{"operator": "OR", "cpeMatch": [
+            {"vulnerable": True, "criteria": f"cpe:2.3:a:filezilla:{product}:*:*:*:*:*:*:*:*",
+             "versionEndExcluding": end_excluding}]}]}]
+        records.append(entry)
+    return records
+
+
+_FILEZILLA_SERVER = ("cpe:/a:filezilla-project:filezilla_server:0.9.41", "cpe:/o:microsoft:windows")
+
+
+@pytest.mark.unit
+@patch("autopwn_suite.nist_search.get")
+def test_online_lookup_keeps_only_the_cves_of_the_product_nmaps_cpe_names(mock_get):
+    cache.clear()
+    mock_get.return_value.json.return_value = {"totalResults": 2, "vulnerabilities": _filezilla_records()}
+    try:
+        found = FindVulnerabilities("FileZilla 0.9.41", lambda term: searchCVE(term, MagicMock(), "key", strict=True),
+                                    _FILEZILLA_SERVER)
+        assert mock_get.call_args.kwargs["params"]["keywordSearch"] == "FileZilla"
+        assert [cve.CVEID for cve in found] == ["CVE-2009-0884"]
+    finally:
+        cache.clear()
+
+
+@pytest.mark.unit
+def test_offline_lookup_keeps_only_the_cves_of_the_product_nmaps_cpe_names(feed_server, monkeypatch):
+    from autopwn_suite.vulnerability_db import update_database
+    feeds = feed_server[0]
+    feeds[min(feeds)] = _filezilla_records()
+    update_database()
+    monkeypatch.setattr("autopwn_suite.nist_search.get", lambda *a, **k: pytest.fail("Offline lookup contacted NVD"))
+    lookup = VulnerabilityLookup("offline")
+    try:
+        found = FindVulnerabilities("FileZilla 0.9.41", lambda term: lookup.search(term, MagicMock()), _FILEZILLA_SERVER)
+        assert [cve.CVEID for cve in found] == ["CVE-2009-0884"]
+    finally:
+        lookup.close()
+        cache.clear()
 
 
 @pytest.mark.unit

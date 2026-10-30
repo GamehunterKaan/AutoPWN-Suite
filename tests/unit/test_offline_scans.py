@@ -179,6 +179,23 @@ def test_database_management_commands_do_not_start_a_scan(local_database, monkey
     updater.assert_called_once()
 
 
+def test_the_database_status_command_advises_updating_a_mirror_without_the_cpe_index(local_database, monkeypatch):
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    from tests.unit.test_vulnerability_db import drop_cpe_index
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    logger = MagicMock()
+    monkeypatch.setattr(autopwn, "Logger", lambda console: logger)
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--vuln-db-status", "--vuln-db", str(local_database)])
+    autopwn.main()
+    assert not [call for call in logger.logger.call_args_list if "CPE product index" in str(call)]
+    drop_cpe_index(local_database)
+    autopwn.main()
+    advice = [call.args for call in logger.logger.call_args_list if "CPE product index" in str(call)]
+    assert len(advice) == 1 and advice[0][0] == "warning" and "--update-vuln-db" in advice[0][1]
+
+
 @pytest.mark.parametrize("flag", ["--check-update", "--apply-update"])
 @pytest.mark.parametrize("offline_flags", [["--offline"], ["--vuln-source", "offline"]])
 def test_update_commands_refuse_offline_and_never_reach_github(monkeypatch, flag, offline_flags):
@@ -256,7 +273,8 @@ def test_web_offline_job_uses_database_and_skips_notifications(web, local_databa
     assert job.config["vulnerability_source_used"] == "offline"
     assert job.config["vulnerability_database_updated_at"]
     notifications.assert_not_called()
-    assert client.get("/api/vulnerability-database").json["count"] == 2
+    status = client.get("/api/vulnerability-database").json
+    assert status["count"] == 2 and status["update_recommended"] is False and status["update_reason"] is None
     export = client.get("/api/vulnerability-database/download")
     assert export.status_code == 200 and export.data == local_database.read_bytes()
     export.close()
@@ -288,6 +306,90 @@ def test_dashboard_nvd_fallback_does_not_make_the_scan_offline(web, local_databa
     web_checks.assert_called_once()
     assert job.hosts_list()[0].get("web_status") != "skipped_offline"
     assert notifications.call_count == 2  # webhook and email
+
+
+@pytest.fixture
+def filezilla_feeds(feed_server):
+    """The local database holds a FileZilla client and a FileZilla Server CVE, both covering release 0.9.41.
+    Request it before local_database, which downloads these feeds."""
+    from tests.unit.test_searchvuln import _filezilla_records
+    feeds = feed_server[0]
+    feeds[min(feeds)] = _filezilla_records()
+    return feed_server
+
+
+def filezilla_observation():
+    """Nmap's answer for FileZilla Server, with the CPEs its version detection reports."""
+    result = MagicMock()
+    result.all_hosts.return_value = ["192.168.1.10"]
+    result.__getitem__.return_value = {"addresses": {"ipv4": "192.168.1.10"},
+                                       "tcp": {21: {"state": "open", "name": "ftp", "product": "FileZilla ftpd",
+                                                    "version": "0.9.41 beta",
+                                                    "cpe": "cpe:/a:filezilla-project:filezilla_server:0.9.41",
+                                                    "cpes": ["cpe:/a:filezilla-project:filezilla_server:0.9.41",
+                                                             "cpe:/o:microsoft:windows"]}}}
+    return result
+
+
+def test_python_api_offline_scan_matches_nmaps_service_cpe(filezilla_feeds, local_database, monkeypatch):
+    import autopwn_suite.api as api
+    monkeypatch.setattr(api, "PortScanner", filezilla_observation)
+    result = api.AutoScanner().scan("192.168.1.10", offline=True, vuln_db=local_database)
+    assert list(result["192.168.1.10"]["vulns"]["FileZilla ftpd"]) == ["CVE-2009-0884"]  # not the client's
+
+
+def test_cli_offline_scan_matches_nmaps_service_cpe(filezilla_feeds, local_database, monkeypatch):
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    stream = io.StringIO()
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=stream, width=200, **kwargs))
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(local_database),
+                                    "-t", "192.168.1.10", "-y", "--skip-discovery"])
+    monkeypatch.setattr(autopwn, "check_nmap", MagicMock())
+    monkeypatch.setattr(autopwn, "PortScan", MagicMock(return_value=filezilla_observation()))
+    monkeypatch.setattr(autopwn, "AnalyseScanResults", lambda *a: [["192.168.1.10", 21, "ftp", "FileZilla ftpd", "0.9.41 beta"]])
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock())
+    autopwn.main()
+    assert "CVE-2009-0884" in stream.getvalue() and "CVE-2007-0315" not in stream.getvalue()
+
+
+@pytest.fixture
+def rapid_reset_feeds(feed_server):
+    """The local database holds an nginx CVE whose description does not name nginx. Request it before
+    local_database."""
+    from tests.unit.test_vulnerability_db import RAPID_RESET, cpe_record
+    feeds = feed_server[0]
+    feeds[min(feeds)] = [cpe_record(*RAPID_RESET, versionEndExcluding="1.25.3")]
+    return feed_server
+
+
+def test_python_api_offline_scan_finds_the_cves_nmaps_cpe_lists_with_no_http(rapid_reset_feeds, local_database,
+                                                                              monkeypatch):
+    import autopwn_suite.api as api
+    observation = MagicMock()
+    observation.all_hosts.return_value = ["192.168.1.10"]
+    observation.__getitem__.return_value = {"addresses": {"ipv4": "192.168.1.10"},
+                                            "tcp": {80: {"state": "open", "name": "http", "product": "nginx",
+                                                         "version": "1.18.0", "cpes": ["cpe:/a:igor_sysoev:nginx:1.18.0"]}}}
+    monkeypatch.setattr(api, "PortScanner", lambda: observation)
+    result = api.AutoScanner().scan("192.168.1.10", offline=True, vuln_db=local_database)
+    assert list(result["192.168.1.10"]["vulns"]["nginx"]) == ["CVE-2023-44487"]
+
+
+def test_web_offline_job_matches_nmaps_service_cpe(web, filezilla_feeds, local_database, monkeypatch):
+    wu, _ = web
+    monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
+    monkeypatch.setattr(wu.shutil, "which", lambda name: "nmap")
+    scanner = importlib.import_module("autopwn_suite.scanner")
+    monkeypatch.setattr(scanner, "PortScan", MagicMock(return_value=filezilla_observation()))
+    monkeypatch.setattr(scanner, "AnalyseScanResults",
+                        lambda *a: [["192.168.1.10", 21, "ftp", "FileZilla ftpd", "0.9.41 beta", "tcp"]])
+    monkeypatch.setattr(wu, "_notify", MagicMock())
+    job = wu.ScanJob("offline", "192.168.1.10", {"target": "192.168.1.10", "skip_discovery": True,
+                                                 "vulnerability_source": "offline"})
+    wu._run_scan(job)
+    assert [finding["cve"] for finding in job.hosts_list()[0]["vulns"]] == ["CVE-2009-0884"]
 
 
 @pytest.mark.parametrize("config, cli_only, toggle, offline", [
@@ -530,3 +632,13 @@ def test_failed_toggle_save_does_not_change_runtime_policy(web, monkeypatch):
     with pytest.raises(OSError):
         client.put("/api/settings", json={"offline_mode": True})
     assert not wu._offline_enabled()
+
+
+def test_the_dashboard_reports_a_mirror_without_the_cpe_index(web, local_database, monkeypatch):
+    from tests.unit.test_vulnerability_db import drop_cpe_index
+    wu, client = web
+    monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)
+    drop_cpe_index(local_database)
+    status = client.get("/api/vulnerability-database").json
+    assert status["ready"] is True
+    assert status["update_recommended"] is True and status["update_reason"] == "missing_cpe_index"

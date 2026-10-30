@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from autopwn_suite.nist_search import CACHE_LIFETIME, FindVars, Vulnerability, cache, searchCVE
+from autopwn_suite.nist_search import CACHE_LIFETIME, FindVars, Vulnerability, cache, searchCPE, searchCVE
 
 
 class Clock:
@@ -268,3 +268,24 @@ class TestFindVars:
         assert severity == "UNKNOWN"
         assert score == 0.0
         assert exploitability == 0.0
+
+
+@pytest.mark.unit
+@patch("autopwn_suite.nist_search.sleep")
+@patch("autopwn_suite.nist_search.get")
+def test_the_cpe_search_asks_nvd_for_the_product_of_any_vendor_and_no_version(mock_get, mock_sleep):
+    cache.clear()
+    mock_get.return_value.json.return_value = {"totalResults": 0, "vulnerabilities": []}
+    try:
+        assert searchCPE("nginx", MagicMock(), "key", strict=True) == []
+        assert mock_get.call_args.kwargs["params"] == {"virtualMatchString": "cpe:2.3:*:*:nginx"}
+        assert mock_get.call_args.kwargs["headers"] == {"apiKey": "key"}
+        searchCPE("nginx", MagicMock(), "key", strict=True)
+        assert mock_get.call_count == 1  # cached
+        searchCVE("nginx", MagicMock(), "key", strict=True)
+        assert mock_get.call_count == 2 and mock_get.call_args.kwargs["params"] == {"keywordSearch": "nginx"}
+        mock_get.return_value.raise_for_status.side_effect = RuntimeError("HTTP 503")
+        with pytest.raises(RuntimeError, match="NVD lookup failed for tomcat"):
+            searchCPE("tomcat", MagicMock(), "key", strict=True)
+    finally:
+        cache.clear()

@@ -999,6 +999,11 @@ let offlineServer = false;
 let savingOfflineMode = false;
 let sourceBeforeOffline = 'auto';
 let databaseStatusRequest = 0;
+// The Settings badge shows when an app update is available or applied, or when the local database needs an update.
+const settingsBadge = {app: false, database: false};
+function renderSettingsBadge(){
+  document.getElementById('badge-settings').classList.toggle('show', settingsBadge.app || settingsBadge.database);
+}
 async function loadDatabaseStatus(){
   const request = ++databaseStatusRequest;
   const status = await fetchJson('/api/vulnerability-database');
@@ -1019,12 +1024,16 @@ async function loadDatabaseStatus(){
     : (status.error || window.i18n.t('settings.db_status_no_local'));
   if(update.running) message += window.i18n.t('settings.db_status_update_progress', {message: update.message, current: update.current, total: update.total || '?'});
   if(update.error) message += ` · ${update.error}`;
+  // A database from before the CPE product index (update_reason "missing_cpe_index") stays usable.
+  if(status.ready && status.update_recommended && !update.running) message += window.i18n.t('settings.db_update_recommended');
   if(offlineServer) message += window.i18n.t('settings.db_status_server_offline');
   document.getElementById('database-status').textContent = message;
   const button = document.getElementById('database-update');
   button.disabled = !!update.running || offlineServer;
   button.textContent = update.running ? window.i18n.t('settings.updating') : status.ready ? window.i18n.t('settings.update_database') : window.i18n.t('settings.download_db');
   document.getElementById('database-export').hidden = !status.ready;
+  settingsBadge.database = !!(status.ready && status.update_recommended);
+  renderSettingsBadge();
   if(offlineServer){
     document.getElementById('f-vuln-source').value = 'offline';
   }
@@ -1115,7 +1124,8 @@ function renderUpdateStatus(state){
   const url = available && typeof status.url === 'string' && status.url.startsWith('https://github.com/') ? status.url : '';
   link.hidden = !url;
   if(url) link.href = url;
-  document.getElementById('badge-settings').classList.toggle('show', available || !!state.restart_required);
+  settingsBadge.app = available || !!state.restart_required;
+  renderSettingsBadge();
 }
 async function loadUpdateStatus(){
   const state = await fetchJson('/api/update');
