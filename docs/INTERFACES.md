@@ -80,8 +80,10 @@ release other than as the one that fixed it; a CVE whose description says the de
 build of it, fixed that product is not kept (a release that starts a range, belongs to another product or is
 followed by a vendor's build is not read as the fix). A version with fewer numbers than the product's releases
 (Apache's `2.4`) is kept only for CVEs that affect every release it may be. When Nmap reports CPEs for the
-service (the port's `cpes`, from Nmap's XML), the CLI, the dashboard and `AutoScanner.scan` count only the
-applicability entries of the product they identify: its application CPEs, or without one, an operating system or
+service (the port's `cpes`, from Nmap's XML), the CLI, the dashboard and `AutoScanner.scan` also fetch the CVEs
+whose applicability lists that CPE's product (`searchCPE` online, the mirror's product index offline), and count
+only the applicability entries of the product they identify; a CPE whose product shares no word with the
+service's name (`python:python` for Werkzeug) is ignored. The product they identify is its application CPEs, or without one, an operating system or
 device CPE that the service's name names (`VxWorks ftpd` and `cpe:/o:windriver:vxworks`, which is searched as
 `VxWorks`); the README's "How Does It Work?" lists the spellings that count. When no search result names that
 product, or there is no CPE, the product's name decides as above. `Vulnerability.affected` holds the
@@ -294,7 +296,8 @@ log as a fixed-text warning with the schedule ID (no exception text).
   copied the same way. The next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
   versions; never edit an active database directly.
 - Nmap receives argv and returns XML/progress. Online NVD receives the product
-  names of detected services (without their versions) and optional API key over HTTPS; Exploit-DB supplies references and
+  names of detected services and the product names of their Nmap CPEs (`virtualMatchString=cpe:2.3:*:*:nginx`),
+  without versions, and optional API key over HTTPS; Exploit-DB supplies references and
   optional downloaded bytes. Explicit NVD mirror maintenance uses annual
   JSON/gzip feeds with metadata checksums.
 - `--check-update` and `--apply-update` send GET requests to `api.github.com`; `--apply-update` also runs

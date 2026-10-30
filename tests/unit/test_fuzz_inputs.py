@@ -30,7 +30,7 @@ import pytest
 from rich.text import Text
 
 from autopwn_suite import i18n, update_checker
-from autopwn_suite.cpe_match import affects, find_affected, service_products
+from autopwn_suite.cpe_match import affects, find_affected, product_queries, service_products
 from autopwn_suite.logger import markup_safe
 from autopwn_suite.nist_search import Vulnerability
 from autopwn_suite.nmap_backend import parse_nmap_xml
@@ -971,7 +971,10 @@ def test_service_keywords_and_cpe_applicability_never_raise_for_banner_or_record
         version = str(rng.choice([random_value(rng), mutate(rng.choice(versions), rng), rng.choice(versions)]))
         cpes = rng.choice([[], rng.sample(service_cpes, 2), [mutate(rng.choice(service_cpes), rng)],
                            [random_value(rng), random_value(rng)], ["cpe:/a:" + "a" * 5000 + ":b"]])
-        assert all(isinstance(vendor, str) and isinstance(name, str) for vendor, name in service_products(cpes, product))
+        identified = service_products(cpes, product)
+        assert all(isinstance(vendor, str) and isinstance(name, str) for vendor, name in identified)
+        # These go into the NVD query unescaped.
+        assert all(re.fullmatch(r"[a-z0-9._-]{1,100}", name) for name in product_queries(identified))
         keyword = GenerateKeyword(product, version, cpes)
         release = keyword.rpartition(" ")[2]
         assert not keyword or product.lower() == "unrealircd" or re.fullmatch(

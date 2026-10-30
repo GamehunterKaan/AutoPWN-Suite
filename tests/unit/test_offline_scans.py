@@ -336,6 +336,29 @@ def test_cli_offline_scan_matches_nmaps_service_cpe(filezilla_feeds, local_datab
     assert "CVE-2009-0884" in stream.getvalue() and "CVE-2007-0315" not in stream.getvalue()
 
 
+@pytest.fixture
+def rapid_reset_feeds(feed_server):
+    """The local database holds an nginx CVE whose description does not name nginx. Request it before
+    local_database."""
+    from tests.unit.test_vulnerability_db import RAPID_RESET, cpe_record
+    feeds = feed_server[0]
+    feeds[min(feeds)] = [cpe_record(*RAPID_RESET, versionEndExcluding="1.25.3")]
+    return feed_server
+
+
+def test_python_api_offline_scan_finds_the_cves_nmaps_cpe_lists_with_no_http(rapid_reset_feeds, local_database,
+                                                                              monkeypatch):
+    import autopwn_suite.api as api
+    observation = MagicMock()
+    observation.all_hosts.return_value = ["192.168.1.10"]
+    observation.__getitem__.return_value = {"addresses": {"ipv4": "192.168.1.10"},
+                                            "tcp": {80: {"state": "open", "name": "http", "product": "nginx",
+                                                         "version": "1.18.0", "cpes": ["cpe:/a:igor_sysoev:nginx:1.18.0"]}}}
+    monkeypatch.setattr(api, "PortScanner", lambda: observation)
+    result = api.AutoScanner().scan("192.168.1.10", offline=True, vuln_db=local_database)
+    assert list(result["192.168.1.10"]["vulns"]["nginx"]) == ["CVE-2023-44487"]
+
+
 def test_web_offline_job_matches_nmaps_service_cpe(web, filezilla_feeds, local_database, monkeypatch):
     wu, _ = web
     monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)

@@ -9,7 +9,7 @@ from unittest.mock import ANY, MagicMock, patch
 import pytest
 from rich.console import Console
 
-from autopwn_suite.cpe_match import affects, cut_short, find_affected, reaches, service_products
+from autopwn_suite.cpe_match import affects, cut_short, find_affected, product_queries, reaches, service_products
 from autopwn_suite.nist_search import Vulnerability, VulnerabilityLookup, cache, searchCVE
 from autopwn_suite.nmap_backend import parse_nmap_xml
 from autopwn_suite.searchvuln import (
@@ -464,6 +464,44 @@ class TestNmapServiceCpe:
         assert _ids("OpenSSH 8.2p1", linux, ["cpe:/a:openbsd:openssh:8.2p1", "cpe:/o:linux:linux_kernel"]) == ["CVE-4"]
         # Nmap's application CPE for OpenBSD ftpd keeps the role word in the search.
         assert GenerateKeyword("OpenBSD ftpd", "6.4", ["cpe:/a:openbsd:ftpd:6.4", "cpe:/o:openbsd:openbsd"]) == "OpenBSD ftpd 6.4"
+
+    def test_a_cpe_that_names_another_product_than_the_service_is_ignored(self):
+        werkzeug = [_cve("CVE-1", "Werkzeug flaw", (_entry("palletsprojects", "werkzeug", end_ex="2.2.3"),)),
+                    _cve("CVE-2", "Werkzeug debugger flaw in Python apps", (_entry("python", "python", end_ex="3.12"),))]
+        mariadb = [_cve("CVE-3", "MariaDB flaw", (_entry("mariadb", "mariadb", end_ex="10.3.30"),)),
+                   _cve("CVE-4", "MySQL and MariaDB flaw", (_entry("oracle", "mysql", end_ex="8.0"),
+                                                            _entry("mysql", "mysql", end_ex="5.7"),))]
+        cpe_search = MagicMock(return_value=[])
+
+        # Nmap gives Werkzeug the Python runtime's CPE, and MariaDB answering as MySQL MySQL's.
+        assert service_products(["cpe:/a:python:python:3.8.10"], "Werkzeug") == frozenset()
+        assert FindVulnerabilities("Werkzeug 2.0.2", lambda term: werkzeug, ["cpe:/a:python:python:3.8.10"],
+                                   cpe_search) == werkzeug[:1]
+        assert FindVulnerabilities("MariaDB 10.3.23", lambda term: mariadb, ["cpe:/a:mysql:mysql:5.5.5"],
+                                   cpe_search) == mariadb[:1]
+        cpe_search.assert_not_called()
+
+    def test_the_records_the_cpe_search_adds_are_kept_only_when_they_cover_the_version_and_once(self):
+        named = [_cve("CVE-1", "nginx flaw", (_entry("f5", "nginx", end_ex="1.20.1"),))]
+        listed = [named[0],
+                  _cve("CVE-2", "The HTTP/2 protocol allows a denial of service", (_entry("f5", "nginx", end_ex="1.25.3"),)),
+                  _cve("CVE-3", "A flaw fixed long ago", (_entry("f5", "nginx", end_ex="1.16.0"),)),
+                  _cve("CVE-4", "A plugin flaw", (_entry("example", "nginx_plugin", end_ex="9.0"),))]
+        cpe_search = MagicMock(return_value=listed)
+        cpes = ["cpe:/a:igor_sysoev:nginx:1.18.0"]
+
+        assert _ids("nginx 1.18.0", named, cpes) == ["CVE-1"]
+        found = FindVulnerabilities("nginx 1.18.0", lambda term: named, cpes, cpe_search)
+        assert [vuln.CVEID for vuln in found] == ["CVE-1", "CVE-2"]
+        cpe_search.assert_called_once_with("nginx")  # Without a version, of any vendor
+        assert FindVulnerabilities("nginx 1.18.0", lambda term: named, (), cpe_search) == named
+        cpe_search.assert_called_once()
+
+    def test_the_cpe_search_asks_for_each_nvd_name_of_the_product(self):
+        assert product_queries({("microsoft", "internet_information_services")}) == (
+            "iis", "internet_information_server", "internet_information_services")
+        assert product_queries({("windriver", "vxworks"), ("example", "a%21b")}) == ("vxworks",)
+        assert product_queries(frozenset()) == ()
 
     @pytest.mark.parametrize("cpes", [[], ["cpe:/a:openbsd"], ["cpe:/x:openbsd:openssh"], ["cpe:/a:open bsd:openssh"],
                                       ["cpe:/a:openbsd:" + "x" * 101], [None, 7], ["cpe:/o:example:---"]])

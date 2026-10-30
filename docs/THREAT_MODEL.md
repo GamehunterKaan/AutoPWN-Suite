@@ -245,7 +245,14 @@ service decide which product's entries count, and Nmap fills some of their field
 a service can point its findings at another product's CVEs or away from its own, as its banner already could
 through the product name and version. Only a part, vendor and product of a bounded allowlisted form are read
 from them, and a malformed one is ignored (`service_products`, fuzzed in the same test and in
-`scripts/fuzz/fuzz_nmap_xml.py`). A record's description decides too: a
+`scripts/fuzz/fuzz_nmap_xml.py`). The product of such a CPE, when it shares a word with the service's name, is
+also sent to NVD as a second query (`virtualMatchString=cpe:2.3:*:*:PRODUCT`, `searchCPE` in
+`autopwn_suite/nist_search.py`): only names of `[a-z0-9._-]` go into it unescaped, never a version, and it uses
+the same HTTPS client, key, pacing, retries, page checks, cache and offline gate as the name search. Its results
+are trusted like the name search's: NVD (or whoever controls a copied mirror) decides which records list a
+product, and the applicability filter still decides which are reported. Offline, the mirror's `products` table,
+built by the updater from each record's vulnerable CPE matches, answers the same query with the same per-record
+and per-search size limits. A record's description decides too: a
 CVE whose description says the detected release fixed the product is left out, so whoever controls a copied database
 can hide a finding through either, and the patterns that read the description run in linear time
 (`_named_as_fix` in `autopwn_suite/searchvuln.py`, fuzzed in the same test). Advertised feed hashes and feed bytes share the

@@ -20,10 +20,17 @@ _FINAL = frozenset({"final", "ga", "release"})
 # A CPE name Nmap reports for a service (cpe:/a:openbsd:openssh:8.2p1). Version detection fills some probes' fields
 # from the service's answer, so only a part, vendor and product of these characters are read.
 _SERVICE_CPE = re.compile(r"cpe:/([aho]):([a-z0-9._~%-]{1,100}):([a-z0-9._~%-]{1,100})(?=:|$)", re.IGNORECASE)
+_PRODUCT_NAME = re.compile(r"[a-z0-9._-]{1,100}")
 
 
 def _words(text):
     return frozenset(re.findall(r"[a-z0-9]+", text.casefold()))
+
+
+def _core_words(product):
+    """The words of a CPE product less the generic ones, or all of them when only generic ones (http_server)."""
+    words = _words(product)
+    return words - _GENERIC_WORDS or words
 
 
 def _service_cpes(cpes):
@@ -38,15 +45,18 @@ def _service_cpes(cpes):
 
 def service_products(cpes, name) -> frozenset:
     """The (vendor, product) pairs that Nmap's CPEs for a service called `name` identify it by: its application
-    CPEs, or without one, the operating system or device CPEs that its name names (VxWorks ftpd is
-    windriver:vxworks, but KarjaSoft Sami ftpd, which Nmap gives only microsoft:windows, is not Windows)."""
+    CPEs whose product shares a word with the name, or without one, the operating system or device CPEs that its
+    name names (VxWorks ftpd is windriver:vxworks, but KarjaSoft Sami ftpd, which Nmap gives only
+    microsoft:windows, is not Windows). Nmap gives some services another product's CPE: Werkzeug python:python,
+    and a MariaDB server that answers as MySQL mysql:mysql."""
     found = _service_cpes(cpes)
-    applications = frozenset((vendor, product) for part, vendor, product in found if part == "a")
+    words = _words(name)
+    applications = frozenset((vendor, product) for part, vendor, product in found
+                             if part == "a" and _core_words(_PRODUCT_ALIASES.get(product, product)) & words)
     if applications:
         return applications
-    words = _words(name)
     return frozenset((vendor, product) for _part, vendor, product in found
-                     if _words(product) and (_words(product) - _GENERIC_WORDS or _words(product)) <= words)
+                     if _core_words(product) and _core_words(product) <= words)
 
 
 def is_system(cpes, name) -> bool:
@@ -55,6 +65,22 @@ def is_system(cpes, name) -> bool:
     found = _service_cpes(cpes)
     return not any(part == "a" for part, _vendor, _product in found) and any(
         _words(product) and _words(product) == _words(name) for _part, _vendor, product in found)
+
+
+def product_queries(products) -> tuple:
+    """The NVD product names whose records to fetch for the (vendor, product) pairs from `service_products`:
+    each product and NVD's other names for it (internet_information_services and internet_information_server),
+    of the characters a CPE 2.3 name holds unescaped."""
+    found = set()
+    for _vendor, product in products:
+        alias = _PRODUCT_ALIASES.get(product, product)
+        found |= {product, alias} | {name for name, target in _PRODUCT_ALIASES.items() if target == alias}
+    return tuple(sorted(name for name in found if _PRODUCT_NAME.fullmatch(name)))
+
+
+def product_key(product) -> str:
+    """An NVD CPE product as `product_queries` names it: escapes removed, casefolded (node.js, pro:duct)."""
+    return product.replace("\\", "").casefold()
 
 
 def _identity(vendor, product):

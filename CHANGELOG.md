@@ -50,8 +50,16 @@ existing release summaries; they do not retroactively claim artifact signing.
   and NetApp Data ONTAP services get the ones filed under the operating system, while `KarjaSoft Sami ftpd`,
   which Nmap gives only `cpe:/o:microsoft:windows`, gets no Windows CVEs. Without a CPE, or when no search result
   names its product (Nmap's dictionary has names NVD does not use, such as `matt_johnston:dropbear_ssh_server`),
-  the product's name decides as described above. On 37 common services checked against a local NVD mirror, using
-  the CPE changes the CVEs reported only for the services named here. The CLI's `SearchSploits` takes the scan as
+  the product's name decides as described above. The CVEs whose applicability lists the CPE's product, of any
+  vendor and without a version, are fetched besides the name search, so a CVE whose description does not name
+  the product is found too (HTTP/2 Rapid Reset, CVE-2023-44487, for nginx, Tomcat and Jetty; Zerologon,
+  CVE-2020-1472, for Samba); online this is one more NVD query per product (`virtualMatchString`), offline an
+  index of the local mirror that a database downloaded before this release gets, from its stored records, at its
+  next update. A CPE whose product shares no word with the service's name is ignored (`python:python` for
+  Werkzeug, `mysql:mysql` for a MariaDB server that answers as MySQL). On the 51-fingerprint set, Nmap's CPEs
+  raise the share of affecting CVEs found from 90% to 97% at the same 99.8% precision, with 24 of the 25
+  well-known exploited CVEs; on 37 common services checked against a local NVD mirror, the CPE filter alone
+  changes the CVEs reported only for the services named here. The CLI's `SearchSploits` takes the scan as
   `scan_result`, and `FindVulnerabilities` and `GenerateKeyword` take a service's CPEs as an optional argument.
 
 ### Security changes
@@ -63,8 +71,10 @@ existing release summaries; they do not retroactively claim artifact signing.
   service, some of whose fields Nmap fills from the service's answer, choose which product's CVEs count, so a
   service can steer its findings as its banner already could through the product name; only a part, vendor and
   product of a bounded allowlisted form are read from them, a malformed one is ignored, and the reading has seeded
-  fuzz coverage (`tests/unit/test_fuzz_inputs.py`, `scripts/fuzz/fuzz_nmap_xml.py`). Using them makes no new
-  calls, and offline lookups still read only the local database. No other security impact.
+  fuzz coverage (`tests/unit/test_fuzz_inputs.py`, `scripts/fuzz/fuzz_nmap_xml.py`). Online lookups send NVD the
+  product names of detected services and of their Nmap CPEs, never a version, in one more query per product
+  that goes through the name search's client, key, pacing and offline gate; offline lookups still read only the
+  local database. No other security impact.
 
 ## [2.8.1] - 2026-10-24
 

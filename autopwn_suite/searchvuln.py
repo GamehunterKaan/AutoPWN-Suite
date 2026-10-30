@@ -4,9 +4,17 @@ import re
 from dataclasses import dataclass
 from textwrap import wrap
 
-from autopwn_suite.cpe_match import affects, cut_short, is_system, known_products, reaches, service_products
+from autopwn_suite.cpe_match import (
+    affects,
+    cut_short,
+    is_system,
+    known_products,
+    product_queries,
+    reaches,
+    service_products,
+)
 from autopwn_suite.logger import banner, console_safe
-from autopwn_suite.nist_search import searchCVE
+from autopwn_suite.nist_search import searchCPE, searchCVE
 from autopwn_suite.utils import CheckConnection, get_terminal_width
 
 
@@ -163,15 +171,17 @@ def _named_as_fix(description, start, end, name=None):
     return False
 
 
-def FindVulnerabilities(keyword: str, search, cpes=()) -> list:
+def FindVulnerabilities(keyword: str, search, cpes=(), cpe_search=None) -> list:
     """The CVEs that affect the product version a keyword from GenerateKeyword names.
 
     `search` takes a search term and returns Vulnerability objects. Most CVE descriptions give a range
     ("before 2.4.52") rather than each version, so search for the product and keep the CVEs whose NVD
     applicability covers the version; a version with fewer numbers than the product's releases (Apache's "2.4")
     is covered only where every release it may be is. Given the CPEs Nmap reported for the service (`cpes`),
-    the applicability counts only for the product they identify, once a search result names it; otherwise for
-    the CPEs the product's name matches (see autopwn_suite.cpe_match). A CVE whose applicability says nothing about versions
+    `cpe_search` also fetches the CVEs whose applicability names the product they identify (it takes an NVD
+    product name, see searchCPE), and the applicability counts only for that product once a result names it;
+    otherwise for the CPEs the product's name matches (see autopwn_suite.cpe_match). A CVE whose applicability
+    says nothing about versions
     (not analyzed, or only "every version") must name the version in its description, other than as the
     release that fixed it. A CVE whose description names the version, or an earlier build of its release, as
     the fix of that product is left out whatever its applicability says ("before 4.4" for OpenSSH 4.4p1).
@@ -190,8 +200,17 @@ def FindVulnerabilities(keyword: str, search, cpes=()) -> list:
                    for match in _NAMED_RELEASE.finditer(description))
 
     results = list(search(name))
+    products = service_products(cpes, name)
+    if cpe_search is not None:
+        # Many records list the product without their description naming it (HTTP/2 Rapid Reset for nginx).
+        seen = {vulnerability.CVEID for vulnerability in results}
+        for product in product_queries(products):
+            for vulnerability in cpe_search(product):
+                if vulnerability.CVEID not in seen:
+                    seen.add(vulnerability.CVEID)
+                    results.append(vulnerability)
     records = [vulnerability.affected for vulnerability in results]
-    products = known_products(records, service_products(cpes, name), name)
+    products = known_products(records, products, name)
     shortened = cut_short(records, name, version, products)
     found = []
     for vulnerability in results:
@@ -237,7 +256,9 @@ def SearchKeyword(keyword: str, log, apiKey=None, *, lookup=None, cpes=()) -> li
     try:
         ApiResponseCVE = FindVulnerabilities(
             keyword, lambda term: lookup.search(term, log, apiKey) if lookup is not None
-            else searchCVE(term, log, apiKey, strict=True), cpes)
+            else searchCVE(term, log, apiKey, strict=True), cpes,
+            lambda product: lookup.search_cpe(product, log, apiKey) if lookup is not None
+            else searchCPE(product, log, apiKey, strict=True))
     except KeyboardInterrupt:
         log.logger("warning", _("Skipped vulnerability detection for {keyword}").format(keyword=keyword))
     except Exception as e:

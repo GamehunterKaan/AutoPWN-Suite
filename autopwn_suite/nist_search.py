@@ -149,6 +149,13 @@ class VulnerabilityLookup:
         self.source = "offline"
 
     def search(self, keyword, log, api_key=None):
+        return self._find(keyword, log, api_key, "search", searchCVE)
+
+    def search_cpe(self, product, log, api_key=None):
+        """The CVEs whose applicability names an NVD CPE product (see searchCPE), from the same source."""
+        return self._find(product, log, api_key, "search_cpe", searchCPE)
+
+    def _find(self, keyword, log, api_key, method, online):
         if self.source == "offline":
             if self.local is None:
                 self._open_local()
@@ -158,9 +165,9 @@ class VulnerabilityLookup:
                         count=self.local.metadata["count"], updated_at=self.local.metadata["updated_at"]
                     ),
                 )
-            return self.local.search(keyword)
+            return getattr(self.local, method)(keyword)
         try:
-            return searchCVE(keyword, log, api_key, strict=True)
+            return online(keyword, log, api_key, strict=True)
         except Exception:
             if self.source != "auto":
                 raise
@@ -175,7 +182,7 @@ class VulnerabilityLookup:
                 ) from unavailable
             log.logger("warning", _("NVD unavailable; using the local vulnerability database "
                        "updated {updated_at} for this scan.").format(updated_at=self.local.metadata['updated_at']))
-            return self.local.search(keyword)
+            return getattr(self.local, method)(keyword)
 
     def close(self):
         if self.local is not None:
@@ -183,18 +190,29 @@ class VulnerabilityLookup:
 
 
 def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=False) -> list[Vulnerability]:
-    url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     # https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=OpenSSH+8.8
+    return _query({"keywordSearch": keyword}, keyword, keyword, log, apiKey, strict, force_refresh)
+
+
+def searchCPE(product: str, log, apiKey=None, *, strict=False, force_refresh=False) -> list[Vulnerability]:
+    """The CVEs whose applicability names an NVD CPE product (`cpe_match.product_queries`), of any part,
+    vendor and version: https://services.nvd.nist.gov/rest/json/cves/2.0?virtualMatchString=cpe:2.3:*:*:nginx"""
+    return _query({"virtualMatchString": f"cpe:2.3:*:*:{product}"}, product, ("cpe", product), log, apiKey, strict,
+                  force_refresh)
+
+
+def _query(parameters, keyword, cache_key, log, apiKey, strict, force_refresh) -> list[Vulnerability]:
+    """Every page of an NVD CVE API query, cached under `cache_key`; `keyword` names it in results and messages."""
+    url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     if apiKey:
         sleep_time = 0.1
         headers = {"apiKey": apiKey}
     else:
         sleep_time = 8
         headers = {}
-    parameters = {"keywordSearch": keyword}
 
     if not force_refresh:
-        cached = _cached(keyword)
+        cached = _cached(cache_key)
         if cached is not None:
             return cached
 
@@ -253,5 +271,5 @@ def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=Fal
             break
         parameters["startIndex"] = start_index
 
-    _store(keyword, Vulnerabilities)
+    _store(cache_key, Vulnerabilities)
     return Vulnerabilities
