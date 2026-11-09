@@ -23,6 +23,10 @@ existing release summaries; they do not retroactively claim artifact signing.
   workflow, whose push and signing jobs need every binary, would have stopped before publishing. The job and check
   names are unchanged. The runner does not set the binary's minimum macOS version: that comes from the pinned
   interpreter, the wheels chosen by fixed platform tags and the PyInstaller bootloader.
+- `--apply-update` verifies the release before moving the checkout. It downloads the release's
+  `release-manifest.json` and its Sigstore bundle, checks the signature against this repository's release workflow,
+  and refuses the update unless the manifest names the same commit the tag points at. `--update-channel commit` is
+  unaffected, because `main` has no release manifest.
 
 ### Security changes
 
@@ -38,6 +42,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   older one.
 - The macOS runner change has no security impact: the job keeps its read-only permissions, and the macOS binary is
   still built twice from the same hash-pinned inputs and must come out identical.
+- A moved or forged release tag no longer decides what `--apply-update` installs. Previously the tag's target was
+  trusted as-is; now the attested build pins it, so pointing a tag at another commit makes the update refuse rather
+  than install. Missing, unreadable, unsigned, or mismatched manifests are all refusals, and the updater still
+  refuses entirely in offline mode.
+- Adds `sigstore` as a runtime dependency, used only by the update path, to verify that signature.
 
 ## [2.9.0] - 2026-10-29
 

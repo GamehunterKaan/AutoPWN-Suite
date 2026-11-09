@@ -2,6 +2,7 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Check GitHub for a newer release or commit than the running copy."""
 
+import json
 import os
 import re
 import shutil
@@ -10,6 +11,7 @@ import sys
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 
@@ -21,6 +23,12 @@ PACKAGE = "autopwn-suite"
 API_ROOT = "https://api.github.com/repos/{repo}"
 REQUEST_TIMEOUT = 6
 CHANNEL_FILE_NAME = "update_channel.txt"
+# The workflow that signs the release manifest, and the issuer its certificate carries. Together they pin the
+# signature to this project's own release process rather than to any identity Sigstore has ever issued.
+RELEASE_SIGNING_WORKFLOW = ".github/workflows/publish-docker.yml"
+SIGSTORE_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
+RELEASE_MANIFEST = "release-manifest.json"
+RELEASE_MANIFEST_BUNDLE = "release-manifest.sigstore.json"
 
 
 def _channel_file():
@@ -142,6 +150,116 @@ def _get_json(url):
     if not isinstance(payload, dict):
         raise UpdateCheckError(_("GitHub API returned an unexpected response."), "update_bad_response")
     return payload
+
+
+def _get_bytes(url):
+    """The bytes at a release asset URL, with the failures of :func:`_get_json` reported the same way."""
+    try:
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
+    except requests.RequestException as exc:
+        raise UpdateCheckError(_("Could not reach GitHub ({error_type}).").format(error_type=type(exc).__name__),
+                               "update_unreachable") from exc
+    if response.status_code == 404:
+        raise UpdateCheckError(_("Nothing found at {url}.").format(url=url), "update_not_found")
+    if response.status_code == 403:
+        raise UpdateCheckError(_("GitHub API rate limit exceeded; try again later."), "update_rate_limited")
+    if not response.ok:
+        raise UpdateCheckError(_("GitHub API returned HTTP {status}.").format(status=response.status_code),
+                               "update_http_error")
+    return response.content
+
+
+def _release_asset(repo, tag, name):
+    """The URL of one asset of a release. ``quote`` keeps a tag with unusual characters from becoming another path."""
+    return f"https://github.com/{repo}/releases/download/{quote(tag)}/{quote(name)}"
+
+
+def _manifest_source_commit(manifest):
+    """The commit a release manifest records, or None when the document is not a manifest this updater reads."""
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != 1:
+        return None
+    commit = manifest.get("source_commit")
+    return commit if isinstance(commit, str) and re.fullmatch(r"[0-9a-f]{40}", commit) else None
+
+
+def _verify_manifest_signature(repo, tag, manifest, bundle):
+    """Verify the manifest's Sigstore bundle against this project's release workflow.
+
+    The identity is pinned to ``RELEASE_SIGNING_WORKFLOW`` at the ref the release ran from, so a manifest signed by
+    anything else - another workflow, another repository, a personal token - is refused rather than accepted as
+    "some valid signature".
+    """
+    try:
+        from sigstore.errors import VerificationError
+        from sigstore.models import Bundle
+        from sigstore.verify import Verifier, policy
+    except ImportError as exc:  # a checkout whose dependencies were never installed
+        raise UpdateCheckError(
+            _("Verifying a release update needs the sigstore package, which is not installed."),
+            "update_manifest_unverified",
+        ) from exc
+    try:
+        parsed = Bundle.from_json(bundle)
+    except Exception as exc:  # the parse error types are pydantic's, and any failure means the bundle is unusable
+        raise UpdateCheckError(_("The release manifest signature is malformed."), "update_manifest_unverified") from exc
+    verifier = Verifier.production()
+    identities = [
+        f"https://github.com/{repo}/{RELEASE_SIGNING_WORKFLOW}@{ref}"
+        for ref in ("refs/heads/main", f"refs/tags/{tag}")
+    ]
+    for identity in identities:
+        try:
+            verifier.verify_artifact(
+                input_=manifest, bundle=parsed,
+                policy=policy.Identity(identity=identity, issuer=SIGSTORE_OIDC_ISSUER),
+            )
+            return
+        except VerificationError:
+            continue
+    raise UpdateCheckError(
+        _("The release manifest is not signed by this project's release workflow."),
+        "update_manifest_unverified",
+    )
+
+
+def verify_release_source(repo, tag, commit):
+    """Check that ``tag`` points at the commit the signed release manifest records for that release.
+
+    A tag can be moved; the manifest cannot, because it is signed and its signature covers the commit it names.
+    This is what ties the git checkout an update produces to the build the release actually attested.
+    """
+    try:
+        manifest = _get_bytes(_release_asset(repo, tag, RELEASE_MANIFEST))
+        bundle = _get_bytes(_release_asset(repo, tag, RELEASE_MANIFEST_BUNDLE))
+    except UpdateCheckError as exc:
+        if exc.code != "update_not_found":
+            raise
+        raise UpdateCheckError(
+            _("Refusing to update: {tag} has no signed release manifest, so the checkout cannot be tied to an "
+              "attested build.").format(tag=tag),
+            "update_manifest_missing",
+        ) from exc
+    _verify_manifest_signature(repo, tag, manifest, bundle)
+    try:
+        document = json.loads(manifest)
+    except (ValueError, RecursionError) as exc:
+        raise UpdateCheckError(_("The release manifest is not readable."), "update_manifest_unverified") from exc
+    if not isinstance(document, dict) or document.get("release") != tag:
+        raise UpdateCheckError(
+            _("The release manifest is for another release than {tag}.").format(tag=tag),
+            "update_manifest_mismatch",
+        )
+    recorded = _manifest_source_commit(document)
+    if recorded is None:
+        raise UpdateCheckError(_("The release manifest names no source commit."), "update_manifest_mismatch")
+    if recorded != commit:
+        raise UpdateCheckError(
+            _(
+                "Refusing to update: {tag} points at {tag_commit}, but the signed release manifest records {manifest_commit}. "
+                "The tag has moved since the release was signed."
+            ).format(tag=tag, tag_commit=commit[:12], manifest_commit=recorded[:12]),
+            "update_manifest_mismatch",
+        )
 
 
 def _parse_version(tag):
@@ -368,6 +486,10 @@ def apply_release_update(repo=None):
     _checked_ref(tag, "release tag")
     previous = _local_commit()
     _fetch(repo, f"refs/tags/{tag}:refs/tags/{tag}")
+    # Verify before anything moves: the tag's commit has to be the one the signed manifest records, or a tag that was
+    # moved after the release would install whatever it now points at.
+    tag_commit = _run_git(["rev-parse", f"refs/tags/{tag}^{{commit}}"]).stdout.strip()
+    verify_release_source(repo, tag, tag_commit)
     if _current_branch() is None:
         # The same rule as the fast-forward on a branch: move only forward, so a detached HEAD that is newer
         # than the release stays where it is instead of going back to the tag.
