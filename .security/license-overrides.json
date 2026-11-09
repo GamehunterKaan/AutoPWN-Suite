@@ -1,22 +1,42 @@
 {
   "pkg:pypi/colorama@0.4.6": {
-    "license": "BSD-3-Clause",
     "evidence": "https://github.com/tartley/colorama/blob/0.4.6/LICENSE.txt",
+    "license": "BSD-3-Clause",
     "sha256": "cac35c02686e5d04a5a7140bfb3b36e73aed496656e891102e428886d7930318"
   },
+  "pkg:pypi/id@1.6.1": {
+    "evidence": "https://raw.githubusercontent.com/di/id/v1.6.1/LICENSE",
+    "license": "Apache-2.0",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
   "pkg:pypi/itsdangerous@2.2.0": {
-    "license": "BSD-3-Clause",
     "evidence": "https://github.com/pallets/itsdangerous/blob/2.2.0/LICENSE.txt",
+    "license": "BSD-3-Clause",
     "sha256": "63af09891b6be8ad1a4252ed43af0f4efba7fc948e228367bed7f3c5ae0b09d7"
   },
   "pkg:pypi/jinja2@3.1.6": {
-    "license": "BSD-3-Clause",
     "evidence": "https://github.com/pallets/jinja/blob/3.1.6/LICENSE.txt",
+    "license": "BSD-3-Clause",
     "sha256": "3b49dcee4105eb37bac10faf1be260408fe85d252b8e9df2e0979fc1e094437b"
   },
   "pkg:pypi/packaging@25.0": {
-    "license": "Apache-2.0 OR BSD-2-Clause",
     "evidence": "https://github.com/pypa/packaging/blob/25.0/LICENSE",
+    "license": "Apache-2.0 OR BSD-2-Clause",
     "sha256": "cad1ef5bd340d73e074ba614d26f7deaca5c7940c3d8c34852e65c4909686c48"
+  },
+  "pkg:pypi/rfc3161-client@1.0.9": {
+    "evidence": "https://raw.githubusercontent.com/trailofbits/rfc3161-client/v1.0.9/LICENSE",
+    "license": "Apache-2.0",
+    "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+  },
+  "pkg:pypi/rfc8785@0.1.4": {
+    "evidence": "https://raw.githubusercontent.com/trailofbits/rfc8785.py/v0.1.4/LICENSE",
+    "license": "Apache-2.0",
+    "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+  },
+  "pkg:pypi/sigstore-rekor-types@0.0.18": {
+    "evidence": "https://raw.githubusercontent.com/trailofbits/sigstore-rekor-types/v0.0.18/LICENSE",
+    "license": "Apache-2.0",
+    "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
   }
 }

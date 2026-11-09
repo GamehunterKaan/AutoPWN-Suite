@@ -63,6 +63,13 @@ for the self-update path in `docs/THREAT_MODEL.md`). It is imported only inside 
 package upgrade never loads it, but it is a genuine runtime requirement of this repository's own code rather than a
 build or publishing tool, which is why it belongs in both runtime declarations instead of `packaging/`.
 
+It also brings three findings the security policy reports and which this change does not resolve on its own, listed
+here rather than silently: `dnspython` 2.8.0 carries GHSA-45c3-73f7-pv4m, and its fixed releases require Python >=3.11
+while this project still supports 3.10; `sigstore-models` publishes no licence metadata, so the scanner reports
+`UNKNOWN`; and `tuf`'s dual `Apache-2.0 OR MIT` is not in the accepted licence set. Licence corrections for the four
+companion packages whose text the scanner could not detect (`id`, `rfc3161-client`, `rfc8785`, `sigstore-rekor-types`)
+are in `.security/license-overrides.json` with upstream evidence and digests.
+
 Its transitive tree is larger than the rest of the runtime set (the verification stack pulls in cryptography
 interfaces, pydantic models and the TUF client). That is accepted because the alternative - trusting a tag - is the
 weaker position for a tool that can update itself, and because the same upward chain is only exercised by the
