@@ -61,7 +61,9 @@ def test_archives_use_tag_and_manifest_binds_every_asset(source_repo, tmp_path):
     assert manifest["source_commit"] == commit
     assert manifest["container"]["digest"] == digest
     assert len(manifest["assets"]) == 3
-    assert len(manifest["supporting_archive"]["files"]) == 4
+    # The security ZIP bundles the VEX feed snapshot plus one document per declaration in it: the index, the
+    # GHSA-45c3-73f7-pv4m statement, two CycloneDX files and the release notes.
+    assert len(manifest["supporting_archive"]["files"]) == 5
     assert {p.name for p in output.iterdir()} == {
         "autopwn-suite-v2.6.0.tar.gz", "autopwn-suite-v2.6.0.zip",
         "autopwn-suite-v2.6.0-security.zip", "release-manifest.json",
@@ -171,7 +173,7 @@ def test_backfill_binds_original_images_and_keeps_findings(source_repo, tmp_path
         release.write_manifest(source_repo, "v2.6.0", output, release.OFFICIAL_IMAGE, digest)
     manifest = release.write_manifest(source_repo, "v2.6.0", output, release.OFFICIAL_IMAGE, digest, backfill=True)
     assert len(manifest["assets"]) == 3
-    assert len(manifest["supporting_archive"]["files"]) == 11
+    assert len(manifest["supporting_archive"]["files"]) == 12
     assert_supporting_hashes(output, manifest)
     assert manifest["publication"]["security_clearance"] is False
     assert manifest["publication"]["rebuilt"] is False
