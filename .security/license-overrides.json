@@ -34,6 +34,11 @@
     "license": "Apache-2.0",
     "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
   },
+  "pkg:pypi/sigstore-models@0.0.6": {
+    "evidence": "https://raw.githubusercontent.com/astral-sh/sigstore-models/v0.0.6/LICENSE",
+    "license": "MIT",
+    "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
+  },
   "pkg:pypi/sigstore-rekor-types@0.0.18": {
     "evidence": "https://raw.githubusercontent.com/trailofbits/sigstore-rekor-types/v0.0.18/LICENSE",
     "license": "Apache-2.0",

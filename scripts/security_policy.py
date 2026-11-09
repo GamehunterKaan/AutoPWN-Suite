@@ -21,7 +21,7 @@ POLICY_ROOT = Path(__file__).resolve().parents[1] / ".security"
 ALLOWED_LICENSES = {
     "Apache-2.0", "Apache-2.0 OR BSD-2-Clause", "Apache-2.0 OR BSD-3-Clause",
     "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "MIT-0", "MPL-2.0", "PSF-2.0",
-    "0BSD", "Unlicense",
+    "0BSD", "Unlicense", "Apache-2.0 OR MIT",
 }
 # Hash-pinned tools that build the release artifacts or run the policy's own static analysis. They are not
 # shipped, so only known vulnerabilities (not licenses) gate them; PyInstaller, for example, is
@@ -102,7 +102,7 @@ def evaluate_sca(report, version, root=POLICY_ROOT, expected=None, licenses=True
                 violations.append(f"{purl or package['name']}: {vuln['id']}")
         if licenses and package.get("ecosystem") == "PyPI":
             detected = item.get("licenses", [])
-            if detected == ["non-standard"] and purl in overrides:
+            if detected in (["non-standard"], ["UNKNOWN"]) and purl in overrides:
                 correction = overrides[purl]
                 if not correction.get("evidence", "").startswith("https://") or not re.fullmatch(r"[0-9a-f]{64}", correction.get("sha256", "")):
                     raise ValueError("License correction needs upstream evidence and digest")
