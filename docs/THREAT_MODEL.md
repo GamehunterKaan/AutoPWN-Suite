@@ -51,7 +51,7 @@ whoever holds it controls every scan, profile, schedule and setting.
 | Native scanning and XML | `autopwn_suite/nmap_backend.py:159`, `autopwn_suite/nmap_progress.py:98` |
 | Web probes and recorded-evidence replay | `autopwn_suite/web/http.py` `bounded_request`, `autopwn_suite/web/poc_runtime.py` `verify_plan` |
 | Providers and database | `autopwn_suite/nist_search.py:131`, `autopwn_suite/vulnerability_db.py:59` |
-| Self-update | `autopwn_suite/update_checker.py` `check_for_updates`, `apply_update`, `install_method` and `apply_package_update`, `autopwn_suite/cli.py` `main`, `autopwn_suite/web_ui.py` `api_app_update_check` and `api_app_update_apply`, `autopwn_suite/web_ui_static/app.js` `maybeCheckForUpdates` |
+| Self-update | `autopwn_suite/update_checker.py` `check_for_updates`, `apply_update`, `verify_release_source`, `install_method` and `apply_package_update`, `autopwn_suite/cli.py` `main`, `autopwn_suite/web_ui.py` `api_app_update_check` and `api_app_update_apply`, `autopwn_suite/web_ui_static/app.js` `maybeCheckForUpdates` |
 | Notifications, credential files and downloads | `autopwn_suite/report.py:37`, `autopwn_suite/credential_files.py` `read_credential_file`, `autopwn_suite/getexploits.py:135` |
 | Installed/service/container startup | `install.sh` (command link step), `autopwn_suite/daemon/daemon_installer.py` (`_root_controlled`, `CopyFiles`, `UninstallDaemon`), `Dockerfile` (`ENV`/`ENTRYPOINT`), `docker-compose.yml:6` |
 | CI and release | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:24`, `scripts/release_assets.py:97` |

@@ -5,6 +5,23 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
+## [Unreleased]
+
+### Functional changes
+
+- `--apply-update` verifies the release before moving the checkout. It downloads the release's
+  `release-manifest.json` and its Sigstore bundle, checks the signature against this repository's release workflow,
+  and refuses the update unless the manifest names the same commit the tag points at. `--update-channel commit` is
+  unaffected, because `main` has no release manifest.
+
+### Security changes
+
+- A moved or forged release tag no longer decides what `--apply-update` installs. Previously the tag's target was
+  trusted as-is; now the attested build pins it, so pointing a tag at another commit makes the update refuse rather
+  than install. Missing, unreadable, unsigned, or mismatched manifests are all refusals, and the updater still
+  refuses entirely in offline mode.
+- Adds `sigstore` as a runtime dependency, used only by the update path, to verify that signature.
+
 ## [2.9.0] - 2026-10-29
 
 ### Functional changes

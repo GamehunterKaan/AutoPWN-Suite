@@ -852,6 +852,9 @@ def test_a_release_tag_reaches_git_only_as_a_plain_name_in_the_expected_argument
     monkeypatch.setattr(update_checker, "_local_commit", lambda: "a" * 40)
     monkeypatch.setattr(update_checker, "_ensure_clean_worktree", lambda: None)
     monkeypatch.setattr(update_checker, "_current_branch", lambda: "main" if on_branch[-1] else None)
+    # The release manifest is verified before anything moves; this test is about the tag reaching git as a plain
+    # name, so the download and the signature are stubbed rather than exercised here.
+    monkeypatch.setattr(update_checker, "verify_release_source", lambda *a: None)
     reached = refused = 0
     for _ in range(2500):
         tag = update_name(rng)
