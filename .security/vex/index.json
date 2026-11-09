@@ -1,4 +1,6 @@
 {
   "schema_version": 1,
-  "documents": []
+  "documents": [
+    "GHSA-45c3-73f7-pv4m.openvex.json"
+  ]
 }
