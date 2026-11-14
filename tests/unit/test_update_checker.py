@@ -934,3 +934,100 @@ def test_manifest_source_commit_is_only_read_from_a_manifest_this_updater_unders
     assert uc._manifest_source_commit({"schema_version": 1, "source_commit": "abc123"}) is None
     assert uc._manifest_source_commit({"schema_version": 1}) is None
     assert uc._manifest_source_commit([]) is None
+
+# --- the download path that carries the release manifest -------------------
+#
+# These cover _get_bytes itself: the mapping from an HTTP status to an
+# UpdateCheckError code, and the fact that a refused release asset is not
+# reported as a rate limit, because assets are not served by the API.
+
+def _bytes_response(status_code):
+    resp = MagicMock(status_code=status_code, ok=status_code < 400, content=b"payload")
+    return resp
+
+
+@pytest.mark.parametrize(
+    "status_code, code, fragment",
+    [
+        (404, "update_not_found", "Nothing found"),
+        (403, "update_http_error", "refused the download"),
+        (500, "update_http_error", "HTTP 500"),
+    ],
+)
+def test_get_bytes_maps_a_status_to_an_error_code(monkeypatch, status_code, code, fragment):
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: _bytes_response(status_code))
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc._get_bytes("https://example.invalid/asset")
+    assert caught.value.code == code
+    assert fragment in str(caught.value)
+
+
+def test_get_bytes_reports_a_refused_asset_as_refused_not_as_a_rate_limit(monkeypatch):
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: _bytes_response(403))
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc._get_bytes("https://example.invalid/asset")
+    assert "rate limit" not in str(caught.value).lower()
+
+
+def test_get_bytes_reports_a_transport_failure_as_unreachable(monkeypatch):
+    def explode(*a, **k):
+        raise uc.requests.RequestException("no route")
+
+    monkeypatch.setattr(uc.requests, "get", explode)
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc._get_bytes("https://example.invalid/asset")
+    assert caught.value.code == "update_unreachable"
+
+
+def test_get_bytes_returns_the_body(monkeypatch):
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: _bytes_response(200))
+    assert uc._get_bytes("https://example.invalid/asset") == b"payload"
+
+
+def test_a_missing_manifest_asset_becomes_update_manifest_missing(monkeypatch):
+    """A 404 on the manifest download is the tag having no signed release, not a generic not-found."""
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: _bytes_response(404))
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.verify_release_source("x/y", "v1.0.0", "a" * 40)
+    assert caught.value.code == "update_manifest_missing"
+    assert "no signed release manifest" in str(caught.value)
+
+
+def test_verify_release_source_pins_the_expected_identity(monkeypatch):
+    """The identity handed to Sigstore must be this repo's release workflow, not whatever signed the manifest."""
+    import sys
+    import types
+
+    captured = {}
+
+    class StubVerifier:
+        def verify_artifact(self, input_=None, bundle=None, policy=None):
+            captured["identity"] = policy.identity
+            captured["issuer"] = policy.issuer
+
+    errors = types.ModuleType("sigstore.errors")
+    errors.VerificationError = type("VerificationError", (Exception,), {})
+    models = types.ModuleType("sigstore.models")
+    models.Bundle = types.SimpleNamespace(from_json=staticmethod(lambda raw: "parsed"))
+    verify = types.ModuleType("sigstore.verify")
+    verify.Verifier = types.SimpleNamespace(production=staticmethod(StubVerifier))
+    verify.policy = types.SimpleNamespace(
+        Identity=lambda identity, issuer: types.SimpleNamespace(identity=identity, issuer=issuer)
+    )
+    package = types.ModuleType("sigstore")
+    package.errors, package.models, package.verify = errors, models, verify
+    for name, module in (
+        ("sigstore", package), ("sigstore.errors", errors),
+        ("sigstore.models", models), ("sigstore.verify", verify),
+    ):
+        monkeypatch.setitem(sys.modules, name, module)
+
+    manifest = json.dumps({"release": "v1.0.0", "schema_version": 1, "source_commit": "a" * 40}).encode()
+    monkeypatch.setattr(uc, "_get_bytes", lambda url: manifest)
+
+    uc.verify_release_source("GamehunterKaan/AutoPWN-Suite", "v1.0.0", "a" * 40)
+
+    assert captured["identity"] == (
+        "https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/heads/main"
+    )
+    assert "token.actions.githubusercontent.com" in captured["issuer"]
