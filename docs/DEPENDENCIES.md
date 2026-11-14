@@ -55,6 +55,29 @@ GPL-2.0-or-later with an exception that allows distributing the frozen program u
 Tests check that each `.txt` is hash-pinned and agrees with its `.in`. The packages frozen into each standalone binary
 are the runtime requirements for its platform, so they are covered by the same lockfile checks as the container.
 
+## Why `sigstore` is a runtime dependency
+
+`sigstore` verifies the Sigstore bundle attached to a release manifest, which is what lets `--apply-update`
+refuse a tag that points somewhere other than the attested build (see `docs/RELEASING.md` and the trust boundary
+for the self-update path in `docs/THREAT_MODEL.md`). It is imported only inside the update path, so a scan or a
+package upgrade never loads it, but it is a genuine runtime requirement of this repository's own code rather than a
+build or publishing tool, which is why it belongs in both runtime declarations instead of `packaging/`.
+
+It also brings findings the security policy reports, and how each is resolved is part of the change rather than
+buried: `id`, `rfc3161-client`, `rfc8785`, `sigstore-rekor-types` and `sigstore-models` publish licence text the
+scanner cannot map to an SPDX id, so their licences are recorded in `.security/license-overrides.json` with the
+upstream file as evidence and its digest. `sigstore-models` publishes no licence metadata at all, which is why the
+override path in `scripts/security_policy.py` now also accepts a correction for an `UNKNOWN` detection; it is MIT
+(Astral), not the Apache-2.0 its siblings use. `tuf`'s dual `Apache-2.0 OR MIT` joins the accepted set.
+`dnspython` 2.8.0 carries GHSA-45c3-73f7-pv4m, and no fixed release supports Python 3.10, so it has a
+`not_affected` declaration in `.security/vex/` resting on the vulnerable function being unreachable: dnspython
+arrives through email-validator, an optional `email` extra of pydantic that nothing here requests or calls.
+
+Its transitive tree is larger than the rest of the runtime set (the verification stack pulls in cryptography
+interfaces, pydantic models and the TUF client). That is accepted because the alternative - trusting a tag - is the
+weaker position for a tool that can update itself, and because the same upward chain is only exercised by the
+update command.
+
 ## Tracking and updates
 
 1. Update both runtime dependency declarations when adding/removing a package.
