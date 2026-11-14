@@ -1,9 +1,9 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://github.com/GamehunterKaan/AutoPWN-Suite/security/vex/GHSA-45c3-73f7-pv4m/1",
-  "author": "Michael Oggwu <198796435+mgkvibez@users.noreply.github.com>",
-  "timestamp": "2026-11-09T04:20:00Z",
-  "version": 1,
+  "author": "Michael Oogwu <198796435+mgkvibez@users.noreply.github.com>",
+  "timestamp": "2026-11-14T08:55:00Z",
+  "version": 2,
   "tooling": "hand-written, reviewed against the published advisory",
   "statements": [
     {
@@ -12,7 +12,7 @@
       },
       "products": [
         {
-          "@id": "pkg:github/GamehunterKaan/AutoPWN-Suite@2.9.0",
+          "@id": "pkg:github/GamehunterKaan/AutoPWN-Suite",
           "subcomponents": [
             {
               "@id": "pkg:pypi/dnspython@2.8.0"
@@ -22,9 +22,9 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "The advisory is excessive CPU consumption in dns.name.from_wire_parser(), reached only by code that parses DNS wire-format names out of a response. AutoPWN Suite never imports dns, never resolves names with it and never parses a DNS message body: name resolution goes through the operating system, and the only network client is requests. The package arrives as a transitive dependency of email-validator, which is itself an optional 'email' extra of pydantic that this project never requests and never calls, so the vulnerable function is present on disk but unreachable from any code path this product runs.",
-      "status_notes": "Reviewed 2026-11-09 for AutoPWN Suite 2.9.0 by reading the advisory (GHSA-45c3-73f7-pv4m, fixed in dnspython 2.9.0) and tracing the dependency: sigstore -> pydantic -> email-validator (extra: email) -> dnspython. A grep of autopwn_suite/, api.py, autopwn.py and scripts/ finds no import of dns, email_validator or EmailStr, and no pydantic import outside the sigstore call path, so nothing in this product can call dns.name.from_wire_parser(). The fix cannot be taken yet because every dnspython release that contains it requires Python >=3.11 and this project supports 3.10; the declaration must be reassessed when that floor moves or when anything in this project starts validating email addresses. Independent human review is required before merge, which is why this document is in a pull request rather than merged directly.",
-      "timestamp": "2026-11-09T04:20:00Z"
+      "impact_statement": "The advisory is excessive CPU consumption in dns.name.from_wire_parser(), which is reached only by code that parses DNS wire-format names out of a response. AutoPWN Suite never imports dns, never parses a DNS message body and never validates an email address: name resolution goes through the operating system and the only network client is requests. dnspython is on disk because sigstore depends on pydantic with its email extra, which pulls in email-validator, which declares dnspython. email-validator only reaches the resolver when it is asked to check deliverability, and no path in this product calls it at all, so the vulnerable function is present but unreachable.",
+      "status_notes": "Reviewed 2026-11-14 against the advisory (GHSA-45c3-73f7-pv4m, fixed in dnspython 2.9.0) and this repository's own lock: sigstore -> pydantic[email] -> email-validator -> dnspython. The earlier note said the email extra is never requested, which is wrong: sigstore asks for it, which is why dnspython appears at all. What matters is that nothing calls it. A search of autopwn_suite/, api.py, autopwn.py and scripts/ finds no import of dns, email_validator or EmailStr, and the update path verifies a Sigstore bundle rather than validating addresses. This statement covers the release that first carries the Sigstore dependency, the one after 2.9.0, so the product is named without a version. The fix cannot be taken yet because dnspython releases containing it require Python >=3.11 and this project supports 3.10. Reassess when that floor moves or when anything here validates addresses.",
+      "timestamp": "2026-11-14T08:55:00Z"
     }
   ]
 }

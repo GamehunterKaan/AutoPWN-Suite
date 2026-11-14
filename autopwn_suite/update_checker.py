@@ -205,7 +205,14 @@ def _verify_manifest_signature(repo, tag, manifest, bundle):
         parsed = Bundle.from_json(bundle)
     except Exception as exc:  # the parse error types are pydantic's, and any failure means the bundle is unusable
         raise UpdateCheckError(_("The release manifest signature is malformed."), "update_manifest_unverified") from exc
-    verifier = Verifier.production()
+    try:
+        verifier = Verifier.production()
+    except Exception as exc:  # the trust root is fetched, so this can be the network, expired TUF metadata or a mirror
+        raise UpdateCheckError(
+            _("Could not load the Sigstore trust root, so the release manifest cannot be checked ({error_type}).")
+            .format(error_type=type(exc).__name__),
+            "update_trust_root_unavailable",
+        ) from exc
     identities = [
         f"https://github.com/{repo}/{RELEASE_SIGNING_WORKFLOW}@{ref}"
         for ref in ("refs/heads/main", f"refs/tags/{tag}")
@@ -219,6 +226,12 @@ def _verify_manifest_signature(repo, tag, manifest, bundle):
             return
         except VerificationError:
             continue
+        except Exception as exc:  # network, timestamp-authority or trust-root trouble, not a signature verdict
+            raise UpdateCheckError(
+                _("Could not check the release manifest signature ({error_type}).")
+                .format(error_type=type(exc).__name__),
+                "update_manifest_unverified",
+            ) from exc
     raise UpdateCheckError(
         _("The release manifest is not signed by this project's release workflow."),
         "update_manifest_unverified",
