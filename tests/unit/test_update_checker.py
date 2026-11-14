@@ -1031,3 +1031,32 @@ def test_verify_release_source_pins_the_expected_identity(monkeypatch):
         "https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/heads/main"
     )
     assert "token.actions.githubusercontent.com" in captured["issuer"]
+
+
+def test_trust_root_failure_is_an_update_error(monkeypatch):
+    import sys
+    import types
+
+    def explode():
+        raise RuntimeError("TUF metadata expired")
+
+    errors = types.ModuleType("sigstore.errors")
+    errors.VerificationError = type("VerificationError", (Exception,), {})
+    models = types.ModuleType("sigstore.models")
+    models.Bundle = types.SimpleNamespace(from_json=staticmethod(lambda raw: "parsed"))
+    verify = types.ModuleType("sigstore.verify")
+    verify.Verifier = types.SimpleNamespace(production=staticmethod(explode))
+    verify.policy = types.SimpleNamespace(Identity=lambda identity, issuer: None)
+    package = types.ModuleType("sigstore")
+    package.errors, package.models, package.verify = errors, models, verify
+    for name, module in (
+        ("sigstore", package), ("sigstore.errors", errors),
+        ("sigstore.models", models), ("sigstore.verify", verify),
+    ):
+        monkeypatch.setitem(sys.modules, name, module)
+    monkeypatch.setattr(uc, "_get_bytes", lambda url: b'{"schema_version":1,"release":"v1","source_commit":"' + b"a" * 40 + b'"}')
+
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.verify_release_source("GamehunterKaan/AutoPWN-Suite", "v1", "a" * 40)
+    assert caught.value.code == "update_trust_root_unavailable"
+    assert "trust root" in str(caught.value)
