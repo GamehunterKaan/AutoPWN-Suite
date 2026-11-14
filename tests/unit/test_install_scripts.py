@@ -233,7 +233,7 @@ def assert_working_install_untouched(app, bindir):
 
 @posix_only
 @pytest.mark.parametrize("failure, message", [
-    ({"FAKE_OLD_PYTHON": "1"}, "3.10"),
+    ({"FAKE_OLD_PYTHON": "1"}, "3.11.5"),
     ({"FAKE_NO_ENSUREPIP": "1"}, "python3-venv"),
     ({"FAKE_PIP_FAILS": "1"}, "restoring the previous virtual environment"),
 ], ids=["python-too-old", "no-venv-support", "pip-fails"])

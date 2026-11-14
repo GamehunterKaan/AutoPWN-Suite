@@ -11,7 +11,7 @@ AutoPWN Suite is an operator-run vulnerability scanner (CLI, Python library, Fla
 ## Done means
 
 - The steps of the required `test` job (`.github/workflows/poetry-tests.yml`) pass locally: lockfile check, `ruff`, the dashboard `node --check` and ESLint steps (Node 20+), `export_locked_requirements.py --check`, then `poetry run pytest` with branch coverage at least 80%. Use Poetry 2.5.1 exactly (`pipx install poetry==2.5.1`, then `poetry install`); other versions refuse to run.
-- Package code stays Python 3.10-compatible: the `Tests (...)` jobs run on 3.10 with `pip install -r requirements.txt`. Run pytest itself on 3.11+ (`scripts/` use `tomllib`).
+- Code stays compatible with Python 3.11.5, the minimum in `pyproject.toml`: the `Tests (...)` jobs run on 3.11 with `pip install -r requirements.txt`.
 - Behavior changes carry tests and bug fixes a regression test; the evidence docs below describe the new behavior.
 - `CHANGELOG.md` `## [Unreleased]` (or the newest section while its version is unreleased) has Functional and Security notes for anything user-visible, security-relevant, or a dependency or CI change; write "no security impact" when true.
 

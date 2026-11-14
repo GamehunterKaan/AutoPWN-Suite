@@ -5,6 +5,33 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
+## [Unreleased]
+
+### Functional changes
+
+- **Breaking:** AutoPWN Suite now needs Python 3.11.5 or newer; Python 3.10 is no longer supported. Python 3.10
+  reached upstream end of life in October 2026, and the `soupsieve` releases that fix the advisories in the security
+  notes require Python 3.11.5. On Python 3.10, `pip` and `pipx` keep resolving 2.9.0, the last release that supports
+  it, and `install.sh` stops before it touches an existing installation. The Docker image and the standalone binaries
+  bundle Python 3.13 and are unaffected. The `Tests (...)` and install smoke checks run on Python 3.11 instead of 3.10.
+- Update the locked `soupsieve`, the CSS selector library that `beautifulsoup4` depends on, from 2.9 to 4.1
+  (`poetry.lock` and the `requirements-locked.txt` exported from it), which the container image and the standalone
+  binaries carry. The development-only backports `tomli` and `exceptiongroup`, which only Python 3.10 needed, leave
+  the lock, and `scripts/export_locked_requirements.py` reads the lock with the standard library's `tomllib` only.
+
+### Security changes
+
+- `soupsieve` 4.1 fixes four denial-of-service advisories in compiling or matching CSS selectors:
+  GHSA-mmhr-3c5m-f64f (CVE-2026-126190, high: polynomial time in the descendant combinator), GHSA-6655-6qjp-jx7x
+  (CVE-2026-126191, high: exponential backtracking in selector compilation), GHSA-4j63-6c4x-wfg4 (CVE-2026-126192,
+  medium: quadratic time for a general sibling combinator inside `:has()`) and GHSA-7g44-g9rc-x53w (CVE-2026-126193,
+  medium: uncontrolled recursion on nested pseudo-classes). The pinned 2.9 is affected by all four, and no release
+  that fixes the last three supports Python 3.10. AutoPWN Suite parses target HTML with Beautiful Soup but finds
+  elements by tag name and never compiles a CSS selector, so there is no known impact on scans; the update keeps the
+  locked dependencies free of known advisories, which the required Security policy check enforces. A `pip` or `pipx`
+  install resolves its own `soupsieve`: upgrade it (`pip install --upgrade soupsieve`) if your environment kept an
+  older one.
+
 ## [2.9.0] - 2026-10-29
 
 ### Functional changes

@@ -8,6 +8,10 @@ release. The same policy applies to source archives, Docker images, the PyPI
 package and the standalone binaries: a fix for any of them is a new stable release,
 never a replaced file.
 
+The PyPI package and source installations need Python 3.11.5 or newer. Python 3.10,
+which reached upstream end of life in October 2026, is no longer supported. The Docker
+image and the standalone binaries bundle their own interpreter.
+
 As of 2026-10-29, **v2.9.0** is the supported stable release. **All versions below
 2.9.0 are end of life** and no longer receive security updates. The maintainer
 updates this statement with every stable release and identifies superseded

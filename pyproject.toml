@@ -17,7 +17,6 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -29,7 +28,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.11.5"
 requests = ">=2.33.0"
 rich = "*"
 beautifulsoup4 = "*"
@@ -121,7 +120,7 @@ requires = ["poetry-core==2.5.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 force-exclude = true
 # PEP 8 with a 200-column limit; see docs/CODING_STANDARDS.md for the rationale.
 line-length = 200

@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python **3.10 or later, below 4.0**, pip, and Git. No compiler or SDK is needed
+- Python **3.11.5 or later, below 4.0**, pip, and Git. No compiler or SDK is needed
   for the Python source itself. Some platforms may need package-specific build
   tools if compatible binary wheels are unavailable.
 - Nmap on `PATH` for network/port scans. Website-only dashboard scans do not
@@ -66,7 +66,7 @@ workflow builds them with `python -m build --no-isolation` from the hash-pinned
 ## Standalone binaries
 
 Releases also attach single-file binaries built with PyInstaller. To build one for
-your platform from a checkout (any Python 3.10 or newer runs the script; the interpreter
+your platform from a checkout (any Python 3.11.5 or newer runs the script; the interpreter
 that builds the binary is downloaded):
 
 ```sh
@@ -146,7 +146,7 @@ are unchanged: the application goes to `/opt/autopwn-suite` and the command to
 | `BINDIR` | `$PREFIX/bin` | Directory for the `autopwn-suite` command. |
 | `APPDIR` | `/opt/autopwn-suite` (or `$PREFIX/lib/autopwn-suite` when `PREFIX` is set) | Application directory, including its `.venv`. |
 | `DESTDIR` | empty | Staging root; every file written goes under it. |
-| `PYTHON` | `python3` | Interpreter (Python 3.10 or newer) used to create the virtualenv. |
+| `PYTHON` | `python3` | Interpreter (Python 3.11.5 or newer) used to create the virtualenv. |
 | `REQUIREMENTS_FILE` | `requirements.txt` | Dependency file; `requirements-locked.txt` gives hash-verified, lockfile-exact installs. |
 | `SYSTEMDDIR` | `/etc/systemd/system` | Directory holding the daemon unit; `install.sh` checks it for a service that an earlier release installed, and `uninstall.sh` removes the unit from it. |
 
@@ -171,7 +171,7 @@ so: `sudo autopwn-suite` would run files that user can change, and `--daemon-ins
 `sudo bash install.sh` has been run.
 Re-running it replaces the venv and leaves other files in `$APPDIR` (such as the
 daemon configuration) alone. Before it changes anything it checks that `$PYTHON` is
-Python 3.10 or newer and can create virtual environments with pip. It then sets the old
+Python 3.11.5 or newer and can create virtual environments with pip. It then sets the old
 venv aside as `$APPDIR/.venv.old` while the new one is built and puts it back if the build
 fails or the script is interrupted, so a failed upgrade (no network, no matching wheel)
 leaves the working installation and its command link in place. A `.venv.old` that exists
