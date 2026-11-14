@@ -15,7 +15,7 @@ required `poetry-tests` job, so a change that violates them cannot be merged.
   unused imports, mutable defaults, late-binding closures, missing `raise ... from` and
   implicit `zip` truncation.
 - **Imports:** sorted and grouped by Ruff's isort rules (`I`).
-- **Target version:** Python 3.10 (`target-version = "py310"`); do not use newer syntax.
+- **Target version:** Python 3.11 (`target-version = "py311"`; the minimum is 3.11.5); do not use newer syntax.
 - **Configuration and exceptions:** all settings live in `pyproject.toml` under
   `[tool.ruff]`. Per-file exceptions are intentional and explained there:
   long literal templates (`autopwn_suite/web/details.py`, `autopwn_suite/web/poc.py`) and test fixtures

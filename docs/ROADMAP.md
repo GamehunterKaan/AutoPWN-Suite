@@ -76,9 +76,9 @@ below before starting large work.
   starting with security-meaning strings, per the
   [internationalization plan](INTERNATIONALIZATION.md), and keep new messages
   translatable.
-- Decide whether to continue supporting Python 3.10, whose upstream end-of-life is
-  scheduled for October 2026, and update `pyproject.toml`, CI, documentation and
-  [SUPPORT.md](../SUPPORT.md) together if support is dropped. Evaluate adding the
+- Done early: Python 3.10 support was dropped after its upstream end of life in October
+  2026; the minimum is now Python 3.11.5, which the fixed `soupsieve` releases require
+  (see the `Unreleased` section of the [changelog](../CHANGELOG.md)). Evaluate adding the
   next Python release to the CI matrix.
 - Continue dependency refreshes through Dependabot-proposed updates reviewed under
   [dependency management](DEPENDENCIES.md) and the [security testing policy](SECURITY_TESTING.md).

@@ -175,7 +175,7 @@ remain registered/exported without unused-import warnings. Security findings fol
 
 ## Test policy and interpreting results
 
-Run `poetry run pytest` locally with Python 3.10+ after installing the dependencies
+Run `poetry run pytest` locally with Python 3.11.5+ after installing the dependencies
 in [BUILDING.md](../docs/BUILDING.md). Pytest runs unit and integration tests in
 `tests/`, including native Nmap contracts, configuration/offline behavior, web
 probe budgets, dashboard/API/scheduler state, persistence, provider parsing and

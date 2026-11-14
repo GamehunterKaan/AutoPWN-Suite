@@ -10,7 +10,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml/badge.svg" alt="dynamic analysis"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/releases"><img src="https://img.shields.io/github/v/release/GamehunterKaan/AutoPWN-Suite?color=3ba9ee&label=release" alt="release"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="license: Apache 2.0"></a>
-      <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.10%2B-3776AB.svg" alt="Python 3.10+"></a>
+      <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.11.5%2B-3776AB.svg" alt="Python 3.11.5+"></a>
     </td>
   </tr>
   <tr>
@@ -34,7 +34,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 
 1. Install [Nmap](https://nmap.org/download.html) (needed for network scans, not for
    website-only dashboard scans) and AutoPWN Suite with [pipx](https://pipx.pypa.io/)
-   or [uv](https://docs.astral.sh/uv/). It needs Python 3.10 or newer. See
+   or [uv](https://docs.astral.sh/uv/). It needs Python 3.11.5 or newer. See
    [Installation](#installation) for standalone binaries, Docker and other options:
 
    ```console
@@ -539,7 +539,7 @@ as described in [Releasing](https://github.com/GamehunterKaan/AutoPWN-Suite/blob
 
 ### pipx or uv (recommended)
 
-Needs Python 3.10 or newer. This keeps AutoPWN Suite and its dependencies in their own
+Needs Python 3.11.5 or newer. This keeps AutoPWN Suite and its dependencies in their own
 environment on Linux, macOS and Windows:
 
 ```bash
