@@ -27,7 +27,7 @@ Variables (standard GNU/packaging conventions):
                      is created when DESTDIR is set: the source is staged in
                      "$DESTDIR$APPDIR/src" and the commands that create the
                      virtualenv on the target system are printed instead.
-  PYTHON             Python interpreter (3.10 or newer) used to create the
+  PYTHON             Python interpreter (3.11.5 or newer) used to create the
                      virtualenv. Default: python3
   REQUIREMENTS_FILE  Dependency file inside the repository. Default:
                      requirements.txt. Use requirements-locked.txt for
@@ -151,8 +151,8 @@ if [ -n "$DESTDIR" ]; then
 else
     echo "[1/3] Creating virtual environment at $VENV_DIR ..."
     # Check the interpreter before an existing installation is touched.
-    if ! "$PYTHON" -c 'import sys; sys.exit(sys.version_info < (3, 10))' 2>/dev/null; then
-        echo "Error: $PYTHON is missing or older than Python 3.10; set PYTHON to a newer interpreter" >&2
+    if ! "$PYTHON" -c 'import sys; sys.exit(sys.version_info < (3, 11, 5))' 2>/dev/null; then
+        echo "Error: $PYTHON is missing or older than Python 3.11.5; set PYTHON to a newer interpreter" >&2
         exit 1
     fi
     if ! "$PYTHON" -c 'import venv, ensurepip' 2>/dev/null; then

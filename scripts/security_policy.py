@@ -12,10 +12,9 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-
-import tomllib
 
 POLICY_ROOT = Path(__file__).resolve().parents[1] / ".security"
 ALLOWED_LICENSES = {
