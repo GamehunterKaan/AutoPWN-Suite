@@ -41,7 +41,7 @@ jobs:
             runner: windows-2022
             suffix: ".exe"
           - target: macos-arm64
-            runner: macos-14
+            runner: macos-15
             suffix: ""
     env:
       TARGET: ${{ matrix.target }}

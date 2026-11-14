@@ -5,6 +5,21 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
+## [Unreleased]
+
+### Functional changes
+
+- The macOS arm64 standalone binary is built on the `macos-15` GitHub-hosted runner. GitHub retired the `macos-14`
+  image on 2 November 2026, so the `Standalone binaries / macos-arm64` job was cancelled at start, and the release
+  workflow, whose push and signing jobs need every binary, would have stopped before publishing. The job and check
+  names are unchanged. The runner does not set the binary's minimum macOS version: that comes from the pinned
+  interpreter, the wheels chosen by fixed platform tags and the PyInstaller bootloader.
+
+### Security changes
+
+- No security impact: the job keeps its read-only permissions, and the macOS binary is still built twice from the
+  same hash-pinned inputs and must come out identical.
+
 ## [2.9.0] - 2026-10-29
 
 ### Functional changes
