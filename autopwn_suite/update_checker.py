@@ -162,7 +162,10 @@ def _get_bytes(url):
     if response.status_code == 404:
         raise UpdateCheckError(_("Nothing found at {url}.").format(url=url), "update_not_found")
     if response.status_code == 403:
-        raise UpdateCheckError(_("GitHub API rate limit exceeded; try again later."), "update_rate_limited")
+        # A release asset is served from the download host, not the API, so a
+        # 403 here is the asset being refused, not the hourly rate limit.
+        raise UpdateCheckError(_("GitHub refused the download of {url} (HTTP 403).").format(url=url),
+                               "update_http_error")
     if not response.ok:
         raise UpdateCheckError(_("GitHub API returned HTTP {status}.").format(status=response.status_code),
                                "update_http_error")

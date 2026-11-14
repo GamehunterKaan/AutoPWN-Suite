@@ -57,6 +57,23 @@ whoever holds it controls every scan, profile, schedule and setting.
 | CI and release | `.github/workflows/security.yml:20`, `.github/workflows/publish-docker.yml:24`, `scripts/release_assets.py:97` |
 | Existing-release authenticity backfill | `.github/workflows/backfill-release-signatures.yml:27`, `scripts/release_assets.py:23`, `scripts/release_assets.py:60` |
 
+### Self-update verification
+
+`--apply-update` verifies the release manifest with Sigstore before it moves the
+checkout: the identity must be `publish-docker.yml` in this repository with the
+GitHub Actions OIDC issuer, and the manifest's `release` and `source_commit`
+must both match what the updater is about to apply.
+
+That defends against a tag that was moved, re-pointed or re-created after the
+release was signed, and against a manifest taken from a different release or a
+different repository.
+
+It does not defend against anyone who can run the release workflow: they can
+sign a manifest for a tag they control, so the signing authority is only as
+strong as write access to this repository. It also says nothing about the
+contents of the published artifacts beyond the commit they were built from.
+
+
 ```mermaid
 flowchart LR
   O[Trusted operator / Python caller] --> C[CLI / library]
