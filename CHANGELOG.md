@@ -18,6 +18,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   (`poetry.lock` and the `requirements-locked.txt` exported from it), which the container image and the standalone
   binaries carry. The development-only backports `tomli` and `exceptiongroup`, which only Python 3.10 needed, leave
   the lock, and `scripts/export_locked_requirements.py` reads the lock with the standard library's `tomllib` only.
+- The macOS arm64 standalone binary is built on the `macos-15` GitHub-hosted runner. GitHub retired the `macos-14`
+  image on 2 November 2026, so the `Standalone binaries / macos-arm64` job was cancelled at start, and the release
+  workflow, whose push and signing jobs need every binary, would have stopped before publishing. The job and check
+  names are unchanged. The runner does not set the binary's minimum macOS version: that comes from the pinned
+  interpreter, the wheels chosen by fixed platform tags and the PyInstaller bootloader.
 
 ### Security changes
 
@@ -31,6 +36,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   locked dependencies free of known advisories, which the required Security policy check enforces. A `pip` or `pipx`
   install resolves its own `soupsieve`: upgrade it (`pip install --upgrade soupsieve`) if your environment kept an
   older one.
+- The macOS runner change has no security impact: the job keeps its read-only permissions, and the macOS binary is
+  still built twice from the same hash-pinned inputs and must come out identical.
 
 ## [2.9.0] - 2026-10-29
 
