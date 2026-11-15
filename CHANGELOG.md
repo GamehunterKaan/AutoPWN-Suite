@@ -37,6 +37,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   (`sigstore`, `tuf`, `pydantic`, `dnspython` and the rest). The only change in that runtime set since 2.9.0 is
   `typing-extensions` 4.13.2 to 4.16.0, the version the shared lock resolves because `sigstore-models` needs it. The
   required `test` check installs the extra.
+- `install.sh` installs the package with its own declared dependencies by default instead of `requirements.txt`
+  first, so its installations leave the `update` extra out as well. `REQUIREMENTS_FILE` still installs a
+  dependency file before the package (`requirements-locked.txt` for hash-verified, lockfile-exact installs).
 
 ### Security changes
 
@@ -57,10 +60,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   than install. Missing, unreadable, unsigned, or mismatched manifests are all refusals, and the updater still
   refuses entirely in offline mode.
 - `sigstore`, which verifies that signature, and its dependencies are the optional `update` extra. The Docker image,
-  the standalone binaries and a pip or pipx installation of the package ship none of them, which keeps code they
-  never run out of the published artifacts; `install.sh` still installs them, because by default it installs
-  `requirements.txt`. A git checkout without the extra cannot verify a release, so it refuses the update rather than
-  skip the check. The Security policy still scans the extra's packages, because it scans the whole `poetry.lock`.
+  the standalone binaries and pip, pipx and `install.sh` installations of the package ship none of them, which keeps
+  code they never run out of the published artifacts. A git checkout without the extra cannot verify a release, so
+  it refuses the update rather than skip the check. The Security policy still scans the extra's packages, because it scans the whole `poetry.lock`.
   Installing the extra in the `test` job, which keeps the real Sigstore bundle parser under test, gives the job no
   new permission or secret, so it has no security impact.
 

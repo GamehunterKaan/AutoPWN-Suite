@@ -124,7 +124,7 @@ def test_destdir_stages_the_source_and_links_to_the_final_path(source_tree, tmp_
     assert os.readlink(command_link) == "/usr/lib/autopwn-suite/.venv/bin/autopwn-suite"
     # No venv is created inside DESTDIR; the operator is told how to make it.
     assert "python3 -m venv /usr/lib/autopwn-suite/.venv" in result.stdout
-    assert "pip install --no-deps /usr/lib/autopwn-suite/src" in result.stdout
+    assert "pip install /usr/lib/autopwn-suite/src" in result.stdout and "pip install -r" not in result.stdout
     # Nothing escaped the staging directory.
     written = {p.relative_to(stage).parts[0] for p in stage.iterdir()}
     assert written == {"usr"}
@@ -204,6 +204,22 @@ def test_non_staged_install_creates_venv_without_sudo(source_tree, tmp_path):
     run_script(source_tree, "uninstall.sh", {"APPDIR": str(app), "BINDIR": str(bindir),
                                             "PATH": env["PATH"]})
     assert not app.exists() and not os.path.lexists(bindir / "autopwn-suite")
+
+
+@posix_only
+def test_default_install_takes_the_package_dependencies_not_requirements_txt(source_tree, tmp_path):
+    """requirements.txt also lists sigstore, the `update` extra only a checkout uses; this installation updates from
+    PyPI, so by default pip installs the package with its own dependencies, which leave the extra out."""
+    app, bindir, pip_log = tmp_path / "live/app", tmp_path / "live/bin", tmp_path / "pip.log"
+    env = {
+        "APPDIR": str(app), "BINDIR": str(bindir), "SYSTEMDDIR": str(tmp_path / "no-systemd"),
+        "PYTHON": str(tmp_path / "fake-python"), "PIP_LOG": str(pip_log),
+    }
+    run_script(source_tree, "install.sh", env)
+
+    log = pip_log.read_text().splitlines()
+    assert f"install {source_tree}" in log
+    assert not [line for line in log if line.startswith("install -r") or "--no-deps" in line]
 
 
 def working_install(tmp_path):

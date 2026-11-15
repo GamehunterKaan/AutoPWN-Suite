@@ -80,8 +80,8 @@ The security policy scans the whole `poetry.lock`, the extra's packages included
 
 Its transitive tree is larger than the rest of the runtime set (the verification stack pulls in cryptography
 interfaces, pydantic models and the TUF client). The extra keeps that tree out of the container image, the standalone
-binaries and package installations, none of which can use it (`install.sh` installs `requirements.txt` by default,
-so it still gets it), and it is accepted in a checkout because the alternative - trusting a tag - is the weaker position for a tool that
+binaries and package installations, `install.sh`'s included, none of which can use it, and it is accepted in a
+checkout because the alternative - trusting a tag - is the weaker position for a tool that
 can update itself, and because the same upward chain is only exercised by the update command.
 
 ## Tracking and updates

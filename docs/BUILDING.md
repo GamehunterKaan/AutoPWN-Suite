@@ -153,7 +153,7 @@ are unchanged: the application goes to `/opt/autopwn-suite` and the command to
 | `APPDIR` | `/opt/autopwn-suite` (or `$PREFIX/lib/autopwn-suite` when `PREFIX` is set) | Application directory, including its `.venv`. |
 | `DESTDIR` | empty | Staging root; every file written goes under it. |
 | `PYTHON` | `python3` | Interpreter (Python 3.11.5 or newer) used to create the virtualenv. |
-| `REQUIREMENTS_FILE` | `requirements.txt` | Dependency file; `requirements-locked.txt` gives hash-verified, lockfile-exact installs. |
+| `REQUIREMENTS_FILE` | empty | Dependency file installed before the package, which then goes in with `--no-deps`; `requirements-locked.txt` gives hash-verified, lockfile-exact installs. Empty installs the package with its own declared dependencies, which leave out the `update` extra. |
 | `SYSTEMDDIR` | `/etc/systemd/system` | Directory holding the daemon unit; `install.sh` checks it for a service that an earlier release installed, and `uninstall.sh` removes the unit from it. |
 
 ```sh
@@ -165,9 +165,9 @@ DESTDIR="$PWD/pkgroot" PREFIX=/usr bash install.sh
 DESTDIR="$PWD/pkgroot" PREFIX=/usr bash uninstall.sh   # mirrors the same variables
 ```
 
-Without `DESTDIR`, `install.sh` creates `$APPDIR/.venv`, installs the dependencies
-and then the package from the checkout itself (`pip install --no-deps`), so no second
-copy of the source tree is kept, and links `$BINDIR/autopwn-suite` to the command in
+Without `DESTDIR`, `install.sh` creates `$APPDIR/.venv` and installs the package from the
+checkout itself with its declared dependencies (or `REQUIREMENTS_FILE` and then the package
+with `pip install --no-deps`), so no second copy of the source tree is kept, and links `$BINDIR/autopwn-suite` to the command in
 that venv. `sudo` is used only when the target is not writable by the current user (for the command
 link, the directory that holds it is what counts, not the venv an existing link points to).
 Run as root, the script also makes `$APPDIR` belong to root and not group- or world-writable, also when
