@@ -248,6 +248,10 @@ _APP_UPDATE_ERRORS = {
     "update_needs_root": "This installation belongs to another account; update it with sudo autopwn-suite --apply-update.",
     "update_needs_cli": "The dashboard does not install packages as root; update it with sudo autopwn-suite --apply-update.",
     "update_install_failed": "The package manager could not install the update. Update it from the command line.",
+    "update_manifest_missing": "The release has no signed manifest, so the update cannot be tied to an attested build.",
+    "update_manifest_unverified": "The release manifest did not verify against the project's release workflow.",
+    "update_trust_root_unavailable": "Could not load the Sigstore trust root, so the release could not be checked. Try again later.",
+    "update_manifest_mismatch": "The release tag no longer matches the commit the signed manifest records.",
     "update_repo_not_pypi": "AUTOPWN_UPDATE_REPO names another repository, and PyPI holds only the upstream releases.",
     "update_windows": "Windows locks the files of a running program; stop the dashboard, then update it from a terminal.",
 }

@@ -2,6 +2,7 @@
 # Copyright 2022-2026 Kaan Gültekin
 """Release- and commit-based update checks, without touching the network."""
 import io
+import json
 import subprocess
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -185,6 +186,22 @@ def test_apply_commit_update_requires_a_git_checkout(monkeypatch):
         uc.apply_commit_update(repo="x/y")
 
 
+def _signed_release(monkeypatch, repo_with_tag, tag, manifest_tag=None, manifest_commit=None):
+    """Stub the manifest download and its signature, as a released tag would provide them. No network, no Sigstore.
+
+    ``repo_with_tag`` is the upstream holding the tag: the clone under test only gets it during the fetch it makes.
+    """
+    commit = _git(repo_with_tag, "rev-parse", f"refs/tags/{tag}^{{commit}}").stdout.strip()
+    document = {
+        "schema_version": 1,
+        "release": manifest_tag or tag,
+        "source_commit": manifest_commit or commit,
+    }
+    monkeypatch.setattr(uc, "_get_bytes", lambda url: url.encode() if url.endswith(".sigstore.json") else
+                        json.dumps(document).encode())
+    monkeypatch.setattr(uc, "_verify_manifest_signature", lambda *a: None)
+
+
 def test_apply_release_update_checks_out_tag_on_branch(repos, monkeypatch):
     upstream, local = repos
     _commit(upstream, "two.txt", "two")
@@ -193,6 +210,7 @@ def test_apply_release_update_checks_out_tag_on_branch(repos, monkeypatch):
     monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
     monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(
         tag_name="v2.7.0", html_url="https://github.com/x/y/releases/tag/v2.7.0"))
+    _signed_release(monkeypatch, upstream, "v2.7.0")
 
     result = uc.apply_update(channel="release", repo="x/y")
 
@@ -210,6 +228,7 @@ def test_apply_release_update_checks_out_tag_when_detached(repos, monkeypatch):
     monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
     monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(
         tag_name="v3.0.0", html_url="https://github.com/x/y/releases/tag/v3.0.0"))
+    _signed_release(monkeypatch, upstream, "v3.0.0")
 
     result = uc.apply_release_update(repo="x/y")
 
@@ -226,6 +245,7 @@ def test_apply_release_update_never_moves_a_detached_head_back_to_an_older_tag(r
     monkeypatch.setattr(uc, "_repo_root", lambda: local)
     monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
     monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+    _signed_release(monkeypatch, upstream, "v2.7.0")
 
     result = uc.apply_release_update(repo="x/y")
 
@@ -244,6 +264,7 @@ def test_apply_release_update_refuses_a_detached_head_that_diverged_from_the_tag
     monkeypatch.setattr(uc, "_repo_root", lambda: local)
     monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
     monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+    _signed_release(monkeypatch, upstream, "v2.7.0")
 
     with pytest.raises(uc.UpdateCheckError, match="diverged"):
         uc.apply_release_update(repo="x/y")
@@ -565,6 +586,7 @@ def test_a_detached_release_update_checks_out_the_tag_not_a_branch_of_the_same_n
     monkeypatch.setattr(uc, "_repo_root", lambda: local)
     monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
     monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+    _signed_release(monkeypatch, upstream, "v2.7.0")
 
     result = uc.apply_release_update(repo="x/y")
 
@@ -823,3 +845,218 @@ def test_on_windows_a_package_installation_is_updated_after_autopwn_suite_exits(
     assert uc.can_apply("checkout") is True
     assert uc.update_command("pip") == f'"{uc.sys.executable}" -m pip install --upgrade autopwn-suite'
     assert uc.update_hint("pipx") == "Close AutoPWN Suite, then update it with: pipx upgrade autopwn-suite"
+
+
+# ── The signed release manifest ──
+
+def test_a_malformed_signature_bundle_refuses_the_update():
+    """The bundle is parsed before Sigstore sees it, so a corrupt download is a refusal with a reason, not a crash."""
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc._verify_manifest_signature("x/y", "v9.9.9", b"{}", b"not a bundle")
+
+    assert caught.value.code == "update_manifest_unverified"
+
+
+def test_a_tag_moved_off_the_attested_commit_is_refused(repos, monkeypatch):
+    """The tampered-tag case: the tag now points at a commit the signed manifest does not name."""
+    upstream, local = repos
+    _commit(upstream, "two.txt", "two")
+    _git(upstream, "tag", "v2.7.0")
+    attested = _git(upstream, "rev-parse", "HEAD").stdout.strip()
+    _commit(upstream, "three.txt", "moved after signing")
+    _git(upstream, "tag", "-f", "v2.7.0")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+    _signed_release(monkeypatch, upstream, "v2.7.0", manifest_commit=attested)
+    before = _git(local, "rev-parse", "HEAD").stdout.strip()
+
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.apply_release_update(repo="x/y")
+
+    assert caught.value.code == "update_manifest_mismatch"
+    assert "has moved" in str(caught.value)
+    # and nothing moved: a refused update leaves the checkout where it was
+    assert _git(local, "rev-parse", "HEAD").stdout.strip() == before
+
+
+def test_a_missing_manifest_refuses_the_update(repos, monkeypatch):
+    upstream, local = repos
+    _git(upstream, "tag", "v2.7.0")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+    monkeypatch.setattr(uc, "verify_release_source", lambda *a: (_ for _ in ()).throw(
+        uc.UpdateCheckError("Nothing found at https://example.test/release-manifest.json.", "update_manifest_missing")))
+
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.apply_release_update(repo="x/y")
+
+    assert caught.value.code == "update_manifest_missing"
+
+
+def test_a_manifest_that_does_not_verify_refuses_the_update(repos, monkeypatch):
+    upstream, local = repos
+    _git(upstream, "tag", "v2.7.0")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+    monkeypatch.setattr(uc, "_get_bytes", lambda url: b"{}")
+    monkeypatch.setattr(uc, "_verify_manifest_signature", lambda *a: (_ for _ in ()).throw(
+        uc.UpdateCheckError("The release manifest is not signed by this project's release workflow.",
+                            "update_manifest_unverified")))
+
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.apply_release_update(repo="x/y")
+
+    assert caught.value.code == "update_manifest_unverified"
+
+
+def test_a_manifest_for_another_release_refuses_the_update(repos, monkeypatch):
+    upstream, local = repos
+    _git(upstream, "tag", "v2.7.0")
+    monkeypatch.setattr(uc, "_repo_root", lambda: local)
+    monkeypatch.setattr(uc, "_remote_url", lambda repo: str(upstream))
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: response(tag_name="v2.7.0"))
+    _signed_release(monkeypatch, upstream, "v2.7.0", manifest_tag="v9.9.9")
+
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.apply_release_update(repo="x/y")
+
+    assert caught.value.code == "update_manifest_mismatch"
+    assert "another release" in str(caught.value)
+
+
+def test_manifest_source_commit_is_only_read_from_a_manifest_this_updater_understands():
+    assert uc._manifest_source_commit({"schema_version": 1, "source_commit": "a" * 40}) == "a" * 40
+    # a schema this updater does not know, a short hash, or no commit at all is not a manifest it acts on
+    assert uc._manifest_source_commit({"schema_version": 2, "source_commit": "a" * 40}) is None
+    assert uc._manifest_source_commit({"schema_version": 1, "source_commit": "abc123"}) is None
+    assert uc._manifest_source_commit({"schema_version": 1}) is None
+    assert uc._manifest_source_commit([]) is None
+
+# --- the download path that carries the release manifest -------------------
+#
+# These cover _get_bytes itself: the mapping from an HTTP status to an
+# UpdateCheckError code, and the fact that a refused release asset is not
+# reported as a rate limit, because assets are not served by the API.
+
+def _bytes_response(status_code):
+    resp = MagicMock(status_code=status_code, ok=status_code < 400, content=b"payload")
+    return resp
+
+
+@pytest.mark.parametrize(
+    "status_code, code, fragment",
+    [
+        (404, "update_not_found", "Nothing found"),
+        (403, "update_http_error", "refused the download"),
+        (500, "update_http_error", "HTTP 500"),
+    ],
+)
+def test_get_bytes_maps_a_status_to_an_error_code(monkeypatch, status_code, code, fragment):
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: _bytes_response(status_code))
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc._get_bytes("https://example.invalid/asset")
+    assert caught.value.code == code
+    assert fragment in str(caught.value)
+
+
+def test_get_bytes_reports_a_refused_asset_as_refused_not_as_a_rate_limit(monkeypatch):
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: _bytes_response(403))
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc._get_bytes("https://example.invalid/asset")
+    assert "rate limit" not in str(caught.value).lower()
+
+
+def test_get_bytes_reports_a_transport_failure_as_unreachable(monkeypatch):
+    def explode(*a, **k):
+        raise uc.requests.RequestException("no route")
+
+    monkeypatch.setattr(uc.requests, "get", explode)
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc._get_bytes("https://example.invalid/asset")
+    assert caught.value.code == "update_unreachable"
+
+
+def test_get_bytes_returns_the_body(monkeypatch):
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: _bytes_response(200))
+    assert uc._get_bytes("https://example.invalid/asset") == b"payload"
+
+
+def test_a_missing_manifest_asset_becomes_update_manifest_missing(monkeypatch):
+    """A 404 on the manifest download is the tag having no signed release, not a generic not-found."""
+    monkeypatch.setattr(uc.requests, "get", lambda *a, **k: _bytes_response(404))
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.verify_release_source("x/y", "v1.0.0", "a" * 40)
+    assert caught.value.code == "update_manifest_missing"
+    assert "no signed release manifest" in str(caught.value)
+
+
+def test_verify_release_source_pins_the_expected_identity(monkeypatch):
+    """The identity handed to Sigstore must be this repo's release workflow, not whatever signed the manifest."""
+    import sys
+    import types
+
+    captured = {}
+
+    class StubVerifier:
+        def verify_artifact(self, input_=None, bundle=None, policy=None):
+            captured["identity"] = policy.identity
+            captured["issuer"] = policy.issuer
+
+    errors = types.ModuleType("sigstore.errors")
+    errors.VerificationError = type("VerificationError", (Exception,), {})
+    models = types.ModuleType("sigstore.models")
+    models.Bundle = types.SimpleNamespace(from_json=staticmethod(lambda raw: "parsed"))
+    verify = types.ModuleType("sigstore.verify")
+    verify.Verifier = types.SimpleNamespace(production=staticmethod(StubVerifier))
+    verify.policy = types.SimpleNamespace(
+        Identity=lambda identity, issuer: types.SimpleNamespace(identity=identity, issuer=issuer)
+    )
+    package = types.ModuleType("sigstore")
+    package.errors, package.models, package.verify = errors, models, verify
+    for name, module in (
+        ("sigstore", package), ("sigstore.errors", errors),
+        ("sigstore.models", models), ("sigstore.verify", verify),
+    ):
+        monkeypatch.setitem(sys.modules, name, module)
+
+    manifest = json.dumps({"release": "v1.0.0", "schema_version": 1, "source_commit": "a" * 40}).encode()
+    monkeypatch.setattr(uc, "_get_bytes", lambda url: manifest)
+
+    uc.verify_release_source("GamehunterKaan/AutoPWN-Suite", "v1.0.0", "a" * 40)
+
+    assert captured["identity"] == (
+        "https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/heads/main"
+    )
+    assert "token.actions.githubusercontent.com" in captured["issuer"]
+
+
+def test_trust_root_failure_is_an_update_error(monkeypatch):
+    import sys
+    import types
+
+    def explode():
+        raise RuntimeError("TUF metadata expired")
+
+    errors = types.ModuleType("sigstore.errors")
+    errors.VerificationError = type("VerificationError", (Exception,), {})
+    models = types.ModuleType("sigstore.models")
+    models.Bundle = types.SimpleNamespace(from_json=staticmethod(lambda raw: "parsed"))
+    verify = types.ModuleType("sigstore.verify")
+    verify.Verifier = types.SimpleNamespace(production=staticmethod(explode))
+    verify.policy = types.SimpleNamespace(Identity=lambda identity, issuer: None)
+    package = types.ModuleType("sigstore")
+    package.errors, package.models, package.verify = errors, models, verify
+    for name, module in (
+        ("sigstore", package), ("sigstore.errors", errors),
+        ("sigstore.models", models), ("sigstore.verify", verify),
+    ):
+        monkeypatch.setitem(sys.modules, name, module)
+    monkeypatch.setattr(uc, "_get_bytes", lambda url: b'{"schema_version":1,"release":"v1","source_commit":"' + b"a" * 40 + b'"}')
+
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc.verify_release_source("GamehunterKaan/AutoPWN-Suite", "v1", "a" * 40)
+    assert caught.value.code == "update_trust_root_unavailable"
+    assert "trust root" in str(caught.value)

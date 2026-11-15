@@ -1,10 +1,12 @@
 # Public non-exploitability feed
 
-[index.json](index.json) lists published OpenVEX 0.2.0 documents. The feed is
-currently empty: the dependency audit found no advisory requiring a not-affected
-declaration. An empty index is **not** an OpenVEX document and does not assert
-that the product is free of vulnerabilities. Existing product findings are in
-the [advisory index](../../docs/SECURITY_ADVISORIES.md).
+[index.json](index.json) lists published OpenVEX 0.2.0 documents. It is empty: every
+advisory the audit reports is resolved by upgrading the dependency, and the one
+declaration this feed carried (a `not_affected` statement for `dnspython` 2.8.0) went
+away when the Python 3.11.5 floor made the fixed release installable. An empty index is
+**not** an OpenVEX document and does not assert that the product is free of
+vulnerabilities. Existing product findings are in the
+[advisory index](../../docs/SECURITY_ADVISORIES.md).
 
 When a dependency advisory is determined not to affect AutoPWN Suite, add a
 `NAME.openvex.json` document to this directory and its filename to the index.

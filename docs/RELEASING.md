@@ -213,6 +213,14 @@ ordering; its completed contents are verified before separate staging copies
 are removed. Release notes are read from the ZIP for the GitHub release body.
 The container's exact `sha256:` digest also has a Cosign registry signature.
 
+The self-updater is a second consumer of that manifest. `--apply-update` downloads
+`release-manifest.json` and `release-manifest.sigstore.json` for the release tag, verifies the bundle against
+`.github/workflows/publish-docker.yml` as the certificate identity, and then requires the manifest's `source_commit`
+to equal the commit the tag points at. A moved tag, a manifest for another release, an absent or unverifiable
+bundle, and a malformed manifest are all refusals that leave the checkout untouched. Renaming the release workflow
+or signing the manifest from another ref therefore changes the identity the updater accepts, and
+`RELEASE_SIGNING_WORKFLOW` in `autopwn_suite/update_checker.py` has to move in the same change.
+
 Existing releases, including the already signed v2.6.0 release and v2.6.1, retain their
 previous layouts. This change does not replace their assets or
 invalidate their existing signatures. Both layouts use the same top-level
