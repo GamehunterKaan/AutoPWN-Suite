@@ -55,13 +55,20 @@ GPL-2.0-or-later with an exception that allows distributing the frozen program u
 Tests check that each `.txt` is hash-pinned and agrees with its `.in`. The packages frozen into each standalone binary
 are the runtime requirements for its platform, so they are covered by the same lockfile checks as the container.
 
-## Why `sigstore` is a runtime dependency
+## Why `sigstore` is the optional `update` extra
 
 `sigstore` verifies the Sigstore bundle attached to a release manifest, which is what lets `--apply-update`
 refuse a tag that points somewhere other than the attested build (see `docs/RELEASING.md` and the trust boundary
-for the self-update path in `docs/THREAT_MODEL.md`). It is imported only inside the update path, so a scan or a
-package upgrade never loads it, but it is a genuine runtime requirement of this repository's own code rather than a
-build or publishing tool, which is why it belongs in both runtime declarations instead of `packaging/`.
+for the self-update path in `docs/THREAT_MODEL.md`). Only a git checkout runs that check: pip, pipx and `install.sh`
+installations update from PyPI, and the container image and the standalone binaries refuse to update themselves. So
+`pyproject.toml` declares it optional, as the `update` extra in `[tool.poetry.extras]`, instead of making every
+install carry it, while `requirements.txt` keeps it because `pip install -r requirements.txt` is the documented
+checkout install. Both declarations still list it, so they keep the same package names. Poetry keeps a package that
+only an extra needs in the lock's `main` group and marks it `optional = true`; `scripts/export_locked_requirements.py`
+leaves those out, so `requirements-locked.txt`, and with it the container image and the standalone binaries, carries
+none of the extra's packages. A checkout without it refuses `--apply-update` with the `update_extra_missing` error,
+which names the install commands, instead of skipping the check. Developers install it with
+`poetry install --extras update`, as the `test` job does so that the real bundle parser stays under test.
 
 It also brings findings the security policy reports, and how each is resolved is part of the change rather than
 buried: `id`, `rfc3161-client`, `rfc8785`, `sigstore-rekor-types` and `sigstore-models` publish licence text the
@@ -69,14 +76,13 @@ scanner cannot map to an SPDX id, so their licences are recorded in `.security/l
 upstream file as evidence and its digest. `sigstore-models` publishes no licence metadata at all, which is why the
 override path in `scripts/security_policy.py` now also accepts a correction for an `UNKNOWN` detection; it is MIT
 (Astral), not the Apache-2.0 its siblings use. `tuf`'s dual `Apache-2.0 OR MIT` joins the accepted set.
-`dnspython` 2.8.0 carries GHSA-45c3-73f7-pv4m, and no fixed release supports Python 3.10, so it has a
-`not_affected` declaration in `.security/vex/` resting on the vulnerable function being unreachable: dnspython
-arrives through email-validator, an optional `email` extra of pydantic that nothing here requests or calls.
+The security policy scans the whole `poetry.lock`, the extra's packages included.
 
 Its transitive tree is larger than the rest of the runtime set (the verification stack pulls in cryptography
-interfaces, pydantic models and the TUF client). That is accepted because the alternative - trusting a tag - is the
-weaker position for a tool that can update itself, and because the same upward chain is only exercised by the
-update command.
+interfaces, pydantic models and the TUF client). The extra keeps that tree out of the container image, the standalone
+binaries and package installations, none of which can use it (`install.sh` installs `requirements.txt` by default,
+so it still gets it), and it is accepted in a checkout because the alternative - trusting a tag - is the weaker position for a tool that
+can update itself, and because the same upward chain is only exercised by the update command.
 
 ## Tracking and updates
 

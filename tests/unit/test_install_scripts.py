@@ -451,6 +451,27 @@ def test_locked_requirements_match_poetry_lock():
         "requirements-locked.txt is stale; run python scripts/export_locked_requirements.py")
 
 
+def test_locked_requirements_leave_out_packages_only_an_extra_needs(tmp_path):
+    lock = tmp_path / "poetry.lock"
+    lock.write_text(
+        '[[package]]\nname = "needed"\nversion = "1.0"\noptional = false\ngroups = ["main"]\n'
+        'files = [{file = "needed-1.0-py3-none-any.whl", hash = "sha256:' + "a" * 64 + '"}]\n\n'
+        '[[package]]\nname = "extra-only"\nversion = "2.0"\noptional = true\ngroups = ["main"]\n'
+        'markers = "extra == \\"update\\""\n'
+        'files = [{file = "extra_only-2.0-py3-none-any.whl", hash = "sha256:' + "b" * 64 + '"}]\n\n'
+        '[metadata]\ncontent-hash = "0"\n',
+        encoding="utf-8",
+    )
+
+    text = load_exporter().render(lock)
+
+    assert "needed==1.0" in text and "extra-only" not in text and "b" * 64 not in text
+    # and the committed file, which feeds the container and the binaries, holds none of the update extra
+    committed = (ROOT / "requirements-locked.txt").read_text()
+    for name in ("sigstore", "tuf", "pydantic", "dnspython"):
+        assert not re.search(rf"^{name}==", committed, re.MULTILINE), name
+
+
 def test_locked_requirements_are_fully_hash_pinned():
     text = (ROOT / "requirements-locked.txt").read_text()
     requirements = [line for line in text.splitlines() if re.match(r"^[A-Za-z0-9]", line)]

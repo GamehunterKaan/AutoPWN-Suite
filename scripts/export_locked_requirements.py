@@ -5,9 +5,10 @@
 
 The container build installs Python dependencies with
 ``pip install --require-hashes --only-binary=:all: -r requirements-locked.txt``.
-That file is derived from ``poetry.lock`` (runtime ``main`` group only), so the
-container, the lockfile, and the Poetry developer environment resolve to the
-same versions and artifact hashes. This is a dependency-free equivalent of
+That file is derived from ``poetry.lock`` (runtime ``main`` group only, without
+the packages only an extra such as ``update`` needs), so the container, the
+lockfile, and the Poetry developer environment resolve to the same versions
+and artifact hashes. This is a dependency-free equivalent of
 ``poetry export --only main --with-hashes`` that does not need the
 ``poetry-plugin-export`` plugin. Output is sorted and contains no timestamps,
 so regenerating from an unchanged lockfile is byte-for-byte identical.
@@ -48,7 +49,11 @@ def render(lock_path: Path = LOCK_FILE) -> str:
         "#   python scripts/export_locked_requirements.py",
         f"# poetry.lock content-hash: {content_hash}",
     ]
-    packages = [p for p in lock.get("package", []) if GROUP in p.get("groups", [])]
+    # Poetry keeps a package that only an extra pulls in under ``main`` and marks it ``optional``; leave it out,
+    # as ``poetry export`` without ``--extras`` does.
+    packages = [
+        p for p in lock.get("package", []) if GROUP in p.get("groups", []) and not p.get("optional", False)
+    ]
     for package in sorted(packages, key=lambda p: p["name"].lower()):
         hashes = sorted({f["hash"] for f in package.get("files", []) if f.get("hash")})
         if not hashes:

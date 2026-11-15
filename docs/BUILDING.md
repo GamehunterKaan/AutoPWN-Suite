@@ -35,6 +35,12 @@ python autopwn.py --help
 python autopwn.py --web --web-host 127.0.0.1
 ```
 
+`requirements.txt` includes `sigstore`, which `pyproject.toml` declares as the optional `update` extra. A checkout
+needs it to verify a release's signed manifest before `--apply-update` moves to the release tag, and refuses the
+update without it (`update_extra_missing`). `pip install .` leaves it out, because an installed package updates
+from PyPI instead, and the container image and the standalone binaries, built from `requirements-locked.txt`,
+leave it out too.
+
 For network scanning, install Nmap (for example, `sudo apt-get install nmap` on
 Debian/Ubuntu or `brew install nmap` on macOS). Windows users can use the official
 Nmap installer. Scan only systems for which you have authorization.
@@ -48,7 +54,7 @@ command on `PATH`.
 
 ```sh
 pipx install poetry==2.5.1
-poetry install
+poetry install --extras update   # the extra installs sigstore, which the update tests need
 poetry check --lock
 poetry run ruff check .
 node --check autopwn_suite/web_ui_static/app.js
