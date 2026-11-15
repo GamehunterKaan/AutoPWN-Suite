@@ -488,8 +488,11 @@ replaced the running `autopwn-suite.exe` would fail halfway and could leave the 
 For a git checkout (a copy inside another git repository is refused), `--apply-update` needs a clean
 working tree, and only fast-forwards — it refuses and leaves your checkout untouched if the
 working tree has uncommitted changes or the local branch has diverged from the target (resolve
-that manually, e.g. with `git rebase` or by committing/stashing first). It does not verify signatures: it
-trusts the repository named by `--update-repo`, so keep the default unless you trust another. Restart
+that manually, e.g. with `git rebase` or by committing/stashing first). On the release channel it first
+verifies the release's signed `release-manifest.json` with Sigstore, which needs the `update` extra (see
+**From source** under Installation), and refuses unless the manifest was signed by the release workflow of the
+repository named by `--update-repo` and names the commit the tag points at. The commit channel verifies no
+signature. Either way it trusts that repository, so keep the default unless you trust another. Restart
 AutoPWN Suite after it reports success so the updated code takes effect. When nothing is newer it changes
 nothing and reports `Already up to date`. It never moves a checkout back: a branch or detached HEAD that is
 already ahead of the target stays where it is, and the commit channel reports such a checkout as up to date.
@@ -557,8 +560,8 @@ single-file binaries that need no Python installation: `linux-amd64`, `linux-arm
 executable and run it:
 
 ```bash
-chmod +x autopwn-suite-v2.9.0-linux-amd64
-./autopwn-suite-v2.9.0-linux-amd64 --help
+chmod +x autopwn-suite-v2.9.1-linux-amd64
+./autopwn-suite-v2.9.1-linux-amd64 --help
 ```
 
 The binaries are checksum-verified and Sigstore-signed but not code-signed for Windows or
@@ -594,6 +597,11 @@ python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install .                    # or: pip install -r requirements.txt && python autopwn.py
 ```
+
+`requirements.txt` includes `sigstore`, the optional `update` extra, which a checkout run as `python autopwn.py`
+needs to verify a release before `--apply-update` moves it; without it the update is refused. A checkout set up
+with Poetry gets it with `poetry install --extras update`. Other installations update from PyPI or not at all, so
+they do not need it.
 
 ### Docker
 
@@ -764,8 +772,10 @@ required by `pyproject.toml`, pinned in CI, and used to generate `poetry.lock`.
 #### Installing Dependencies
 ```console
 pipx install poetry==2.5.1
-poetry install
+poetry install --extras update
 ```
+
+The `update` extra installs `sigstore`, which the update tests and `--apply-update` on the checkout use.
 
 After changing dependencies, run `poetry lock` with Poetry 2.5.1 and commit
 `pyproject.toml` and `poetry.lock` together. This retains already locked versions

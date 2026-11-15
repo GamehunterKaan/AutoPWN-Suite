@@ -857,6 +857,20 @@ def test_a_malformed_signature_bundle_refuses_the_update():
     assert caught.value.code == "update_manifest_unverified"
 
 
+def test_a_checkout_without_the_update_extra_is_told_to_install_it(monkeypatch):
+    """sigstore is the optional `update` extra: without it the refusal says how to get it, not that the release is bad."""
+    import sys
+
+    for name in ("sigstore", "sigstore.errors", "sigstore.models", "sigstore.verify"):
+        monkeypatch.setitem(sys.modules, name, None)  # what an import of a package that is not installed sees
+
+    with pytest.raises(uc.UpdateCheckError) as caught:
+        uc._verify_manifest_signature("x/y", "v9.9.9", b"{}", b"{}")
+
+    assert caught.value.code == "update_extra_missing"
+    assert "poetry install --extras update" in str(caught.value)
+
+
 def test_a_tag_moved_off_the_attested_commit_is_refused(repos, monkeypatch):
     """The tampered-tag case: the tag now points at a commit the signed manifest does not name."""
     upstream, local = repos

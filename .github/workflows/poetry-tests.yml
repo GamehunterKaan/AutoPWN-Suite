@@ -39,7 +39,7 @@ jobs:
       run: poetry check --lock
 
     - name: Install dependencies
-      run: poetry install
+      run: poetry install --extras update
 
     - name: Check coding standards, JavaScript syntax and locked container inputs
       run: |

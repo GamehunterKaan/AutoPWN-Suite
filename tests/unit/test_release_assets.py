@@ -61,9 +61,6 @@ def test_archives_use_tag_and_manifest_binds_every_asset(source_repo, tmp_path):
     assert manifest["source_commit"] == commit
     assert manifest["container"]["digest"] == digest
     assert len(manifest["assets"]) == 3
-    # The security ZIP bundles the VEX feed snapshot plus one document per declaration in it: the index, two
-    # CycloneDX files and the release notes. There is no declaration any more, since the dnspython advisory this
-    # one covered is fixed by the version the lock now resolves.
     assert len(manifest["supporting_archive"]["files"]) == 4
     assert {p.name for p in output.iterdir()} == {
         "autopwn-suite-v2.6.0.tar.gz", "autopwn-suite-v2.6.0.zip",

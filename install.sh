@@ -29,9 +29,10 @@ Variables (standard GNU/packaging conventions):
                      virtualenv on the target system are printed instead.
   PYTHON             Python interpreter (3.11.5 or newer) used to create the
                      virtualenv. Default: python3
-  REQUIREMENTS_FILE  Dependency file inside the repository. Default:
-                     requirements.txt. Use requirements-locked.txt for
-                     hash-verified, lockfile-exact installs.
+  REQUIREMENTS_FILE  Dependency file inside the repository, installed before
+                     the package. Default: none, so pip installs the
+                     package's own dependencies. Use requirements-locked.txt
+                     for hash-verified, lockfile-exact installs.
   SYSTEMDDIR         Directory holding the daemon unit, checked for a service
                      that an earlier release installed. Default:
                      /etc/systemd/system
@@ -47,7 +48,7 @@ esac
 # Path setup (mirrored in uninstall.sh)
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 PYTHON="${PYTHON:-python3}"
-REQUIREMENTS_FILE="${REQUIREMENTS_FILE:-requirements.txt}"
+REQUIREMENTS_FILE="${REQUIREMENTS_FILE:-}"
 DESTDIR="${DESTDIR:-}"
 
 strip_slashes() {
@@ -197,10 +198,16 @@ else
     # shellcheck disable=SC1091
     source "$VENV_DIR/bin/activate"
     pip install --upgrade pip setuptools wheel
-    if [ -f "$REPO_DIR/$REQUIREMENTS_FILE" ]; then
-        pip install -r "$REPO_DIR/$REQUIREMENTS_FILE"
+    if [ -n "$REQUIREMENTS_FILE" ]; then
+        if [ -f "$REPO_DIR/$REQUIREMENTS_FILE" ]; then
+            pip install -r "$REPO_DIR/$REQUIREMENTS_FILE"
+        fi
+        pip install --no-deps "$SOURCE_DIR"
+    else
+        # The package's own dependencies, without the `update` extra: this installation updates from PyPI and
+        # never verifies a release manifest, so it has no use for sigstore.
+        pip install "$SOURCE_DIR"
     fi
-    pip install --no-deps "$SOURCE_DIR"
     deactivate
     SET_ASIDE=0
     run_for "$VENV_OLD" rm -rf "$VENV_OLD"
@@ -215,8 +222,12 @@ if [ -n "$DESTDIR" ]; then
     echo "Staged installation complete under $DESTDIR."
     echo "On the target system, create the virtualenv the command links to:"
     echo "  $PYTHON -m venv $VENV_DIR"
-    echo "  $VENV_DIR/bin/pip install -r $SOURCE_DIR/$REQUIREMENTS_FILE"
-    echo "  $VENV_DIR/bin/pip install --no-deps $SOURCE_DIR"
+    if [ -n "$REQUIREMENTS_FILE" ]; then
+        echo "  $VENV_DIR/bin/pip install -r $SOURCE_DIR/$REQUIREMENTS_FILE"
+        echo "  $VENV_DIR/bin/pip install --no-deps $SOURCE_DIR"
+    else
+        echo "  $VENV_DIR/bin/pip install $SOURCE_DIR"
+    fi
     exit 0
 fi
 

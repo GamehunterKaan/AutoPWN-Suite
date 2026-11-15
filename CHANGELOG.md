@@ -5,7 +5,7 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
-## [Unreleased]
+## [2.9.1] - 2026-11-15
 
 ### Functional changes
 
@@ -27,6 +27,19 @@ existing release summaries; they do not retroactively claim artifact signing.
   `release-manifest.json` and its Sigstore bundle, checks the signature against this repository's release workflow,
   and refuses the update unless the manifest names the same commit the tag points at. `--update-channel commit` is
   unaffected, because `main` has no release manifest.
+- `sigstore`, which that check needs, is the optional `update` extra, because only a git checkout runs the check:
+  pip, pipx and `install.sh` installations update from PyPI, and the Docker image and the standalone binaries do not
+  update themselves. `requirements.txt` still lists it, so a checkout installed with `pip install -r requirements.txt` has it;
+  a Poetry development environment gets it with `poetry install --extras update`. A checkout without it refuses
+  `--apply-update` with the new `update_extra_missing` error, which names both commands, instead of reporting the
+  release as unverified. `scripts/export_locked_requirements.py` leaves out the packages only an extra needs, so
+  `requirements-locked.txt`, the Docker image and the standalone binaries carry none of the extra's packages
+  (`sigstore`, `tuf`, `pydantic`, `dnspython` and the rest). The only change in that runtime set since 2.9.0 is
+  `typing-extensions` 4.13.2 to 4.16.0, the version the shared lock resolves because `sigstore-models` needs it. The
+  required `test` check installs the extra.
+- `install.sh` installs the package with its own declared dependencies by default instead of `requirements.txt`
+  first, so its installations leave the `update` extra out as well. `REQUIREMENTS_FILE` still installs a
+  dependency file before the package (`requirements-locked.txt` for hash-verified, lockfile-exact installs).
 
 ### Security changes
 
@@ -46,11 +59,12 @@ existing release summaries; they do not retroactively claim artifact signing.
   trusted as-is; now the attested build pins it, so pointing a tag at another commit makes the update refuse rather
   than install. Missing, unreadable, unsigned, or mismatched manifests are all refusals, and the updater still
   refuses entirely in offline mode.
-- Adds `sigstore` as a runtime dependency, used only by the update path, to verify that signature.
-- The locked `dnspython` moves from 2.8.0 to 2.9.2, the release that fixes GHSA-45c3-73f7-pv4m and
-  GHSA-vvf4-9x63-8xvv. The fix could not be installed while Python 3.10 was supported, which is why a
-  `not_affected` VEX statement covered the advisory instead; with the 3.11.5 floor the dependency resolves and
-  the statement is deleted rather than reworded, so the VEX feed is empty again.
+- `sigstore`, which verifies that signature, and its dependencies are the optional `update` extra. The Docker image,
+  the standalone binaries and pip, pipx and `install.sh` installations of the package ship none of them, which keeps
+  code they never run out of the published artifacts. A git checkout without the extra cannot verify a release, so
+  it refuses the update rather than skip the check. The Security policy still scans the extra's packages, because it scans the whole `poetry.lock`.
+  Installing the extra in the `test` job, which keeps the real Sigstore bundle parser under test, gives the job no
+  new permission or secret, so it has no security impact.
 
 ## [2.9.0] - 2026-10-29
 

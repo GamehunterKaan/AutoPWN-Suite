@@ -196,10 +196,11 @@ def _verify_manifest_signature(repo, tag, manifest, bundle):
         from sigstore.errors import VerificationError
         from sigstore.models import Bundle
         from sigstore.verify import Verifier, policy
-    except ImportError as exc:  # a checkout whose dependencies were never installed
+    except ImportError as exc:  # a checkout set up without the optional `update` extra
         raise UpdateCheckError(
-            _("Verifying a release update needs the sigstore package, which is not installed."),
-            "update_manifest_unverified",
+            _("Verifying a release update needs the sigstore package from the update extra, which is not installed. "
+              "Install it with pip install -r requirements.txt or poetry install --extras update."),
+            "update_extra_missing",
         ) from exc
     try:
         parsed = Bundle.from_json(bundle)
