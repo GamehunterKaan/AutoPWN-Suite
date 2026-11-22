@@ -1022,9 +1022,10 @@ release that contains it.
     its own text, because that text is fixed by the project and says what to do (for
     example to download the database).
   - A schedule disabled after a failed validation still shows the validator's message,
-    which is project text that names the field to fix.
-  - Settings that cannot be loaded are still logged with a traceback; that handler is
-    being changed separately.
+    which is project text that names the field to fix (for an integer too long to
+    convert, Python's own message, which gives only digit counts).
+  - Settings that cannot be loaded are still logged with a traceback; that handler is not
+    changed here.
   - The console output of the scanner and the CLI is not part of this advisory.
 - Mitigation: upgrade once a release contains the fix. Until then, limit who can sign in
   to the dashboard and who can read its server log.
