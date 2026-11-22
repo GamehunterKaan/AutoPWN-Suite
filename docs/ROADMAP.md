@@ -19,13 +19,14 @@ below before starting large work.
 
 ## Where the project is today
 
-- **v2.9.1** (2026-11-15) is the supported stable release ([support policy](../SUPPORT.md)).
+- **v2.9.2** (2026-11-22) is the supported stable release ([support policy](../SUPPORT.md)).
 - v2.7.0 (2026-10-19) added the PyPI package and the standalone binaries; v2.8.0 (2026-10-21) added Turkish
   localization, `--check-update` and `--apply-update`, and vulnerability categories in the dashboard;
   v2.8.1 (2026-10-24) added the dashboard's update check and self-update (Settings), and made
   `--apply-update` move only forward; v2.9.0 (2026-10-29) matches CVEs to the detected release through NVD's
-  applicability data instead of the exact version text of a description; v2.9.1 needs Python 3.11.5, takes the
-  fixed `soupsieve`, and has a checkout's `--apply-update` verify the signed release manifest first.
+  applicability data instead of the exact version text of a description; v2.9.1 (2026-11-15) needs Python 3.11.5,
+  takes the fixed `soupsieve`, and has a checkout's `--apply-update` verify the signed release manifest first;
+  v2.9.2 fixes AUTOPWN-SA-2026-022 through 024 in the dashboard.
 - v2.6.1 (2026-10-16) shipped fixes for AUTOPWN-SA-2026-002 through 005, a
   required dashboard login, signed-release tooling and expanded documentation.
   v2.6.0 and earlier do not have these changes.

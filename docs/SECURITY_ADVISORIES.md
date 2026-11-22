@@ -901,8 +901,7 @@ release that contains it.
 - Assessed affected version: **2.9.1**. The same loader is in the source of **2.5.0**,
   which added the dashboard's offline mode, through 2.9.0; those releases were read, not
   tested.
-- Status: **fixed on `main`, not yet released**; 2.9.1 remains affected. This entry
-  names the fixed release once it ships.
+- Status: **fixed in v2.9.2** (2026-11-22). Fixed released version: **2.9.2**.
 - CWE-636 (not failing securely); low. Nothing an attacker sends causes it: the
   settings file has to exist and fail to load, after a hand edit, a disk or backup
   fault, or a value of the wrong type. Someone who can write the data directory already
@@ -955,7 +954,7 @@ release that contains it.
 
 - Assessed affected versions: **2.5.0**, which introduced the dashboard offline mode and this
   way of saving settings, through **2.9.1**. Earlier versions not assessed.
-- Status: **fixed on `main`, not yet released.** No released version contains the fix.
+- Status: **fixed in v2.9.2** (2026-11-22). Fixed released version: **2.9.2**.
 - CWE-362; low: the window is a few bytecodes long and has not been observed; the
   regression test shows the in-place change, not a lost race.
 - Prerequisite: a signed-in operator saves settings (`PUT /api/settings`, any key) and, at
@@ -999,8 +998,7 @@ release that contains it.
 ## AUTOPWN-SA-2026-024 — Dashboard scan and scheduler logs carry exception text
 
 - Assessed affected version: **2.9.1** (`f2235c3`). Earlier versions not assessed.
-- Status: **fixed on the development branch, not yet released.** No released version
-  contains the fix; this entry will name the release that does.
+- Status: **fixed in v2.9.2** (2026-11-22). Fixed released version: **2.9.2**.
 - CWE-209 and CWE-532; low: the text reaches only signed-in dashboard users and the
   operator's server log, and it discloses details of the scan host, not credentials the
   dashboard holds.

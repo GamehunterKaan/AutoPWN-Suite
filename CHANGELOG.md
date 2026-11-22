@@ -5,7 +5,7 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
-## [Unreleased]
+## [2.9.2] - 2026-11-22
 
 ### Functional changes
 
@@ -28,12 +28,11 @@ existing release summaries; they do not retroactively claim artifact signing.
 - AUTOPWN-SA-2026-023: A scan that started while dashboard settings were being saved could read offline mode as
   off and run online CVE lookups and Nmap without `-n`, and a notification sent then could be skipped. The window
   was a few bytecodes long and has not been observed (the regression test shows the in-place change, not a lost
-  race); a dashboard started with
-  `--web --offline` was not affected. Affects 2.5.0 through 2.9.1.
-- The dashboard's job log (`/api/log`, the event stream) and its server log no longer carry exception text from host
-  discovery, port scans, CVE lookups, the scheduler or vulnerability database updates, which could quote Nmap's
-  standard error, file paths, host names or a URL; they carry fixed text and the exception class
-  (AUTOPWN-SA-2026-024).
+  race); a dashboard started with `--web --offline` was not affected. Affects 2.5.0 through 2.9.1.
+- AUTOPWN-SA-2026-024: the dashboard's job log (`/api/log`, the event stream) and its server log no longer carry
+  exception text from host discovery, port scans, CVE lookups, the scheduler or vulnerability database updates,
+  which could quote Nmap's standard error, file paths, host names or a URL; they carry fixed text and the
+  exception class.
 
 ## [2.9.1] - 2026-11-15
 
