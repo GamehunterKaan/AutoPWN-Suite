@@ -3,6 +3,7 @@
 """End-to-end scan orchestration using real local CVEs and mocked Nmap only."""
 import importlib
 import io
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -519,15 +520,30 @@ def test_database_update_requires_explicit_post_and_prevents_duplicate_jobs(web,
     assert client.post("/api/vulnerability-database/update").status_code == 409
 
 
-def test_update_error_is_reported_and_not_left_running(web, monkeypatch):
+def test_update_error_is_reported_and_not_left_running(web, monkeypatch, caplog):
     wu, client = web
     monkeypatch.setattr(wu, "update_database", MagicMock(side_effect=OSError("private path details")))
     wu._database_update["running"] = True
-    wu._update_vulnerability_database()
+    with caplog.at_level("DEBUG"):
+        wu._update_vulnerability_database()
     status = client.get("/api/vulnerability-database").json
     assert not status["update"]["running"]
     assert "preserved" in status["update"]["error"]
     assert "private path" not in status["update"]["error"]
+    # The server log carries the class of the exception, not its text (AUTOPWN-SA-2026-024).
+    assert "update failed (OSError)" in caplog.text
+    assert "private path" not in caplog.text and "Traceback" not in caplog.text
+
+
+def test_update_that_cannot_start_logs_the_class_of_the_exception_only(web, monkeypatch, caplog):
+    wu, client = web
+    monkeypatch.setattr(wu.threading, "Thread", MagicMock(side_effect=RuntimeError("private path details")))
+    with caplog.at_level("DEBUG"):
+        response = client.post("/api/vulnerability-database/update")
+    assert response.status_code == 500 and response.json["code"] == "db_update_start_failed"
+    assert not wu._database_update["running"]
+    assert "Could not start vulnerability database update (RuntimeError)" in caplog.text
+    assert "private path" not in caplog.text and "Traceback" not in caplog.text
 
 
 def test_update_blocked_by_a_running_scan_asks_to_stop_scans_not_to_check_the_connection(web, monkeypatch):
@@ -574,6 +590,30 @@ def test_dashboard_offline_toggle_persists_and_blocks_remote_actions(web, monkey
     threads.assert_not_called()
     assert client.put("/api/settings", json={"offline_mode": False}).status_code == 200
     assert not client.get("/api/vulnerability-database").json["offline_only"]
+
+
+def test_an_unreadable_settings_file_starts_offline(web):
+    """AUTOPWN-SA-2026-022: the file may have had offline mode on, so remote actions stay blocked."""
+    wu, client = web
+    wu._SETTINGS_FILE.write_text('{"offline_mode": true, "webhook": "', encoding="utf-8")
+    wu._load_settings()
+    assert client.get("/api/settings").json["offline_mode"] is True
+    for route in ("/api/vulnerability-database/update", "/api/settings/test_email", "/api/settings/test_webhook"):
+        assert client.post(route).status_code == 409
+
+
+def test_saving_settings_never_changes_the_settings_a_running_request_holds(web):
+    """AUTOPWN-SA-2026-023: a save emptied the shared settings before refilling them, so a request reading them
+    in between saw offline mode off. A save must publish a new dictionary and leave the one readers hold intact."""
+    wu, client = web
+    assert client.put("/api/settings", json={"offline_mode": True}).status_code == 200
+    held = wu._settings
+    snapshot = deepcopy(held)
+    assert client.put("/api/settings", json={"update_auto_check": False}).status_code == 200
+    assert held == snapshot and held["offline_mode"] is True
+    assert wu._settings is not held
+    assert wu._settings["offline_mode"] is True and wu._settings["update_auto_check"] is False
+    assert wu._offline_enabled()
 
 
 def test_dashboard_toggle_overrides_manual_and_scheduled_scan_sources(web, local_database, monkeypatch):

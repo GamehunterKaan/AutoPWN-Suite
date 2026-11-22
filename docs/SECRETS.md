@@ -25,7 +25,9 @@ quarterly, on role changes, and immediately after a suspected compromise.
   for a genuine credential. Exclude local secrets from Docker build contexts.
 - Runtime NVD keys, SMTP passwords and webhook URLs are operator-owned secrets.
   The current dashboard stores values entered in its settings page in
-  **unencrypted** `web_ui_settings.json`; CLI/daemon configuration and optional
+  **unencrypted** `web_ui_settings.json` (and, when that file cannot be loaded, in an
+  owner-only (mode `0600` on POSIX) copy `web_ui_settings.json.corrupt-<UTC timestamp>` beside it, which the
+  dashboard never deletes); CLI/daemon configuration and optional
   `api.txt` are also plaintext. `--create-config` and `--daemon-install` create the
   INI file with mode `0600`, and the daemon installer creates the installed
   `/opt/autopwn-suite/autopwn-daemon.conf` owner-only from its first byte too,

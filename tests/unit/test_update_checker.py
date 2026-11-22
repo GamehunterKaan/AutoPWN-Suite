@@ -1044,7 +1044,7 @@ def test_verify_release_source_pins_the_expected_identity(monkeypatch):
     assert captured["identity"] == (
         "https://github.com/GamehunterKaan/AutoPWN-Suite/.github/workflows/publish-docker.yml@refs/heads/main"
     )
-    assert "token.actions.githubusercontent.com" in captured["issuer"]
+    assert captured["issuer"] == "https://token.actions.githubusercontent.com"
 
 
 def test_trust_root_failure_is_an_update_error(monkeypatch):

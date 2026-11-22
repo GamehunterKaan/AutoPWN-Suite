@@ -356,3 +356,98 @@ def test_a_failed_web_check_or_scan_logs_and_records_the_class_of_the_exception_
         assert record["status"] == "error" and record["error"] == label
         assert [event["msg"] for event in events if event.get("level") == "error"] == [f"[-] {label}."]
         assert "ZQ1" not in json.dumps(record) + str(events)
+
+
+# The text of an exception can quote Nmap's stderr, a file path, a host name or a URL (AUTOPWN-SA-2026-024).
+EXCEPTION_TEXT = "secret-marker /etc/x"
+
+
+def logged_lines(client, caplog):
+    """The log lines that reach the browser (`/api/log`, also the SSE history), after checking that neither they nor
+    the server log carry the exception's text or a traceback."""
+    lines = [event["msg"] for event in client.get("/api/log").get_json()]
+    for text in (json.dumps(lines), caplog.text):
+        assert "secret-marker" not in text and "/etc/x" not in text and "Traceback" not in text
+    return lines
+
+
+@pytest.mark.unit
+def test_a_failed_host_discovery_logs_the_class_of_the_exception_only(dashboard, caplog):
+    wu, client = dashboard
+    job = wu.ScanJob("discovery", "192.0.2.0/30", {"target": "192.0.2.0/30", "scan_ports": False, "scan_vulns": False})
+    with patch("shutil.which", return_value="nmap"), patch("autopwn_suite.scanner.DiscoverHosts", side_effect=RuntimeError(EXCEPTION_TEXT)), \
+         patch.object(wu, "_notify"), caplog.at_level("DEBUG"):
+        wu._run_scan(job)
+    assert "[-] Host discovery failed (RuntimeError)." in logged_lines(client, caplog)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("error", [RuntimeError(EXCEPTION_TEXT), SystemExit(EXCEPTION_TEXT)])
+def test_a_failed_port_scan_logs_the_class_of_the_exception_only(dashboard, caplog, error):
+    wu, client = dashboard
+    job = wu.ScanJob("ports", "192.0.2.1", {"target": "192.0.2.1", "skip_discovery": True, "scan_vulns": False})
+    with patch("shutil.which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", side_effect=error), \
+         patch.object(wu, "_notify"), caplog.at_level("DEBUG"):
+        wu._run_scan(job)
+    assert job.status == "partial"
+    assert f"[-] Port scan failed for 192.0.2.1 ({type(error).__name__})." in logged_lines(client, caplog)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("source,shown", [
+    ("online", "lookup failed (RuntimeError)."),
+    # Without a local database to fall back on, the error is the database's own fixed text, which says what to do.
+    ("auto", "NVD lookup failed and no local vulnerability database is available."),
+])
+def test_a_failed_vulnerability_lookup_logs_the_class_of_the_exception_only(dashboard, caplog, source, shown):
+    wu, client = dashboard
+    nm = MagicMock()
+    nm.all_hosts.return_value = ["192.0.2.1"]
+    nm.__getitem__.return_value = {"addresses": {}, "tcp": {80: {"state": "open", "name": "http", "product": "nginx", "version": "1.0"}}}
+    job = wu.ScanJob("lookup", "192.0.2.1", {"target": "192.0.2.1", "skip_discovery": True, "vulnerability_source": source})
+    with patch("shutil.which", return_value="nmap"), patch("autopwn_suite.scanner.PortScan", return_value=nm), \
+         patch("autopwn_suite.nist_search.searchCVE", side_effect=RuntimeError(EXCEPTION_TEXT)), \
+         patch.object(wu, "_notify"), caplog.at_level("DEBUG"):
+        wu._run_scan(job)
+    assert job.status == "partial"
+    failures = [line for line in logged_lines(client, caplog) if line.startswith("[-] CVE search error")]
+    assert failures and all(shown in line for line in failures)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("failing,shown,logged", [
+    ("_launch_scan", "[!] Scheduled scan skipped (Site): unexpected error (RuntimeError).", "Scheduled scan failed (RuntimeError)"),
+    # The scan is already running when saving its last run fails, so it was not skipped.
+    ("_save_schedules", "[!] Scheduled scan started (Site), but saving the schedule failed (RuntimeError).",
+     "Scheduled scan started, but saving the schedule failed (RuntimeError)"),
+])
+def test_a_failed_scheduled_scan_logs_the_class_of_the_exception_only(dashboard, caplog, failing, shown, logged):
+    wu, client = dashboard
+    schedule = {"id": "sched-0001", "name": "Site", "target": "192.0.2.10", "profile_id": "profile", "enabled": True}
+    wu._schedules.clear()
+    wu._schedules[schedule["id"]] = dict(schedule)
+    wu._profiles["profile"] = {"config": {}}
+    class Stop(Exception):
+        pass
+    failure = {failing: {"side_effect": RuntimeError(EXCEPTION_TEXT)}}
+    with patch.object(wu.time, "sleep", side_effect=[None, Stop]), patch.object(wu, "_should_fire", return_value=True), \
+         patch.object(wu, "_previous_run_active", return_value=False), patch.object(wu, "_schedule_data", return_value=schedule), \
+         patch.object(wu, "_launch_scan", **failure.get("_launch_scan", {"return_value": MagicMock(id="job")})) as launch, \
+         patch.object(wu, "_save_schedules", **failure.get("_save_schedules", {})), caplog.at_level("DEBUG"), pytest.raises(Stop):
+        wu._scheduler_loop()
+    launch.assert_called_once()
+    assert shown in logged_lines(client, caplog)
+    assert logged in caplog.text
+
+
+@pytest.mark.unit
+def test_a_failed_update_hold_check_logs_the_class_of_the_exception_only(dashboard, caplog):
+    wu, client = dashboard
+    class Stop(Exception):
+        pass
+    with patch.object(wu.time, "sleep", side_effect=[None, Stop]), \
+         patch.object(wu, "_scheduler_update_hold", side_effect=RuntimeError(EXCEPTION_TEXT)), \
+         caplog.at_level("DEBUG"), pytest.raises(Stop):
+        wu._scheduler_loop()
+    logged_lines(client, caplog)
+    assert "Could not check whether an update holds scheduled scans (RuntimeError)" in caplog.text

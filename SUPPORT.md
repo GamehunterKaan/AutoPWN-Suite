@@ -12,8 +12,8 @@ The PyPI package and source installations need Python 3.11.5 or newer. Python 3.
 which reached upstream end of life in October 2026, is no longer supported. The Docker
 image and the standalone binaries bundle their own interpreter.
 
-As of 2026-11-15, **v2.9.1** is the supported stable release. **All versions below
-2.9.1 are end of life** and no longer receive security updates. The maintainer
+As of 2026-11-22, **v2.9.2** is the supported stable release. **All versions below
+2.9.2 are end of life** and no longer receive security updates. The maintainer
 updates this statement with every stable release and identifies superseded
 versions in its release notes. A mutable Docker `latest` alias is not a version:
 record the release version and digest before reporting a problem.

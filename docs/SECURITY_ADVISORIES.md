@@ -643,7 +643,7 @@ release that contains it.
   `xss.py`, `boolean_sqli.py`, `additional.py`, `probes.py`, `dirbust.py`, `http.py`
   and `tls.py`.
 - Fix in v2.7.0: web scan diagnostics now redact by position, not by parameter name, and no character inside a URL can cut the redaction short. Two functions in `autopwn_suite/web/runtime.py` do it. `redact_target` takes a string that is known to be one target as typed (what a dashboard record, answer, notification, report file name or the CLI summary echoes) and walks the whole string with no tokenizing, so an apostrophe, a quote, an angle bracket, a space or a Unicode space (U+00A0, U+2028, U+3000) inside a query value or the userinfo cannot end the URL early and leave the rest of the query visible (an earlier form of this fix split free text at those characters and printed `?q=REDACTED'Brien&token=SECRET` for `?q=O'Brien&token=SECRET`). `redact_text` redacts the URLs inside free text such as log lines and coverage notes: a URL starts at its scheme (or at a word that holds `?`, `@` or `#`) and runs to the next space, tab or line break, and only the sentence punctuation behind it (`.`, `,`, `;`, `:`, `)`) and the quote or bracket that closes one opened in front of it stay out of the redacted part. Both replace every query value with `REDACTED` whatever the parameter is called (`?id=REDACTED&x=REDACTED`; the names stay), drop the userinfo and the fragment (an access token of a redirect-based sign-in lives there), and replace the value of a `;name=value` path parameter (`;jsessionid=...`). They read a scheme in any case (`HTTP://`, `HtTpS://`) and also a target typed without a scheme: `host:8080?x=y`, `host/app?x=y`, `[::1]:80/?x=y`, `user:pw@host` and `//user:pw@host`. A query part without `=` is replaced whole in a URL and in every target that `redact_target` echoes (`host/verify?3f9a7c` becomes `host/verify?REDACTED`); in free text it is kept in a word without a scheme (`what?`) so that prose stays readable. The walk is plain string work, does not raise, and ran in linear time on 1 MB inputs. Every web log line (`ScanLog.logger`) and coverage issue (`ScanContext.issue`) goes through `redact_text`; the two messages that quote the target as typed ("No reachable in-scope web endpoint on <target>." and "<target> presented a certificate that could not be verified ...") redact it with `redact_target` before the text is built, and so does the console line "Testing web application on <url> ..." in `webvuln`, which was printed to the recording console without redaction. The target a dashboard shows or exports is redacted as one string by `redact_target`: `ScanJob.to_dict` (`target` and `config.target`, hence the scan status JSON, the scan history, the downloaded JSON report and the printable report), the web coverage `endpoint` and `target`, a finding's `endpoint` and the target of its reproduction plan (a replay reads only the origin of that field), the webhook event `target`, the email subject, report and command line (`ScanJob.public_target`), the "Scheduled scan fired" log line and the answer to `POST /api/scan/start`; the CLI prints its parameter summary ("Target : ...") and builds a generated report file name from the redacted target as well. Redaction changes only what is displayed and exported: `ScanJob.target`, `config["target"]` and the endpoint passed to `webvuln` stay as typed, and tests show that a scan runs with, and Resume reaches again, the typed URL. The dashboard also stopped writing exception text where a request error can quote a URL with its query: the web check and evidence verification handlers log the class of the exception only (`Web application check failed (RuntimeError)`), and a failed scan records `Unexpected error (<class>)` or `Scan aborted (<class>)` in the job log and in `job.error`, which the status JSON, the webhook and the email carry. Findings keep redacting by parameter name (`redact_url`), because a PoC replays the other values and `validate_plan` rejects a request that still holds `REDACTED`; the name list was extended (`pwd`, `otp`, `totp`, `hotp`, `sig`, `sid`, `sessid`, `key`, `code`, `pw`, `ticket`, `nonce`, `verifier`, `SAMLResponse`, `RelayState`, `api`/`access`/`private`/`app`/`client`/`license` keys, `bearer`, `credential`, `cred`, `cookie`, `hmac`, `xsrf` and the verification codes such as `reset_code` and `mfa_code`), with whole-word rules so that `sort_key`, `monkey`, `keyword`, `design`, `credit`, `country_code`, `zipcode` and `tickets` still replay (`key` and `code` count only as the whole name), and the narrowing that keeps `author`, `bypass`, `passage` and `passenger` readable stays. `;` now ends a query pair as well as `&`, a URL without a credential value is returned byte for byte instead of re-encoded, a finding's evidence text is redacted by name (the directory-discovery "redirect to" evidence quoted a raw `Location` header), and the standalone copy in `autopwn_suite/web/poc_runtime.py` carries the same pattern and algorithm (a test pins both). Regression: `tests/unit/test_web_webvuln.py` (`test_a_quote_an_angle_bracket_or_a_unicode_space_inside_a_url_does_not_cut_the_redaction_short`, `test_a_target_is_redacted_as_one_string_with_no_tokenizing`, `test_a_breaker_character_in_the_target_leaves_no_later_value_in_the_banner_the_log_and_the_summary`, `test_a_breaker_character_in_the_typed_target_leaves_no_later_value_in_the_unreachable_messages`, `test_the_announcement_line_of_a_web_scan_does_not_carry_query_secrets`, `test_the_target_as_typed_is_redacted_in_the_unreachable_and_certificate_messages`, `test_redact_text_hides_every_query_value_userinfo_and_fragment_of_a_target` and the updated `test_probe_log_lines_and_coverage_issues_do_not_carry_query_secrets` and `test_redact_text_hides_query_secrets_in_every_url_of_a_message`), `tests/unit/test_web_dashboard.py` (`test_scan_record_exports_show_a_redacted_target_and_the_scan_keeps_the_one_typed`, `test_a_breaker_character_in_the_typed_target_leaves_no_later_value_in_a_record_an_answer_or_a_notification`, `test_starting_a_web_scan_answers_with_a_redacted_target_and_launches_the_one_typed`, `test_finding_and_coverage_endpoints_hide_every_value_of_the_target`, `test_notifications_carry_the_redacted_target`, `test_the_scheduler_log_line_hides_the_target_it_fired_and_launches_the_one_stored`, `test_a_failed_web_check_or_scan_logs_and_records_the_class_of_the_exception_only`), `tests/unit/test_utils.py` (`test_param_print_redacts_the_target_it_echoes`, `test_a_breaker_character_in_a_typed_target_leaves_no_later_value_in_the_summary_and_the_report_name`, `test_a_generated_report_name_does_not_carry_the_query_values_of_a_url_target`), `tests/unit/test_web_poc.py` (the extended `test_only_credential_parameters_are_redacted_from_urls`, `test_redacting_a_url_keeps_everything_but_the_credential_values`, `test_finding_replays_every_parameter_that_is_not_a_credential_name`, `test_scanner_and_standalone_poc_redact_alike`) and `tests/unit/test_web_dirbust.py` (`test_a_redirect_in_the_evidence_of_a_finding_hides_credential_values`); they fail on the code before the fix (94 test cases of these files, run with only the new function name aliased to the old one so that they execute). The seeded fuzz test `test_redact_text_never_raises_and_leaves_no_value_of_a_diagnostic_target` in `tests/unit/test_fuzz_inputs.py` feeds 3000 random URL-like strings (random scheme case, userinfo, host, path parameters, `&` and `;` queries, bare query parts, credential and ordinary names, fragments) whose values hold apostrophes, quotes, angle brackets, U+00A0, U+2028 and U+3000 between serial-numbered chunks (and, for a whole target, spaces and tabs), once as a message and once as a target, and checks that nothing raises, that no chunk of any value is left, that the result is idempotent, and that the finding form leaves no chunk of a credential-named value, no userinfo and no fragment; 3000 URLs with a random hostile run in front of a credential parameter check that the credential is hidden, and 3000 arbitrary strings check that the scanner and the downloaded PoC redact a URL alike.
-- Limits: a finding still redacts by parameter name only, because its URL must stay replayable. A secret in a parameter whose name is not on the list (`ref`, `s`, `id` or any name the application chose), in the URL path, in a `;name=value` path parameter, in a query part without `=`, or nested inside the value of another parameter (`redirect_uri=https%3A%2F%2Fapp%2Fcb%3Fcode%3Dabc`, `next=http://h/?token=abc`: only the outer name is read) is shown in a finding's `url`, in its recorded requests and in the finding line that the CLI prints (and so in the CLI's saved and emailed reports), and a name that is on the list hides a value a replay would need, so such a PoC must be restored by hand. Diagnostics redact every query value but not the URL path: a secret in a path segment (`/reset/<token>`) is shown. A log line, coverage note or finding evidence ends a URL at the next space, tab or line break, so a raw space inside a URL cuts it there and the part after the space is not recognized; a link in a page is written with `%20` when the scan reads it (`resolve_url`, which is what a browser and the HTTP client send), so this needs a URL typed with a space or a redirect target or `Location` value that carries one; a Unicode space does not end a URL in free text, so the prose after a no-break space is redacted with it. A password with an unescaped `/`, `?` or `#` in the userinfo of a URL is cut where a URL parser cuts it, so the part before that character stays visible. In free text a target typed without a scheme is parsed only when its word shows a `?`, an `@` or a `#`, and a `//` that follows a prefix (`target=//user@host`) is not read as a network-path reference; the targets that the dashboard and the CLI echo go through `redact_target`, which reads the whole string as a target, and the messages that quote the typed target redact it before building the text. Not changed: the Nmap-stage console lines of the CLI ("Scanning <target> ...", "Target <target> seems to be offline", "Portscan results for <target>") print the typed target as given (an Nmap target cannot carry a query, so a URL there is an operator error); saved schedules and profiles store and display the target as typed, because the edit form fills it in; and the job log lines of the network-scan paths of the dashboard ("Port scan failed for <host>: ...", "Host discovery failed: ...", "CVE search error (...)") still carry exception text, because those targets are hosts and ranges and cannot hold a query. The dashboard's web check and evidence verification handlers, and its scan-failure handlers (job log and `job.error`), no longer write exception text (the class only). Rotate a credential that appeared in a log, report or export of an earlier version.
+- Limits: a finding still redacts by parameter name only, because its URL must stay replayable. A secret in a parameter whose name is not on the list (`ref`, `s`, `id` or any name the application chose), in the URL path, in a `;name=value` path parameter, in a query part without `=`, or nested inside the value of another parameter (`redirect_uri=https%3A%2F%2Fapp%2Fcb%3Fcode%3Dabc`, `next=http://h/?token=abc`: only the outer name is read) is shown in a finding's `url`, in its recorded requests and in the finding line that the CLI prints (and so in the CLI's saved and emailed reports), and a name that is on the list hides a value a replay would need, so such a PoC must be restored by hand. Diagnostics redact every query value but not the URL path: a secret in a path segment (`/reset/<token>`) is shown. A log line, coverage note or finding evidence ends a URL at the next space, tab or line break, so a raw space inside a URL cuts it there and the part after the space is not recognized; a link in a page is written with `%20` when the scan reads it (`resolve_url`, which is what a browser and the HTTP client send), so this needs a URL typed with a space or a redirect target or `Location` value that carries one; a Unicode space does not end a URL in free text, so the prose after a no-break space is redacted with it. A password with an unescaped `/`, `?` or `#` in the userinfo of a URL is cut where a URL parser cuts it, so the part before that character stays visible. In free text a target typed without a scheme is parsed only when its word shows a `?`, an `@` or a `#`, and a `//` that follows a prefix (`target=//user@host`) is not read as a network-path reference; the targets that the dashboard and the CLI echo go through `redact_target`, which reads the whole string as a target, and the messages that quote the typed target redact it before building the text. Not changed: the Nmap-stage console lines of the CLI ("Scanning <target> ...", "Target <target> seems to be offline", "Portscan results for <target>") print the typed target as given (an Nmap target cannot carry a query, so a URL there is an operator error); saved schedules and profiles store and display the target as typed, because the edit form fills it in; and the job log lines of the network-scan paths of the dashboard ("Port scan failed for <host>: ...", "Host discovery failed: ...", "CVE search error (...)") still carry exception text, because those targets are hosts and ranges and cannot hold a query (AUTOPWN-SA-2026-024 removes it). The dashboard's web check and evidence verification handlers, and its scan-failure handlers (job log and `job.error`), no longer write exception text (the class only). Rotate a credential that appeared in a log, report or export of an earlier version.
 - Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
 
 ## AUTOPWN-SA-2026-018 — Records of a copied vulnerability database are not validated
@@ -895,6 +895,157 @@ release that contains it.
   The first two tests fail on the previous code; the others exercise the new challenge
   format and are not evidence of the defect.
 - Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-022 — An unreadable dashboard settings file turns offline mode off, and the next save destroys it
+
+- Assessed affected version: **2.9.1**. The same loader is in the source of **2.5.0**,
+  which added the dashboard's offline mode, through 2.9.0; those releases were read, not
+  tested.
+- Status: **fixed in v2.9.2** (2026-11-22). Fixed released version: **2.9.2**.
+- CWE-636 (not failing securely); low. Nothing an attacker sends causes it: the
+  settings file has to exist and fail to load, after a hand edit, a disk or backup
+  fault, or a value of the wrong type. Someone who can write the data directory already
+  controls the dashboard's configuration.
+- Prerequisite: `web_ui_settings.json` exists but is not JSON, holds an `email` or
+  `webhook` value that is not an object, or holds an `offline_mode` or
+  `update_auto_check` value that is not a boolean.
+- Impact: `_load_settings` fell back to the default settings, in which `offline_mode`
+  is off. An operator who had switched offline mode on in Settings was put online,
+  and only the server log said why: the dashboard allowed online NVD lookups (which
+  receive the product names of detected services) for scans whose source is `auto` or
+  `online`, web checks and replay, the vulnerability database download, and update
+  checks to GitHub, automatic ones included because `update_auto_check` defaulted to
+  on. Notifications stayed off, because their settings fell back to the defaults too.
+  The server log said "Could not load settings; preserving the existing file", but the
+  next `PUT /api/settings`, from any change in Settings, replaced the file with the
+  defaults merged with that request, so the stored NVD key, SMTP password, webhook URL
+  and other settings were lost and no copy was kept. The log line was written with
+  `logging.exception`, so it carried a traceback and the exception text (a JSON parse
+  position, a fixed validation message or, for an unreadable file, the path),
+  contrary to the rule that logs carry fixed text; it carried no stored value.
+- Mitigation: on an affected version start the dashboard with `--web --offline`,
+  which keeps offline mode on whatever the settings file holds. When the log says
+  "Could not load settings", copy `web_ui_settings.json` elsewhere before saving
+  anything in Settings, then repair it by hand or enter the settings again.
+- Source: `_load_settings` in `autopwn_suite/web_ui.py` (`modules/web_ui.py` before 2.7.0).
+- Fix: a settings file that exists but cannot be loaded stays in place, and
+  `_set_aside(move=False)` keeps an owner-only copy beside it as
+  `web_ui_settings.json.corrupt-<UTC timestamp>` (one copy of an identical file, so
+  restarts add none). The dashboard starts with the default settings and offline mode
+  on, and logs fixed text naming the file and the copy, without the exception or a
+  traceback: "Could not load web_ui_settings.json; starting with offline mode on until
+  the settings are saved." Every start fails closed until the operator saves the
+  settings; turning offline mode off in Settings saves a valid file. A missing file
+  still starts with the defaults and offline mode off, and a valid file loads as
+  before. The stored NVD key, SMTP password and webhook URL are not loaded from the
+  unreadable file; they stay in the copy until entered again. Regression:
+  `tests/unit/test_web_ui.py::TestSettings::test_unreadable_file_fails_closed_and_is_kept_past_the_next_save`
+  (bad JSON, `email` not an object, non-boolean `offline_mode` and non-boolean
+  `update_auto_check`: offline mode is on after two starts, one copy holds the
+  original bytes and survives `PUT /api/settings`, and the log carries no exception
+  text or stored value), `test_missing_file_still_starts_online` and
+  `tests/unit/test_offline_scans.py::test_an_unreadable_settings_file_starts_offline`
+  (the database update and notification tests answer 409). The first and third fail
+  on the previous code.
+- Found during a review of `main` at f2235c3, after 2.9.1; it is not part of the
+  earlier assessments.
+
+## AUTOPWN-SA-2026-023 — Saving dashboard settings briefly exposes empty settings to running requests
+
+- Assessed affected versions: **2.5.0**, which introduced the dashboard offline mode and this
+  way of saving settings, through **2.9.1**. Earlier versions not assessed.
+- Status: **fixed in v2.9.2** (2026-11-22). Fixed released version: **2.9.2**.
+- CWE-362; low: the window is a few bytecodes long and has not been observed; the
+  regression test shows the in-place change, not a lost race.
+- Prerequisite: a signed-in operator saves settings (`PUT /api/settings`, any key) and, at
+  that moment, another thread reads a setting. The offline bypass also needs the dashboard's
+  offline mode to be on.
+- Impact: `api_settings_put` published a save by emptying the shared settings dictionary and
+  refilling it (`_settings.clear()`, then `_settings.update(...)`) under `_settings_lock`.
+  `_get_setting` takes that dictionary under the lock but reads its keys after releasing it,
+  so a read that ran after `clear()` and before `update()` saw no settings: offline mode
+  off, no notification configuration, no stored NVD key and no `update_auto_check`. CPython
+  switches threads between those two calls only when the saving thread's switch interval
+  expires exactly there, so a read rarely lands in the window. Where it does:
+  - A scan thread that starts in the window (a scheduled scan, or a manual start whose
+    request was also checked during a save) takes the job's own vulnerability source instead of the
+    forced offline one (`_run_scan`), so it runs as an online scan: online CVE lookups and
+    Nmap without `-n`. This breaks the offline-mode promise for that scan.
+  - A notification being delivered reads no email or webhook configuration and is skipped,
+    and a scan starting then runs without the stored NVD key. These fail closed.
+  - The gates that run under `_mode_lock`, which the save holds throughout, never saw the
+    window, in every affected release that has them: whether a notification may be sent
+    (`_notification_operation`, which each scan notification and the test email and webhook
+    routes pass through even when the earlier unlocked check in `_notify` misses), and
+    whether a PoC verification, an update check or apply, a database update or a resume
+    may start. A dashboard started with `--web --offline` and jobs whose own source is
+    offline do not depend on the setting and were not affected.
+- Mitigation: none is needed once the fix is installed. Before that, change dashboard
+  settings while no scan runs or is scheduled to start, or start the dashboard with
+  `--web --offline` where online access must never happen.
+- Source: `api_settings_put` and `_get_setting` in `autopwn_suite/web_ui.py`
+  (`modules/web_ui.py` before the package move).
+- Fix: `api_settings_put` publishes copy-on-write. It builds the merged settings as a new
+  dictionary, writes it to disk and then rebinds the module's `_settings` to it under
+  `_settings_lock`; the dictionary a reader already holds never changes, so a reader sees
+  either the old settings or the new ones. No other package code changes the published
+  dictionary in place (`_load_settings` already rebinds). Regression:
+  `tests/unit/test_offline_scans.py::test_saving_settings_never_changes_the_settings_a_running_request_holds`
+  (it fails on the previous code, where the dictionary a reader holds changes during a save).
+- Found during a review of `main` at `f2235c3` after release 2.9.1; it is not part of the
+  2.7.0 review or the 2026-10-15 assessment.
+
+## AUTOPWN-SA-2026-024 — Dashboard scan and scheduler logs carry exception text
+
+- Assessed affected version: **2.9.1** (`f2235c3`). Earlier versions not assessed.
+- Status: **fixed in v2.9.2** (2026-11-22). Fixed released version: **2.9.2**.
+- CWE-209 and CWE-532; low: the text reaches only signed-in dashboard users and the
+  operator's server log, and it discloses details of the scan host, not credentials the
+  dashboard holds.
+- Prerequisite: a network scan, vulnerability lookup or scheduled scan fails with an
+  exception, and someone can read the dashboard's log (any signed-in user, through
+  `GET /api/log` and `GET /api/events`) or the server log.
+- Impact: the job log lines "Host discovery failed: ...", "Port scan failed for <host>:
+  ..." and "CVE search error (<keyword>): ..." quoted the exception's text, and so did
+  the scheduler's "Scheduled scan skipped (<name>): ..." line, which also wrote the
+  traceback with the exception's message to the server log. The vulnerability database
+  update, its start and the scheduler's own checks wrote tracebacks to the server log the
+  same way. That text can carry Nmap's standard error, file paths of the scan host, host
+  names, or a `requests` error that quotes the URL it sent. This broke the documented
+  rule that the job log, the job's `error` and the server log carry the class of an
+  exception, never its text (`docs/INTERFACES.md`). The web-check, evidence-verification
+  and scan-failure handlers already followed it (AUTOPWN-SA-2026-017).
+  Not changed:
+  - An error of the local vulnerability database (`DatabaseUnavailable`) is still shown as
+    its own text, because that text is fixed by the project and says what to do (for
+    example to download the database).
+  - A schedule disabled after a failed validation still shows the validator's message,
+    which is project text that names the field to fix (for an integer too long to
+    convert, Python's own message, which gives only digit counts).
+  - Settings that cannot be loaded are still logged with a traceback; that handler is not
+    changed here.
+  - The console output of the scanner and the CLI is not part of this advisory.
+- Mitigation: upgrade once a release contains the fix. Until then, limit who can sign in
+  to the dashboard and who can read its server log.
+- Source: `_run_scan`, `_collect_host_results`, `_scheduler_loop`,
+  `_update_vulnerability_database` and `api_update_vulnerability_database` in
+  `autopwn_suite/web_ui.py`.
+- Fix: these lines carry fixed text and the class of the exception
+  (`[-] Port scan failed for 192.0.2.1 (RuntimeError).`), and the server log uses
+  `logging.error` with the class instead of `logging.exception`. A scheduled scan that
+  started before saving its schedule failed is reported as started, no longer as
+  skipped. Regression: in `tests/unit/test_web_dashboard.py`,
+  `test_a_failed_host_discovery_logs_the_class_of_the_exception_only`,
+  `test_a_failed_port_scan_logs_the_class_of_the_exception_only`,
+  `test_a_failed_vulnerability_lookup_logs_the_class_of_the_exception_only`,
+  `test_a_failed_scheduled_scan_logs_the_class_of_the_exception_only` and
+  `test_a_failed_update_hold_check_logs_the_class_of_the_exception_only`, and in
+  `tests/unit/test_offline_scans.py`, `test_update_error_is_reported_and_not_left_running`
+  and `test_update_that_cannot_start_logs_the_class_of_the_exception_only`. Each makes the
+  mocked step raise an exception whose text carries a marker and checks that neither
+  `/api/log` (the SSE history) nor the captured server log contains it, and that the
+  class name appears; the new tests fail on the previous code.
+- Found during a review of `main` after release 2.9.1.
 
 ## Local fix validation — 2026-10-16
 
