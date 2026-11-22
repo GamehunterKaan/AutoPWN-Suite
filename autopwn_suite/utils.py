@@ -58,6 +58,27 @@ def _port(value) -> int:
     return port
 
 
+def _smtp_port(value) -> int:
+    try:
+        port = int(value)
+    except ValueError:
+        port = 0
+    if not 1 <= port <= 65535:
+        raise ArgumentTypeError(f"invalid port {value!r} (-rpesp/--report-email-server-port): use a number from 1 to 65535")
+    return port
+
+
+def _seconds(value) -> int:
+    """Non-negative whole seconds: the range the config loader already enforces for these settings."""
+    try:
+        seconds = int(value)
+    except ValueError:
+        seconds = -1
+    if seconds < 0:
+        raise ArgumentTypeError(f"invalid duration {value!r}: use a whole number of seconds, 0 or more")
+    return seconds
+
+
 def cli():
     argparser = ArgumentParser(
         description=_(
@@ -224,7 +245,7 @@ def cli():
         "--host-timeout",
         help=_("Timeout for every host. (Default :240)"),
         default=240,
-        type=int,
+        type=_seconds,
         required=False,
     )
     scanargs.add_argument(
@@ -252,7 +273,7 @@ def cli():
         "--noise-timeout",
         help=_("Noise mode timeout."),
         default=None,
-        type=int,
+        type=_seconds,
         required=False,
         metavar="TIMEOUT",
     )
@@ -349,7 +370,7 @@ def cli():
         "-rpesp",
         "--report-email-server-port",
         help=_("Port of the email server."),
-        type=int,
+        type=_smtp_port,
         required=False,
         default=None,
         metavar="PORT",

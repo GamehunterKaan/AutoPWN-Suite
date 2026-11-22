@@ -5,6 +5,22 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
+## [Unreleased]
+
+### Functional changes
+
+- `-nt/--noise-timeout`, `-ht/--host-timeout` and `-rpesp/--report-email-server-port` reject an
+  out-of-range value on the command line instead of failing later. The config loader already
+  refused a negative timeout and a port outside 1–65535; the command line parsed them as plain
+  integers, so `-m noise -nt -5` started the noise processes and then raised `ValueError` from
+  `sleep()`, and `-rpesp 0` was only rejected when the report was sent. Each value is now a usage
+  error (exit status 2) where it is typed.
+
+### Security changes
+
+- No security impact. This is an operator-facing input check on values the operator supplies; the
+  rejected values are the ones the INI path already refused, and no new input reaches the scanner.
+
 ## [2.9.2] - 2026-11-22
 
 ### Functional changes

@@ -35,7 +35,7 @@ from autopwn_suite.logger import markup_safe
 from autopwn_suite.nist_search import Vulnerability
 from autopwn_suite.nmap_backend import parse_nmap_xml
 from autopwn_suite.searchvuln import FindVulnerabilities, GenerateKeyword
-from autopwn_suite.utils import _port, _report_name
+from autopwn_suite.utils import _port, _report_name, _seconds, _smtp_port
 from autopwn_suite.vulnerability_categories import CATEGORIES, categorize, find_weaknesses
 from autopwn_suite.vulnerability_db import SCHEMA_VERSION, DatabaseUnavailable, OfflineDatabase
 from autopwn_suite.web.options import normalize_options
@@ -201,6 +201,24 @@ def test_web_port_validator_only_raises_its_documented_error():
             rejected += 1
             continue
         assert isinstance(port, int) and 1 <= port <= 65535
+        accepted += 1
+    assert accepted and rejected  # the corpus exercises both outcomes
+
+
+@pytest.mark.parametrize("validator,low,high", [(_smtp_port, 1, 65535), (_seconds, 0, None)])
+def test_the_new_cli_range_validators_only_raise_their_documented_error(validator, low, high):
+    """A negative duration or an impossible port must be a usage error, not a late traceback."""
+    rng = random.Random(SEED + 43)
+    alphabet = string.digits * 3 + string.printable + "\u0663\u00e9\u0000"
+    accepted = rejected = 0
+    for _ in range(3000):
+        text = str(rng.randint(-5, 70000)) if rng.random() < .5 else "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 8)))
+        try:
+            value = validator(text)
+        except ArgumentTypeError:
+            rejected += 1
+            continue
+        assert isinstance(value, int) and value >= low and (high is None or value <= high)
         accepted += 1
     assert accepted and rejected  # the corpus exercises both outcomes
 

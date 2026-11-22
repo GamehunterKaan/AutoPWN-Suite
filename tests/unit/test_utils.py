@@ -207,6 +207,50 @@ class TestWebPortOption:
 
 
 @pytest.mark.unit
+class TestCommandLineRangeChecks:
+    """Command-line values are rejected where the config loader rejects them, instead of failing later."""
+
+    def parse(self, *argv):
+        from autopwn_suite.utils import cli
+        with patch("sys.argv", ["autopwn.py", *argv]):
+            return cli()
+
+    @pytest.mark.parametrize("option", ["-nt", "--noise-timeout"])
+    @pytest.mark.parametrize("value", ["-5", "-1", "abc", "1.5", ""])
+    def test_a_noise_timeout_that_is_not_whole_seconds_is_a_usage_error(self, option, value, capsys):
+        with pytest.raises(SystemExit) as exit_:
+            self.parse(option, value)
+        assert exit_.value.code == 2
+        assert "noise-timeout" in capsys.readouterr().err
+
+    @pytest.mark.parametrize("option", ["-ht", "--host-timeout"])
+    @pytest.mark.parametrize("value", ["-5", "-240", "abc", ""])
+    def test_a_negative_host_timeout_is_a_usage_error(self, option, value, capsys):
+        with pytest.raises(SystemExit) as exit_:
+            self.parse(option, value)
+        assert exit_.value.code == 2
+        assert "host-timeout" in capsys.readouterr().err
+
+    @pytest.mark.parametrize("option", ["-rpesp", "--report-email-server-port"])
+    @pytest.mark.parametrize("value", ["0", "-1", "65536", "99999", "abc", ""])
+    def test_an_out_of_range_smtp_port_is_a_usage_error(self, option, value, capsys):
+        with pytest.raises(SystemExit) as exit_:
+            self.parse(option, value)
+        assert exit_.value.code == 2
+        assert "report-email-server-port" in capsys.readouterr().err
+
+    def test_whole_second_and_port_values_still_parse(self):
+        args = self.parse("-nt", "30", "-ht", "0", "-rpesp", "587")
+        assert (args.noise_timeout, args.host_timeout, args.report_email_server_port) == (30, 0, 587)
+        args = self.parse("-nt", "0", "-rpesp", "465")
+        assert (args.noise_timeout, args.report_email_server_port) == (0, 465)
+
+    def test_the_defaults_are_unchanged(self):
+        args = self.parse()
+        assert (args.noise_timeout, args.host_timeout, args.report_email_server_port) == (None, 240, None)
+
+
+@pytest.mark.unit
 class TestInitArgsConf:
     """Tests for the InitArgsConf function."""
 
