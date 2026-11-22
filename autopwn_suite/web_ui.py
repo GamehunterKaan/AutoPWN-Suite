@@ -424,7 +424,12 @@ def _load_settings() -> None:
                 _settings = merged
             return
         except (OSError, ValueError, TypeError, RecursionError):
-            logging.exception("Could not load settings; preserving the existing file")
+            # Fail closed: the unreadable file may have had offline mode on. Fixed text, no exception message.
+            logging.error("Could not load %s; starting with offline mode on until the settings are saved. %s",
+                          _SETTINGS_FILE.name, _set_aside(_SETTINGS_FILE, move=False))
+            with _settings_lock:
+                _settings = _deep_merge(_DEFAULT_SETTINGS, {"offline_mode": True})
+            return
     with _settings_lock:
         _settings = _deep_merge(_DEFAULT_SETTINGS, {})
     if not _SETTINGS_FILE.exists():

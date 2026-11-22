@@ -233,7 +233,12 @@ Redaction: a web scan shows a URL in two ways. In a finding (`url`, `evidence`, 
 ### Settings and schedules
 
 Settings contain `nist_api_key`, boolean `offline_mode`, and `email`/`webhook`
-objects. Since v2.6.1, `AUTOPWN_NIST_API_KEY_FILE`,
+objects. A settings file that exists but cannot be loaded (it is not JSON, `email`
+or `webhook` is not an object, or `offline_mode` or `update_auto_check` is not a
+boolean) starts the dashboard with the default settings and offline mode on, so an
+operator who had offline mode on is never put online; turning offline mode off in
+Settings saves a valid file (since the release after 2.9.1; earlier releases started
+online). Since v2.6.1, `AUTOPWN_NIST_API_KEY_FILE`,
 `AUTOPWN_SMTP_PASSWORD_FILE` and `AUTOPWN_WEBHOOK_URL_FILE` override the
 corresponding stored values at use time and are never written to the settings
 file. Email keys are `enabled,smtp_host,smtp_port,username,password,from_addr,
@@ -293,7 +298,11 @@ log as a fixed-text warning with the schedule ID (no exception text).
   already kept does not add another). A file that parses but holds a profile or
   schedule that this release refuses (Nmap options saved by an earlier release, or
   a technique or ports outside the lists in the scan section) keeps every entry and is
-  copied the same way. The next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
+  copied the same way. A settings file that cannot be loaded stays in place and is
+  copied the same way (since the release after 2.9.1; earlier releases kept no copy, and
+  the next save replaced it), so every start fails closed until the settings are saved;
+  the stored NVD key, SMTP password and webhook URL are then empty until entered again
+  or restored from the copy. The next save never destroys the only copy. SQLite schema/readiness is versioned internally. Export before moving
   versions; never edit an active database directly.
 - Nmap receives argv and returns XML/progress. Online NVD receives the product
   names of detected services and the product names of their Nmap CPEs (`virtualMatchString=cpe:2.3:*:*:nginx`),

@@ -5,6 +5,21 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
+## [Unreleased]
+
+### Functional changes
+
+- A dashboard settings file that exists but cannot be loaded (not JSON, `email` or `webhook` not an object,
+  `offline_mode` or `update_auto_check` not a boolean) now starts the dashboard with offline mode on, keeps the file
+  in place and keeps a copy beside it as `web_ui_settings.json.corrupt-<UTC timestamp>`. Turning offline mode off in
+  Settings saves a valid file. A missing settings file still starts with offline mode off.
+
+### Security changes
+
+- AUTOPWN-SA-2026-022: an unreadable dashboard settings file no longer turns offline mode off, and the next save no
+  longer destroys the only copy of the stored NVD key, SMTP password and webhook URL. The server log line for such a
+  file is fixed text that names the kept copy, without the exception text or a traceback.
+
 ## [2.9.1] - 2026-11-15
 
 ### Functional changes

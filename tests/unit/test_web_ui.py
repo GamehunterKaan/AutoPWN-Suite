@@ -302,6 +302,42 @@ class TestSettings:
             for path in (wu._SETTINGS_FILE, wu._PROFILES_FILE, wu._SCHEDULES_FILE):
                 assert path.stat().st_mode & 0o777 == 0o600
 
+    @pytest.mark.parametrize("content", [
+        '{"nist_api_key": "SECRETKEY", "offline_mode": true,',  # truncated JSON
+        '{"nist_api_key": "SECRETKEY", "offline_mode": true, "email": []}',
+        '{"nist_api_key": "SECRETKEY", "offline_mode": "yes"}',
+        '{"nist_api_key": "SECRETKEY", "offline_mode": true, "update_auto_check": 0}',
+    ])
+    def test_unreadable_file_fails_closed_and_is_kept_past_the_next_save(self, client, wu, caplog, content):
+        """AUTOPWN-SA-2026-022: an unreadable file used to start online and the next save destroyed it."""
+        wu._SETTINGS_FILE.write_text(content, encoding="utf-8")
+        original = wu._SETTINGS_FILE.read_bytes()
+        with caplog.at_level(logging.DEBUG):
+            wu._load_settings()
+            wu._load_settings()  # a second start keeps failing closed and adds no copy
+        assert wu._offline_enabled()
+        assert wu._settings["nist_api_key"] == ""
+        assert wu._SETTINGS_FILE.read_bytes() == original
+        kept, = wu._DATA_DIR.glob(wu._SETTINGS_FILE.name + ".corrupt-*")
+        assert kept.read_bytes() == original
+        assert wu._SETTINGS_FILE.name in caplog.text and kept.name in caplog.text and "offline mode on" in caplog.text
+        assert all(record.exc_info is None for record in caplog.records)
+        logged = " ".join(record.getMessage() for record in caplog.records)
+        assert "Traceback" not in logged and "Error" not in logged and "SECRETKEY" not in logged
+        assert client.put("/api/settings", json={"language": "en"}).status_code == 200
+        assert json.loads(wu._SETTINGS_FILE.read_text(encoding="utf-8"))["offline_mode"] is True
+        assert kept.read_bytes() == original
+        assert client.put("/api/settings", json={"offline_mode": False}).status_code == 200
+        assert not wu._offline_enabled()
+        wu._load_settings()  # the saved file is valid again
+        assert not wu._offline_enabled() and kept.read_bytes() == original
+
+    def test_missing_file_still_starts_online(self, wu):
+        wu._load_settings()
+        assert not wu._offline_enabled()
+        assert json.loads(wu._SETTINGS_FILE.read_text(encoding="utf-8"))["offline_mode"] is False
+        assert not list(wu._DATA_DIR.glob("*.corrupt-*"))
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Files an earlier release wrote with the process umask (AUTOPWN-SA-2026-007)

@@ -576,6 +576,16 @@ def test_dashboard_offline_toggle_persists_and_blocks_remote_actions(web, monkey
     assert not client.get("/api/vulnerability-database").json["offline_only"]
 
 
+def test_an_unreadable_settings_file_starts_offline(web):
+    """AUTOPWN-SA-2026-022: the file may have had offline mode on, so remote actions stay blocked."""
+    wu, client = web
+    wu._SETTINGS_FILE.write_text('{"offline_mode": true, "webhook": "', encoding="utf-8")
+    wu._load_settings()
+    assert client.get("/api/settings").json["offline_mode"] is True
+    for route in ("/api/vulnerability-database/update", "/api/settings/test_email", "/api/settings/test_webhook"):
+        assert client.post(route).status_code == 409
+
+
 def test_dashboard_toggle_overrides_manual_and_scheduled_scan_sources(web, local_database, monkeypatch):
     wu, client = web
     monkeypatch.setattr(wu, "_VULNERABILITY_DB", local_database)

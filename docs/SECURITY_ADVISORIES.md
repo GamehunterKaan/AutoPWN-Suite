@@ -896,6 +896,61 @@ release that contains it.
   format and are not evidence of the defect.
 - Found during the 2.7.0 bug review; it is not part of the 2026-10-15 assessment.
 
+## AUTOPWN-SA-2026-022 — An unreadable dashboard settings file turns offline mode off, and the next save destroys it
+
+- Assessed affected version: **2.9.1**. The same loader is in the source of **2.5.0**,
+  which added the dashboard's offline mode, through 2.9.0; those releases were read, not
+  tested.
+- Status: **fixed on `main`, not yet released**; 2.9.1 remains affected. This entry
+  names the fixed release once it ships.
+- CWE-636 (not failing securely); low. Nothing an attacker sends causes it: the
+  settings file has to exist and fail to load, after a hand edit, a disk or backup
+  fault, or a value of the wrong type. Someone who can write the data directory already
+  controls the dashboard's configuration.
+- Prerequisite: `web_ui_settings.json` exists but is not JSON, holds an `email` or
+  `webhook` value that is not an object, or holds an `offline_mode` or
+  `update_auto_check` value that is not a boolean.
+- Impact: `_load_settings` fell back to the default settings, in which `offline_mode`
+  is off. An operator who had switched offline mode on in Settings was put online,
+  and only the server log said why: the dashboard allowed online NVD lookups (which
+  receive the product names of detected services) for scans whose source is `auto` or
+  `online`, web checks and replay, the vulnerability database download, and update
+  checks to GitHub, automatic ones included because `update_auto_check` defaulted to
+  on. Notifications stayed off, because their settings fell back to the defaults too.
+  The server log said "Could not load settings; preserving the existing file", but the
+  next `PUT /api/settings`, from any change in Settings, replaced the file with the
+  defaults merged with that request, so the stored NVD key, SMTP password, webhook URL
+  and other settings were lost and no copy was kept. The log line was written with
+  `logging.exception`, so it carried a traceback and the exception text (a JSON parse
+  position, a fixed validation message or, for an unreadable file, the path),
+  contrary to the rule that logs carry fixed text; it carried no stored value.
+- Mitigation: on an affected version start the dashboard with `--web --offline`,
+  which keeps offline mode on whatever the settings file holds. When the log says
+  "Could not load settings", copy `web_ui_settings.json` elsewhere before saving
+  anything in Settings, then repair it by hand or enter the settings again.
+- Source: `_load_settings` in `autopwn_suite/web_ui.py` (`modules/web_ui.py` before 2.7.0).
+- Fix: a settings file that exists but cannot be loaded stays in place, and
+  `_set_aside(move=False)` keeps an owner-only copy beside it as
+  `web_ui_settings.json.corrupt-<UTC timestamp>` (one copy of an identical file, so
+  restarts add none). The dashboard starts with the default settings and offline mode
+  on, and logs fixed text naming the file and the copy, without the exception or a
+  traceback: "Could not load web_ui_settings.json; starting with offline mode on until
+  the settings are saved." Every start fails closed until the operator saves the
+  settings; turning offline mode off in Settings saves a valid file. A missing file
+  still starts with the defaults and offline mode off, and a valid file loads as
+  before. The stored NVD key, SMTP password and webhook URL are not loaded from the
+  unreadable file; they stay in the copy until entered again. Regression:
+  `tests/unit/test_web_ui.py::TestSettings::test_unreadable_file_fails_closed_and_is_kept_past_the_next_save`
+  (bad JSON, `email` not an object, non-boolean `offline_mode` and non-boolean
+  `update_auto_check`: offline mode is on after two starts, one copy holds the
+  original bytes and survives `PUT /api/settings`, and the log carries no exception
+  text or stored value), `test_missing_file_still_starts_online` and
+  `tests/unit/test_offline_scans.py::test_an_unreadable_settings_file_starts_offline`
+  (the database update and notification tests answer 409). The first and third fail
+  on the previous code.
+- Found during a review of `main` at f2235c3, after 2.9.1; it is not part of the
+  earlier assessments.
+
 ## Local fix validation — 2026-10-16
 
 `python -m pytest -q --tb=short`: **986 passed, 2 platform-specific skips**.
