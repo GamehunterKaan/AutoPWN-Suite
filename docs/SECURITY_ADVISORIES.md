@@ -956,10 +956,11 @@ release that contains it.
 - Assessed affected versions: **2.5.0**, which introduced the dashboard offline mode and this
   way of saving settings, through **2.9.1**. Earlier versions not assessed.
 - Status: **fixed on `main`, not yet released.** No released version contains the fix.
-- CWE-362; low: the window is a few bytecodes long and has not been observed outside the
-  regression test, which shows the in-place change, not a lost race.
-- Prerequisite: a signed-in operator saves settings (`PUT /api/settings`, any key) while the
-  dashboard's offline mode is on and, at that moment, another thread reads a setting.
+- CWE-362; low: the window is a few bytecodes long and has not been observed; the
+  regression test shows the in-place change, not a lost race.
+- Prerequisite: a signed-in operator saves settings (`PUT /api/settings`, any key) and, at
+  that moment, another thread reads a setting. The offline bypass also needs the dashboard's
+  offline mode to be on.
 - Impact: `api_settings_put` published a save by emptying the shared settings dictionary and
   refilling it (`_settings.clear()`, then `_settings.update(...)`) under `_settings_lock`.
   `_get_setting` takes that dictionary under the lock but reads its keys after releasing it,
@@ -974,9 +975,11 @@ release that contains it.
   - A notification being delivered reads no email or webhook configuration and is skipped,
     and a scan starting then runs without the stored NVD key. These fail closed.
   - The gates that run under `_mode_lock`, which the save holds throughout, never saw the
-    window: whether a notification (`_notification_operation`, scan notifications and the
-    test email and webhook routes), an update check or apply, a database update or a resume
-    may run. A dashboard started with `--web --offline` and jobs whose own source is
+    window, in every affected release that has them: whether a notification may be sent
+    (`_notification_operation`, which each scan notification and the test email and webhook
+    routes pass through even when the earlier unlocked check in `_notify` misses), and
+    whether a PoC verification, an update check or apply, a database update or a resume
+    may start. A dashboard started with `--web --offline` and jobs whose own source is
     offline do not depend on the setting and were not affected.
 - Mitigation: none is needed once the fix is installed. Before that, change dashboard
   settings while no scan runs or is scheduled to start, or start the dashboard with

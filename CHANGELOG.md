@@ -24,7 +24,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   file is fixed text that names the kept copy, without the exception text or a traceback.
 - AUTOPWN-SA-2026-023: A scan that started while dashboard settings were being saved could read offline mode as
   off and run online CVE lookups and Nmap without `-n`, and a notification sent then could be skipped. The window
-  was a few bytecodes long and has not been observed outside the regression test; a dashboard started with
+  was a few bytecodes long and has not been observed (the regression test shows the in-place change, not a lost
+  race); a dashboard started with
   `--web --offline` was not affected. Affects 2.5.0 through 2.9.1.
 
 ## [2.9.1] - 2026-11-15
