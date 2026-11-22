@@ -84,7 +84,7 @@ from autopwn_suite.nist_search import VulnerabilityLookup
 from autopwn_suite.nmap_progress import ScanCancelled
 from autopwn_suite.paths import data_dir
 from autopwn_suite.text import printable
-from autopwn_suite.vulnerability_db import DatabaseInUse, database_path, database_status, update_database
+from autopwn_suite.vulnerability_db import DatabaseInUse, DatabaseUnavailable, database_path, database_status, update_database
 from autopwn_suite.web.options import CHECKS as WEB_CHECKS
 from autopwn_suite.web.options import normalize_options
 from autopwn_suite.web.runtime import redact_target
@@ -206,7 +206,7 @@ def _update_vulnerability_database():
     try:
         update_database(_VULNERABILITY_DB, _database_progress)
     except Exception as error:
-        logging.exception("Vulnerability database update failed; retaining the previous database")
+        logging.error("Vulnerability database update failed (%s); retaining the previous database", type(error).__name__)
         text = ("A running scan is using the database, or the file is read-only. Stop running scans, make it writable and update again; "
                 "the previous database is preserved." if isinstance(error, DatabaseInUse) else
                 "Download failed. Check your connection and available disk space; "
@@ -1496,7 +1496,7 @@ def _run_scan(job: ScanJob) -> None:
             except ScanCancelled:
                 raise
             except Exception as e:
-                _log(job, f"[-] Host discovery failed: {e}", "error")
+                _log(job, f"[-] Host discovery failed ({type(e).__name__}).", "error")
                 had_failures = True
                 hosts_found = [target] if isinstance(target, str) else list(target)
 
@@ -1537,14 +1537,14 @@ def _run_scan(job: ScanJob) -> None:
             except ScanCancelled:
                 raise
             except SystemExit as e:
-                _log(job, f"[-] Port scan failed for {host_ip}: {e}", "error")
+                _log(job, f"[-] Port scan failed for {host_ip} ({type(e).__name__}).", "error")
                 had_failures = True
                 job.get_or_create_host(host_ip)
                 job.mark_host_done(host_ip, "error")
                 job.complete_target()
                 continue
             except Exception as e:
-                _log(job, f"[-] Port scan failed for {host_ip}: {e}", "error")
+                _log(job, f"[-] Port scan failed for {host_ip} ({type(e).__name__}).", "error")
                 had_failures = True
                 job.get_or_create_host(host_ip)
                 job.mark_host_done(host_ip, "error")
@@ -1723,7 +1723,9 @@ def _collect_host_results(job, nm, ip, log, silent, scan_vulns, api_key, *, look
                 job._lookup_results[cache_key] = cves
         except Exception as exc:
             failed = True
-            _log(job, f"[-] CVE search error ({keyword}): {exc}", "error")
+            # The database's own errors are fixed text that says what to do; another exception's text can quote a URL.
+            detail = str(exc) if isinstance(exc, DatabaseUnavailable) else f"lookup failed ({type(exc).__name__})."
+            _log(job, f"[-] CVE search error ({keyword}): {detail}", "error")
             job.set_progress("vulnerabilities", f"Lookup failed: {keyword}", percent=100 * (lookup_index + 1) / len(tasks),
                              completed=lookup_index + 1, total=len(tasks))
             continue
@@ -2061,16 +2063,17 @@ def _scheduler_loop() -> None:
             with _schedules_lock:
                 all_schedules = [dict(value) if isinstance(value, dict) else value
                                  for value in _schedules.values()]
-        except Exception:
-            logging.exception("Could not read scheduled scans")
+        except Exception as exc:
+            logging.error("Could not read scheduled scans (%s)", type(exc).__name__)
             continue
 
         try:
             hold = _scheduler_update_hold()
-        except Exception:
-            logging.exception("Could not check whether an update holds scheduled scans")
+        except Exception as exc:
+            logging.error("Could not check whether an update holds scheduled scans (%s)", type(exc).__name__)
             hold = True
         for schedule in all_schedules:
+            launched = False
             try:
                 if not _should_fire(schedule):
                     continue
@@ -2104,6 +2107,7 @@ def _scheduler_loop() -> None:
                             job = _launch_scan(config)
                         except _UpdateHeld:
                             continue  # still due: an update started since the check above
+                        launched = True
                         _schedule_jobs[schedule["id"]] = job.id
                         now = datetime.now(timezone.utc)
                         with _schedule_last_run_lock:
@@ -2117,12 +2121,19 @@ def _scheduler_loop() -> None:
                 })
                 _save_schedules()
             except Exception as exc:
-                logging.exception("Scheduled scan failed")
+                # Fixed text and the class: the text of an exception can quote a path, a host or a URL.
+                error = type(exc).__name__
                 label = schedule.get("name") or schedule.get("id", "unknown") if isinstance(schedule, dict) else "unknown"
+                if launched:
+                    logging.error("Scheduled scan started, but saving the schedule failed (%s)", error)
+                    message = f"[!] Scheduled scan started ({label}), but saving the schedule failed ({error})."
+                else:
+                    logging.error("Scheduled scan failed (%s)", error)
+                    message = f"[!] Scheduled scan skipped ({label}): unexpected error ({error})."
                 _broadcast({
                     "scan_id": "", "level": "error",
                     "ts": datetime.now(timezone.utc).strftime("%H:%M:%S"),
-                    "msg": f"[!] Scheduled scan skipped ({label}): {exc}",
+                    "msg": message,
                 })
 
 
@@ -2380,10 +2391,10 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                 _database_update.update(running=True, message="Starting download", current=0, total=0, error=None)
             try:
                 threading.Thread(target=_update_vulnerability_database, daemon=True).start()
-            except Exception:
+            except Exception as exc:
                 with _database_update_lock:
                     _database_update["running"] = False
-                logging.exception("Could not start vulnerability database update")
+                logging.error("Could not start vulnerability database update (%s)", type(exc).__name__)
                 return jsonify({"error": "Could not start database update.", "code": "db_update_start_failed"}), 500
         return jsonify({"ok": True}), 202
 

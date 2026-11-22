@@ -16,6 +16,9 @@ existing release summaries; they do not retroactively claim artifact signing.
 - Saving dashboard settings replaces the settings that running requests and scans read with a new copy instead of
   emptying and refilling the shared one, so a request that reads a setting during a save gets either the old value
   or the new one.
+- The dashboard's host discovery, port scan and CVE lookup failure lines, and the scheduler's failure line, name the
+  class of the exception instead of quoting its text (`[-] Port scan failed for 192.0.2.1 (RuntimeError).`). A
+  scheduled scan that started before saving its schedule failed is reported as started, no longer as skipped.
 
 ### Security changes
 
@@ -27,6 +30,10 @@ existing release summaries; they do not retroactively claim artifact signing.
   was a few bytecodes long and has not been observed (the regression test shows the in-place change, not a lost
   race); a dashboard started with
   `--web --offline` was not affected. Affects 2.5.0 through 2.9.1.
+- The dashboard's job log (`/api/log`, the event stream) and its server log no longer carry exception text from host
+  discovery, port scans, CVE lookups, the scheduler or vulnerability database updates, which could quote Nmap's
+  standard error, file paths, host names or a URL; they carry fixed text and the exception class
+  (AUTOPWN-SA-2026-024).
 
 ## [2.9.1] - 2026-11-15
 
