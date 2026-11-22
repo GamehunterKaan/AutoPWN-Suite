@@ -951,6 +951,48 @@ release that contains it.
 - Found during a review of `main` at f2235c3, after 2.9.1; it is not part of the
   earlier assessments.
 
+## AUTOPWN-SA-2026-023 — Saving dashboard settings briefly exposes empty settings to running requests
+
+- Assessed affected versions: **2.5.0**, which introduced the dashboard offline mode and this
+  way of saving settings, through **2.9.1**. Earlier versions not assessed.
+- Status: **fixed on `main`, not yet released.** No released version contains the fix.
+- CWE-362; low: the window is a few bytecodes long and has not been observed outside the
+  regression test, which shows the in-place change, not a lost race.
+- Prerequisite: a signed-in operator saves settings (`PUT /api/settings`, any key) while the
+  dashboard's offline mode is on and, at that moment, another thread reads a setting.
+- Impact: `api_settings_put` published a save by emptying the shared settings dictionary and
+  refilling it (`_settings.clear()`, then `_settings.update(...)`) under `_settings_lock`.
+  `_get_setting` takes that dictionary under the lock but reads its keys after releasing it,
+  so a read that ran after `clear()` and before `update()` saw no settings: offline mode
+  off, no notification configuration, no stored NVD key and no `update_auto_check`. CPython
+  switches threads between those two calls only when the saving thread's switch interval
+  expires exactly there, so a read rarely lands in the window. Where it does:
+  - A scan thread that starts in the window (a scheduled scan, or a manual start whose
+    request was also checked during a save) takes the job's own vulnerability source instead of the
+    forced offline one (`_run_scan`), so it runs as an online scan: online CVE lookups and
+    Nmap without `-n`. This breaks the offline-mode promise for that scan.
+  - A notification being delivered reads no email or webhook configuration and is skipped,
+    and a scan starting then runs without the stored NVD key. These fail closed.
+  - The gates that run under `_mode_lock`, which the save holds throughout, never saw the
+    window: whether a notification (`_notification_operation`, scan notifications and the
+    test email and webhook routes), an update check or apply, a database update or a resume
+    may run. A dashboard started with `--web --offline` and jobs whose own source is
+    offline do not depend on the setting and were not affected.
+- Mitigation: none is needed once the fix is installed. Before that, change dashboard
+  settings while no scan runs or is scheduled to start, or start the dashboard with
+  `--web --offline` where online access must never happen.
+- Source: `api_settings_put` and `_get_setting` in `autopwn_suite/web_ui.py`
+  (`modules/web_ui.py` before the package move).
+- Fix: `api_settings_put` publishes copy-on-write. It builds the merged settings as a new
+  dictionary, writes it to disk and then rebinds the module's `_settings` to it under
+  `_settings_lock`; the dictionary a reader already holds never changes, so a reader sees
+  either the old settings or the new ones. No other package code changes the published
+  dictionary in place (`_load_settings` already rebinds). Regression:
+  `tests/unit/test_offline_scans.py::test_saving_settings_never_changes_the_settings_a_running_request_holds`
+  (it fails on the previous code, where the dictionary a reader holds changes during a save).
+- Found during a review of `main` at `f2235c3` after release 2.9.1; it is not part of the
+  2.7.0 review or the 2026-10-15 assessment.
+
 ## Local fix validation — 2026-10-16
 
 `python -m pytest -q --tb=short`: **986 passed, 2 platform-specific skips**.

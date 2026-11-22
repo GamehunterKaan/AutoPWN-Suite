@@ -13,12 +13,19 @@ existing release summaries; they do not retroactively claim artifact signing.
   `offline_mode` or `update_auto_check` not a boolean) now starts the dashboard with offline mode on, keeps the file
   in place and keeps a copy beside it as `web_ui_settings.json.corrupt-<UTC timestamp>`. Turning offline mode off in
   Settings saves a valid file. A missing settings file still starts with offline mode off.
+- Saving dashboard settings replaces the settings that running requests and scans read with a new copy instead of
+  emptying and refilling the shared one, so a request that reads a setting during a save gets either the old value
+  or the new one.
 
 ### Security changes
 
 - AUTOPWN-SA-2026-022: an unreadable dashboard settings file no longer turns offline mode off, and the next save no
   longer destroys the only copy of the stored NVD key, SMTP password and webhook URL. The server log line for such a
   file is fixed text that names the kept copy, without the exception text or a traceback.
+- AUTOPWN-SA-2026-023: A scan that started while dashboard settings were being saved could read offline mode as
+  off and run online CVE lookups and Nmap without `-n`, and a notification sent then could be skipped. The window
+  was a few bytecodes long and has not been observed outside the regression test; a dashboard started with
+  `--web --offline` was not affected. Affects 2.5.0 through 2.9.1.
 
 ## [2.9.1] - 2026-11-15
 

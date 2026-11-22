@@ -2546,6 +2546,7 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
 
     @app.route("/api/settings", methods=["PUT"])
     def api_settings_put():
+        global _settings
         body = request.get_json(force=True, silent=True) or {}
         if not isinstance(body, dict):
             return jsonify({"error": "Settings must be an object", "code": "invalid_settings_type"}), 400
@@ -2575,13 +2576,13 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
                        for job in _all_scans()):
                     return jsonify({"error": "Stop or finish active online scans before enabling offline mode.", "code": "offline_blocked_scans"}), 409
             with _settings_lock:
-                # Persist before publishing the new setting to running requests.
+                # Persist before publishing the new setting to running requests. Publish a new dictionary:
+                # readers walk the one they took after releasing the lock, so it must never change.
                 if body.get("email", {}).get("password") == "••••••••":
                     body["email"]["password"] = _settings.get("email", {}).get("password", "")
                 updated = _deep_merge(_settings, body)
                 _write_json(_SETTINGS_FILE, updated)
-                _settings.clear()
-                _settings.update(updated)
+                _settings = updated
         return jsonify({"ok": True})
 
     @app.route("/api/settings/test_email", methods=["POST"])

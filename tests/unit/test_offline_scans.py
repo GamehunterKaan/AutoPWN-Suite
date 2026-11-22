@@ -3,6 +3,7 @@
 """End-to-end scan orchestration using real local CVEs and mocked Nmap only."""
 import importlib
 import io
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -584,6 +585,20 @@ def test_an_unreadable_settings_file_starts_offline(web):
     assert client.get("/api/settings").json["offline_mode"] is True
     for route in ("/api/vulnerability-database/update", "/api/settings/test_email", "/api/settings/test_webhook"):
         assert client.post(route).status_code == 409
+
+
+def test_saving_settings_never_changes_the_settings_a_running_request_holds(web):
+    """AUTOPWN-SA-2026-023: a save emptied the shared settings before refilling them, so a request reading them
+    in between saw offline mode off. A save must publish a new dictionary and leave the one readers hold intact."""
+    wu, client = web
+    assert client.put("/api/settings", json={"offline_mode": True}).status_code == 200
+    held = wu._settings
+    snapshot = deepcopy(held)
+    assert client.put("/api/settings", json={"update_auto_check": False}).status_code == 200
+    assert held == snapshot and held["offline_mode"] is True
+    assert wu._settings is not held
+    assert wu._settings["offline_mode"] is True and wu._settings["update_auto_check"] is False
+    assert wu._offline_enabled()
 
 
 def test_dashboard_toggle_overrides_manual_and_scheduled_scan_sources(web, local_database, monkeypatch):
