@@ -16,6 +16,7 @@ from autopwn_suite.nist_search import VulnerabilityLookup
 from autopwn_suite.report import InitializeReport
 from autopwn_suite.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, ResolveScanHosts
 from autopwn_suite.searchvuln import SearchSploits
+from autopwn_suite.text import printable
 from autopwn_suite.update_checker import (
     UpdateCheckError,
     apply_update,
@@ -70,8 +71,11 @@ def StartScanning(
             NoiseScan(targetarg, log, console, scantype, args.noise_timeout)
 
     if not args.skip_discovery:
-        hosts = (DiscoverHosts(targetarg, console, scantype, scanmode, offline=True) if offline
-                 else DiscoverHosts(targetarg, console, scantype, scanmode))
+        try:
+            hosts = (DiscoverHosts(targetarg, console, scantype, scanmode, offline=True) if offline
+                     else DiscoverHosts(targetarg, console, scantype, scanmode))
+        except ValueError as exc:
+            raise SystemExit(_("Error: {error}").format(error=printable(str(exc), multiline=True))) from exc
         Targets = GetHostsToScan(hosts, console)
     else:
         Targets = targetarg if isinstance(targetarg, list) else [targetarg]
