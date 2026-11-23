@@ -48,6 +48,14 @@ def _tokens(value):
     raise TypeError("Nmap targets and arguments must be strings or lists of strings")
 
 
+def check_targets(hosts):
+    """The target tokens Nmap would get; ValueError for an unmatched quote or a target that is an Nmap option."""
+    targets = _tokens(" ".join(hosts) if isinstance(hosts, (list, tuple)) else hosts)
+    if any(target.startswith("-") for target in targets):
+        raise ValueError("Targets cannot contain Nmap options")
+    return targets
+
+
 # Nmap reads options with getopt_long_only: "-" and "--" are interchangeable, a unique prefix of a long
 # option is enough, and "-6o file" is the short options -6 and -o. Options are therefore matched by name.
 _OWNED_OUTPUT = ("resume", "append-output", "append_output")

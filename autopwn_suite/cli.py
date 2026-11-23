@@ -13,6 +13,7 @@ from autopwn_suite.daemon.daemon_installer import CreateConfig, InstallDaemon, U
 from autopwn_suite.getexploits import GetExploitsFromArray
 from autopwn_suite.logger import Logger, console_safe
 from autopwn_suite.nist_search import VulnerabilityLookup
+from autopwn_suite.nmap_progress import check_targets
 from autopwn_suite.report import InitializeReport
 from autopwn_suite.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, ResolveScanHosts
 from autopwn_suite.searchvuln import SearchSploits
@@ -69,21 +70,21 @@ def StartScanning(
     else:
         check_nmap(log)
 
-    if scanmode == ScanMode.Noise:
+    if scanmode == ScanMode.Noise or not args.skip_discovery:
         try:
-            if offline:
-                NoiseScan(targetarg, log, console, scantype, args.noise_timeout, offline=True)
-            else:
-                NoiseScan(targetarg, log, console, scantype, args.noise_timeout)
+            check_targets(targetarg)
         except ValueError as exc:
             raise _target_error(exc) from exc
 
+    if scanmode == ScanMode.Noise:
+        if offline:
+            NoiseScan(targetarg, log, console, scantype, args.noise_timeout, offline=True)
+        else:
+            NoiseScan(targetarg, log, console, scantype, args.noise_timeout)
+
     if not args.skip_discovery:
-        try:
-            hosts = (DiscoverHosts(targetarg, console, scantype, scanmode, offline=True) if offline
-                     else DiscoverHosts(targetarg, console, scantype, scanmode))
-        except ValueError as exc:
-            raise _target_error(exc) from exc
+        hosts = (DiscoverHosts(targetarg, console, scantype, scanmode, offline=True) if offline
+                 else DiscoverHosts(targetarg, console, scantype, scanmode))
         Targets = GetHostsToScan(hosts, console)
     else:
         Targets = targetarg if isinstance(targetarg, list) else [targetarg]

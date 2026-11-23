@@ -257,6 +257,17 @@ def test_malformed_discovery_target(tmp_path, monkeypatch, scantype, target, mod
     assert exit_.value.code == "Error: " + expected
 
 
+def test_noise_scan_value_error_is_not_reported_as_a_target_error(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("autopwn_suite.utils.is_root", lambda: True)
+    monkeypatch.setattr("sys.argv", ["autopwn-suite", "--offline", "--lang", "en", "-y",
+                                     "-st", "ping", "-m", "noise", "-t", "127.0.0.1"])
+    with patch("autopwn_suite.cli.check_nmap"), patch("autopwn_suite.cli.print_banner"), \
+         patch("autopwn_suite.cli.NoiseScan", side_effect=ValueError("sleep length must be non-negative")):
+        with pytest.raises(ValueError, match="sleep length must be non-negative"):
+            main()
+
+
 def response(data):
     result = MagicMock()
     result.json.return_value = data
