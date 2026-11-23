@@ -234,12 +234,13 @@ def test_noise_scan_with_no_hosts_exits_before_waiting():
     sleep.assert_not_called()
 
 
+@pytest.mark.parametrize("mode", [[], ["-m", "noise"]], ids=["normal", "noise"])
 @pytest.mark.parametrize("scantype", ["ping", "arp"])
 @pytest.mark.parametrize("target", ["O'Reilly", "-iL other.txt"], ids=["unmatched-quote", "option-like-line"])
-def test_malformed_discovery_target(tmp_path, monkeypatch, scantype, target):
+def test_malformed_discovery_target(tmp_path, monkeypatch, scantype, target, mode):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("autopwn_suite.utils.is_root", lambda: True)
-    argv = ["autopwn-suite", "--offline", "--lang", "en", "-y", "-st", scantype]
+    argv = ["autopwn-suite", "--offline", "--lang", "en", "-y", "-st", scantype, *mode]
     expected = "No closing quotation" if "'" in target else "Targets cannot contain Nmap options"
     if target.startswith("-"):
         host_file = tmp_path / "hosts.txt"

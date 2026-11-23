@@ -53,6 +53,11 @@ from autopwn_suite.web.webvuln import web_endpoints, webvuln
 from autopwn_suite.web_ui import FLASK_AVAILABLE, reset_web_account, start_server
 
 
+def _target_error(exc: ValueError) -> SystemExit:
+    """The run's exit for a target list that fails validation."""
+    return SystemExit(_("Error: {error}").format(error=printable(str(exc), multiline=True)))
+
+
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, console, console2, log, lookup=None
 ) -> None:
@@ -65,17 +70,20 @@ def StartScanning(
         check_nmap(log)
 
     if scanmode == ScanMode.Noise:
-        if offline:
-            NoiseScan(targetarg, log, console, scantype, args.noise_timeout, offline=True)
-        else:
-            NoiseScan(targetarg, log, console, scantype, args.noise_timeout)
+        try:
+            if offline:
+                NoiseScan(targetarg, log, console, scantype, args.noise_timeout, offline=True)
+            else:
+                NoiseScan(targetarg, log, console, scantype, args.noise_timeout)
+        except ValueError as exc:
+            raise _target_error(exc) from exc
 
     if not args.skip_discovery:
         try:
             hosts = (DiscoverHosts(targetarg, console, scantype, scanmode, offline=True) if offline
                      else DiscoverHosts(targetarg, console, scantype, scanmode))
         except ValueError as exc:
-            raise SystemExit(_("Error: {error}").format(error=printable(str(exc), multiline=True))) from exc
+            raise _target_error(exc) from exc
         Targets = GetHostsToScan(hosts, console)
     else:
         Targets = targetarg if isinstance(targetarg, list) else [targetarg]

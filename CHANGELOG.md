@@ -18,7 +18,7 @@ existing release summaries; they do not retroactively claim artifact signing.
 - A malformed discovery target — an unmatched quote such as `-t "O'Reilly"`, or a host file line
   that reads as an Nmap option such as `-iL other.txt` — now ends the run with the validation
   message (`Error: ...`), the way a port scan failure already did, instead of a `ValueError`
-  traceback during host discovery.
+  traceback during host discovery or noise mode.
 
 ### Security changes
 
