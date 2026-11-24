@@ -234,6 +234,40 @@ def test_noise_scan_with_no_hosts_exits_before_waiting():
     sleep.assert_not_called()
 
 
+@pytest.mark.parametrize("mode", [[], ["-m", "noise"]], ids=["normal", "noise"])
+@pytest.mark.parametrize("scantype", ["ping", "arp"])
+@pytest.mark.parametrize("target", ["O'Reilly", "-iL other.txt"], ids=["unmatched-quote", "option-like-line"])
+def test_malformed_discovery_target(tmp_path, monkeypatch, scantype, target, mode):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("autopwn_suite.utils.is_root", lambda: True)
+    argv = ["autopwn-suite", "--offline", "--lang", "en", "-y", "-st", scantype, *mode]
+    expected = "No closing quotation" if "'" in target else "Targets cannot contain Nmap options"
+    if target.startswith("-"):
+        host_file = tmp_path / "hosts.txt"
+        host_file.write_text(target + "\n", encoding="utf-8")
+        argv += ["-hf", str(host_file)]
+    else:
+        argv += ["-t", target]
+    monkeypatch.setattr("sys.argv", argv)
+    with patch("autopwn_suite.cli.check_nmap"), patch("autopwn_suite.cli.print_banner"), \
+         patch("shutil.which", return_value="/nonexistent/nmap"), \
+         patch("subprocess.Popen", side_effect=AssertionError("started a scan subprocess")):
+        with pytest.raises(SystemExit) as exit_:
+            main()
+    assert exit_.value.code == "Error: " + expected
+
+
+def test_noise_scan_value_error_is_not_reported_as_a_target_error(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("autopwn_suite.utils.is_root", lambda: True)
+    monkeypatch.setattr("sys.argv", ["autopwn-suite", "--offline", "--lang", "en", "-y",
+                                     "-st", "ping", "-m", "noise", "-t", "127.0.0.1"])
+    with patch("autopwn_suite.cli.check_nmap"), patch("autopwn_suite.cli.print_banner"), \
+         patch("autopwn_suite.cli.NoiseScan", side_effect=ValueError("sleep length must be non-negative")):
+        with pytest.raises(ValueError, match="sleep length must be non-negative"):
+            main()
+
+
 def response(data):
     result = MagicMock()
     result.json.return_value = data

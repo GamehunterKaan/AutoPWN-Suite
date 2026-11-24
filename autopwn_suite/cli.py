@@ -13,9 +13,11 @@ from autopwn_suite.daemon.daemon_installer import CreateConfig, InstallDaemon, U
 from autopwn_suite.getexploits import GetExploitsFromArray
 from autopwn_suite.logger import Logger, console_safe
 from autopwn_suite.nist_search import VulnerabilityLookup
+from autopwn_suite.nmap_progress import check_targets
 from autopwn_suite.report import InitializeReport
 from autopwn_suite.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, ResolveScanHosts
 from autopwn_suite.searchvuln import SearchSploits
+from autopwn_suite.text import printable
 from autopwn_suite.update_checker import (
     UpdateCheckError,
     apply_update,
@@ -52,6 +54,11 @@ from autopwn_suite.web.webvuln import web_endpoints, webvuln
 from autopwn_suite.web_ui import FLASK_AVAILABLE, reset_web_account, start_server
 
 
+def _target_error(exc: ValueError) -> SystemExit:
+    """The run's exit for a target list that fails validation."""
+    return SystemExit(_("Error: {error}").format(error=printable(str(exc), multiline=True)))
+
+
 def StartScanning(
     args, targetarg, scantype, scanmode, apiKey, console, console2, log, lookup=None
 ) -> None:
@@ -62,6 +69,12 @@ def StartScanning(
         args.nmap_flags = (args.nmap_flags + " -n").strip()
     else:
         check_nmap(log)
+
+    if scanmode == ScanMode.Noise or not args.skip_discovery:
+        try:
+            check_targets(targetarg)
+        except ValueError as exc:
+            raise _target_error(exc) from exc
 
     if scanmode == ScanMode.Noise:
         if offline:

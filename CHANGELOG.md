@@ -15,11 +15,17 @@ existing release summaries; they do not retroactively claim artifact signing.
   integers, so `-m noise -nt -5` started the noise processes and then raised `ValueError` from
   `sleep()`, and `-rpesp 0` was only rejected when the report was sent. Each value is now a usage
   error (exit status 2) where it is typed.
+- A malformed discovery target — an unmatched quote such as `-t "O'Reilly"`, or a host file line
+  that reads as an Nmap option such as `-iL other.txt` — now ends the run with the validation
+  message (`Error: ...`), the way a port scan failure already did, instead of a `ValueError`
+  traceback during host discovery or noise mode.
 
 ### Security changes
 
 - No security impact. This is an operator-facing input check on values the operator supplies; the
   rejected values are the ones the INI path already refused, and no new input reaches the scanner.
+- No security impact. The change only reports the `ValueError` that target validation already
+  raised for the operator's own target list; no new input reaches the scanner.
 
 ## [2.9.2] - 2026-11-22
 
