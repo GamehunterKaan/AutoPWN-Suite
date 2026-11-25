@@ -25,6 +25,32 @@ existing release summaries; they do not retroactively claim artifact signing.
   target. The prompt now reads "Leave empty for none - ignored when a target is set", which is
   what the scanner does (`InitArgsTarget` reads the host file only when no target is given). The
   Turkish catalog entry is reviewed and no longer fuzzy.
+- `--daemon-install` exits with status 1 when the service was not installed: not root on Linux, an
+  installation the root service must not use, a configuration that was not written, a unit file that
+  could not be written, or a failing `systemctl`. It exited with status 0 in every case, so a
+  provisioning script could not tell. A complete installation still exits with status 0.
+- A CLI scan keeps its recorded output when Nmap fails on a later host. `PortScan` ended the run with
+  `SystemExit`, which skipped the "saving the output recorded so far" step that an NVD failure already
+  had, so the results of the hosts scanned before the failure were lost. A target or option that
+  validation refuses still ends the run with its message and saves nothing.
+- The email report is sent with the `-rpef/--report-email-from` address as SMTP envelope sender, not
+  with the login name. A provider whose login is not a mailbox (an API-key user name) refuses the login
+  name as sender, and the option changed only the `From:` header. Without the option the From address
+  is the login address, as before.
+- The CLI shows a host's details (MAC address, vendor, OS, accuracy, type) when either the MAC address
+  or the OS is known. It required both, so a routed target, which has no MAC address, never showed its
+  detected OS.
+- `--check-update`, `--apply-update` and the dashboard's update check order a pre-release before its
+  release: `2.9.3rc1` (or a `v2.9.3-rc.1` tag) is older than `2.9.3`. Every number in the text used to
+  count, which made the pre-release newer, so an installed pre-release was told it was up to date when
+  its final release was out.
+- The web-check warning for a truncated response names the limit the scan ran with (`max_response_kb`,
+  for example "exceeded 64 KiB") instead of always saying 1 MiB.
+- A local vulnerability database whose `metadata` values are not text is reported as unusable ("Local
+  vulnerability database is unreadable or incomplete"), and a CVSS score in a record counts only when
+  it is a number from 0 to 10; any other value leaves the finding without a score (`UNKNOWN`, 0.0).
+- The daemon log `/var/log/autopwn-daemon.log` is created with mode 0600 and `--daemon-install` sets an
+  existing log to 0600. Read it as root (`sudo tail -f /var/log/autopwn-daemon.log`).
 
 ### Security changes
 
@@ -36,6 +62,22 @@ existing release summaries; they do not retroactively claim artifact signing.
   settings.
 - No security impact. Only the wording of a wizard prompt (and its Turkish translation) changes; the
   precedence of target over host file is unchanged.
+- AUTOPWN-SA-2026-018 (follow-up, low, availability only): a vulnerability database copied from another
+  machine could still stop the dashboard's lists and status. A record whose CVSS score was `NaN` or
+  `Infinity` (both valid for Python's JSON parser) was returned as a bare `NaN` in `GET /api/hosts`, which
+  a browser rejects, and a file whose `metadata` values were not text made
+  `GET /api/vulnerability-database` and a scan start answer HTTP 500 and ended a CLI scan in a traceback.
+  A score that is not a number from 0 to 10 is now ignored, and such a file is reported as an unusable
+  database; see the advisory.
+- Hardening of `--daemon-install`, with no advisory: `/var/log/autopwn-daemon.log` holds the scan output
+  (hosts, ports, CVEs) and was created with mode 0664, readable by every local account; it is now created
+  with mode 0600, and each install sets an existing log to 0600. The installer also reads the wizard's
+  configuration back from the working directory only if it is still a regular file of the installing
+  user, opened without following a symlink, so a file that another account placed there under that name
+  (possible when root runs the installer in a directory that account can write to) is not installed as the
+  root service's configuration.
+- No security impact for the other functional changes above (exit status, saved output, envelope sender,
+  host details, pre-release ordering, warning text).
 
 ## [2.9.2] - 2026-11-22
 

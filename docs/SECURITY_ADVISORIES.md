@@ -650,7 +650,10 @@ release that contains it.
 
 - Assessed affected version: **2.6.1**; **2.6.0** has the same code. Earlier versions not assessed.
 - Status: **fixed in v2.7.0** (2026-10-19) for the failures listed under Impact; the
-  limits listed under Residual remain. Fixed released version: **2.7.0**.
+  limits listed under Residual remain. Fixed released version: **2.7.0**. Two further
+  failures of the same kind, found on 2026-11-26 (a score that is not a number from 0 to
+  10, and `metadata` values that are not text), are **fixed on `main`, not yet
+  released**; no released version contains those two fixes.
 - CWE-409 and CWE-755; low and availability only, requiring a database file that an
   attacker shaped or damage corrupted, and an operator who then scans with it.
 - Prerequisite: the scanner reads a database file that was copied from another machine
@@ -701,16 +704,41 @@ release that contains it.
   code). `test_one_search_inflates_a_bounded_total_not_only_a_bounded_record` covers the
   search budget; it patches the new limits, so it cannot run on the previous code as it
   is.
+- Further failures, fixed on `main` and not yet released (measured on v2.9.2; v2.7.0
+  through v2.9.2 have the same code):
+  - A score of `NaN` or `Infinity` (Python's JSON parser accepts both) passed the lookup,
+    and the dashboard returned it as a bare `NaN` or `Infinity` in `GET /api/hosts`,
+    which a browser's `JSON.parse` rejects; the dashboard's polling request ignores that
+    failure, so its scan and host lists stop updating while that scan's result is held
+    (the response was produced with Flask's serializer; the browser side is read from
+    `app.js`, not run in a browser). Fix: `FindVars` in `autopwn_suite/nist_search.py`
+    takes a base score and an exploitability score only when the value is a number from
+    0 to 10 and not a boolean (`_is_score`); any other value leaves the finding without a
+    score (severity `UNKNOWN`, score 0.0), for a record from the NVD as well. Regression:
+    `tests/unit/test_vulnerability_db.py::test_a_copied_record_whose_score_is_not_a_cvss_score_is_read_without_a_score`
+    (all seven cases fail on the previous code) and the seeded
+    `tests/unit/test_fuzz_inputs.py::test_a_cvss_score_from_any_record_is_a_number_from_0_to_10`.
+  - A `metadata` table whose `count` was `NULL` raised `TypeError`, and an infinite
+    number there raised `OverflowError`. Neither `database_status` nor
+    `OfflineDatabase` expected them: `database_status` raised, so
+    `GET /api/vulnerability-database` (which the page polls) and a scan start that checks
+    the local database answer HTTP 500, and a scan that opens the file gets the same
+    error instead of "database unavailable" (the status call was run; the routes and the
+    CLI are read from the code). A numeric `count` or a non-text `updated_at` was
+    accepted as it was. Fix: `_metadata` in `autopwn_suite/vulnerability_db.py` requires `count` and
+    `updated_at` to be text, as the update writes them, and reports anything else as
+    invalid metadata, which the status shows as an unreadable database and a scan as
+    "Offline vulnerability database unavailable". Regression:
+    `tests/unit/test_vulnerability_db.py::test_copied_metadata_that_is_not_text_is_an_unusable_database`
+    (five of its six cases fail on the previous code; a `NULL` `updated_at` was already
+    refused).
 - Residual after the fix: the records are bounded and type-checked, not authenticated,
   and the limits count inflated bytes, not what a record costs once parsed or what the
   file around it can do. A record of valid shape is used as it is, so a database from an
   untrusted source can still hide a CVE or report a false one, and the 16 MiB and
   256 MiB limits are fixed in the code. A valid-shaped record can also still break the
-  consumers of the result. A score of NaN or Infinity (Python's JSON parser accepts both)
-  passes the lookup, and the dashboard returns it as a bare `NaN` or `Infinity` in
-  `GET /api/hosts`, which a browser's `JSON.parse` rejects; the dashboard's polling
-  request ignores that failure, so its scan and host lists stop updating while that
-  scan's result is held (read from `app.js`, not run in a browser). A description with a
+  consumers of the result (for a score of NaN or Infinity, see the further failures
+  above, which released versions still have). A description with a
   lone surrogate (`"\ud800"`, which is valid JSON) ends the CLI scan with a
   `UnicodeEncodeError` traceback when it is printed (measured with a UTF-8 console on
   Windows). Memory is bounded but not by 256 MiB: a 16 MiB record made of `{},` entries

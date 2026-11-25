@@ -87,7 +87,9 @@ def SendEmail(email, password, email_to, email_from, server, port, log, report_p
             mail.starttls(context=context)
         mail.login(email, password)
         text = msg.as_string()
-        mail.sendmail(email, email_to, text)
+        # The envelope sender is the From address: a provider whose login is not a mailbox (an API-key
+        # user name) refuses the login name as sender.
+        mail.sendmail(email_from, email_to, text)
     except Exception:
         log.logger("error", _("An error occurred while trying to send email report."))
     else:

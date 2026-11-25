@@ -18,6 +18,7 @@ from autopwn_suite.scanner import (
     InitPortInfo,
     NoiseScan,
     PortScan,
+    PortScanFailed,
     TargetInfo,
     TestArp,
     TestPing,
@@ -136,6 +137,17 @@ class TestPortScan:
         arguments = mock_port_scanner.scan.call_args.kwargs["arguments"].split()
         assert arguments.count("-sA") == 1 and arguments.count("-O") == 2
         mock_log.logger.assert_called_once_with("info", "Scanning 127.0.0.1 for open ports ...")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("failure, raised", [(RuntimeError("Nmap scan failed"), PortScanFailed),
+                                             (ValueError("Nmap target must not look like an option"), SystemExit)])
+def test_port_scan_tells_a_failed_scan_from_a_refused_target(mock_port_scanner, failure, raised):
+    """The CLI saves the recorded output after a failed scan; a refused target ends the run as before."""
+    mock_port_scanner.scan.side_effect = failure
+    with patch("autopwn_suite.scanner.is_root", return_value=False), pytest.raises(SystemExit) as stopped:
+        PortScan("192.0.2.10", MagicMock())
+    assert type(stopped.value) is raised and stopped.value.code == f"Error: {failure}"
 
 
 @pytest.mark.unit
@@ -265,6 +277,24 @@ class TestResultParsing:
 
         # Verify the table was printed
         mock_rich_console.print.assert_called_with(mock_table_instance, justify="center")
+
+    @pytest.mark.parametrize("info, shown", [
+        (TargetInfo(os="Linux 5.15", os_accuracy=96, os_type="general purpose"), True),  # routed: no MAC address
+        (TargetInfo(mac="00:00:5E:00:53:01", vendor="Example"), True),
+        (TargetInfo(), False),
+    ], ids=["os-without-mac", "mac-without-os", "neither"])
+    def test_host_details_are_shown_when_either_the_mac_or_the_os_is_known(self, mock_nmap_result, mock_rich_console, info, shown):
+        """The details were printed only when both were known, so a routed target never showed its detected OS."""
+        target_ip = "192.168.1.1"
+        mock_host_result = MagicMock()
+        mock_host_result.__getitem__.side_effect = mock_nmap_result["scan"][target_ip].__getitem__
+        mock_scanner_obj = MagicMock()
+        mock_scanner_obj.__getitem__.return_value = mock_host_result
+
+        with patch("autopwn_suite.scanner.InitHostInfo", return_value=info):
+            AnalyseScanResults(mock_scanner_obj, MagicMock(), mock_rich_console, target_ip)
+
+        assert (call(info.colored(), justify="center") in mock_rich_console.print.call_args_list) is shown
 
     def test_analyse_scan_results_no_target_provided(self, mock_nmap_result, mock_rich_console):
         """Verify it correctly determines the target if none is provided."""

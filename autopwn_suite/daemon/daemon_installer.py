@@ -327,8 +327,21 @@ def _check_installable(console, install_path):
 def _install_config(src, dst):
     """Put the wizard's configuration at `dst` for root only, from its first byte: it is read into memory and
     written through `_private_file`, never copied with the process umask and tightened afterwards (the copy
-    would be readable by others, and stay readable through an open descriptor, until the mode changed)."""
-    data = src.read_bytes()
+    would be readable by others, and stay readable through an open descriptor, until the mode changed).
+
+    `src` is the file the wizard has just written as this user, in a working directory that another account may
+    be able to change. It is opened without following a symlink and has to be a regular file of this user, so a
+    file that someone else put under that name in the meantime never becomes the root service's configuration."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+    descriptor = os.open(src, flags)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or (hasattr(os, "geteuid") and info.st_uid != os.geteuid()):
+            raise PermissionError("it is not a regular file that belongs to the installing user")
+        with os.fdopen(descriptor, "rb", closefd=False) as source:
+            data = source.read()
+    finally:
+        os.close(descriptor)
     with _private_file(dst, mode="wb") as output:
         output.write(data)
 
@@ -362,9 +375,10 @@ def CopyFiles(console):
     try:
         if not LOG_PATH.exists():
             LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            LOG_PATH.touch()
-            LOG_PATH.chmod(0o664)
+            LOG_PATH.touch(mode=0o600)
             console.print(_("[green]Created log file: {path}[/green]").format(path=LOG_PATH))
+        # The log holds the scan output (hosts, ports, CVEs): root only, also a log that an earlier release created 0664.
+        LOG_PATH.chmod(0o600)
     except Exception as e:
         console.print(_("[yellow]Warning: could not create log file {path}: {error}[/yellow]").format(path=LOG_PATH, error=e))
 
@@ -420,21 +434,23 @@ WantedBy=multi-user.target
         return
 
     console.print(_("[green]AutoPWN daemon installation complete.[/green]"))
+    return True
 
 
 
 
-def InstallDaemon(console):
+def InstallDaemon(console) -> bool:
+    """Install the service. False when it was refused or a step failed, so the command exits with status 1."""
     if not is_root() or not system().lower() == "linux":
         console.print(_("Daemon can only be installed on [cyan]Linux[/cyan] and as [cyan]root[/cyan]!"))
-        return
+        return False
     print_banner(console)
     # Refuse an unusable installation first: the wizard below writes a configuration that can hold secrets.
     if not _check_installable(console, Path(INSTALL_DIR)):
-        return
+        return False
     if CreateConfig(console, "autopwn-daemon.conf") is False:
-        return
-    CopyFiles(console)
+        return False
+    return CopyFiles(console) is True
 
 
 def _systemctl(console, *arguments):

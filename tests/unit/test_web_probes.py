@@ -131,3 +131,21 @@ def test_probe_auth_disables_ambient_netrc_and_strips_supplied_secrets():
             "Authorization": "secret", "Cookie": "secret", "Proxy-Authorization": "secret"}))
     netrc.assert_not_called()
     assert not ({"Authorization", "Cookie", "Proxy-Authorization"} & set(prepared.headers))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("controls, limit", [(None, 1024), ({"max_response_kb": 64}, 64)])
+def test_the_truncated_response_warning_names_the_limit_in_force(controls, limit):
+    """The warning said 1 MiB whatever max_response_kb the scan ran with."""
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    from autopwn_suite.web.runtime import ScanContext
+    log = MagicMock()
+    client = ProbeClient("http://example.com/", log)
+    scan = ScanContext("http://example.com/", MagicMock(), controls=controls).activate() if controls else nullcontext()
+    with scan, patch("autopwn_suite.web.http.bounded_request", return_value=SimpleNamespace(autopwn_truncated=True)):
+        client.send("http://example.com/")
+        client.send("http://example.com/")
+    log.logger.assert_called_once_with(
+        "warning", f"Web response exceeded {limit} KiB on http://example.com/; content coverage is limited.")

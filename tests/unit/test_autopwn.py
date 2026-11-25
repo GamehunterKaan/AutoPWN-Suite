@@ -151,6 +151,19 @@ class TestMainExecution:
         # Verify that cli was called to get the arguments
         mock_cli.assert_called_once()
 
+    @pytest.mark.parametrize("installed, status", [(True, None), (False, 1)])
+    @patch("autopwn_suite.cli.InstallDaemon")
+    @patch("autopwn_suite.cli.cli")
+    def test_daemon_install_exits_with_status_1_when_nothing_was_installed(self, mock_cli, mock_install_daemon, installed, status):
+        """It exited with status 0 after a refusal or a failed step, so a provisioning script saw success."""
+        mock_cli.return_value = MagicMock(version=False, daemon_install=True, no_color=True)
+        mock_install_daemon.return_value = installed
+
+        with pytest.raises(SystemExit) as stopped:
+            main()
+
+        assert stopped.value.code == status
+
 
 @pytest.mark.unit
 class TestEmptyDiscovery:
