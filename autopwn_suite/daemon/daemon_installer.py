@@ -143,7 +143,7 @@ def CreateConfig(console, config_filename=""):
         console.print(_("[yellow]No notifications enabled.[/yellow]"))
 
     target = console.input(_("Enter your [cyan]target[/cyan] (Leave empty for auto detection): "))
-    host_file = console.input(_("Enter [cyan]host file[/cyan] (Leave empty for none - will override target): "))
+    host_file = console.input(_("Enter [cyan]host file[/cyan] (Leave empty for none - ignored when a target is set): "))
 
     if target == "" and host_file == "":
         skip_discovery = False
