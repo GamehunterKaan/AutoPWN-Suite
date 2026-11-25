@@ -269,12 +269,12 @@ msgid "Enter your [cyan]target[/cyan] (Leave empty for auto detection): "
 msgstr "[cyan]Hedefinizi[/cyan] girin (otomatik algılama için boş bırakın): "
 
 #: autopwn_suite/daemon/daemon_installer.py:146
-#, fuzzy
 msgid ""
-"Enter [cyan]host file[/cyan] (Leave empty for none - will override target): "
+"Enter [cyan]host file[/cyan] (Leave empty for none - ignored when a target "
+"is set): "
 msgstr ""
-"[cyan]Host dosyasını[/cyan] girin (yoksa boş bırakın - hedefi geçersiz "
-"kılar): "
+"[cyan]Host dosyasını[/cyan] girin (yoksa boş bırakın - hedef girilmişse yok "
+"sayılır): "
 
 #: autopwn_suite/daemon/daemon_installer.py:151
 #, fuzzy
