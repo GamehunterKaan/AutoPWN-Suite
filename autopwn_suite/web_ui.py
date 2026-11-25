@@ -1427,7 +1427,6 @@ def _run_scan(job: ScanJob) -> None:
             nmap_flags = (nmap_flags + " -n").strip()
             with job._lock:
                 config["vulnerability_source"] = "offline"
-                config["nmap_flags"] = nmap_flags
         if config.get("scan_web") and not scan_ports:
             from urllib.parse import urlsplit
 
