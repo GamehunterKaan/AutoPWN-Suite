@@ -19,6 +19,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   that reads as an Nmap option such as `-iL other.txt` — now ends the run with the validation
   message (`Error: ...`), the way a port scan failure already did, instead of a `ValueError`
   traceback during host discovery or noise mode.
+- Resuming an offline dashboard scan no longer adds another `-n` to the job's stored Nmap flags
+  (`config.nmap_flags` in `/api/scans`) each time, and Nmap still gets one `-n` on every run.
 - The `--create-config` / `--daemon-install` wizard no longer says the host file overrides the
   target. The prompt now reads "Leave empty for none - ignored when a target is set", which is
   what the scanner does (`InitArgsTarget` reads the host file only when no target is given). The
@@ -30,6 +32,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   rejected values are the ones the INI path already refused, and no new input reaches the scanner.
 - No security impact. The change only reports the `ValueError` that target validation already
   raised for the operator's own target list; no new input reaches the scanner.
+- No security impact. The change only stops writing the offline `-n` back into the stored scan
+  settings.
 - No security impact. Only the wording of a wizard prompt (and its Turkish translation) changes; the
   precedence of target over host file is unchanged.
 
