@@ -110,6 +110,10 @@ def _execute_webvuln(target, log, console):
         # Recorded in results and the summary: a redirect can have put control characters in it.
         current.target = wire_url(target_url)
     results = []
+    # The header and cookie advisories only read the first response, so they run
+    # before the active stages can exhaust the request budget.
+    if enabled("headers"):
+        results.extend(run_task("headers", target_url, lambda: inspect_response(target_url, response, console)))
     controls = options()
     selected = set()
     fast_scanners = [(LFIScanner(log, console), "test_lfi", "lfi"),
@@ -175,8 +179,6 @@ def _execute_webvuln(target, log, console):
         for base in dict.fromkeys(discovery_base(url) for url in (requested, target_url)):
             results.extend(dirbust(base, console, log))
     results.extend(additional_checks(target_url, urls, response, log, console, headers, include_boolean=False))
-    if enabled("headers"):
-        results.extend(run_task("headers", target_url, lambda: inspect_response(target_url, response, console)))
     log.logger("info", _("Web checks completed: {count} findings (candidates, advisories and observations).").format(count=len(results)))
     return results
 

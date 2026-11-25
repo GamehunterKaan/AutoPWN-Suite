@@ -25,6 +25,10 @@ existing release summaries; they do not retroactively claim artifact signing.
   target. The prompt now reads "Leave empty for none - ignored when a target is set", which is
   what the scanner does (`InitArgsTarget` reads the host file only when no target is given). The
   Turkish catalog entry is reviewed and no longer fuzzy.
+- A web scan that reaches its request budget still reports the response header and cookie
+  advisories (the "headers" check). They read only the first response and used to run last, so
+  a scan whose crawl or injection checks used up `request_budget` ended without them. They now
+  run before the active stages.
 
 ### Security changes
 
@@ -36,6 +40,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   settings.
 - No security impact. Only the wording of a wizard prompt (and its Turkish translation) changes; the
   precedence of target over host file is unchanged.
+- Low security impact, positive. Missing security headers and cookie flags are no longer silently
+  left out of a budget-limited scan; no extra request is sent.
 
 ## [2.9.2] - 2026-11-22
 
