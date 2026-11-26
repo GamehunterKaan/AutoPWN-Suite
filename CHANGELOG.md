@@ -78,6 +78,15 @@ existing release summaries; they do not retroactively claim artifact signing.
 - CI: the `test` job runs pytest on every CPU of the runner (`pytest -n auto`) through the new dev dependency
   `pytest-xdist` 3.8.0 (with `execnet` 2.1.2); branch coverage is combined across the workers and still has
   to reach 80%. The suite ran in about six minutes on one CPU.
+- CI: every JavaScript action runs on Node.js 24, which removes GitHub's Node.js 20 deprecation warnings. The
+  pins move to `actions/checkout` v7.0.1, `actions/cache` v6.1.0, `actions/setup-python` v7.1.0,
+  `actions/upload-artifact` v7.0.2, `actions/download-artifact` v8.0.2, `actions/github-script` v9.0.0,
+  `docker/build-push-action` v7.4.0, `docker/login-action` v4.8.0, `docker/setup-buildx-action` v4.4.1,
+  `docker/setup-qemu-action` v4.4.0, and the Scorecard workflow's `github/codeql-action/upload-sarif` from v3 to
+  v4.39.0, each by full commit SHA. None of the inputs these workflows use was removed.
+- CI: ClusterFuzzLite builds the four Atheris harnesses in parallel (each PyInstaller build in its own work
+  directory) and fuzzes with every core of the runner (`parallel-fuzzing`) for 120 seconds instead of one core
+  for 180 seconds.
 
 ### Security changes
 
@@ -126,6 +135,12 @@ existing release summaries; they do not retroactively claim artifact signing.
   by branch protection (one approval, stale approvals dismissed, approval of the latest push required,
   administrators included); `GITHUB_TOKEN` cannot approve pull requests. Removing the workflows also removes a
   `workflow_run` handler that held `actions: write`.
+- Action updates: no security impact. Every action stays pinned by full commit SHA with the same inputs and
+  permissions. `actions/download-artifact` v8 now fails on an artifact whose digest does not match instead of
+  warning, and `actions/checkout` v7 refuses to check out a fork's pull request in `pull_request_target` and
+  `workflow_run` workflows (none of ours does).
+- ClusterFuzzLite: no security impact. The same harnesses, seeds and hash-pinned dependencies are built; each
+  fuzzer now gets more executions in less time.
 - `pytest-xdist`: no security impact. It is a dev-group dependency used only to run the tests; it is not in the
   package, the image or the binaries, and the Security policy scans it with the rest of `poetry.lock`.
 

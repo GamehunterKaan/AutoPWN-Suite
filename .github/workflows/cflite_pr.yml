@@ -35,6 +35,9 @@ jobs:
         uses: google/clusterfuzzlite/actions/run_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          fuzz-seconds: 180
+          # The fuzzers run one after another; parallel-fuzzing gives each one every core of the runner
+          # (libFuzzer -jobs/-workers), so 120 seconds run more inputs than 180 seconds on one core did.
+          fuzz-seconds: 120
+          parallel-fuzzing: true
           mode: code-change
           sanitizer: address
