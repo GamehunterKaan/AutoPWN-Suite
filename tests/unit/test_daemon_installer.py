@@ -1091,3 +1091,94 @@ class TestUninstallDaemon:
 
         assert len(layout.environments) == 2
         assert all("LD_LIBRARY_PATH" not in environment for environment in layout.environments)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("copied, installed", [(True, True), (None, False)])
+def test_install_daemon_reports_whether_the_service_was_installed(monkeypatch, mock_console, copied, installed):
+    """`--daemon-install` exited with status 0 whatever happened; CopyFiles returns True only after its last step."""
+    for name, replacement in (("is_root", lambda: True), ("system", lambda: "Linux"), ("print_banner", lambda console: None),
+                              ("_check_installable", lambda console, path: True), ("CreateConfig", lambda console, name: True),
+                              ("CopyFiles", lambda console: copied)):
+        monkeypatch.setattr(daemon_installer, name, replacement)
+    assert InstallDaemon(mock_console) is installed
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("refusal", ["not-root", "not-installable", "config-not-written"])
+def test_install_daemon_reports_a_refusal(monkeypatch, mock_console, refusal):
+    for name, replacement in (("is_root", lambda: refusal != "not-root"), ("system", lambda: "Linux"),
+                              ("print_banner", lambda console: None),
+                              ("_check_installable", lambda console, path: refusal != "not-installable"),
+                              ("CreateConfig", lambda console, name: refusal != "config-not-written"),
+                              ("CopyFiles", lambda console: pytest.fail("nothing may be installed after a refusal"))):
+        monkeypatch.setattr(daemon_installer, name, replacement)
+    assert InstallDaemon(mock_console) is False
+
+
+@pytest.fixture
+def staged_install(tmp_path, monkeypatch, mock_console):
+    """CopyFiles on real directories: the wizard's file in the working directory, and the install directory,
+    the unit and the log under tmp_path. Only systemd and the root-ownership probes are replaced."""
+    work = tmp_path / "work"
+    work.mkdir()
+    (work / "autopwn-daemon.conf").write_text("email_password = synthetic-secret-for-tests\n", encoding="utf-8")
+    monkeypatch.chdir(work)
+    monkeypatch.setattr(daemon_installer, "INSTALL_DIR", str(tmp_path / "opt"))
+    monkeypatch.setattr(daemon_installer, "SERVICE_FILE", str(tmp_path / "autopwn-daemon.service"))
+    monkeypatch.setattr(daemon_installer, "LOG_FILE", str(tmp_path / "log" / "autopwn-daemon.log"))
+    monkeypatch.setattr(daemon_installer, "_service_files_are_root_controlled", lambda install_path: True)
+    monkeypatch.setattr(daemon_installer, "_service_can_import_package", lambda install_path: True)
+    systemctl = MagicMock()
+    monkeypatch.setattr(daemon_installer.subprocess, "check_call", systemctl)
+    return SimpleNamespace(staged=work / "autopwn-daemon.conf", installed=tmp_path / "opt" / "autopwn-daemon.conf",
+                           log=tmp_path / "log" / "autopwn-daemon.log", console=mock_console, systemctl=systemctl)
+
+
+@pytest.mark.unit
+def test_copy_files_returns_true_only_when_every_step_succeeded(staged_install):
+    assert CopyFiles(staged_install.console) is True
+    staged_install.systemctl.side_effect = subprocess.CalledProcessError(1, "systemctl")
+    assert CopyFiles(staged_install.console) is None
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX file modes")
+@pytest.mark.parametrize("existing_mode", [None, 0o664])
+def test_the_daemon_log_is_for_root_only_also_one_an_earlier_release_created(staged_install, existing_mode):
+    """The log holds the scan output (hosts, ports, CVEs) and was created with mode 0664."""
+    if existing_mode is not None:
+        staged_install.log.parent.mkdir()
+        staged_install.log.write_text("earlier output\n", encoding="utf-8")
+        staged_install.log.chmod(existing_mode)
+    previous = os.umask(0)
+    try:
+        assert CopyFiles(staged_install.console) is True
+    finally:
+        os.umask(previous)
+    assert stat.S_IMODE(staged_install.log.stat().st_mode) == 0o600
+    assert staged_install.log.read_text(encoding="utf-8") == ("earlier output\n" if existing_mode is not None else "")
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(os.name == "nt", reason="needs POSIX symlinks and file owners")
+@pytest.mark.parametrize("swap", ["symlink", "other-owner", "directory"])
+def test_a_file_someone_else_put_in_the_working_directory_is_not_installed(staged_install, tmp_path, monkeypatch, swap):
+    """The wizard's file is read back from the working directory, which another account may be able to change:
+    only a regular file that the installing user owns becomes the root service's configuration."""
+    if swap == "other-owner":
+        monkeypatch.setattr(daemon_installer.os, "geteuid", lambda: staged_install.staged.stat().st_uid + 1)
+    else:
+        staged_install.staged.unlink()
+        other = tmp_path / "elsewhere"
+        if swap == "symlink":
+            other.write_text("nmapflags = --script=/tmp/other.nse\n", encoding="utf-8")
+            staged_install.staged.symlink_to(other)
+        else:
+            staged_install.staged.mkdir()
+
+    assert CopyFiles(staged_install.console) is None
+
+    assert not staged_install.installed.exists()
+    staged_install.systemctl.assert_not_called()
+    assert "Error copying" in staged_install.console.print.call_args.args[0]

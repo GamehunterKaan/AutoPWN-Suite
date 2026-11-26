@@ -77,6 +77,12 @@ class Vulnerability:
         )
 
 
+def _is_score(value) -> bool:
+    """Whether a record's value is a CVSS score: a number from 0 to 10. JSON also carries NaN and Infinity, which
+    are not scores and which a JSON response cannot hold."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 10
+
+
 def FindVars(vuln: dict) -> tuple:
     CVE_ID = vuln["cve"]["id"]
     descriptions = vuln["cve"].get("descriptions", [])
@@ -100,7 +106,7 @@ def FindVars(vuln: dict) -> tuple:
                 continue
             entries = sorted(entries, key=lambda entry: entry.get("type") != "Primary")
             metric = next((entry for entry in entries
-                           if isinstance(entry.get("cvssData", {}).get("baseScore"), (int, float))), None)
+                           if _is_score(entry.get("cvssData", {}).get("baseScore"))), None)
             if metric is None:
                 continue
             # Take severity and score from the same preferred metric. A valid
@@ -111,7 +117,7 @@ def FindVars(vuln: dict) -> tuple:
                 scored = True
             # CVSS v4 metrics carry no exploitabilityScore, and 0.0 would read as "not
             # exploitable": take it from the newest version that has one.
-            if isinstance(metric.get("exploitabilityScore"), (int, float)):
+            if _is_score(metric.get("exploitabilityScore")):
                 exploitability = metric["exploitabilityScore"]
                 break
 

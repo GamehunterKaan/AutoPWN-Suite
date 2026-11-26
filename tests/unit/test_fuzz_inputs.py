@@ -1037,3 +1037,30 @@ def test_service_keywords_and_cpe_applicability_never_raise_for_banner_or_record
         candidate = Vulnerability("term", "CVE-2026-0001", mutate(description, rng), "HIGH", 7.5,
                                   "https://nvd.test/", 3.9, affected=found)
         assert FindVulnerabilities(keyword or product, lambda term: [candidate], cpes) in ([], [candidate])
+
+
+def test_a_cvss_score_from_any_record_is_a_number_from_0_to_10():
+    """A record from the NVD or from a copied database controls the score, and JSON can carry NaN and Infinity."""
+    from autopwn_suite.nist_search import FindVars
+    rng = random.Random(SEED)
+    odd = [float("nan"), float("inf"), float("-inf"), True, False, None, "7.5", [], {}, 10 ** 400, -1, -0.0001, 10.0001, 0, 10, 7.5]
+    for _ in range(3000):
+        metric = {"type": rng.choice(["Primary", "Secondary"]),
+                  "exploitabilityScore": rng.choice(odd + [rng.uniform(-20, 20)]),
+                  "cvssData": {"baseScore": rng.choice(odd + [rng.uniform(-20, 20)]), "baseSeverity": "HIGH"}}
+        record = json.loads(json.dumps({"cve": {"id": "CVE-2025-1234", "metrics": {rng.choice(["cvssMetricV2", "cvssMetricV31", "cvssMetricV40"]): [metric]}}}))
+        _cve, _description, _severity, score, _url, exploitability = FindVars(record)
+        for number in (score, exploitability):
+            assert isinstance(number, (int, float)) and not isinstance(number, bool) and 0 <= number <= 10
+        json.dumps([score, exploitability], allow_nan=False)
+
+
+def test_version_keys_never_raise_and_always_compare():
+    """The installed version and GitHub's release tag are compared through these keys."""
+    rng = random.Random(SEED)
+    seeds = ["2.9.3", "v2.9.3", "2.9.3rc1", "v2.9.3-rc.1", "2.9.3.dev1", "2.9.3b2", "2.9.3.post1", "2.9.3+local.1", "unknown", ""]
+    keys = [update_checker._parse_version(candidate) for candidate in [None, *seeds]]
+    for _ in range(3000):
+        keys.append(update_checker._parse_version(mutate(rng.choice(seeds), rng) + rng.choice(JUNK)))
+    assert sorted(keys)[0] <= sorted(keys)[-1]  # every key compares with every other one
+    assert all(isinstance(release, tuple) and release and 0 <= stage <= 6 for release, stage, _rest in keys)

@@ -1074,3 +1074,21 @@ def test_trust_root_failure_is_an_update_error(monkeypatch):
         uc.verify_release_source("GamehunterKaan/AutoPWN-Suite", "v1", "a" * 40)
     assert caught.value.code == "update_trust_root_unavailable"
     assert "trust root" in str(caught.value)
+
+
+@pytest.mark.parametrize("older, newer", [
+    ("2.9.3rc1", "2.9.3"), ("v2.9.3-rc.1", "v2.9.3"), ("2.9.3.dev1", "2.9.3a1"), ("2.9.3a2", "2.9.3b1"),
+    ("2.9.3b1", "2.9.3rc1"), ("2.9.3rc1", "2.9.3rc2"), ("2.9.2", "2.9.3rc1"), ("2.9.3", "2.9.3.post1"),
+    ("2.9.3", "2.10.0"), ("unknown", "0.0.1"),
+])
+def test_a_pre_release_sorts_before_its_release(older, newer):
+    """Every number in the text used to count, so 2.9.3rc1 was (2, 9, 3, 1), later than 2.9.3."""
+    assert uc._parse_version(older) < uc._parse_version(newer)
+    assert uc._parse_version("v2.9.3") == uc._parse_version("2.9.3")
+
+
+def test_a_pre_release_install_is_offered_its_final_release(monkeypatch):
+    monkeypatch.setattr(uc, "_get_json", lambda url: {"tag_name": "v2.9.3", "html_url": "https://example.invalid/r"})
+    assert uc.check_release("2.9.3rc1").update_available is True
+    assert uc.check_release("2.9.3").update_available is False
+    assert uc.check_release("2.9.4rc1").update_available is False
