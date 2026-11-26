@@ -150,7 +150,10 @@ def markdown_text(title):
     """A pull request title as inert Markdown: no HTML, no links and no mention that notifies anyone."""
     title = " ".join(title.split())
     title = re.sub(r"[&<>\[\]]", lambda char: {"&": "&amp;", "<": "&lt;", ">": "&gt;"}.get(char[0], "\\" + char[0]), title)
-    return re.sub(r"@[\w./-]+", lambda mention: f"`{mention[0]}`", title)
+    # A code span closes only on a backtick run of its own length, so a longer fence than any run in the
+    # title cannot be paired with a stray backtick there.
+    fence = "`" * (max(map(len, re.findall("`+", title)), default=0) + 1)
+    return re.sub(r"@[\w./-]+", lambda mention: f"{fence}{mention[0]}{fence}", title)
 
 
 def contributors_notes(repo, tag, commit):

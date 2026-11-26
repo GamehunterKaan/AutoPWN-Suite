@@ -132,6 +132,15 @@ def test_notes_credit_the_pull_requests_merged_since_the_previous_release(source
     assert release.release_notes(written, "v2.7.0", contributors).endswith("### Contributors\nThanks, Alice.\n")
 
 
+@pytest.mark.parametrize("title,expected", [
+    ("Fix ` @bob", "Fix ` ``@bob``"),  # a stray backtick cannot close the code span early and free the mention
+    ("Bump `@types/node`", "Bump ```@types/node```"),
+    ("a ``x`` @bob", "a ``x`` ```@bob```"),
+])
+def test_a_mention_in_a_title_stays_inside_a_code_span(title, expected):
+    assert release.markdown_text(title) == expected
+
+
 def test_notes_have_no_contributors_section_without_a_previous_release_or_merged_pull_requests(source_repo):
     assert release.contributors_notes(source_repo, "v2.6.0", command(source_repo, "rev-parse", "HEAD")) == ""
     command(source_repo, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "Direct change")

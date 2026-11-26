@@ -72,8 +72,8 @@ existing release summaries; they do not retroactively claim artifact signing.
   fork's results were never uploaded (and OpenSSF Scorecard counted those commits as not scanned). It now
   lists the open pull requests of the run's head owner and branch.
 - CI: the `Tests (ubuntu-latest)` and `Tests (macos-latest)` workflow (`tests.yml`, an import check and a scan
-  of `127.0.0.1`) is removed; the `test` job, the wheel smoke installs on Python 3.11 and 3.14 and the binary
-  smoke tests cover it. The `Independent human approval` workflows (`human-review*.yml`) are removed: branch
+  of `127.0.0.1`) is removed. The `test` job, the wheel smoke installs on Python 3.11 and 3.14 and the binary
+  smoke tests remain; no job installs `requirements.txt` with pip or runs a source checkout on macOS any more. The `Independent human approval` workflows (`human-review*.yml`) are removed: branch
   protection on `main` enforces the same non-author approval of the latest push.
 - CI: the `test` job runs pytest on every CPU of the runner (`pytest -n auto`) through the new dev dependency
   `pytest-xdist` 3.8.0 (with `execnet` 2.1.2); branch coverage is combined across the workers and still has
