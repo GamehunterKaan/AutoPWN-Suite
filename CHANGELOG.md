@@ -5,6 +5,17 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
+## [Unreleased]
+
+### Functional changes
+
+- After a temporary failure loading the dashboard session, the next dashboard request retries
+  automatically. Recovery preserves account edits and validation messages without a page reload.
+
+### Security changes
+
+- Session recovery keeps the existing sign-in and CSRF requirements.
+
 ## [2.10.0] - 2026-11-26
 
 ### Functional changes
