@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autopwn-suite"
-version = "2.9.2"
+version = "2.10.0"
 requires-poetry = "==2.5.1"
 description = "AutoPWN Suite - Automated Vulnerability Scanning and Exploitation Tool"
 authors = ["AutoPWN Suite Contributors"]
@@ -50,6 +50,7 @@ pytest = "^9.0.3"
 pytest-cov = "^4.1.0"
 pytest-mock = "^3.11.0"
 ruff = "==0.17.1"
+pytest-xdist = "^3.8.0"
 
 [tool.poetry.scripts]
 autopwn-suite = "autopwn_suite.cli:run"

@@ -39,11 +39,10 @@ run uses its `security-events: write` to upload. For pull requests, including th
 the results travel as an artifact and a handler from protected main (`codeql-upload.yml`) holds
 `security-events: write` to upload them to code scanning; it holds no secret, never checks out
 pull request code and validates the artifact as data.
-Review events use a credential-free notification workflow. A handler from
-protected main has Actions-write access only to rerun the original approval
-checks for the PR's current revision; it never checks out PR code or consumes
-PR artifacts. This refreshes approvals and dismissals without creating another
-required approval check.
+The non-author human approval is enforced by branch protection on `main`
+(one approving review, stale approvals dismissed on new commits, approval of the
+most recent push required, administrators included). Workflows cannot approve
+pull requests: the repository does not let `GITHUB_TOKEN` approve reviews.
 
 ## Continuity and project direction
 

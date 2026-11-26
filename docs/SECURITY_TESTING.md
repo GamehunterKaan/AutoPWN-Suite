@@ -166,26 +166,21 @@ or when this table names a file that does not exist. Third-party actions are pin
 to full commit SHAs, every checkout sets `persist-credentials: false`, and each
 workflow declares its permissions at workflow level and a job states its own where it
 needs more or less. The third column lists everything beyond read-only contents. The
-required status checks are `test`, `Tests (ubuntu-latest)`, `Tests (macos-latest)`,
-`Security policy` and `Independent human approval`, plus the CodeQL checks `Analyze (actions)`,
+required status checks are `test` and `Security policy`, plus the CodeQL checks `Analyze (actions)`,
 `Analyze (javascript-typescript)`, `Analyze (python)` and `CodeQL`; the workflows behind them have no
 `paths:` filter.
 
 | Workflow | Runs on | Permissions beyond read-only contents | What it checks or does |
 | --- | --- | --- | --- |
-| `poetry-tests.yml` | Pull request and push to `main` | None | Check `test`: lockfile check, installation of the locked dependencies with the `update` extra (so the Sigstore bundle parser is under test), Ruff, JavaScript syntax and ESLint, the locked-requirements export, installation of system Nmap and gettext, the translation-catalog drift check, then pytest with 80% branch coverage. |
-| `tests.yml` | Pull request and push to `main` and `dev` | None | Checks `Tests (ubuntu-latest)` and `Tests (macos-latest)`: Python 3.11 with `requirements.txt`, an import smoke test and a scan of `127.0.0.1` with Nmap. |
+| `poetry-tests.yml` | Pull request and push to `main` | None | Check `test`: lockfile check, installation of the locked dependencies with the `update` extra (so the Sigstore bundle parser is under test), Ruff, JavaScript syntax and ESLint, the locked-requirements export, installation of system Nmap and gettext, the translation-catalog drift check, then pytest with 80% branch coverage, run in parallel on every CPU of the runner (`pytest -n auto`, pytest-xdist). |
 | `codeql.yml` | Pull request and push to `main`, weekly | `security-events: write` in its one job (a pull request run is read-only and does not use it) | Checks `Analyze (actions)`, `Analyze (javascript-typescript)` and `Analyze (python)`: CodeQL with `build-mode: none`, so no code of the pull request runs. A pull request run leaves its SARIF file as an artifact; a push or the weekly run uploads directly. |
 | `codeql-upload.yml` | `workflow_run` of `codeql.yml`, from `main` | `security-events: write` in its one job | Uploads a pull request's CodeQL results to code scanning, which produces the `CodeQL` check, including for a fork; checks out no pull request code (see [below](#codeql-for-pull-requests-from-forks)). |
 | `install-smoke.yml` | Pull request and push to `main` and `dev` | None | Installs the built wheel into a clean environment and starts it (Ubuntu, macOS and Windows, Python 3.11 and 3.14); archives the commit the way a release does and builds the standalone binaries from that archive through `build-binary.yml`. |
 | `build-binary.yml` | Reusable: called by `install-smoke.yml` and `publish-docker.yml` | None | Builds each standalone binary twice on its own runner (Linux amd64 and arm64, Windows amd64, macOS arm64) from the pinned interpreter and hash-pinned requirements, fails unless both builds are identical, smoke-tests it and writes its SBOM. |
 | `security.yml` | Pull request and push to `main`; reusable with a release commit | None | Check `Security policy`: `scripts/security_policy.py` (OSV-Scanner SCA of the lockfile and the pinned release build tools, Bandit SAST). The release workflows run it on the exact release commit. |
 | `dynamic-analysis.yml` | Pull request and push to `main`, manually; reusable with a release commit | None | OWASP ZAP baseline scan of the running dashboard, unauthenticated and signed in (see [Dynamic analysis](#dynamic-analysis-owasp-zap-baseline)). The release workflows need it before they push or publish anything. |
-| `cflite_pr.yml` | Pull requests that change `autopwn_suite/`, `scripts/fuzz/`, `.clusterfuzzlite/`, `requirements-locked.txt` or the workflow itself (a path filter; not a required check) | None (the job token is read-only) | ClusterFuzzLite builds the Atheris harnesses in `scripts/fuzz/` and fuzzes the changed code for 180 seconds. |
+| `cflite_pr.yml` | Pull requests that change `autopwn_suite/`, `scripts/fuzz/`, `.clusterfuzzlite/`, `requirements-locked.txt` or the workflow itself (a path filter; not a required check) | None (the job token is read-only) | ClusterFuzzLite builds the Atheris harnesses in `scripts/fuzz/` (in parallel) and fuzzes the changed code for 120 seconds on every core of the runner (`parallel-fuzzing`). |
 | `scorecard.yml` | Weekly, on push to `main` and on branch-protection changes | `security-events: write` and `id-token: write` in its one job | OpenSSF Scorecard analysis; uploads the SARIF results to code scanning and publishes them to the OpenSSF API for the badge. It gates nothing and stores no secret. |
-| `human-review.yml` | Pull request | `pull-requests: read` | Check `Independent human approval`: a human other than the author must approve the current revision. |
-| `human-review-events.yml` | Pull request review submitted or dismissed | None (`permissions: {}`) | Credential-free notification that a review changed. |
-| `human-review-refresh.yml` | `workflow_run` of the notification, from `main` | `actions: write` and `pull-requests: read` in its one job | Reruns the approval check for the pull request's current revision; never checks out pull request code. |
 | `publish-docker.yml` | Published release; manually from `main` to recover one | `id-token: write` (sign job), `contents: write` (publish job), Docker Hub secrets (push and sign jobs) | Validates the tag, runs the security and dynamic-analysis workflows and the binary builds, builds and scans each image architecture, pushes, signs with Sigstore (the image signature check is retried for about two minutes in case Docker Hub lists the new signature late; the signing runs once) and uploads the release assets. See [Releasing](RELEASING.md). |
 | `publish-pypi.yml` | Published release; manually from `main`, which runs the gates and the build but cannot publish (the `pypi` environment admits only `v*` tags) | `id-token: write` in the publish job, which runs in the `pypi` environment | The same validation and gates, two identical builds of the wheel and source distribution, a clean-install smoke test, then PyPI trusted publishing with attestations. See [Releasing](RELEASING.md). |
 | `backfill-release-signatures.yml` | Manually from `main` | `id-token: write` (sign job), `contents: write` (publish job), Docker Hub secrets (sign job) | Signs an existing release and its original image digest without rebuilding anything (the image signature check is retried for about two minutes, as in `publish-docker.yml`). See [Releasing](RELEASING.md#authenticity-backfill-for-an-existing-release). |
@@ -202,8 +197,10 @@ categories (`/language:<name>`), so the required checks and the alert history ar
    to an artifact per language and finishes.
 2. `codeql-upload.yml` starts from `main` when that run completes. For each language it downloads the
    artifact, accepts exactly the two expected files, requires a SARIF 2.1.0 log of the CodeQL tool with
-   that language's category, finds the pull request through the GitHub API (open, targets `main`, same
-   head commit and branch, and a test merge commit equal to the analyzed commit) and uploads the file
+   that language's category, finds the pull request through the GitHub API (it lists the open pull
+   requests from the run's head owner and branch, because GitHub's commit-to-pull-request lookup returns
+   nothing for an open fork pull request; then requires open, targets `main`, same head commit and branch,
+   and a test merge commit equal to the analyzed commit) and uploads the file
    to `refs/pull/<number>/merge`. The number, the commit and the category come from the API and
    fixed values, never from the artifact. It checks out no pull request code, and a result for a
    pull request that has since changed is not uploaded.

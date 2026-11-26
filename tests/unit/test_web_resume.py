@@ -44,10 +44,10 @@ def test_recording_many_findings_stays_fast_and_keeps_the_checkpoint_in_step():
     context = ScanContext("http://example.com/", MagicMock(), checkpoint=state, on_finding=seen.append)
     with context.activate():
         results = [finding("XSS", f"http://example.com/p?id={number}", "Unescaped reflection", parameter="id") for number in range(1_500)]
-        started = time.perf_counter()
+        started = time.process_time()
         for result in results + results[:10]:
             context.record_finding(result)
-        elapsed = time.perf_counter() - started
+        elapsed = time.process_time() - started
     assert elapsed < 2
     assert len(context.findings) == len(state["findings"]) == len(seen) == 1_500
     assert state["findings"] == context.findings

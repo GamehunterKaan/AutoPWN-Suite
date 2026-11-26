@@ -652,8 +652,8 @@ release that contains it.
 - Status: **fixed in v2.7.0** (2026-10-19) for the failures listed under Impact; the
   limits listed under Residual remain. Fixed released version: **2.7.0**. Two further
   failures of the same kind, found on 2026-11-26 (a score that is not a number from 0 to
-  10, and `metadata` values that are not text), are **fixed on `main`, not yet
-  released**; no released version contains those two fixes.
+  10, and `metadata` values that are not text), are **fixed in v2.10.0** (2026-11-26);
+  2.9.2 and earlier remain affected by those two.
 - CWE-409 and CWE-755; low and availability only, requiring a database file that an
   attacker shaped or damage corrupted, and an operator who then scans with it.
 - Prerequisite: the scanner reads a database file that was copied from another machine
@@ -704,8 +704,8 @@ release that contains it.
   code). `test_one_search_inflates_a_bounded_total_not_only_a_bounded_record` covers the
   search budget; it patches the new limits, so it cannot run on the previous code as it
   is.
-- Further failures, fixed on `main` and not yet released (measured on v2.9.2; v2.7.0
-  through v2.9.2 have the same code):
+- Further failures, fixed in v2.10.0 (measured on v2.9.2; v2.7.0 through v2.9.2 have
+  the same code):
   - A score of `NaN` or `Infinity` (Python's JSON parser accepts both) passed the lookup,
     and the dashboard returned it as a bare `NaN` or `Infinity` in `GET /api/hosts`,
     which a browser's `JSON.parse` rejects; the dashboard's polling request ignores that

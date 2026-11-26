@@ -5,7 +5,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 <table align="center">
   <tr>
     <td align="center">
-      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/poetry-tests.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/poetry-tests.yml/badge.svg" alt="tests"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml/badge.svg" alt="security policy"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml/badge.svg" alt="dynamic analysis"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/releases"><img src="https://img.shields.io/github/v/release/GamehunterKaan/AutoPWN-Suite?color=3ba9ee&label=release" alt="release"></a>
@@ -560,8 +560,8 @@ single-file binaries that need no Python installation: `linux-amd64`, `linux-arm
 executable and run it:
 
 ```bash
-chmod +x autopwn-suite-v2.9.2-linux-amd64
-./autopwn-suite-v2.9.2-linux-amd64 --help
+chmod +x autopwn-suite-v2.10.0-linux-amd64
+./autopwn-suite-v2.10.0-linux-amd64 --help
 ```
 
 The binaries are checksum-verified and Sigstore-signed but not code-signed for Windows or
