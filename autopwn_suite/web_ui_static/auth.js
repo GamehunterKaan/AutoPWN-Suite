@@ -5,23 +5,48 @@
   const nativeFetch = window.fetch.bind(window);
   let csrf = '';
   function expired() { window.location.replace('/login'); }
-  function displayAccount(username) {
-    document.getElementById('account-username').value = username;
+  const usernameInput = document.getElementById('account-username');
+  const message = document.getElementById('account-message');
+  let usernameEdited = false;
+  let showingSessionError = false;
+  usernameInput.addEventListener('input', () => { usernameEdited = true; });
+  function displayAccount(username, updateInput = true) {
+    if(updateInput) usernameInput.value = username;
     document.getElementById('auth-username').textContent = username;
   }
-  const ready = (async () => {
+  let session;
+  let unauthorized = false;
+  async function loadSession() {
     const response = await nativeFetch('/api/auth/session', {credentials:'same-origin', cache:'no-store'});
-    if(response.status === 401) { expired(); throw new Error(window.i18n.t('auth.sign_in_to_continue')); }
-    const result = await response.json();
-    if(!response.ok) throw new Error(result.error || window.i18n.t('auth.account_unavailable'));
+    if(response.status === 401) { unauthorized = true; expired(); throw new Error(window.i18n.t('auth.sign_in_to_continue')); }
+    const result = await response.json().catch(() => null);
+    if(!response.ok || !result) throw new Error(result?.error || window.i18n.t('auth.account_unavailable'));
     csrf = result.csrf_token;
-    displayAccount(result.username);
-  })();
+    displayAccount(result.username, !usernameEdited && !usernameInput.value);
+    if(showingSessionError) {
+      message.textContent = '';
+      showingSessionError = false;
+    }
+  }
+  function ensureSession() {
+    if(!session) {
+      session = loadSession();
+      session.catch(error => {
+        if(!unauthorized) session = undefined;
+        if(!message.textContent || showingSessionError) {
+          message.textContent = error.message;
+          showingSessionError = true;
+        }
+      });
+    }
+    return session;
+  }
+  const initial = ensureSession();
   // All dashboard fetch calls, including web-security controls, share this gate.
   window.fetch = async (input, options = {}) => {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url, window.location.href);
     if(url.origin !== window.location.origin) return nativeFetch(input, options);
-    await ready;
+    await ensureSession();
     const headers = new Headers(options.headers || (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined));
     const method = (options.method || input.method || 'GET').toUpperCase();
     headers.set('X-App-Language', window.i18n.getLang());
@@ -38,7 +63,7 @@
   });
   document.getElementById('account-form').addEventListener('submit', async event => {
     event.preventDefault();
-    const message = document.getElementById('account-message');
+    showingSessionError = false;
     const button = document.getElementById('account-save');
     const current = document.getElementById('account-current-password');
     const password = document.getElementById('account-password');
@@ -59,6 +84,5 @@
     } catch(error) { message.textContent = error.message; }
     finally { button.disabled = false; }
   });
-  window.dashboardAuth = {ready};
-  ready.catch(error => { document.getElementById('account-message').textContent = error.message; });
+  window.dashboardAuth = {get ready() { return session || initial; }};
 })();
