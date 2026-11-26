@@ -127,7 +127,9 @@ are JSON except static files, SSE and downloads. Errors normally use
 `{"error":"message"}` with 400 (invalid input), 401 (not signed in), 403
 (CSRF/origin/HTTPS/credential refusal), 404 (missing resource), 409
 (state/offline conflict), 429 (too many sign-in attempts) or 500 (operation
-failure). POST creation returns 201 where noted; asynchronous verification/database
+failure). A request body larger than 1 MiB (4,096 bytes for `/api/auth/login` and
+`/api/auth/account`) is answered 413 before it is parsed, with the server's default
+error page, not a JSON object. POST creation returns 201 where noted; asynchronous verification/database
 updates return 202. Responses the dashboard can localize also carry a stable
 machine-readable `"code"` (for example `{"error":"...","code":"invalid_scan_config"}`);
 the English `"error"` or `"message"` text is unchanged.

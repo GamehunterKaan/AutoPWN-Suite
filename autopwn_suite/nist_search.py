@@ -205,6 +205,19 @@ class VulnerabilityLookup:
             self.local.close()
 
 
+_REDIRECTS = (301, 302, 303, 307, 308)
+_RETRY_LIMIT = 30  # Seconds; the NVD counts requests over 30 seconds, and a scan checks Stop only between lookups.
+
+
+def _retry_delay(response, attempt, pause) -> int:
+    """Seconds to wait before the next try: what a rate-limit answer (429 or 403) asks for in Retry-After, when
+    that is a whole number of seconds, otherwise a pause that doubles with each try; never more than _RETRY_LIMIT."""
+    asked = response.headers.get("Retry-After") if response is not None and response.status_code in (403, 429) else None
+    if isinstance(asked, str) and asked.isascii() and asked.isdigit() and len(asked) <= 6:
+        return min(int(asked), _RETRY_LIMIT)
+    return min(max(pause, 1) * 2 ** attempt, _RETRY_LIMIT)
+
+
 def searchCVE(keyword: str, log, apiKey=None, *, strict=False, force_refresh=False) -> list[Vulnerability]:
     # https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=OpenSSH+8.8
     return _query({"keywordSearch": keyword}, keyword, keyword, log, apiKey, strict, force_refresh)
@@ -236,12 +249,18 @@ def _query(parameters, keyword, cache_key, log, apiKey, strict, force_refresh) -
     start_index = 0
     while True:
         page = None
+        records = None
         last_error = None
         for tries in range(3):
             response = None
             try:
                 sleep(sleep_time)
-                response = get(url, params=dict(parameters), headers=headers, timeout=20)
+                # Rejected CVEs are left out. A redirect is not followed: it would carry the apiKey header to
+                # whatever host the Location names.
+                response = get(url, params={**parameters, "noRejected": ""}, headers=headers, timeout=20,
+                               allow_redirects=False)
+                if response.status_code in _REDIRECTS:
+                    raise ValueError("NVD answered with a redirect")
                 response.raise_for_status()
                 data = response.json()
                 if not isinstance(data, dict) or not isinstance(data.get("vulnerabilities"), list):
@@ -253,15 +272,7 @@ def _query(parameters, keyword, cache_key, log, apiKey, strict, force_refresh) -
                     raise ValueError("NVD returned the wrong result page")
                 if not data["vulnerabilities"] and start_index < total:
                     raise ValueError("NVD returned an empty page before all results")
-                parsed = []
-                for vuln in data["vulnerabilities"]:
-                    (CVE_ID, description, severity, severity_score,
-                     details_url, exploitability) = FindVars(vuln)
-                    parsed.append(Vulnerability(keyword, CVE_ID, description, severity,
-                                                severity_score, details_url, exploitability,
-                                                weaknesses=find_weaknesses(vuln),
-                                                affected=find_affected(vuln)))
-                page = parsed
+                records = data["vulnerabilities"]
             except Exception as error:
                 last_error = error
                 if response is not None and response.status_code in (403, 429):
@@ -270,9 +281,15 @@ def _query(parameters, keyword, cache_key, log, apiKey, strict, force_refresh) -
                         _("Requests are being rate limited by NIST API, please get a NIST API key to prevent this."),
                     )
                 if tries < 2:
-                    sleep(sleep_time)
+                    sleep(_retry_delay(response, tries, sleep_time))
             else:
                 break
+        if records is not None:
+            try:  # outside the tries: a record of the wrong shape fails the same way every time
+                page = [Vulnerability(keyword, *FindVars(vuln), weaknesses=find_weaknesses(vuln),
+                                      affected=find_affected(vuln)) for vuln in records]
+            except Exception as error:
+                last_error = error
         if page is None:
             if strict:
                 raise RuntimeError(_("NVD lookup failed for {keyword}").format(keyword=keyword)) from last_error

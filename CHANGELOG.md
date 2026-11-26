@@ -51,6 +51,19 @@ existing release summaries; they do not retroactively claim artifact signing.
   it is a number from 0 to 10; any other value leaves the finding without a score (`UNKNOWN`, 0.0).
 - The daemon log `/var/log/autopwn-daemon.log` is created with mode 0600 and `--daemon-install` sets an
   existing log to 0600. Read it as root (`sudo tail -f /var/log/autopwn-daemon.log`).
+- The dashboard answers HTTP 413 to a request body larger than 1 MiB, before parsing it. Sign-in and the
+  account route keep their limit of 4,096 bytes; the other routes had none. Every route takes a small
+  JSON object, so no request the page sends comes near the limit.
+- Online NVD lookups wait longer before a retry: for the `Retry-After` of a 429 or 403 answer, or for a
+  pause that doubles with each try (1 s then 2 s with an API key, 8 s then 16 s without), at most 30
+  seconds. The three tries were 0.1 s apart with a key, so one rate-limit answer used them all up and
+  the scan fell back to the local database or stopped. A record that cannot be parsed fails the lookup
+  at once instead of being requested three times.
+- Online NVD lookups leave out rejected CVEs (the API's `noRejected` parameter), which have no
+  applicability data and could only be reported through a product name in their text. The local
+  database still holds the rejected records of the NVD feeds, so an offline lookup can return one.
+- An NVD answer that is a redirect is a failed request and is not followed.
+- `GET /api/scans` counts each job's hosts, ports and CVEs without copying them; the totals are the same.
 
 ### Security changes
 
@@ -78,6 +91,19 @@ existing release summaries; they do not retroactively claim artifact signing.
   root service's configuration.
 - No security impact for the other functional changes above (exit status, saved output, envelope sender,
   host details, pre-release ordering, warning text).
+- Hardening, with no advisory:
+  - The dashboard bounds every request body (1 MiB; 4,096 bytes for sign-in and the account route).
+    Only a signed-in client reached the unbounded routes, since a request without a session is answered
+    401 before its body is read, so this limits what a session can make the server hold in memory.
+  - NVD requests no longer follow redirects. `requests` keeps a custom header when a redirect names
+    another host, so a redirect would have carried the `apiKey` header to that host. The NVD is reached
+    over verified HTTPS, so this needs the NVD itself (or a host in front of it) to send the redirect.
+  - The local vulnerability database is read through a connection with `PRAGMA query_only` on and
+    `PRAGMA trusted_schema` off, in addition to the read-only open mode: nothing is written through it,
+    and views or triggers in a copied file cannot call SQL functions or virtual tables with side effects
+    (SQLite 3.31 or newer). A copied file can still define its own views, so the AUTOPWN-SA-2026-018
+    residual about the file's structure is unchanged.
+- No security impact for the retry pauses, the left-out rejected CVEs and the job counts.
 
 ## [2.9.2] - 2026-11-22
 

@@ -774,6 +774,22 @@ class TestScanJob:
         assert d["port_count"] == 0
         assert d["vuln_count"] == 0
 
+    def test_to_dict_counts_hosts_ports_and_cves_without_copying_them(self, wu):
+        """/api/scans is polled for every job; each call deep-copied every host with all of its CVEs to count them."""
+        class NotCopied:
+            def __deepcopy__(self, memo):
+                raise AssertionError("to_dict copied a host's findings")
+
+        job = wu.ScanJob("id1", "target", {"target": "target"})
+        first, second = job.get_or_create_host("10.0.0.1"), job.get_or_create_host("10.0.0.2")
+        first["ports"] = [{"port": 22}, {"port": 80}]
+        first["vulns"] = [NotCopied(), NotCopied(), NotCopied()]
+        second["ports"] = [{"port": 443}]
+
+        d = job.to_dict()
+
+        assert (d["host_count"], d["port_count"], d["vuln_count"]) == (2, 3, 3)
+
     def test_to_dict_copies_the_config_while_holding_the_job_lock(self, wu):
         """The scan thread adds config keys under the lock; iterating them outside raised during /api/scans."""
         import threading
@@ -2814,3 +2830,14 @@ def test_settings_reject_an_unsupported_language(client, wu, value):
     assert response.status_code == 400
     assert response.get_json() == {"error": "language must be empty or a supported language", "code": "invalid_language"}
     assert wu._settings["language"] != value
+
+
+@pytest.mark.parametrize("content_type", ["application/json", "text/plain"])
+def test_a_signed_in_request_body_over_the_limit_is_answered_413(client, wu, content_type):
+    """Only sign-in and the account route had a limit; any other route read a body of any size into memory."""
+    oversized = b'{"nist_api_key": "' + b"x" * wu._MAX_REQUEST_BYTES + b'"}'
+    assert client.put("/api/settings", data=oversized, content_type=content_type).status_code == 413
+    assert client.post("/api/scan/stop", data=oversized, content_type=content_type).status_code == 413
+    assert wu._get_setting("nist_api_key") == ""
+    within = b'{"nist_api_key": "' + b"x" * 1024 + b'"}'
+    assert client.put("/api/settings", data=within, content_type=content_type).status_code == 200

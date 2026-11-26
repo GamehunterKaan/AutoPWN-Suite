@@ -1064,3 +1064,18 @@ def test_version_keys_never_raise_and_always_compare():
         keys.append(update_checker._parse_version(mutate(rng.choice(seeds), rng) + rng.choice(JUNK)))
     assert sorted(keys)[0] <= sorted(keys)[-1]  # every key compares with every other one
     assert all(isinstance(release, tuple) and release and 0 <= stage <= 6 for release, stage, _rest in keys)
+
+
+def test_the_nvd_retry_pause_is_bounded_for_any_retry_after_header():
+    """The NVD, or whatever answers in its place, controls the header."""
+    from autopwn_suite.nist_search import _RETRY_LIMIT, _retry_delay
+    rng = random.Random(SEED)
+    values = ["7", "0", "30", "31", "86400", "9" * 400, "-1", "1.5", " 7", "7 ", "1e3", "0x10", "٧", "²", "", "Wed, 21 Oct 2026 07:28:00 GMT",
+              None, 7, 7.5, True, [], {}, b"7"]
+    for _ in range(3000):
+        header = rng.choice(values + [mutate("120", rng), mutate("Wed, 21 Oct 2026 07:28:00 GMT", rng)])
+        response = rng.choice([None, SimpleNamespace(status_code=rng.choice([200, 403, 429, 500, None, "429"]),
+                                                     headers={} if header is None else {"Retry-After": header})])
+        pause = _retry_delay(response, rng.randint(0, 2), rng.choice([0.1, 8]))
+        assert isinstance(pause, (int, float)) and not isinstance(pause, bool) and 0 <= pause <= _RETRY_LIMIT
+    assert _retry_delay(SimpleNamespace(status_code=429, headers={"Retry-After": "7"}), 0, 0.1) == 7
