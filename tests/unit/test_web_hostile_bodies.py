@@ -24,8 +24,20 @@ from autopwn_suite.web.similarity import similarity
 from autopwn_suite.web.sqli import SQLIScanner
 from autopwn_suite.web.xss import reflection_context
 
-# CPU time of this process: the limit holds when other test workers share the CPUs (pytest -n auto).
-LIMIT_SECONDS = 2.0
+
+def _coverage_is_tracing():
+    try:
+        import coverage
+    except ImportError:
+        return False
+    return coverage.Coverage.current() is not None
+
+
+# CPU time of this process, so other test workers on the same CPUs (pytest -n auto) do not count. Branch
+# coverage tracing, which the CI test job always runs, makes this pure-Python work about three times slower
+# on Python 3.11 (the nested-forms page: 0.30 s untraced, 0.96 s traced), so the limit allows for it. The
+# unbounded versions these tests guard against took many times longer either way.
+LIMIT_SECONDS = 2.0 * (3 if _coverage_is_tracing() else 1)
 
 SQL_BODIES = [
     "microsoft odbc " * 12_000, "microsoft jet " * 12_000, "microsoft access " * 12_000, "warning " * 20_000,
