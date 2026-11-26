@@ -256,7 +256,12 @@ their arguments (`--script http-fetch`, `--script-args`). Those native options r
 functionality of the command line and the Python API only.
 
 External provider data enters NVD parsing, local DB updates and exploit-reference
-storage. Database readers use read-only snapshots and parameterized operations;
+storage. NVD requests do not follow a redirect (it is a failed request, so the
+`apiKey` header is never sent to another host), leave out rejected CVEs
+(`noRejected`), and before a retry wait for the `Retry-After` of a 429 or 403 answer
+or for a pause that doubles, at most 30 seconds (`_query` and `_retry_delay` in
+`autopwn_suite/nist_search.py`). Database readers use read-only snapshots (opened
+read-only, with `query_only` on and `trusted_schema` off) and parameterized operations;
 updates validate/stage/replace. A mirror copied from another system is not
 validated again as a whole, so each stored record is inflated with a size limit
 (16 MiB, and 256 MiB for all the records one search reads, so that many matching
