@@ -76,12 +76,14 @@ jobs:
                 throw new Error('The results do not belong to this language');
               }
             }
-            // Fork runs can omit pull_requests; resolve through GitHub's commit association API, then
-            // validate every candidate's live state. Only a pull request that is open, targets main, still
-            // has the analyzed head and whose test merge commit is the analyzed commit gets the results.
+            // A fork's run lists no pull_requests, and GitHub's commit association API returns nothing for
+            // a commit that only an open fork pull request holds; list the open pull requests from the
+            // run's head repository owner and branch instead. Then validate every candidate's live state.
+            // Only a pull request that is open, targets main, still has the analyzed head and whose test
+            // merge commit is the analyzed commit gets the results.
             const candidates = run.pull_requests?.length ? run.pull_requests :
-              await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,
-                {...context.repo, commit_sha: run.head_sha});
+              await github.paginate(github.rest.pulls.list, {...context.repo, state: 'open', base: 'main',
+                head: `${run.head_repository?.owner?.login}:${run.head_branch}`});
             const matching = [];
             for (const candidate of candidates) {
               let pr;

@@ -211,6 +211,12 @@ The manifest's `assets` array hashes the downloadable source archives, binaries,
 member's `name` and `sha256` in `files`. The ZIP uses fixed timestamps and member
 ordering; its completed contents are verified before separate staging copies
 are removed. Release notes are read from the ZIP for the GitHub release body.
+The notes are the version's changelog section followed by a generated
+`### Contributors` section (skipped when the changelog section has its own): the
+pull requests merged into `main` since the previous non-pre-release tag, by the
+owner of each head branch (Dependabot for its branches), with their titles made
+inert Markdown, the first-time contributors, and the compare link. It is read from
+the merge commits' messages, so it needs no network access.
 The container's exact `sha256:` digest also has a Cosign registry signature.
 
 The self-updater is a second consumer of that manifest. `--apply-update` downloads

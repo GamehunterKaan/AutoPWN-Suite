@@ -104,11 +104,12 @@ def pull(number=83, **overrides):
     return value
 
 
-def run_script(tmp_path, *, event="pull_request", prs=None, associated=None, run_pull_requests=None, directory=None, language="python"):
+def run_script(tmp_path, *, event="pull_request", prs=None, listed=None, run_pull_requests=None, directory=None, language="python"):
     prs = [pull()] if prs is None else prs
     scenario = {"dir": str(directory or _artifact(tmp_path)), "prs": {str(item["number"]): item for item in prs},
-                "associated": associated if associated is not None else [{"number": item["number"]} for item in prs],
-                "run": {"event": event, "head_sha": SHA, "head_branch": "topic", "head_repository": {"full_name": "fork/repo"},
+                "listed": listed if listed is not None else [{"number": item["number"]} for item in prs],
+                "run": {"event": event, "head_sha": SHA, "head_branch": "topic",
+                        "head_repository": {"full_name": "fork/repo", "owner": {"login": "fork"}},
                         "pull_requests": run_pull_requests or []},
                 "language": language}
     harness = r"""
@@ -119,8 +120,11 @@ const github = {
     const data = {...scenario.prs[String(pull_number)]};
     if (scenario.prs[String(pull_number)].computeAfter && result.reads <= scenario.prs[String(pull_number)].computeAfter) data.mergeable = null;
     return {data};
-  }}, repos: {listPullRequestsAssociatedWithCommit: () => {}}},
-  paginate: async (fn, args) => { result.args = args; return scenario.associated; }
+  }, list: () => {}}},
+  paginate: async (fn, args) => {
+    if (fn !== github.rest.pulls.list) throw new Error('unexpected listing');
+    result.args = args; return scenario.listed;
+  }
 };
 const context = {repo: {owner: 'owner', repo: 'repo'}, payload: {workflow_run: scenario.run}};
 const core = {setOutput: (key, value) => { result.outputs[key] = value; }, notice: message => result.notices.push(message)};
@@ -139,16 +143,18 @@ const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
 
 @pytestmark_node
-def test_a_fork_pull_request_is_resolved_through_the_commit_association_and_gets_its_results_uploaded(tmp_path):
+def test_a_fork_pull_request_is_found_by_its_head_branch_and_gets_its_results_uploaded(tmp_path):
+    # Regression: the commit association API returns nothing for an open fork pull request's head, so
+    # fork pull requests never got the CodeQL check (and Scorecard counted their commits as unscanned).
     result = run_script(tmp_path)
     assert not result.get("error")
     assert result["outputs"] == {"upload": "true", "number": "83", "sha": MERGE}
-    assert result["args"]["commit_sha"] == SHA
+    assert result["args"] == {"owner": "owner", "repo": "repo", "state": "open", "base": "main", "head": "fork:topic"}
 
 
 @pytestmark_node
 def test_a_same_repository_pull_request_listed_by_the_run_needs_no_lookup(tmp_path):
-    result = run_script(tmp_path, run_pull_requests=[{"number": 83}], associated=[])
+    result = run_script(tmp_path, run_pull_requests=[{"number": 83}], listed=[])
     assert result["outputs"]["upload"] == "true" and "args" not in result
 
 

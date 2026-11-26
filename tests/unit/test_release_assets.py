@@ -97,6 +97,47 @@ def test_notes_must_describe_functional_and_security_changes():
         release.release_notes("## [2.6.0]\n### Functional changes\nSomething.\n### Security changes\n", "v2.6.0")
 
 
+def _merge_pull_request(repo, number, branch, title):
+    command(repo, "switch", "-q", "-c", branch.split("/", 1)[1], "main")
+    command(repo, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "change")
+    command(repo, "switch", "-q", "main")
+    command(repo, "-c", "commit.gpgsign=false", "merge", "-q", "--no-ff", branch.split("/", 1)[1],
+            "-m", f"Merge pull request #{number} from {branch}", "-m", title)
+
+
+def test_notes_credit_the_pull_requests_merged_since_the_previous_release(source_repo):
+    _merge_pull_request(source_repo, 1, "owner/before", "Earlier work")
+    command(source_repo, "tag", "v2.6.1")
+    _merge_pull_request(source_repo, 2, "alice/fix-x", "Fix <b>x</b> for @bob, see [here](http://e.test)")
+    _merge_pull_request(source_repo, 3, "owner/dependabot/pip/certifi-1", "Bump certifi")
+    _merge_pull_request(source_repo, 4, "owner/feature", "Add y")
+    command(source_repo, "tag", "v2.7.0-rc.1")  # a pre-release is not the previous release
+    _merge_pull_request(source_repo, 5, "alice/fix-z", "Fix z")
+    command(source_repo, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "Not a merge")
+    head = command(source_repo, "rev-parse", "HEAD")
+
+    contributors = release.contributors_notes(source_repo, "v2.7.0", head)
+
+    assert contributors == (
+        "### Contributors\n\nThank you to everyone who contributed to this release:\n\n"
+        "- @alice: Fix &lt;b&gt;x&lt;/b&gt; for `@bob`, see \\[here\\](http://e.test) (#2), Fix z (#5)\n"
+        "- @dependabot: Bump certifi (#3)\n"
+        "- @owner: Add y (#4)\n\n"
+        "### New contributors\n\n- @alice made their first contribution in #2\n"
+        "- @dependabot made their first contribution in #3\n\n"
+        f"**Full Changelog**: {release.REPOSITORY_URL}/compare/v2.6.1...v2.7.0\n")
+    changelog = "## [2.7.0]\n### Functional changes\nA.\n### Security changes\nB.\n"
+    assert release.release_notes(changelog, "v2.7.0", contributors).endswith("\nB.\n\n" + contributors)
+    written = changelog + "### Contributors\nThanks, Alice.\n"
+    assert release.release_notes(written, "v2.7.0", contributors).endswith("### Contributors\nThanks, Alice.\n")
+
+
+def test_notes_have_no_contributors_section_without_a_previous_release_or_merged_pull_requests(source_repo):
+    assert release.contributors_notes(source_repo, "v2.6.0", command(source_repo, "rev-parse", "HEAD")) == ""
+    command(source_repo, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "Direct change")
+    assert release.contributors_notes(source_repo, "v2.6.1", command(source_repo, "rev-parse", "HEAD")) == ""
+
+
 def test_runtime_version_must_match(source_repo):
     (source_repo / "autopwn_suite" / "__init__.py").write_text('__version__ = "2.5.0"\n')
     command(source_repo, "add", ".")

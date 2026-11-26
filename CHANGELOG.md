@@ -5,7 +5,7 @@ Confirmed vulnerabilities and mitigation status are tracked separately in
 [Security advisories](docs/SECURITY_ADVISORIES.md). The entries below backfill
 existing release summaries; they do not retroactively claim artifact signing.
 
-## [Unreleased]
+## [2.10.0] - 2026-11-26
 
 ### Functional changes
 
@@ -64,6 +64,20 @@ existing release summaries; they do not retroactively claim artifact signing.
   database still holds the rejected records of the NVD feeds, so an offline lookup can return one.
 - An NVD answer that is a redirect is a failed request and is not followed.
 - `GET /api/scans` counts each job's hosts, ports and CVEs without copying them; the totals are the same.
+- Release notes end with a generated Contributors section: each contributor's pull requests merged since the
+  previous release, the first-time contributors and the compare link (`scripts/release_assets.py`, from the
+  merge commits). A changelog section that has its own `### Contributors` keeps it.
+- CI: pull requests from forks get the `CodeQL` check. `codeql-upload.yml` looked the pull request up through
+  GitHub's commit-to-pull-request API, which returns nothing for the head of an open fork pull request, so a
+  fork's results were never uploaded (and OpenSSF Scorecard counted those commits as not scanned). It now
+  lists the open pull requests of the run's head owner and branch.
+- CI: the `Tests (ubuntu-latest)` and `Tests (macos-latest)` workflow (`tests.yml`, an import check and a scan
+  of `127.0.0.1`) is removed; the `test` job, the wheel smoke installs on Python 3.11 and 3.14 and the binary
+  smoke tests cover it. The `Independent human approval` workflows (`human-review*.yml`) are removed: branch
+  protection on `main` enforces the same non-author approval of the latest push.
+- CI: the `test` job runs pytest on every CPU of the runner (`pytest -n auto`) through the new dev dependency
+  `pytest-xdist` 3.8.0 (with `execnet` 2.1.2); branch coverage is combined across the workers and still has
+  to reach 80%. The suite ran in about six minutes on one CPU.
 
 ### Security changes
 
@@ -104,6 +118,16 @@ existing release summaries; they do not retroactively claim artifact signing.
     (SQLite 3.31 or newer). A copied file can still define its own views, so the AUTOPWN-SA-2026-018
     residual about the file's structure is unchanged.
 - No security impact for the retry pauses, the left-out rejected CVEs and the job counts.
+- Release notes: no security impact. The Contributors section is built offline from the merge commits; a pull
+  request title is written as inert Markdown (no HTML, no link, and an `@name` in code so it notifies nobody).
+- CodeQL for forks: the upload handler keeps every check of the pull request's live state (open, targets
+  `main`, same head commit and branch, test merge commit equal to the analyzed one) and gains no permission.
+- Review and test workflows: the non-author human approval is unchanged as a control but is now enforced only
+  by branch protection (one approval, stale approvals dismissed, approval of the latest push required,
+  administrators included); `GITHUB_TOKEN` cannot approve pull requests. Removing the workflows also removes a
+  `workflow_run` handler that held `actions: write`.
+- `pytest-xdist`: no security impact. It is a dev-group dependency used only to run the tests; it is not in the
+  package, the image or the binaries, and the Security policy scans it with the rest of `poetry.lock`.
 
 ## [2.9.2] - 2026-11-22
 
