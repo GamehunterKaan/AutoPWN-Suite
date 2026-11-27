@@ -37,11 +37,15 @@ def _handshake(context, hostname, port):
     current = ACTIVE.get()
     if current:
         current.before()
-    with socket.create_connection((hostname, port), timeout=current.options["timeout"] if current else 10) as connection:
-        # Legacy contexts intentionally test whether the target accepts TLS 1.0/1.1.
-        # Only handshake/certificate metadata is exchanged: no HTTP, credentials or application data.
-        with context.wrap_socket(connection, server_hostname=hostname) as secure:
-            return secure.getpeercert(binary_form=True), secure.version()
+    try:
+        with socket.create_connection((hostname, port), timeout=current.options["timeout"] if current else 10) as connection:
+            # Legacy contexts intentionally test whether the target accepts TLS 1.0/1.1.
+            # Only handshake/certificate metadata is exchanged: no HTTP, credentials or application data.
+            with context.wrap_socket(connection, server_hostname=hostname) as secure:
+                return secure.getpeercert(binary_form=True), secure.version()
+    finally:
+        if current:
+            current.after()
 
 
 def _dns_match(pattern, hostname):

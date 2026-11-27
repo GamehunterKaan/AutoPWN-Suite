@@ -11,6 +11,17 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 - After a temporary failure loading the dashboard session, the next dashboard request retries
   automatically. Recovery preserves account edits and validation messages without a page reload.
+- The reflected XSS check and the dashboard's PoC re-verification report a script element or HTML event
+  handler only when its code is the payload's own (`alert('…')` for the four built-in payloads), or an inline
+  script whose text holds the payload's raw markup up to its trailing `</script>`, where the payload breaks
+  out of an existing script. A page that echoed the payload raw where it runs nothing, such as a quoted
+  attribute value, and also carried an escaped copy in a script, such as a JSON state object, was reported
+  as "Unescaped reflection in script element" and confirmed on re-verification (#125).
+- Web request pacing counts the delay from the end of the previous request (its response read, or its
+  failure), not from its start. The pause shrank by the time the target took to answer, and a target
+  slower than the delay got none: with a 2-second delay and 3-second answers, each request went out as
+  soon as the previous answer arrived. TLS handshakes are paced the same way. The README described the
+  old behaviour ("between request starts") (#127).
 - `PUT /api/settings` refuses a key the settings do not have (400 `unknown_setting`) and a value of the
   wrong type for `nist_api_key` or an `email` or `webhook` field (400 `invalid_setting_type`), and stores
   nothing from that request. `smtp_port` must be a JSON integer from 1 to 65535, not a boolean or numeric
@@ -23,6 +34,11 @@ existing release summaries; they do not retroactively claim artifact signing.
 ### Security changes
 
 - Session recovery keeps the existing sign-in and CSRF requirements.
+- No security impact. The change removes a false XSS candidate from scan results and keeps reporting a
+  payload reflected raw inside an existing inline script; the target's response is parsed as before and no
+  new request is sent.
+- No security impact. The configured delay is now kept against slow targets, so a scan sends requests
+  less often than before, never more often.
 - Settings input is validated with an allowlist of keys and types. No security impact: only a signed-in
   operator could store the extra keys and values. A settings file whose `offline_mode` is not a boolean now
   starts online (its default) instead of offline, so that one stray value never leaves the dashboard

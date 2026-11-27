@@ -40,6 +40,9 @@ def bounded_request(call, *args, max_bytes=1_048_576, **kwargs):
         if current and not current.discovery:
             current.issue(_("A web request failed; coverage is incomplete."))
         raise
+    finally:
+        if current:
+            current.after()
     if current:
         method, url = (args[0], args[1]) if len(args) > 1 else ("GET", args[0])
         response.autopwn_observation = current.capture(response, method, url, kwargs.get("headers", {}), started)

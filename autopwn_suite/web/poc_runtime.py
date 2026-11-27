@@ -95,18 +95,26 @@ _INACTIVE_TAGS = ("textarea", "title", "style", "xmp", "noscript", "template")
 
 
 class _Document(HTMLParser):
-    def __init__(self, marker=""):
+    def __init__(self, marker="", payload=None):
         super().__init__(convert_charrefs=True)
         self.stack, self.links, self.urls, self.heading = [], [], [], []
-        self.marker, self.active = marker, False
+        self.marker, self.active, self.code, self.script = marker, False, [], None
+        # Only the script or handler the payload created counts, as in reflection_context in xss.py: its code is the
+        # payload's own. An escaped copy in a script holds the marker too, while the raw copy may sit where it runs nothing.
+        self.expected = None if payload is None else _payload_code(payload, marker)
+        # A payload reflected raw inside an existing inline script creates no element of its own, but its raw markup
+        # (up to its own trailing </script>, where the outer script ends) breaks out of that script.
+        self.markup = None if payload is None else _raw_markup(payload)
         # Counts of the open elements, kept beside the stack: scanning the stack for every tag costs the page's
         # depth each, which is quadratic on the deeply nested page a target controls.
         self.open, self.inactive = {}, 0
 
     def handle_starttag(self, tag, attributes):
         attributes = dict(attributes)
-        if self.marker and not self.inactive and any(name.startswith("on") and self.marker in (value or "") for name, value in attributes.items()):
-            self.active = True
+        if self.marker and not self.inactive:
+            for name, value in attributes.items():
+                if name.startswith("on") and self.marker in (value or ""):
+                    self._found(value)
         if tag == "a" and "href" in attributes:
             self.links.append(attributes["href"])
         if tag in ("a", "link", "script", "img", "form"):
@@ -118,6 +126,10 @@ class _Document(HTMLParser):
                 self.inactive += 1
 
     def handle_endtag(self, tag):
+        if tag == "script" and self.script is not None:
+            code, self.script = "".join(self.script), None
+            if self.marker in code:
+                self._found(code, script=True)
         if not self.open.get(tag):
             return
         index = len(self.stack) - 1
@@ -136,9 +148,27 @@ class _Document(HTMLParser):
             attributes = self.stack[-1][1]
             if (not self.inactive
                     and not attributes.get("src")
-                    and attributes.get("type", "").strip().lower() in ("", "module", "text/javascript", "application/javascript")
-                    and self.marker in data):
-                self.active = True
+                    and attributes.get("type", "").strip().lower() in ("", "module", "text/javascript", "application/javascript")):
+                # The parser may hand a script's text over in pieces; it is compared whole at the end tag.
+                self.script = self.script if self.script is not None else []
+                self.script.append(data)
+
+    def _found(self, code, script=False):
+        self.code.append(code)
+        if self.expected is None or code.strip() == self.expected or (script and self.markup in code):
+            self.active = True
+
+
+def _raw_markup(payload):
+    """The payload up to its own trailing </script>, as in reflection_context in xss.py."""
+    return payload[:-len("</script>")] if payload.lower().endswith("</script>") else payload
+
+
+def _payload_code(payload, marker):
+    """The script text or handler value the payload carries, or the payload itself when it carries neither."""
+    document = _Document(marker)
+    document.feed(payload)
+    return next(iter(document.code), payload).strip()
 
 
 def _sql_errors(text):
@@ -326,7 +356,7 @@ def _check_http(plan, responses):
     if strategy == "xss_reflection":
         response = responses[0]
         mime = response.headers.get("Content-Type", "text/html").split(";", 1)[0].lower()
-        document = _Document(plan["marker"])
+        document = _Document(plan["marker"], plan["payload"])
         document.feed(response.text)
         return mime in ("text/html", "application/xhtml+xml") and plan["payload"] in response.text and document.active
     if strategy == "directory":

@@ -2,6 +2,7 @@
 # Copyright 2022-2026 Kaan Gültekin
 import ast
 import ipaddress
+import json
 import ssl
 from unittest.mock import MagicMock, call, patch
 
@@ -215,6 +216,28 @@ def test_xss_poc_rejects_comment_and_inactive_reflection(web_response):
     result["reproduction"].update(marker="marker", payload=payload, requests=[{"url": "http://example.com/?q=x"}])
     for context, expected in (("<html>{}</html>", "reproduced"), ("<!-- {} -->", "not_reproduced"), ("<textarea>{}</textarea>", "not_reproduced")):
         assert verify_plan(build_plan(result), transport=MagicMock(return_value=web_response(context.format(payload))))["status"] == expected
+
+
+@pytest.mark.unit
+def test_xss_poc_requires_the_script_the_payload_created(web_response):
+    result = sample("XSS", "xss_reflection")
+    payload = "<script>alert('marker')</script>"
+    result["reproduction"].update(marker="marker", payload=payload, requests=[{"url": "http://example.com/?q=x"}])
+    # Issue #125: an escaped copy in a script beside an inert raw copy is not a reflection the payload made active.
+    state = "<script>var state=" + json.dumps({"q": payload}).replace("<", "\\u003c").replace(">", "\\u003e") + ";</script>"
+    for page, expected in ((f'<input value="{payload}">{state}', "not_reproduced"), (f"{state}<p>{payload}</p>", "reproduced")):
+        assert verify_plan(build_plan(result), transport=MagicMock(return_value=web_response(page)))["status"] == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("payload", ["<script>alert('marker')</script>", "<img src=x onerror=\"alert('marker')\">",
+                                     "\"><svg onload=\"alert('marker')\"></svg>", "</textarea><script>alert('marker')</script>"])
+def test_xss_poc_reproduces_payload_reflected_raw_inside_an_existing_script(web_response, payload):
+    result = sample("XSS", "xss_reflection")
+    result["reproduction"].update(marker="marker", payload=payload, requests=[{"url": "http://example.com/?q=x"}])
+    # The payload creates no element of its own here, but its raw markup breaks out of the script around it.
+    for page in (f"<script>var q=\"{payload}\";</script>", f"<script>var state={{\"q\":'{payload}'}};</script>"):
+        assert verify_plan(build_plan(result), transport=MagicMock(return_value=web_response(page)))["status"] == "reproduced"
 
 
 @pytest.mark.unit
