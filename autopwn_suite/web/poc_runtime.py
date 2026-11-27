@@ -102,6 +102,9 @@ class _Document(HTMLParser):
         # Only the script or handler the payload created counts, as in reflection_context in xss.py: its code is the
         # payload's own. An escaped copy in a script holds the marker too, while the raw copy may sit where it runs nothing.
         self.expected = None if payload is None else _payload_code(payload, marker)
+        # A payload reflected raw inside an existing inline script creates no element of its own, but its raw markup
+        # (up to its own trailing </script>, where the outer script ends) breaks out of that script.
+        self.markup = None if payload is None else _raw_markup(payload)
         # Counts of the open elements, kept beside the stack: scanning the stack for every tag costs the page's
         # depth each, which is quadratic on the deeply nested page a target controls.
         self.open, self.inactive = {}, 0
@@ -126,7 +129,7 @@ class _Document(HTMLParser):
         if tag == "script" and self.script is not None:
             code, self.script = "".join(self.script), None
             if self.marker in code:
-                self._found(code)
+                self._found(code, script=True)
         if not self.open.get(tag):
             return
         index = len(self.stack) - 1
@@ -150,10 +153,15 @@ class _Document(HTMLParser):
                 self.script = self.script if self.script is not None else []
                 self.script.append(data)
 
-    def _found(self, code):
+    def _found(self, code, script=False):
         self.code.append(code)
-        if self.expected is None or code.strip() == self.expected:
+        if self.expected is None or code.strip() == self.expected or (script and self.markup in code):
             self.active = True
+
+
+def _raw_markup(payload):
+    """The payload up to its own trailing </script>, as in reflection_context in xss.py."""
+    return payload[:-len("</script>")] if payload.lower().endswith("</script>") else payload
 
 
 def _payload_code(payload, marker):

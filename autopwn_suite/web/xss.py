@@ -36,13 +36,22 @@ def _active_code(markup, marker):
             pending.extend(reversed(node.contents))
 
 
+def _raw_markup(payload):
+    """The payload up to its own trailing </script>, which ends an inline script the payload is reflected into."""
+    return payload[:-len("</script>")] if payload.lower().endswith("</script>") else payload
+
+
 def reflection_context(response, payload, marker):
     if not is_html(response) or payload not in response.text:
         return None
     # Only the script or handler the payload created counts: its code is the payload's own. An escaped copy in a
     # script (a JSON state object) holds the marker too, while the raw copy may sit where it runs nothing.
     code = next((found for _, found in _active_code(payload, marker)), payload).strip()
-    return next((context for context, found in _active_code(response.text, marker) if found.strip() == code), None)
+    # A payload reflected raw inside an existing inline script creates no element of its own, but its raw markup
+    # (quotes, </script>) lets it break out of that script. An escaped copy never holds the raw markup.
+    markup = _raw_markup(payload)
+    return next((context for context, found in _active_code(response.text, marker)
+                 if found.strip() == code or (context == "script element" and markup in found)), None)
 
 
 class XSSScanner:

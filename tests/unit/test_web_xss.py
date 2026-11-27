@@ -112,3 +112,13 @@ def test_each_payload_is_found_in_the_context_it_creates(web_response, index, pa
     # An escaped copy in an earlier script does not hide the script or handler the payload created.
     body = ESCAPED_STATE.format(json_copy(payload)) + page.format(payload)
     assert reflection_context(web_response(body, headers={"Content-Type": "text/html"}), payload, MARKER) == context
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("index", [0, 1, 2, 3])
+@pytest.mark.parametrize("script", ['<script>var q="{}";</script>', "<script>var state={{\"q\":'{}'}};</script>"])
+def test_payload_reflected_raw_inside_an_existing_script_is_found(web_response, index, script):
+    # The payload creates no element of its own here, but its raw markup breaks out of the script around it.
+    payload = XSSScanner(MagicMock(), MagicMock()).xss_test[index].replace("PAYLOAD", MARKER)
+    page = "<html><body>" + script.format(payload) + "</body></html>"
+    assert reflection_context(web_response(page, headers={"Content-Type": "text/html"}), payload, MARKER) == "script element"

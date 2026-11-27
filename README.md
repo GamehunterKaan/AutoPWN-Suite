@@ -201,7 +201,8 @@ URL longer than 8,192 characters is not followed.
 
 SQLi and LFI checks compare against the original response and repeat promising probes before
 reporting new database errors or Unix/Windows file signatures. Reflected XSS checks require an
-unescaped payload to create a script element or HTML event handler in an HTML response; JSON, plain
+unescaped payload to create a script element or HTML event handler, or to sit raw inside an inline
+script, in an HTML response; JSON, plain
 text, comments, inactive HTML contexts and escaped copies in a script are excluded. Browser execution and CSP bypass are
 not verified, so injection findings remain **candidates** requiring review. Directory hits are
 **observations**, with random missing-path controls suppressing soft 404 pages and blanket

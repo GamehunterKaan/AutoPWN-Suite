@@ -230,6 +230,17 @@ def test_xss_poc_requires_the_script_the_payload_created(web_response):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("payload", ["<script>alert('marker')</script>", "<img src=x onerror=\"alert('marker')\">",
+                                     "\"><svg onload=\"alert('marker')\"></svg>", "</textarea><script>alert('marker')</script>"])
+def test_xss_poc_reproduces_payload_reflected_raw_inside_an_existing_script(web_response, payload):
+    result = sample("XSS", "xss_reflection")
+    result["reproduction"].update(marker="marker", payload=payload, requests=[{"url": "http://example.com/?q=x"}])
+    # The payload creates no element of its own here, but its raw markup breaks out of the script around it.
+    for page in (f"<script>var q=\"{payload}\";</script>", f"<script>var state={{\"q\":'{payload}'}};</script>"):
+        assert verify_plan(build_plan(result), transport=MagicMock(return_value=web_response(page)))["status"] == "reproduced"
+
+
+@pytest.mark.unit
 def test_browser_poc_escapes_script_closing_payload_and_requires_click():
     result = sample("XSS", "xss_reflection")
     result["url"] = "http://example.com/?q=</script><script>bad()</script>"
