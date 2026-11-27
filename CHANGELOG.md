@@ -11,10 +11,17 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 - After a temporary failure loading the dashboard session, the next dashboard request retries
   automatically. Recovery preserves account edits and validation messages without a page reload.
+- Web request pacing counts the delay from the end of the previous request (its response read, or its
+  failure), not from its start. The pause shrank by the time the target took to answer, and a target
+  slower than the delay got none: with a 2-second delay and 3-second answers, each request went out as
+  soon as the previous answer arrived. TLS handshakes are paced the same way. The README described the
+  old behaviour ("between request starts") (#127).
 
 ### Security changes
 
 - Session recovery keeps the existing sign-in and CSRF requirements.
+- No security impact. The configured delay is now kept against slow targets, so a scan sends requests
+  less often than before, never more often.
 
 ## [2.10.0] - 2026-11-26
 
