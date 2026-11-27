@@ -15,10 +15,9 @@ from autopwn_suite.web.query import parameter_indexes, probe_url, query_parts
 from autopwn_suite.web.runtime import begin_parameter, finish_parameter, parameter_done
 
 
-def reflection_context(response, payload, marker):
-    if not is_html(response) or payload not in response.text:
-        return None
-    soup = BeautifulSoup(response.text, "html.parser")
+def _active_code(markup, marker):
+    """Yield (context, code) for each inline script and on* attribute holding the marker outside an inactive element."""
+    soup = BeautifulSoup(markup, "html.parser")
     # Walk the tree once, in document order, and do not enter an inactive element: asking every element for its
     # ancestors costs the page's depth each, which is quadratic on the deeply nested page a target controls.
     pending = list(reversed(soup.contents))
@@ -29,13 +28,30 @@ def reflection_context(response, payload, marker):
         if node.name == "script" and not node.has_attr("src"):
             kind = node.get("type", "").lower().strip()
             if kind in ("", "module", "text/javascript", "application/javascript") and marker in node.get_text():
-                return "script element"
+                yield "script element", node.get_text()
         for name, value in node.attrs.items():
             if name.lower().startswith("on") and isinstance(value, str) and marker in value:
-                return "HTML event handler"
+                yield "HTML event handler", value
         if node.name not in ("textarea", "title", "style", "xmp", "noscript", "template"):
             pending.extend(reversed(node.contents))
-    return None
+
+
+def _raw_markup(payload):
+    """The payload up to its own trailing </script>, which ends an inline script the payload is reflected into."""
+    return payload[:-len("</script>")] if payload.lower().endswith("</script>") else payload
+
+
+def reflection_context(response, payload, marker):
+    if not is_html(response) or payload not in response.text:
+        return None
+    # Only the script or handler the payload created counts: its code is the payload's own. An escaped copy in a
+    # script (a JSON state object) holds the marker too, while the raw copy may sit where it runs nothing.
+    code = next((found for _, found in _active_code(payload, marker)), payload).strip()
+    # A payload reflected raw inside an existing inline script creates no element of its own, but its raw markup
+    # (quotes, </script>) lets it break out of that script. An escaped copy never holds the raw markup.
+    markup = _raw_markup(payload)
+    return next((context for context, found in _active_code(response.text, marker)
+                 if found.strip() == code or (context == "script element" and markup in found)), None)
 
 
 class XSSScanner:

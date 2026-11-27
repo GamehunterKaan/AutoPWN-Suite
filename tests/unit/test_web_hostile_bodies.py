@@ -123,7 +123,7 @@ INACTIVE_CASES = [
 @pytest.mark.parametrize("page,context", INACTIVE_CASES)
 def test_inactive_elements_are_skipped_in_the_scanner_and_in_the_downloaded_poc(web_response, page, context):
     assert reflection_context(web_response(page, headers={"Content-Type": "text/html"}), "MARK", "MARK") == context
-    document = poc_runtime._Document("MARK")
+    document = poc_runtime._Document("MARK", "MARK")
     document.feed(page)
     assert document.active is (context is not None)
 
