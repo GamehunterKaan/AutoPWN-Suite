@@ -403,6 +403,72 @@ _DEFAULT_SETTINGS = {
     },
 }
 
+# The fields of each notification section and their types. Settings hold only these, the top-level keys of
+# _DEFAULT_SETTINGS, so neither a save nor a hand-edited file can store a key or a type the dashboard does not use.
+_NOTIFICATION_FIELDS = {
+    "email": {"enabled": bool, "smtp_host": str, "smtp_port": int, "username": str, "password": str,
+              "from_addr": str, "to_addr": str, "on_complete": bool, "on_error": bool, "on_vuln_found": bool},
+    "webhook": {"enabled": bool, "url": str, "on_complete": bool, "on_error": bool, "on_vuln_found": bool},
+}
+_SETTINGS_ERRORS = {
+    "unknown_setting": "Settings can only contain the keys the dashboard uses.",
+    "invalid_setting_type": "A setting has a value of the wrong type.",
+    "invalid_notification_config_type": "email and webhook must be objects",
+    "invalid_language": "language must be empty or a supported language",
+    "invalid_offline_mode_type": "offline_mode must be a boolean",
+    "invalid_update_auto_check_type": "update_auto_check must be a boolean",
+}
+# A stored file with one of these is not loaded: it may have had offline mode on (AUTOPWN-SA-2026-022).
+_SETTINGS_FAIL_CLOSED = {"invalid_notification_config_type", "invalid_offline_mode_type", "invalid_update_auto_check_type"}
+
+
+def _notification_field(kind, value):
+    """`value` as a notification field of type `kind`; ValueError when it is not one."""
+    if kind is int:
+        return _integer_option(value, "smtp_port", 1, 65535)
+    if not isinstance(value, kind):
+        raise ValueError("Wrong type")
+    return value
+
+
+def _checked_settings(data: dict):
+    """The valid part of a settings object, and the error code of each value it leaves out (an unknown key or a
+    wrong type), in the object's order. A save with any is refused; a stored file loads without them."""
+    checked, problems = {}, []
+    for key, value in data.items():
+        if key in _NOTIFICATION_FIELDS:
+            if not isinstance(value, dict):
+                problems.append("invalid_notification_config_type")
+                continue
+            section = checked[key] = {}
+            for field, item in value.items():
+                if field not in _NOTIFICATION_FIELDS[key]:
+                    problems.append("unknown_setting")
+                    continue
+                try:
+                    section[field] = _notification_field(_NOTIFICATION_FIELDS[key][field], item)
+                except ValueError:
+                    problems.append("invalid_setting_type")
+        elif key in ("offline_mode", "update_auto_check"):
+            if isinstance(value, bool):
+                checked[key] = value
+            else:
+                problems.append(f"invalid_{key}_type")
+        elif key == "language":
+            if isinstance(value, str) and value in ("", *i18n.SUPPORTED_LANGUAGES):
+                checked[key] = value
+            else:
+                problems.append("invalid_language")
+        elif key == "nist_api_key":
+            if isinstance(value, str):
+                checked[key] = value
+            else:
+                problems.append("invalid_setting_type")
+        else:
+            problems.append("unknown_setting")
+    return checked, problems
+
+
 _settings: dict = {}
 _settings_lock  = threading.Lock()
 
@@ -412,14 +478,16 @@ def _load_settings() -> None:
     if _SETTINGS_FILE.exists():
         try:
             data = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
-            if not isinstance(data, dict) or any(k in data and not isinstance(data[k], dict) for k in ("email", "webhook")):
-                raise ValueError("Settings must contain objects")
-            if "offline_mode" in data and not isinstance(data["offline_mode"], bool):
-                raise ValueError("offline_mode must be a boolean")
-            if "update_auto_check" in data and not isinstance(data["update_auto_check"], bool):
-                raise ValueError("update_auto_check must be a boolean")
+            if not isinstance(data, dict):
+                raise ValueError("Settings must be an object")
+            checked, problems = _checked_settings(data)
+            if _SETTINGS_FAIL_CLOSED.intersection(problems):
+                raise ValueError("Settings must contain objects and boolean switches")
+            if problems:  # one unknown key or wrong type costs that value, which takes its default
+                logging.error("Skipped %d unknown or invalid settings of %s; they take their default values. %s",
+                              len(problems), _SETTINGS_FILE.name, _set_aside(_SETTINGS_FILE, move=False))
             # Deep merge with defaults so new keys are always present
-            merged = _deep_merge(_DEFAULT_SETTINGS, data)
+            merged = _deep_merge(_DEFAULT_SETTINGS, checked)
             with _settings_lock:
                 _settings = merged
             return
@@ -2570,14 +2638,9 @@ def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
             return jsonify({"error": "Settings must be an object", "code": "invalid_settings_type"}), 400
         if set(body) & {"auth", "account", "username", "password", "password_hash", "revision", "session_secret"}:
             return jsonify({"error": "Use the account settings to change dashboard credentials.", "code": "settings_account_fields_forbidden"}), 400
-        if any(k in body and not isinstance(body[k], dict) for k in ("email", "webhook")):
-            return jsonify({"error": "email and webhook must be objects", "code": "invalid_notification_config_type"}), 400
-        if "language" in body and body["language"] not in ("", *i18n.SUPPORTED_LANGUAGES):
-            return jsonify({"error": "language must be empty or a supported language", "code": "invalid_language"}), 400
-        if "offline_mode" in body and not isinstance(body["offline_mode"], bool):
-            return jsonify({"error": "offline_mode must be a boolean", "code": "invalid_offline_mode_type"}), 400
-        if "update_auto_check" in body and not isinstance(body["update_auto_check"], bool):
-            return jsonify({"error": "update_auto_check must be a boolean", "code": "invalid_update_auto_check_type"}), 400
+        body, problems = _checked_settings(body)
+        if problems:  # an unknown key or a wrong type refuses the whole save; nothing is stored
+            return jsonify({"error": _SETTINGS_ERRORS[problems[0]], "code": problems[0]}), 400
         with _mode_lock:
             if body.get("offline_mode") is True and not _offline_enabled():
                 if _web_verifications_running:

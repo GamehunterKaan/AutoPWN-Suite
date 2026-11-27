@@ -11,10 +11,17 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 - After a temporary failure loading the dashboard session, the next dashboard request retries
   automatically. Recovery preserves account edits and validation messages without a page reload.
+- `PUT /api/settings` refuses a key the settings do not have (400 `unknown_setting`) and a value of the
+  wrong type for `nist_api_key` or an `email` or `webhook` field, such as a text SMTP port (400
+  `invalid_setting_type`), and stores nothing from that request. A valid partial update is still merged.
+  When the dashboard starts, such keys and values in the settings file are skipped and take their
+  defaults, and a copy of the file is kept beside it, instead of being stored and failing later.
 
 ### Security changes
 
 - Session recovery keeps the existing sign-in and CSRF requirements.
+- Settings input is validated with an allowlist of keys and types. No security impact: only a signed-in
+  operator could store the extra keys and values.
 
 ## [2.10.0] - 2026-11-26
 
