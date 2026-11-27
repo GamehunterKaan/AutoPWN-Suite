@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from requests.exceptions import ConnectionError
 
-from autopwn_suite.web.xss import XSSScanner
+from autopwn_suite.web.xss import XSSScanner, reflection_context
 
 
 @pytest.mark.unit
@@ -79,3 +79,36 @@ def test_connection_error_and_no_query():
         get.assert_not_called()
         assert scanner.test_xss("http://example.com/page?q=test") == []
     scanner.log.logger.assert_called_once()
+
+
+MARKER = "AbCdEfGhIjKlMnOp"
+ESCAPED_STATE = '<script>var state={{"q":"{}"}};</script>'
+
+
+def json_copy(payload):
+    """The payload as a JSON string in a script: markup escaped, the marker still in the script text."""
+    return payload.replace("<", "\\u003c").replace(">", "\\u003e").replace("'", "\\'").replace('"', '\\"')
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("index", [0, 1])
+@pytest.mark.parametrize("raw", ['<input name="q" value="{}">', "<!-- {} -->", "<textarea>{}</textarea>"])
+def test_inert_reflection_beside_an_escaped_script_copy_is_not_xss(web_response, raw, index):
+    # Issue #125: the raw payload is inert, and the only script holding the marker has an escaped copy of it.
+    payload = XSSScanner(MagicMock(), MagicMock()).xss_test[index].replace("PAYLOAD", MARKER)
+    page = "<html><body>" + raw.format(payload) + ESCAPED_STATE.format(json_copy(payload)) + "</body></html>"
+    assert reflection_context(web_response(page, headers={"Content-Type": "text/html"}), payload, MARKER) is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("index,page,context", [
+    (0, "<html><body>{}</body></html>", "script element"),
+    (1, "<html><body>{}</body></html>", "HTML event handler"),
+    (2, '<html><body><input value="{}"></body></html>', "HTML event handler"),
+    (3, "<html><body><textarea>{}</textarea></body></html>", "script element"),
+])
+def test_each_payload_is_found_in_the_context_it_creates(web_response, index, page, context):
+    payload = XSSScanner(MagicMock(), MagicMock()).xss_test[index].replace("PAYLOAD", MARKER)
+    # An escaped copy in an earlier script does not hide the script or handler the payload created.
+    body = ESCAPED_STATE.format(json_copy(payload)) + page.format(payload)
+    assert reflection_context(web_response(body, headers={"Content-Type": "text/html"}), payload, MARKER) == context

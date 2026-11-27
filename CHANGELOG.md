@@ -11,10 +11,17 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 - After a temporary failure loading the dashboard session, the next dashboard request retries
   automatically. Recovery preserves account edits and validation messages without a page reload.
+- The reflected XSS check and the dashboard's PoC re-verification report a script element or HTML event
+  handler only when its code is the payload's own (`alert('…')` for the four built-in payloads). A page
+  that echoed the payload raw where it runs nothing, such as a quoted attribute value, and also carried an
+  escaped copy in a script, such as a JSON state object, was reported as "Unescaped reflection in script
+  element" and confirmed on re-verification (#125).
 
 ### Security changes
 
 - Session recovery keeps the existing sign-in and CSRF requirements.
+- No security impact. The change removes a false XSS candidate from scan results; the target's response is
+  parsed as before and no new request is sent.
 
 ## [2.10.0] - 2026-11-26
 
