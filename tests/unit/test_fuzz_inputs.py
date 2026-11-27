@@ -421,11 +421,31 @@ def test_settings_validation_only_keeps_known_keys_of_the_right_type(web_ui):
                 for field, item in value.items():
                     assert type(item) is wu._NOTIFICATION_FIELDS[key][field]
                     assert field != "smtp_port" or 1 <= item <= 65535
+                    assert field != "smtp_port" or item is data[key][field]  # never converted from text
             else:
                 assert type(value) is type(wu._DEFAULT_SETTINGS[key])
-        # A value is left out exactly when it is reported (smtp_port may only change from integer text to a number).
-        assert bool(problems) == ({key: set(value) if isinstance(value, dict) else value for key, value in checked.items()}
-                                  != {key: set(value) if isinstance(value, dict) else value for key, value in data.items()})
+        # A value is left out exactly when it is reported, and a kept value is stored as it came.
+        assert bool(problems) == (checked != data)
+
+
+def test_loading_any_settings_object_never_fails_closed(web_ui):
+    """Issue #124: a settings file holding a JSON object always loads; only offline_mode true turns offline mode on."""
+    rng = random.Random(SEED + 45)
+    wu = web_ui.module
+    keys = list(wu._DEFAULT_SETTINGS) + ["junk", "auth", "session_secret"]
+    for _ in range(300):
+        data = {key: random_value(rng) for key in rng.sample(keys, rng.randint(0, len(keys)))}
+        if "email" in data and rng.random() < .5:
+            data["email"] = {"smtp_port": random_value(rng), "smtp_host": random_value(rng)}
+        try:
+            text = json.dumps(data)
+        except (TypeError, ValueError):
+            continue
+        wu._SETTINGS_FILE.write_text(text, encoding="utf-8")
+        wu._load_settings()
+        assert set(wu._settings) == set(wu._DEFAULT_SETTINGS)
+        assert wu._offline_enabled() is (data.get("offline_mode") is True)
+        assert type(wu._settings["email"]["smtp_port"]) is int and 1 <= wu._settings["email"]["smtp_port"] <= 65535
 
 
 TIMESTAMPS = ["2026-10-19T02:00:00Z", "2026-10-19T02:00:00", "2026-10-19T02:00:00+05:30", "2026-10-19"]

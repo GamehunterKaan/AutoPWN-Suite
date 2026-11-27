@@ -418,22 +418,20 @@ _SETTINGS_ERRORS = {
     "invalid_offline_mode_type": "offline_mode must be a boolean",
     "invalid_update_auto_check_type": "update_auto_check must be a boolean",
 }
-# A stored file with one of these is not loaded: it may have had offline mode on (AUTOPWN-SA-2026-022).
-_SETTINGS_FAIL_CLOSED = {"invalid_notification_config_type", "invalid_offline_mode_type", "invalid_update_auto_check_type"}
 
 
 def _notification_field(kind, value):
     """`value` as a notification field of type `kind`; ValueError when it is not one."""
-    if kind is int:
-        return _integer_option(value, "smtp_port", 1, 65535)
-    if not isinstance(value, kind):
+    # bool is an int subclass, and integer text is not a number: the stored type is exactly the default's.
+    if type(value) is not kind or (kind is int and not 1 <= value <= 65535):
         raise ValueError("Wrong type")
     return value
 
 
 def _checked_settings(data: dict):
     """The valid part of a settings object, and the error code of each value it leaves out (an unknown key or a
-    wrong type), in the object's order. A save with any is refused; a stored file loads without them."""
+    wrong type), in the object's order. A save with any is refused; a stored file loads without them, and each
+    known value left out takes its default."""
     checked, problems = {}, []
     for key, value in data.items():
         if key in _NOTIFICATION_FIELDS:
@@ -481,9 +479,10 @@ def _load_settings() -> None:
             if not isinstance(data, dict):
                 raise ValueError("Settings must be an object")
             checked, problems = _checked_settings(data)
-            if _SETTINGS_FAIL_CLOSED.intersection(problems):
-                raise ValueError("Settings must contain objects and boolean switches")
-            if problems:  # one unknown key or wrong type costs that value, which takes its default
+            # An unknown key (one an earlier release stored, or a hand edit) is dropped, and a known field of the wrong
+            # type takes its default, offline_mode and a non-object email or webhook included: refusing the file would
+            # start the dashboard offline over one stray value, as after an upgrade. A copy keeps what was dropped.
+            if problems:
                 logging.error("Skipped %d unknown or invalid settings of %s; they take their default values. %s",
                               len(problems), _SETTINGS_FILE.name, _set_aside(_SETTINGS_FILE, move=False))
             # Deep merge with defaults so new keys are always present
