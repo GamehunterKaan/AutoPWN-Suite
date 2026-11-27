@@ -16,12 +16,19 @@ existing release summaries; they do not retroactively claim artifact signing.
   that echoed the payload raw where it runs nothing, such as a quoted attribute value, and also carried an
   escaped copy in a script, such as a JSON state object, was reported as "Unescaped reflection in script
   element" and confirmed on re-verification (#125).
+- Web request pacing counts the delay from the end of the previous request (its response read, or its
+  failure), not from its start. The pause shrank by the time the target took to answer, and a target
+  slower than the delay got none: with a 2-second delay and 3-second answers, each request went out as
+  soon as the previous answer arrived. TLS handshakes are paced the same way. The README described the
+  old behaviour ("between request starts") (#127).
 
 ### Security changes
 
 - Session recovery keeps the existing sign-in and CSRF requirements.
 - No security impact. The change removes a false XSS candidate from scan results; the target's response is
   parsed as before and no new request is sent.
+- No security impact. The configured delay is now kept against slow targets, so a scan sends requests
+  less often than before, never more often.
 
 ## [2.10.0] - 2026-11-26
 

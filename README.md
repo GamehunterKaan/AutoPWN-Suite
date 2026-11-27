@@ -308,9 +308,9 @@ Saved profiles retain their explicit limits when defaults change. Adjustable upp
 longer and send more requests; reaching any configured limit still reports incomplete coverage.
 
 Web speed is independent of Nmap speed: 0–5 adds minimum delays of 5 seconds, 2 seconds,
-500 ms, 100 ms, 25 ms or no delay between request starts. **Minimum request delay** can increase
-that delay; timeout controls both HTTP requests and TLS connections. These settings are saved
-with profiles and used by scheduled scans.
+500 ms, 100 ms, 25 ms or no delay between the end of one request and the start of the next.
+**Minimum request delay** can increase that delay; timeout controls both HTTP requests and TLS
+connections. These settings are saved with profiles and used by scheduled scans.
 
 Use **Resume** on an incomplete, stopped or failed scan, or **Resume scan** in its web coverage
 card. Review the suggested speed and limits, then resume the same job. Completed checks,
