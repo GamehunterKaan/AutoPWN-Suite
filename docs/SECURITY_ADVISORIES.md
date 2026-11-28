@@ -974,12 +974,7 @@ release that contains it.
   text or stored value), `test_missing_file_still_starts_online` and
   `tests/unit/test_offline_scans.py::test_an_unreadable_settings_file_starts_offline`
   (the database update and notification tests answer 409). The first and third fail
-  on the previous code. Since the release after 2.10.0 (#124), a file that is a JSON
-  object loads even when `email` or `webhook` is not an object or `offline_mode` or
-  `update_auto_check` is not a boolean: that field takes its default, a copy is kept the
-  same way, and only a file that is not JSON or not a JSON object starts offline. The
-  regression test above keeps those two cases; the others moved to
-  `test_load_never_fails_closed_over_a_known_field_of_the_wrong_type`.
+  on the previous code.
 - Found during a review of `main` at f2235c3, after 2.9.1; it is not part of the
   earlier assessments.
 

@@ -235,15 +235,15 @@ Redaction: a web scan shows a URL in two ways. In a finding (`url`, `evidence`, 
 ### Settings and schedules
 
 Settings contain `nist_api_key`, boolean `offline_mode`, and `email`/`webhook`
-objects. A settings file that exists but cannot be loaded (it is not JSON, or not a
-JSON object) starts the dashboard with the default settings and offline mode on, so an
+objects. A settings file that exists but cannot be loaded (it is not JSON or not a JSON
+object, `email` or `webhook` is not an object, or `offline_mode` or `update_auto_check`
+is not a boolean) starts the dashboard with the default settings and offline mode on, so an
 operator who had offline mode on is never put online; turning offline mode off in
 Settings saves a valid file (since the release after 2.9.1; earlier releases started
-online). A file that loads drops unknown keys (such as ones an earlier release stored),
-and a known field of the wrong type takes its default, including `offline_mode` and
-`update_auto_check` that are not booleans and `email` or `webhook` that is not an
-object (since the release after 2.10.0, which started such a file offline); the
-dashboard logs the count and keeps a copy as below. Since v2.6.1, `AUTOPWN_NIST_API_KEY_FILE`,
+online). Otherwise the file loads, unknown keys (such as ones an earlier release stored)
+are dropped and a wrong-typed `nist_api_key`, `language` or `email` or `webhook` field
+takes its default (notifications default to off); the dashboard logs the count and keeps
+a copy as below. Since v2.6.1, `AUTOPWN_NIST_API_KEY_FILE`,
 `AUTOPWN_SMTP_PASSWORD_FILE` and `AUTOPWN_WEBHOOK_URL_FILE` override the
 corresponding stored values at use time and are never written to the settings
 file. Email keys are `enabled,smtp_host,smtp_port,username,password,from_addr,

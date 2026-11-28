@@ -305,6 +305,13 @@ class TestSettings:
     @pytest.mark.parametrize("content", [
         '{"nist_api_key": "SECRETKEY", "offline_mode": true,',  # truncated JSON
         '["SECRETKEY"]',  # not an object
+        # A wrong-typed field that may have meant offline is not loaded either.
+        '{"nist_api_key": "SECRETKEY", "offline_mode": "yes"}',
+        '{"nist_api_key": "SECRETKEY", "offline_mode": 1}',
+        '{"nist_api_key": "SECRETKEY", "offline_mode": true, "update_auto_check": 0}',
+        '{"nist_api_key": "SECRETKEY", "offline_mode": true, "email": []}',
+        '{"nist_api_key": "SECRETKEY", "email": "off", "webhook": {"enabled": true}}',
+        '{"nist_api_key": "SECRETKEY", "webhook": null}',
     ])
     def test_unreadable_file_fails_closed_and_is_kept_past_the_next_save(self, client, wu, caplog, content):
         """AUTOPWN-SA-2026-022: an unreadable file used to start online and the next save destroyed it."""
@@ -398,26 +405,27 @@ class TestSettings:
         assert "Skipped 7" in caplog.text and kept.name in caplog.text
 
     @pytest.mark.parametrize("stored,key", [
-        ({"offline_mode": "yes"}, "offline_mode"),
-        ({"offline_mode": 1}, "offline_mode"),
-        ({"update_auto_check": 0}, "update_auto_check"),
-        ({"email": []}, "email"),
-        ({"email": "off", "webhook": {"enabled": True}}, "email"),
-        ({"webhook": None}, "webhook"),
         ({"auth": {"username": "admin"}, "session_secret": "x"}, None),  # keys an earlier release stored
+        ({"nist_api_key": ["x"]}, "nist_api_key"),
+        ({"language": 5}, "language"),
+        ({"email": {"smtp_port": "587", "enabled": "yes"}}, "email"),
+        ({"webhook": {"url": ["https://example.invalid/hook"], "on_error": "no", "junk": 1}}, "webhook"),
     ])
-    def test_load_never_fails_closed_over_a_known_field_of_the_wrong_type(self, wu, caplog, stored, key):
-        """Issue #124: an upgrade must not start the dashboard offline; the field takes its default instead."""
-        wu._SETTINGS_FILE.write_text(json.dumps({"nist_api_key": "synthetic-key", **stored}), encoding="utf-8")
+    def test_load_stays_online_over_unknown_keys_and_wrong_typed_fields(self, wu, caplog, stored, key):
+        """Issue #124: a leftover key or a wrong-typed field other than offline_mode, update_auto_check, email or
+        webhook does not start the dashboard offline after an upgrade; the field takes its default instead."""
+        wu._SETTINGS_FILE.write_text(json.dumps({"nist_api_key": "synthetic-key", "webhook": {"enabled": True},
+                                                 **stored}), encoding="utf-8")
         original = wu._SETTINGS_FILE.read_bytes()
         with caplog.at_level(logging.DEBUG):
             wu._load_settings()
         assert not wu._offline_enabled()
-        assert wu._settings["nist_api_key"] == "synthetic-key"
         assert set(wu._settings) == set(wu._DEFAULT_SETTINGS)
         if key is not None:
             assert wu._settings[key] == wu._DEFAULT_SETTINGS[key]
-        if stored.get("webhook") == {"enabled": True}:
+        if key != "nist_api_key":
+            assert wu._settings["nist_api_key"] == "synthetic-key"
+        if key != "webhook":
             assert wu._settings["webhook"]["enabled"] is True
         kept, = wu._DATA_DIR.glob(wu._SETTINGS_FILE.name + ".corrupt-*")
         assert kept.read_bytes() == original and "offline mode on" not in caplog.text

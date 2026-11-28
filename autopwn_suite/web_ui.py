@@ -478,10 +478,15 @@ def _load_settings() -> None:
             data = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 raise ValueError("Settings must be an object")
+            # A wrong-typed offline_mode or update_auto_check, or an email or webhook that is not an object, may have
+            # meant offline: the file is not loaded and the dashboard starts offline (AUTOPWN-SA-2026-022).
+            expected = {"offline_mode": bool, "update_auto_check": bool, "email": dict, "webhook": dict}
+            if any(key in data and not isinstance(data[key], kind) for key, kind in expected.items()):
+                raise ValueError("Wrong type")
             checked, problems = _checked_settings(data)
-            # An unknown key (one an earlier release stored, or a hand edit) is dropped, and a known field of the wrong
-            # type takes its default, offline_mode and a non-object email or webhook included: refusing the file would
-            # start the dashboard offline over one stray value, as after an upgrade. A copy keeps what was dropped.
+            # An unknown key (one an earlier release stored, or a hand edit) is dropped, and a wrong-typed nist_api_key,
+            # language or email or webhook field takes its default (notifications default to off): refusing the file
+            # would start the dashboard offline over a leftover key after an upgrade. A copy keeps what was dropped.
             if problems:
                 logging.error("Skipped %d unknown or invalid settings of %s; they take their default values. %s",
                               len(problems), _SETTINGS_FILE.name, _set_aside(_SETTINGS_FILE, move=False))

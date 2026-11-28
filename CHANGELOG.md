@@ -26,10 +26,10 @@ existing release summaries; they do not retroactively claim artifact signing.
   wrong type for `nist_api_key` or an `email` or `webhook` field (400 `invalid_setting_type`), and stores
   nothing from that request. `smtp_port` must be a JSON integer from 1 to 65535, not a boolean or numeric
   text. A valid partial update is still merged.
-- When the dashboard starts, unknown keys in the settings file are dropped and a known field of the wrong
-  type takes its default, and a copy of the file is kept beside it. This includes `offline_mode`,
-  `update_auto_check` and an `email` or `webhook` value that is not an object, which used to start the
-  dashboard with offline mode on; only a file that is not JSON or not a JSON object still does.
+- When the dashboard starts, unknown keys in the settings file (such as ones an earlier release stored)
+  are dropped, a wrong-typed `nist_api_key`, `language` or `email` or `webhook` field takes its default,
+  and a copy of the file is kept beside it. A non-boolean `offline_mode` or `update_auto_check`, or an
+  `email` or `webhook` value that is not an object, still starts the dashboard with offline mode on.
 
 ### Security changes
 
@@ -40,10 +40,7 @@ existing release summaries; they do not retroactively claim artifact signing.
 - No security impact. The configured delay is now kept against slow targets, so a scan sends requests
   less often than before, never more often.
 - Settings input is validated with an allowlist of keys and types. No security impact: only a signed-in
-  operator could store the extra keys and values. A settings file whose `offline_mode` is not a boolean now
-  starts online (its default) instead of offline, so that one stray value never leaves the dashboard
-  offline after an upgrade; a file that is not JSON or not a JSON object still starts offline
-  (AUTOPWN-SA-2026-022).
+  operator could store the extra keys and values.
 
 ## [2.10.0] - 2026-11-26
 

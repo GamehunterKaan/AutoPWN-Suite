@@ -428,8 +428,9 @@ def test_settings_validation_only_keeps_known_keys_of_the_right_type(web_ui):
         assert bool(problems) == (checked != data)
 
 
-def test_loading_any_settings_object_never_fails_closed(web_ui):
-    """Issue #124: a settings file holding a JSON object always loads; only offline_mode true turns offline mode on."""
+def test_loading_any_settings_object_fails_closed_only_on_the_offline_fields(web_ui):
+    """Issue #124: a settings file holding a JSON object starts offline only when offline_mode is true, or when
+    offline_mode or update_auto_check is not a boolean or email or webhook is not an object (AUTOPWN-SA-2026-022)."""
     rng = random.Random(SEED + 45)
     wu = web_ui.module
     keys = list(wu._DEFAULT_SETTINGS) + ["junk", "auth", "session_secret"]
@@ -444,7 +445,8 @@ def test_loading_any_settings_object_never_fails_closed(web_ui):
         wu._SETTINGS_FILE.write_text(text, encoding="utf-8")
         wu._load_settings()
         assert set(wu._settings) == set(wu._DEFAULT_SETTINGS)
-        assert wu._offline_enabled() is (data.get("offline_mode") is True)
+        fails_closed = any(key in data and not isinstance(data[key], bool) for key in ("offline_mode", "update_auto_check"))             or any(key in data and not isinstance(data[key], dict) for key in ("email", "webhook"))
+        assert wu._offline_enabled() is (fails_closed or data.get("offline_mode") is True)
         assert type(wu._settings["email"]["smtp_port"]) is int and 1 <= wu._settings["email"]["smtp_port"] <= 65535
 
 
