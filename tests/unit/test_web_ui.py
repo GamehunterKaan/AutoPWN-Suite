@@ -304,9 +304,14 @@ class TestSettings:
 
     @pytest.mark.parametrize("content", [
         '{"nist_api_key": "SECRETKEY", "offline_mode": true,',  # truncated JSON
-        '{"nist_api_key": "SECRETKEY", "offline_mode": true, "email": []}',
+        '["SECRETKEY"]',  # not an object
+        # A wrong-typed field that may have meant offline is not loaded either.
         '{"nist_api_key": "SECRETKEY", "offline_mode": "yes"}',
+        '{"nist_api_key": "SECRETKEY", "offline_mode": 1}',
         '{"nist_api_key": "SECRETKEY", "offline_mode": true, "update_auto_check": 0}',
+        '{"nist_api_key": "SECRETKEY", "offline_mode": true, "email": []}',
+        '{"nist_api_key": "SECRETKEY", "email": "off", "webhook": {"enabled": true}}',
+        '{"nist_api_key": "SECRETKEY", "webhook": null}',
     ])
     def test_unreadable_file_fails_closed_and_is_kept_past_the_next_save(self, client, wu, caplog, content):
         """AUTOPWN-SA-2026-022: an unreadable file used to start online and the next save destroyed it."""
@@ -337,6 +342,95 @@ class TestSettings:
         assert not wu._offline_enabled()
         assert json.loads(wu._SETTINGS_FILE.read_text(encoding="utf-8"))["offline_mode"] is False
         assert not list(wu._DATA_DIR.glob("*.corrupt-*"))
+
+    @pytest.mark.parametrize("body,code", [
+        ({"junk": {"a": 1}, "nist_api_key": ["x"], "email": {"smtp_port": "abc", "enabled": "yes"}}, None),  # issue #124
+        ({"junk": {"a": 1}}, "unknown_setting"),
+        ({"email": {"smtp_server": "mail.example.test"}}, "unknown_setting"),
+        ({"webhook": {"url": "https://example.invalid/hook", "secret": "x"}}, "unknown_setting"),
+        ({"nist_api_key": ["x"]}, "invalid_setting_type"),
+        ({"nist_api_key": None}, "invalid_setting_type"),
+        ({"email": {"smtp_port": "abc"}}, "invalid_setting_type"),
+        ({"email": {"smtp_port": "587"}}, "invalid_setting_type"),  # a number, not numeric text
+        ({"email": {"smtp_port": False}}, "invalid_setting_type"),
+        ({"email": {"smtp_port": 0}}, "invalid_setting_type"),
+        ({"email": {"smtp_port": 70000}}, "invalid_setting_type"),
+        ({"email": {"smtp_port": True}}, "invalid_setting_type"),
+        ({"email": {"smtp_port": 587.5}}, "invalid_setting_type"),
+        ({"email": {"enabled": "yes"}}, "invalid_setting_type"),
+        ({"email": {"smtp_host": 5}}, "invalid_setting_type"),
+        ({"email": {"password": {}}}, "invalid_setting_type"),
+        ({"webhook": {"url": ["https://example.invalid/hook"]}}, "invalid_setting_type"),
+        ({"webhook": {"on_error": 1}}, "invalid_setting_type"),
+        ({"language": "en", "offline_mode": False, "junk": 1}, "unknown_setting"),  # one bad key refuses the whole save
+    ])
+    def test_put_refuses_unknown_keys_and_wrong_types_and_leaves_the_file_alone(self, client, wu, body, code):
+        wu._load_settings()
+        before = wu._SETTINGS_FILE.read_bytes()
+        response = client.put("/api/settings", json=body)
+        assert response.status_code == 400
+        assert response.get_json()["code"] in (("unknown_setting", "invalid_setting_type") if code is None else (code,))
+        assert wu._SETTINGS_FILE.read_bytes() == before
+        assert client.get("/api/settings").get_json() == json.loads(before)
+
+    def test_put_merges_a_valid_partial_update(self, client, wu):
+        wu._load_settings()
+        assert client.put("/api/settings", json={"email": {"smtp_host": "mail.example.test", "smtp_port": 465,
+                                                           "enabled": True}}).status_code == 200
+        assert client.put("/api/settings", json={"email": {"smtp_port": 2525}, "nist_api_key": "synthetic-key",
+                                                 "webhook": {"on_error": False}}).status_code == 200
+        saved = json.loads(wu._SETTINGS_FILE.read_text(encoding="utf-8"))
+        assert saved["email"] == {**wu._DEFAULT_SETTINGS["email"], "smtp_host": "mail.example.test", "smtp_port": 2525,
+                                  "enabled": True}
+        assert saved["webhook"] == {**wu._DEFAULT_SETTINGS["webhook"], "on_error": False}
+        assert saved["nist_api_key"] == "synthetic-key"
+        assert set(saved) == set(wu._DEFAULT_SETTINGS)
+
+    def test_load_drops_unknown_keys_and_wrong_types_and_keeps_the_rest(self, wu, caplog):
+        stored = {"junk": {"a": 1}, "nist_api_key": ["x"], "language": "xx", "offline_mode": True,
+                  "email": {"smtp_port": "587", "enabled": "yes", "smtp_host": "mail.example.test", "extra": 1},
+                  "webhook": {"url": "https://example.invalid/hook", "on_error": "no"}}
+        wu._SETTINGS_FILE.write_text(json.dumps(stored), encoding="utf-8")
+        original = wu._SETTINGS_FILE.read_bytes()
+        with caplog.at_level(logging.DEBUG):
+            wu._load_settings()
+        defaults = wu._DEFAULT_SETTINGS
+        assert set(wu._settings) == set(defaults)
+        assert wu._settings["nist_api_key"] == "" and wu._settings["language"] == ""
+        assert wu._settings["offline_mode"] is True  # a valid value next to invalid ones still loads
+        assert wu._settings["email"] == {**defaults["email"], "smtp_host": "mail.example.test"}
+        assert wu._settings["webhook"] == {**defaults["webhook"], "url": "https://example.invalid/hook"}
+        kept, = wu._DATA_DIR.glob(wu._SETTINGS_FILE.name + ".corrupt-*")  # the dropped values are kept for the operator
+        assert kept.read_bytes() == original and wu._SETTINGS_FILE.read_bytes() == original
+        assert "Skipped 7" in caplog.text and kept.name in caplog.text
+
+    @pytest.mark.parametrize("stored,key", [
+        ({"auth": {"username": "admin"}, "session_secret": "x"}, None),  # keys an earlier release stored
+        ({"nist_api_key": ["x"]}, "nist_api_key"),
+        ({"language": 5}, "language"),
+        ({"email": {"smtp_port": "587", "enabled": "yes"}}, "email"),
+        ({"webhook": {"url": ["https://example.invalid/hook"], "on_error": "no", "junk": 1}}, "webhook"),
+    ])
+    def test_load_stays_online_over_unknown_keys_and_wrong_typed_fields(self, wu, caplog, stored, key):
+        """Issue #124: a leftover key or a wrong-typed field other than offline_mode, update_auto_check, email or
+        webhook does not start the dashboard offline after an upgrade; the field takes its default instead."""
+        wu._SETTINGS_FILE.write_text(json.dumps({"nist_api_key": "synthetic-key", "webhook": {"enabled": True},
+                                                 **stored}), encoding="utf-8")
+        original = wu._SETTINGS_FILE.read_bytes()
+        with caplog.at_level(logging.DEBUG):
+            wu._load_settings()
+        assert not wu._offline_enabled()
+        assert set(wu._settings) == set(wu._DEFAULT_SETTINGS)
+        if key is not None:
+            assert wu._settings[key] == wu._DEFAULT_SETTINGS[key]
+        if key != "nist_api_key":
+            assert wu._settings["nist_api_key"] == "synthetic-key"
+        if key != "webhook":
+            assert wu._settings["webhook"]["enabled"] is True
+        kept, = wu._DATA_DIR.glob(wu._SETTINGS_FILE.name + ".corrupt-*")
+        assert kept.read_bytes() == original and "offline mode on" not in caplog.text
+        logged = " ".join(record.getMessage() for record in caplog.records)
+        assert "junk" not in logged and "example.invalid" not in logged
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

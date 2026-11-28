@@ -402,6 +402,54 @@ def test_profile_validation_never_raises_anything_but_value_error_for_hand_edite
             wu._profile_config({}, stored)
 
 
+def test_settings_validation_only_keeps_known_keys_of_the_right_type(web_ui):
+    rng = random.Random(SEED + 44)
+    wu = web_ui.module
+    keys = list(wu._DEFAULT_SETTINGS) + ["junk", "auth", "password"]
+    fields = sorted({field for section in wu._NOTIFICATION_FIELDS.values() for field in section} | {"extra"})
+    for _ in range(3000):
+        data = {key: random_value(rng) for key in rng.sample(keys, rng.randint(0, len(keys)))}
+        for section in ("email", "webhook"):
+            if section in data and rng.random() < .7:
+                data[section] = {field: random_value(rng) for field in rng.sample(fields, rng.randint(0, len(fields)))}
+        checked, problems = wu._checked_settings(data)
+        assert set(problems) <= set(wu._SETTINGS_ERRORS)
+        assert set(checked) <= set(wu._DEFAULT_SETTINGS)
+        for key, value in checked.items():
+            if key in wu._NOTIFICATION_FIELDS:
+                assert set(value) <= set(wu._NOTIFICATION_FIELDS[key])
+                for field, item in value.items():
+                    assert type(item) is wu._NOTIFICATION_FIELDS[key][field]
+                    assert field != "smtp_port" or 1 <= item <= 65535
+                    assert field != "smtp_port" or item is data[key][field]  # never converted from text
+            else:
+                assert type(value) is type(wu._DEFAULT_SETTINGS[key])
+        # A value is left out exactly when it is reported, and a kept value is stored as it came.
+        assert bool(problems) == (checked != data)
+
+
+def test_loading_any_settings_object_fails_closed_only_on_the_offline_fields(web_ui):
+    """Issue #124: a settings file holding a JSON object starts offline only when offline_mode is true, or when
+    offline_mode or update_auto_check is not a boolean or email or webhook is not an object (AUTOPWN-SA-2026-022)."""
+    rng = random.Random(SEED + 45)
+    wu = web_ui.module
+    keys = list(wu._DEFAULT_SETTINGS) + ["junk", "auth", "session_secret"]
+    for _ in range(300):
+        data = {key: random_value(rng) for key in rng.sample(keys, rng.randint(0, len(keys)))}
+        if "email" in data and rng.random() < .5:
+            data["email"] = {"smtp_port": random_value(rng), "smtp_host": random_value(rng)}
+        try:
+            text = json.dumps(data)
+        except (TypeError, ValueError):
+            continue
+        wu._SETTINGS_FILE.write_text(text, encoding="utf-8")
+        wu._load_settings()
+        assert set(wu._settings) == set(wu._DEFAULT_SETTINGS)
+        fails_closed = any(key in data and not isinstance(data[key], bool) for key in ("offline_mode", "update_auto_check"))             or any(key in data and not isinstance(data[key], dict) for key in ("email", "webhook"))
+        assert wu._offline_enabled() is (fails_closed or data.get("offline_mode") is True)
+        assert type(wu._settings["email"]["smtp_port"]) is int and 1 <= wu._settings["email"]["smtp_port"] <= 65535
+
+
 TIMESTAMPS = ["2026-10-19T02:00:00Z", "2026-10-19T02:00:00", "2026-10-19T02:00:00+05:30", "2026-10-19"]
 RANGE_LIMITS = ["0001-01-01T00:00:00+05:00", "9999-12-31T23:59:59-05:00", "9999-12-31T23:59:59Z", "0001-01-01T00:00:00"]
 
