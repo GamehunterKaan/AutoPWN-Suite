@@ -351,3 +351,25 @@ def test_terminal_control_characters_in_a_crawled_url_never_reach_the_console_or
     assert expected in summary["issues"]
     assert expected in output.getvalue()
     assert not re.search(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]", output.getvalue() + str(summary["issues"]))
+
+
+@pytest.mark.unit
+def test_header_and_cookie_advisories_survive_a_request_budget_an_earlier_stage_exhausts(web_response):
+    from autopwn_suite.web.runtime import ACTIVE
+    url = "http://example.com/"
+    page = web_response("<html>Home</html>", url=url, headers={"Content-Type": "text/html"}, cookies=["session=abc; Path=/"])
+
+    def exhaust_budget(*args, **kwargs):
+        while True:
+            ACTIVE.get().before()
+
+    summary = {}
+    with patch("autopwn_suite.web.webvuln.get", return_value=page), patch("autopwn_suite.web.webvuln.crawl", side_effect=exhaust_budget), \
+         patch("autopwn_suite.web.webvuln.dirbust") as dirs:
+        findings = webvuln(url, MagicMock(), MagicMock(), controls={"speed": 5, "request_budget": 20}, on_complete=summary.update)
+    dirs.assert_not_called()
+    evidence = [item["evidence"] for item in findings if item["type"] == "WEB_CONFIG"]
+    assert "X-Content-Type-Options is missing or is not nosniff" in evidence
+    assert "No enforced Content-Security-Policy on this HTML response" in evidence
+    assert any("session" in text and "HttpOnly" in text for text in evidence)
+    assert "Request budget reached; coverage is limited." in summary["issues"]
