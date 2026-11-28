@@ -8,11 +8,19 @@
 pip3 install --require-hashes --no-deps -r requirements-locked.txt
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 
+# The PyInstaller builds run in parallel. compile_python_fuzzer empties $SRC/pyfuzzworkdir before each build, so
+# every build gets its own $SRC for that work directory; its other outputs are named after the fuzzer.
+builds=()
 for fuzzer in scripts/fuzz/fuzz_*.py; do
-  compile_python_fuzzer "$fuzzer"
+  SRC="$(mktemp -d)" compile_python_fuzzer "$fuzzer" &
+  builds+=("$!")
   name="$(basename "$fuzzer" .py)"
   # A seed corpus of valid inputs lets the fuzzer start from inputs that pass the first checks.
   if [ -d "scripts/fuzz/seeds/$name" ]; then
     zip -jq "$OUT/${name}_seed_corpus.zip" scripts/fuzz/seeds/"$name"/*
   fi
+done
+# `wait PID` returns that build's exit status, so a failed build fails the script (-e).
+for build in "${builds[@]}"; do
+  wait "$build"
 done

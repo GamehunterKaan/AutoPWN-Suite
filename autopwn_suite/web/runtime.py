@@ -253,6 +253,10 @@ class ScanContext:
         self.publish_progress()
         return time.monotonic()
 
+    def after(self):
+        """Pace the next request from the end of this one: a target slower than the delay still gets the delay."""
+        self.last_request = time.monotonic()
+
     def issue(self, message):
         message = redact_text(message)
         self.problem_revision += 1

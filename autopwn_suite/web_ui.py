@@ -909,7 +909,11 @@ class ScanJob:
 
     def to_dict(self) -> dict:
         with self._lock:
-            hosts = deepcopy(list(self._hosts.values()))
+            # Counted in place: /api/scans is polled for every job, and copying each host with its CVEs
+            # only to count them was most of that work.
+            host_count = len(self._hosts)
+            port_count = sum(len(host["ports"]) for host in self._hosts.values())
+            vuln_count = sum(len(host["vulns"]) for host in self._hosts.values())
             status = self.status
             finished_at = self.finished_at
             error = self.error
@@ -928,9 +932,9 @@ class ScanJob:
             "started_at":  self.started_at,
             "finished_at": finished_at,
             "error":       error,
-            "host_count":  len(hosts),
-            "port_count":  sum(len(h["ports"]) for h in hosts),
-            "vuln_count":  sum(len(h["vulns"])  for h in hosts),
+            "host_count":  host_count,
+            "port_count":  port_count,
+            "vuln_count":  vuln_count,
             "progress":    progress,
             "web_finding_count": web_count,
             "web_coverage": web_coverage,
@@ -994,6 +998,9 @@ _log_history_lock = threading.Lock()
 # starts from the clock, not from zero: a restarted dashboard then never reuses an id a still-open page has seen.
 _log_seq = time.time_ns() // 1000
 _MAX_LOG_HISTORY = 5000
+# The largest body a dashboard route accepts. Every route takes a small JSON object (the longest fields are a
+# target of 8,192 and a port list of 2,048 characters); sign-in and the account route keep their own 4,096 bytes.
+_MAX_REQUEST_BYTES = 1024 * 1024
 _MAX_COMPLETED_SCANS = 100
 _web_verifications_running = 0
 
@@ -2140,6 +2147,7 @@ def _scheduler_loop() -> None:
 
 def _build_app(static_dir: Path, *, account_path=None) -> "Flask":
     app = Flask(__name__, static_folder=str(static_dir), static_url_path="")
+    app.config["MAX_CONTENT_LENGTH"] = _MAX_REQUEST_BYTES  # a larger body is answered 413 before it is parsed
     auth = install_auth(app, static_dir, account_path or _DATA_DIR / ACCOUNT_FILE)
 
     @app.before_request

@@ -11,7 +11,7 @@ AutoPWN Suite is an operator-run vulnerability scanner (CLI, Python library, Fla
 ## Done means
 
 - The steps of the required `test` job (`.github/workflows/poetry-tests.yml`) pass locally: lockfile check, `ruff`, the dashboard `node --check` and ESLint steps (Node 20+), `export_locked_requirements.py --check`, then `poetry run pytest` with branch coverage at least 80%. Use Poetry 2.5.1 exactly (`pipx install poetry==2.5.1`, then `poetry install --extras update`); other versions refuse to run.
-- Code stays compatible with Python 3.11.5, the minimum in `pyproject.toml`: the `Tests (...)` jobs run on 3.11 with `pip install -r requirements.txt`.
+- Code stays compatible with Python 3.11.5, the minimum in `pyproject.toml`: the `test` job and the wheel smoke installs (`.github/workflows/install-smoke.yml`) run on 3.11.
 - Behavior changes carry tests and bug fixes a regression test; the evidence docs below describe the new behavior.
 - `CHANGELOG.md` `## [Unreleased]` (or the newest section while its version is unreleased) has Functional and Security notes for anything user-visible, security-relevant, or a dependency or CI change; write "no security impact" when true.
 
@@ -36,14 +36,14 @@ Update these in the same change:
 - Declare every runtime dependency in both `pyproject.toml` and `requirements.txt` with matching version constraints (the test compares names only), then `poetry lock` (Poetry 2.5.1; `poetry update PACKAGE` to bump one) and `poetry run python scripts/export_locked_requirements.py`. Any edit to a `pyproject.toml` dependency table, the dev group included, changes the lock hash, and only CI's `poetry check --lock` catches a stale lock.
 - A new runtime dependency passes the Security policy check (no OSV findings, approved license) and ships prebuilt wheels (the container and binary builds use `--only-binary=:all:`).
 - Regenerate `poetry.lock`, `requirements-locked.txt`, `packaging/requirements-*.txt` and `.security/requirements-bandit.txt`; hand edits are overwritten. For the last two groups edit the `.in` file and run the `uv pip compile` command in the `.txt` header. Keep the `poetry-core` pin in `pyproject.toml` equal to the one in `packaging/requirements-publish.txt`.
-- New third-party installs in release, container, security and fuzz steps come from hash-pinned files (`--require-hashes`); `.github/workflows/tests.yml`, `install.sh`, the wheel smoke installs and Poetry's own installation are the existing exceptions.
+- New third-party installs in release, container, security and fuzz steps come from hash-pinned files (`--require-hashes`); `install.sh`, the wheel smoke installs and Poetry's own installation are the existing exceptions.
 
 **Workflows**
 - Model new workflows on `.github/workflows/poetry-tests.yml` and `.github/workflows/security.yml`. Pin every external `uses:` to a full 40-character commit SHA with a `# v4`-style tag comment and container images to a digest; set `persist-credentials: false` on every `actions/checkout`; declare `permissions` at workflow and job level, read-only unless a job must write; trigger on `pull_request`, not `pull_request_target`; pass inputs, refs and tags to scripts through `env:` (validate refs against `^[0-9a-f]{40}$`), never `${{ }}` inside `run:`.
 - Build release artifacts from the validated release source archive passed between jobs, not from a ref taken from an input (CodeQL flags that), and run no PR code in `workflow_run` or write-token jobs.
 - The standalone binaries come from `scripts/build_binary.py` (interpreter pinned by SHA-256 in `packaging/build-python.json`, built twice, bytes compared); a change to the spec, the requirements or the interpreter that makes two builds differ fails CI, so keep the build free of host paths, timestamps and host libraries.
 - PyPI publishes through trusted publishing (`.github/workflows/publish-pypi.yml`, environment `pypi`; never add a PyPI token) and signing uses keyless OIDC. The only stored secrets are `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, referenced only by the push and sign jobs. Keep signing in the `sign` job of `.github/workflows/publish-docker.yml`: that workflow's path is the signer identity consumers verify.
-- Keep the required check names stable (`test`, `Tests (ubuntu-latest)`, `Tests (macos-latest)`, `Security policy`, `Independent human approval`, plus `Analyze (...)` from `.github/workflows/codeql.yml` and `CodeQL`, which `.github/workflows/codeql-upload.yml` publishes for pull requests; GitHub's default setup skips pull requests from forks, so it stays off) and give the workflows behind them no `paths:` filter: a renamed or skipped required check blocks merging.
+- Keep the required check names stable (`test`, `Security policy`, plus `Analyze (...)` from `.github/workflows/codeql.yml` and `CodeQL`, which `.github/workflows/codeql-upload.yml` publishes for pull requests; GitHub's default setup skips pull requests from forks, so it stays off) and give the workflows behind them no `paths:` filter: a renamed or skipped required check blocks merging.
 
 **Versions and releases**
 - The maintainer versions and releases (`docs/RELEASING.md`); leave `version` alone. `pyproject.toml` `version`, `autopwn_suite/__init__.py` `__version__` and a `## [X.Y.Z]` changelog section with non-empty `### Functional changes` and `### Security changes` must agree; a test checks.
@@ -66,7 +66,7 @@ Update these in the same change:
 
 ## Gotchas
 
-- Partial test runs fail the coverage gate: add `--no-cov`. The full suite takes about three minutes.
+- Partial test runs fail the coverage gate: add `--no-cov`. The full suite takes about three minutes; `poetry run pytest -n auto` runs it in parallel, as CI does.
 - `tests/conftest.py` points `AUTOPWN_DATA_DIR` (dashboard account, settings, CVE database) at a temporary directory; otherwise it is a per-user directory. Outputs, exploits and `api.txt` use the working directory.
 - `SyntaxWarning` anywhere and `DeprecationWarning` or `FutureWarning` from `autopwn_suite` fail pytest.
 - Python, JavaScript, HTML, CSS, shell, Dockerfile and `.spec` files start with the SPDX and copyright header (copy a neighbour's, after any shebang); nothing enforces it.

@@ -15,7 +15,7 @@ from autopwn_suite.logger import Logger, console_safe
 from autopwn_suite.nist_search import VulnerabilityLookup
 from autopwn_suite.nmap_progress import check_targets
 from autopwn_suite.report import InitializeReport
-from autopwn_suite.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, ResolveScanHosts
+from autopwn_suite.scanner import AnalyseScanResults, DiscoverHosts, NoiseScan, PortScan, PortScanFailed, ResolveScanHosts
 from autopwn_suite.searchvuln import SearchSploits
 from autopwn_suite.text import printable
 from autopwn_suite.update_checker import (
@@ -153,7 +153,8 @@ def main() -> None:
         print(_("AutoPWN Suite v{version}").format(version=__version__))
         raise SystemExit
     elif args.daemon_install:
-        InstallDaemon(console)
+        if not InstallDaemon(console):
+            raise SystemExit(1)
         raise SystemExit
     elif args.daemon_uninstall:
         UninstallDaemon(console)
@@ -262,7 +263,7 @@ def main() -> None:
         if not (args.scan_interval and args.scan_interval > 0):
             raise
         no_hosts = exc
-    except RuntimeError as exc:
+    except (RuntimeError, PortScanFailed) as exc:
         # A lookup or Nmap failure late in a long scan must not discard the output recorded so far. The
         # reason stays the exit text on stderr (the lookup has logged its own); it is not added to the report.
         log.logger("warning", _("The scan did not finish; saving the output recorded so far."))

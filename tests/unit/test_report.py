@@ -40,6 +40,8 @@ class TestSendMail:
 
         mock_server.login.assert_called_once_with("user@example.com", "password")
         mock_server.sendmail.assert_called_once()
+        # The envelope sender is the From address, not the SMTP login (which need not be a mailbox).
+        assert mock_server.sendmail.call_args.args[:2] == ("from@example.com", "to@example.com")
         mock_log.logger.assert_called_with("success", "Email report sent successfully.")
         # Verify it tried to open the temp report file
         mock_file.assert_called_with("tmp_report.html", "r", encoding="utf-8")

@@ -682,3 +682,34 @@ def test_the_dashboard_reports_a_mirror_without_the_cpe_index(web, local_databas
     status = client.get("/api/vulnerability-database").json
     assert status["ready"] is True
     assert status["update_recommended"] is True and status["update_reason"] == "missing_cpe_index"
+
+
+def test_cli_keeps_the_recorded_output_when_nmap_fails_on_a_later_host(local_database, tmp_path, monkeypatch):
+    """PortScan ended the run with SystemExit, which skipped the handler that saves the output of the hosts
+    scanned before the failure."""
+    from rich.console import Console
+
+    import autopwn_suite.cli as autopwn
+    from autopwn_suite.scanner import PortScanFailed
+    hosts = tmp_path / "hosts.txt"
+    hosts.write_text("192.0.2.10\n192.0.2.11\n", encoding="utf-8")
+    monkeypatch.setattr("autopwn_suite.utils.DontAskForConfirmation", False)  # -y sets it; restored afterwards.
+    monkeypatch.setattr(autopwn, "Console", lambda **kwargs: Console(file=io.StringIO(), **kwargs))
+    monkeypatch.setattr("sys.argv", ["autopwn.py", "--offline", "--vuln-db", str(local_database), "-hf", str(hosts),
+                                    "-y", "--skip-discovery"])
+    monkeypatch.setattr(autopwn, "UserConfirmation", lambda args: (True, False, False))  # ports only
+    logger = MagicMock()
+    monkeypatch.setattr(autopwn, "Logger", lambda console: logger)
+    monkeypatch.setattr(autopwn, "check_nmap", MagicMock())
+    monkeypatch.setattr(autopwn, "PortScan", MagicMock(side_effect=[nmap_observation(), PortScanFailed("Error: Nmap scan failed")]))
+    monkeypatch.setattr(autopwn, "AnalyseScanResults", lambda *a: [["192.0.2.10", 22, "ssh", "OpenSSH", "8.2p1"]])
+    monkeypatch.setattr(autopwn, "WebScan", lambda: False)
+    monkeypatch.setattr(autopwn, "SaveOutput", MagicMock())
+
+    with pytest.raises(SystemExit) as stopped:
+        autopwn.main()
+
+    assert stopped.value.code == "Error: Nmap scan failed"
+    assert autopwn.PortScan.call_count == 2
+    autopwn.SaveOutput.assert_called_once()
+    assert any(call.args[0] == "warning" and "did not finish" in str(call.args[1]) for call in logger.logger.call_args_list)

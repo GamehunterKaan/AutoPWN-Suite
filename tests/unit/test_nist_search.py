@@ -87,8 +87,9 @@ class TestSearchCVE:
         results = searchCVE("keyword", mock_log, "test-api-key")
         assert results == []
 
+    @patch("autopwn_suite.nist_search.sleep")
     @patch("autopwn_suite.nist_search.get")
-    def test_search_cve_rate_limit(self, mock_get, mock_log, clear_cache):
+    def test_search_cve_rate_limit(self, mock_get, mock_sleep, mock_log, clear_cache):
         """Verify it handles a 403 rate-limit error."""
         mock_response_403 = MagicMock()
         mock_response_403.status_code = 403
@@ -107,8 +108,9 @@ class TestSearchCVE:
             "error", "Requests are being rate limited by NIST API, please get a NIST API key to prevent this."
         )
 
+    @patch("autopwn_suite.nist_search.sleep")
     @patch("autopwn_suite.nist_search.get")
-    def test_search_cve_connection_error(self, mock_get, mock_log, clear_cache):
+    def test_search_cve_connection_error(self, mock_get, mock_sleep, mock_log, clear_cache):
         """Verify it handles a connection error gracefully."""
         # To work around the UnboundLocalError bug, we simulate failure on the
         # first two retries and success on the third.
@@ -278,14 +280,74 @@ def test_the_cpe_search_asks_nvd_for_the_product_of_any_vendor_and_no_version(mo
     mock_get.return_value.json.return_value = {"totalResults": 0, "vulnerabilities": []}
     try:
         assert searchCPE("nginx", MagicMock(), "key", strict=True) == []
-        assert mock_get.call_args.kwargs["params"] == {"virtualMatchString": "cpe:2.3:*:*:nginx"}
+        assert mock_get.call_args.kwargs["params"] == {"virtualMatchString": "cpe:2.3:*:*:nginx", "noRejected": ""}
         assert mock_get.call_args.kwargs["headers"] == {"apiKey": "key"}
         searchCPE("nginx", MagicMock(), "key", strict=True)
         assert mock_get.call_count == 1  # cached
         searchCVE("nginx", MagicMock(), "key", strict=True)
-        assert mock_get.call_count == 2 and mock_get.call_args.kwargs["params"] == {"keywordSearch": "nginx"}
+        assert mock_get.call_count == 2 and mock_get.call_args.kwargs["params"] == {"keywordSearch": "nginx", "noRejected": ""}
         mock_get.return_value.raise_for_status.side_effect = RuntimeError("HTTP 503")
         with pytest.raises(RuntimeError, match="NVD lookup failed for tomcat"):
             searchCPE("tomcat", MagicMock(), "key", strict=True)
     finally:
         cache.clear()
+
+
+def refused(status, **headers):
+    """An NVD answer that is not a result: raise_for_status raises for 4xx and 5xx, as requests does."""
+    response = MagicMock(status_code=status, headers=headers)
+    if status >= 400:
+        response.raise_for_status.side_effect = RuntimeError(f"HTTP {status}")
+    return response
+
+
+@pytest.mark.unit
+@patch("autopwn_suite.nist_search.sleep")
+@patch("autopwn_suite.nist_search.get")
+def test_a_redirect_from_nvd_is_a_failed_request_and_is_not_followed(mock_get, mock_sleep):
+    """requests keeps a custom header across hosts, so following a redirect would send the apiKey to its target."""
+    cache.clear()
+    mock_get.return_value = refused(302, Location="https://example.invalid/")
+    with pytest.raises(RuntimeError, match="NVD lookup failed for nginx"):
+        searchCVE("nginx", MagicMock(), "key", strict=True)
+    assert mock_get.call_count == 3
+    assert all(call.kwargs["allow_redirects"] is False for call in mock_get.call_args_list)
+    mock_get.return_value.json.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("answers, key, pauses", [
+    ([refused(429, **{"Retry-After": "7"})] * 3, "key", [7, 7]),       # what the NVD asks for
+    ([refused(403, **{"Retry-After": "86400"})] * 3, "key", [30, 30]),  # never longer than the limit
+    ([refused(429)] * 3, "key", [1, 2]),                                 # no header: a pause that doubles
+    ([refused(503, **{"Retry-After": "7"})] * 3, "key", [1, 2]),        # the header counts for 429 and 403 only
+    ([refused(429)] * 3, None, [8, 16]),                                 # without a key the pause starts at 8 s
+], ids=["retry-after", "capped", "no-header", "not-a-rate-limit", "no-key"])
+@patch("autopwn_suite.nist_search.sleep")
+@patch("autopwn_suite.nist_search.get")
+def test_a_failed_nvd_request_waits_longer_before_each_retry(mock_get, mock_sleep, answers, key, pauses):
+    """The three tries were 0.1 s apart with a key and ignored Retry-After, so a rate limit used them up at once."""
+    cache.clear()
+    mock_get.side_effect = answers
+    assert searchCVE("nginx", MagicMock(), key) == []
+    before = 0.1 if key else 8  # the pause before every request, as before
+    assert [call.args[0] for call in mock_sleep.call_args_list] == [before, pauses[0], before, pauses[1], before]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("strict", [True, False])
+@patch("autopwn_suite.nist_search.sleep")
+@patch("autopwn_suite.nist_search.get")
+def test_a_record_that_cannot_be_parsed_is_not_requested_again(mock_get, mock_sleep, strict):
+    """It fails the same way each time; the page was fetched three times, 8 s apart without a key."""
+    cache.clear()
+    mock_get.return_value.json.return_value = {"totalResults": 1, "vulnerabilities": [{"not-a-cve": {}}]}
+    log = MagicMock()
+    if strict:
+        with pytest.raises(RuntimeError, match="NVD lookup failed for nginx"):
+            searchCVE("nginx", log, strict=True)
+    else:
+        assert searchCVE("nginx", log) == []
+        log.logger.assert_called_once_with("warning", "NVD lookup failed for nginx; vulnerability coverage is incomplete.")
+    assert mock_get.call_count == 1
+    assert "nginx" not in cache

@@ -9,6 +9,33 @@ existing release summaries; they do not retroactively claim artifact signing.
 
 ### Functional changes
 
+- After a temporary failure loading the dashboard session, the next dashboard request retries
+  automatically. Recovery preserves account edits and validation messages without a page reload.
+- The reflected XSS check and the dashboard's PoC re-verification report a script element or HTML event
+  handler only when its code is the payload's own (`alert('…')` for the four built-in payloads), or an inline
+  script whose text holds the payload's raw markup up to its trailing `</script>`, where the payload breaks
+  out of an existing script. A page that echoed the payload raw where it runs nothing, such as a quoted
+  attribute value, and also carried an escaped copy in a script, such as a JSON state object, was reported
+  as "Unescaped reflection in script element" and confirmed on re-verification (#125).
+- Web request pacing counts the delay from the end of the previous request (its response read, or its
+  failure), not from its start. The pause shrank by the time the target took to answer, and a target
+  slower than the delay got none: with a 2-second delay and 3-second answers, each request went out as
+  soon as the previous answer arrived. TLS handshakes are paced the same way. The README described the
+  old behaviour ("between request starts") (#127).
+
+### Security changes
+
+- Session recovery keeps the existing sign-in and CSRF requirements.
+- No security impact. The change removes a false XSS candidate from scan results and keeps reporting a
+  payload reflected raw inside an existing inline script; the target's response is parsed as before and no
+  new request is sent.
+- No security impact. The configured delay is now kept against slow targets, so a scan sends requests
+  less often than before, never more often.
+
+## [2.10.0] - 2026-11-26
+
+### Functional changes
+
 - `-nt/--noise-timeout`, `-ht/--host-timeout` and `-rpesp/--report-email-server-port` reject an
   out-of-range value on the command line instead of failing later. The config loader already
   refused a negative timeout and a port outside 1–65535; the command line parsed them as plain
@@ -29,6 +56,68 @@ existing release summaries; they do not retroactively claim artifact signing.
   advisories (the "headers" check). They read only the first response and used to run last, so
   a scan whose crawl or injection checks used up `request_budget` ended without them. They now
   run before the active stages.
+- `--daemon-install` exits with status 1 when the service was not installed: not root on Linux, an
+  installation the root service must not use, a configuration that was not written, a unit file that
+  could not be written, or a failing `systemctl`. It exited with status 0 in every case, so a
+  provisioning script could not tell. A complete installation still exits with status 0.
+- A CLI scan keeps its recorded output when Nmap fails on a later host. `PortScan` ended the run with
+  `SystemExit`, which skipped the "saving the output recorded so far" step that an NVD failure already
+  had, so the results of the hosts scanned before the failure were lost. A target or option that
+  validation refuses still ends the run with its message and saves nothing.
+- The email report is sent with the `-rpef/--report-email-from` address as SMTP envelope sender, not
+  with the login name. A provider whose login is not a mailbox (an API-key user name) refuses the login
+  name as sender, and the option changed only the `From:` header. Without the option the From address
+  is the login address, as before.
+- The CLI shows a host's details (MAC address, vendor, OS, accuracy, type) when either the MAC address
+  or the OS is known. It required both, so a routed target, which has no MAC address, never showed its
+  detected OS.
+- `--check-update`, `--apply-update` and the dashboard's update check order a pre-release before its
+  release: `2.9.3rc1` (or a `v2.9.3-rc.1` tag) is older than `2.9.3`. Every number in the text used to
+  count, which made the pre-release newer, so an installed pre-release was told it was up to date when
+  its final release was out.
+- The web-check warning for a truncated response names the limit the scan ran with (`max_response_kb`,
+  for example "exceeded 64 KiB") instead of always saying 1 MiB.
+- A local vulnerability database whose `metadata` values are not text is reported as unusable ("Local
+  vulnerability database is unreadable or incomplete"), and a CVSS score in a record counts only when
+  it is a number from 0 to 10; any other value leaves the finding without a score (`UNKNOWN`, 0.0).
+- The daemon log `/var/log/autopwn-daemon.log` is created with mode 0600 and `--daemon-install` sets an
+  existing log to 0600. Read it as root (`sudo tail -f /var/log/autopwn-daemon.log`).
+- The dashboard answers HTTP 413 to a request body larger than 1 MiB, before parsing it. Sign-in and the
+  account route keep their limit of 4,096 bytes; the other routes had none. Every route takes a small
+  JSON object, so no request the page sends comes near the limit.
+- Online NVD lookups wait longer before a retry: for the `Retry-After` of a 429 or 403 answer, or for a
+  pause that doubles with each try (1 s then 2 s with an API key, 8 s then 16 s without), at most 30
+  seconds. The three tries were 0.1 s apart with a key, so one rate-limit answer used them all up and
+  the scan fell back to the local database or stopped. A record that cannot be parsed fails the lookup
+  at once instead of being requested three times.
+- Online NVD lookups leave out rejected CVEs (the API's `noRejected` parameter), which have no
+  applicability data and could only be reported through a product name in their text. The local
+  database still holds the rejected records of the NVD feeds, so an offline lookup can return one.
+- An NVD answer that is a redirect is a failed request and is not followed.
+- `GET /api/scans` counts each job's hosts, ports and CVEs without copying them; the totals are the same.
+- Release notes end with a generated Contributors section: each contributor's pull requests merged since the
+  previous release, the first-time contributors and the compare link (`scripts/release_assets.py`, from the
+  merge commits). A changelog section that has its own `### Contributors` keeps it.
+- CI: pull requests from forks get the `CodeQL` check. `codeql-upload.yml` looked the pull request up through
+  GitHub's commit-to-pull-request API, which returns nothing for the head of an open fork pull request, so a
+  fork's results were never uploaded (and OpenSSF Scorecard counted those commits as not scanned). It now
+  lists the open pull requests of the run's head owner and branch.
+- CI: the `Tests (ubuntu-latest)` and `Tests (macos-latest)` workflow (`tests.yml`, an import check and a scan
+  of `127.0.0.1`) is removed. The `test` job, the wheel smoke installs on Python 3.11 and 3.14 and the binary
+  smoke tests remain; no job installs `requirements.txt` with pip or runs a source checkout on macOS any more. The `Independent human approval` workflows (`human-review*.yml`) are removed: branch
+  protection on `main` enforces the same non-author approval of the latest push.
+- CI: the `test` job runs pytest on every CPU of the runner (`pytest -n auto`) through the new dev dependency
+  `pytest-xdist` 3.8.0 (with `execnet` 2.1.2); branch coverage is combined across the workers and still has
+  to reach 80%. The suite ran in about six minutes on one CPU.
+- CI: every JavaScript action runs on Node.js 24, which removes GitHub's Node.js 20 deprecation warnings. The
+  pins move to `actions/checkout` v7.0.1, `actions/cache` v6.1.0, `actions/setup-python` v7.1.0,
+  `actions/upload-artifact` v7.0.2, `actions/download-artifact` v8.0.2, `actions/github-script` v9.0.0,
+  `docker/build-push-action` v7.4.0, `docker/login-action` v4.8.0, `docker/setup-buildx-action` v4.4.1,
+  `docker/setup-qemu-action` v4.4.0, and the Scorecard workflow's `github/codeql-action/upload-sarif` from v3 to
+  v4.39.0, each by full commit SHA. None of the inputs these workflows use was removed.
+- CI: ClusterFuzzLite builds the four Atheris harnesses in parallel (each PyInstaller build in its own work
+  directory) and fuzzes with every core of the runner (`parallel-fuzzing`) for 120 seconds instead of one core
+  for 180 seconds.
 
 ### Security changes
 
@@ -42,6 +131,51 @@ existing release summaries; they do not retroactively claim artifact signing.
   precedence of target over host file is unchanged.
 - Low security impact, positive. Missing security headers and cookie flags are no longer silently
   left out of a budget-limited scan; no extra request is sent.
+- AUTOPWN-SA-2026-018 (follow-up, low, availability only): a vulnerability database copied from another
+  machine could still stop the dashboard's lists and status. A record whose CVSS score was `NaN` or
+  `Infinity` (both valid for Python's JSON parser) was returned as a bare `NaN` in `GET /api/hosts`, which
+  a browser rejects, and a file whose `metadata` values were not text made
+  `GET /api/vulnerability-database` and a scan start answer HTTP 500 and ended a CLI scan in a traceback.
+  A score that is not a number from 0 to 10 is now ignored, and such a file is reported as an unusable
+  database; see the advisory.
+- Hardening of `--daemon-install`, with no advisory: `/var/log/autopwn-daemon.log` holds the scan output
+  (hosts, ports, CVEs) and was created with mode 0664, readable by every local account; it is now created
+  with mode 0600, and each install sets an existing log to 0600. The installer also reads the wizard's
+  configuration back from the working directory only if it is still a regular file of the installing
+  user, opened without following a symlink, so a file that another account placed there under that name
+  (possible when root runs the installer in a directory that account can write to) is not installed as the
+  root service's configuration.
+- No security impact for the other functional changes above (exit status, saved output, envelope sender,
+  host details, pre-release ordering, warning text).
+- Hardening, with no advisory:
+  - The dashboard bounds every request body (1 MiB; 4,096 bytes for sign-in and the account route).
+    Only a signed-in client reached the unbounded routes, since a request without a session is answered
+    401 before its body is read, so this limits what a session can make the server hold in memory.
+  - NVD requests no longer follow redirects. `requests` keeps a custom header when a redirect names
+    another host, so a redirect would have carried the `apiKey` header to that host. The NVD is reached
+    over verified HTTPS, so this needs the NVD itself (or a host in front of it) to send the redirect.
+  - The local vulnerability database is read through a connection with `PRAGMA query_only` on and
+    `PRAGMA trusted_schema` off, in addition to the read-only open mode: nothing is written through it,
+    and views or triggers in a copied file cannot call SQL functions or virtual tables with side effects
+    (SQLite 3.31 or newer). A copied file can still define its own views, so the AUTOPWN-SA-2026-018
+    residual about the file's structure is unchanged.
+- No security impact for the retry pauses, the left-out rejected CVEs and the job counts.
+- Release notes: no security impact. The Contributors section is built offline from the merge commits; a pull
+  request title is written as inert Markdown (no HTML, no link, and an `@name` in code so it notifies nobody).
+- CodeQL for forks: the upload handler keeps every check of the pull request's live state (open, targets
+  `main`, same head commit and branch, test merge commit equal to the analyzed one) and gains no permission.
+- Review and test workflows: the non-author human approval is unchanged as a control but is now enforced only
+  by branch protection (one approval, stale approvals dismissed, approval of the latest push required,
+  administrators included); `GITHUB_TOKEN` cannot approve pull requests. Removing the workflows also removes a
+  `workflow_run` handler that held `actions: write`.
+- Action updates: no security impact. Every action stays pinned by full commit SHA with the same inputs and
+  permissions. `actions/download-artifact` v8 now fails on an artifact whose digest does not match instead of
+  warning, and `actions/checkout` v7 refuses to check out a fork's pull request in `pull_request_target` and
+  `workflow_run` workflows (none of ours does).
+- ClusterFuzzLite: no security impact. The same harnesses, seeds and hash-pinned dependencies are built; each
+  fuzzer now gets more executions in less time.
+- `pytest-xdist`: no security impact. It is a dev-group dependency used only to run the tests; it is not in the
+  package, the image or the binaries, and the Security policy scans it with the rest of `poetry.lock`.
 
 ## [2.9.2] - 2026-11-22
 

@@ -92,6 +92,39 @@ assert.equal(redirects.join(','),'/login');
 """)
 
 
+def test_concurrent_requests_retry_after_non_json_bootstrap_failure():
+    run_js("auth.js", r"""
+await assert.rejects(dashboardAuth.ready,{message:i18n.t('auth.account_unavailable')});
+assert.equal(nodes.get('account-message').textContent,i18n.t('auth.account_unavailable'));
+setResponse(async()=>reply(200,{username:'admin',csrf_token:'new-token'}));
+await Promise.all([fetch('/api/scans'),fetch('/api/settings',{method:'PUT'})]);
+await dashboardAuth.ready;
+assert.deepEqual(Array.from(calls,call=>call[0]),['/api/auth/session','/api/auth/session','/api/scans','/api/settings']);
+assert.equal(calls.at(-1)[1].headers.get('X-CSRF-Token'),'new-token');
+assert.equal(nodes.get('account-username').value,'admin');
+assert.equal(nodes.get('auth-username').textContent,'admin');
+assert.equal(nodes.get('account-message').textContent,'');
+""", "setResponse(async()=>({status:502,ok:false,json:async()=>JSON.parse('<html>')}));")
+
+
+def test_session_retry_preserves_account_edits_and_validation_message():
+    run_js("auth.js", r"""
+await assert.rejects(dashboardAuth.ready);
+nodes.get('account-username').value='new-admin';
+handlers['account-username:input']();
+nodes.get('account-password').value='one';
+nodes.get('account-confirm-password').value='two';
+await handlers['account-form:submit']({preventDefault(){}});
+setResponse(async()=>reply(200,{username:'admin',csrf_token:'new-token'}));
+await fetch('/api/scans');
+assert.equal(nodes.get('auth-username').textContent,'admin');
+assert.equal(nodes.get('account-username').value,'new-admin');
+assert.equal(nodes.get('account-password').value,'one');
+assert.equal(nodes.get('account-confirm-password').value,'two');
+assert.equal(nodes.get('account-message').textContent,i18n.t('auth.passwords_mismatch'));
+""", "setResponse(async()=>reply(502,{}));")
+
+
 def test_expired_bootstrap_redirects_and_prevents_dashboard_requests():
     run_js("auth.js", r"""
 await assert.rejects(dashboardAuth.ready,/Sign in/);

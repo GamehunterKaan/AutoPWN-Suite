@@ -44,10 +44,10 @@ def test_recording_many_findings_stays_fast_and_keeps_the_checkpoint_in_step():
     context = ScanContext("http://example.com/", MagicMock(), checkpoint=state, on_finding=seen.append)
     with context.activate():
         results = [finding("XSS", f"http://example.com/p?id={number}", "Unescaped reflection", parameter="id") for number in range(1_500)]
-        started = time.perf_counter()
+        started = time.process_time()
         for result in results + results[:10]:
             context.record_finding(result)
-        elapsed = time.perf_counter() - started
+        elapsed = time.process_time() - started
     assert elapsed < 2
     assert len(context.findings) == len(state["findings"]) == len(seen) == 1_500
     assert state["findings"] == context.findings
@@ -470,3 +470,56 @@ def test_pacing_uses_speed_and_minimum_delay_and_is_cancellable():
     with patch("autopwn_suite.web.runtime.time.sleep", side_effect=lambda seconds: stop.__setitem__(0, True)), pytest.raises(ScanCancelled):
         context.before()
     assert context.requests == 1
+
+
+def slow_clock():
+    """A patched clock: time.sleep advances it, and a slow target advances it by its answer time."""
+    now = [0.0]
+
+    def sleep(seconds):
+        now[0] += seconds
+    clock = (patch("autopwn_suite.web.runtime.time.monotonic", side_effect=lambda: now[0]),
+             patch("autopwn_suite.web.runtime.time.sleep", side_effect=sleep))
+    return now, clock
+
+
+@pytest.mark.unit
+def test_pacing_counts_from_the_end_of_a_slow_request(web_response):
+    from requests.exceptions import ConnectionError
+
+    from autopwn_suite.web.http import bounded_request
+    from autopwn_suite.web.tls import _handshake
+
+    now, (monotonic, sleep) = slow_clock()
+
+    def slow_response(*args, **kwargs):
+        now[0] += 3
+        response = web_response("ok")
+        response.autopwn_truncated = False
+        return response
+
+    def slow_failure(*args, **kwargs):
+        now[0] += 3
+        raise ConnectionError("refused")
+
+    def slow_handshake(*args, **kwargs):
+        now[0] += 3
+        raise OSError("handshake timed out")
+
+    # Issue #127: a 2 s delay against a target that answers in 3 s must still leave 2 s between an answer and
+    # the next request, whether the request succeeded, failed, or was a TLS handshake.
+    with monotonic, sleep, patch("autopwn_suite.web.tls.socket.create_connection", side_effect=slow_handshake):
+        context = ScanContext("http://example.com/", MagicMock(), controls={"speed": 5, "request_delay_ms": 2000})
+        with context.activate():
+            with patch("autopwn_suite.web.http.read_response", side_effect=slow_response):
+                bounded_request(None, "http://example.com/")
+            assert now[0] == pytest.approx(3)
+            with patch("autopwn_suite.web.http.read_response", side_effect=slow_failure), pytest.raises(ConnectionError):
+                bounded_request(None, "http://example.com/")
+            assert now[0] == pytest.approx(3 + 2 + 3)
+            with pytest.raises(OSError):
+                _handshake(MagicMock(), "example.com", 443)
+            assert now[0] == pytest.approx(3 + 2 + 3 + 2 + 3)
+            context.before()
+    assert now[0] == pytest.approx(3 + 2 + 3 + 2 + 3 + 2)
+    assert context.requests == 4

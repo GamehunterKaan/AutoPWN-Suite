@@ -15,12 +15,12 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
 
     - name: Set up Python
-      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: '3.11'
 
@@ -30,7 +30,7 @@ jobs:
         version: '2.5.1'
 
     - name: Set up cache
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: .venv
         key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
@@ -59,5 +59,6 @@ jobs:
     - name: Check translation catalogs are up to date
       run: poetry run python scripts/i18n_messages.py check --lang tr
 
+    # pytest-xdist runs the suite on every CPU of the runner; coverage is combined across the workers.
     - name: Run tests
-      run: poetry run pytest
+      run: poetry run pytest -n auto

@@ -279,9 +279,18 @@ def verify_release_source(repo, tag, commit):
         )
 
 
+_VERSION = re.compile(r"(\d+(?:\.\d+)*)(?:[-._]?(dev|alpha|beta|preview|pre|rc|a|b|c)(?![a-z])[-._]?(\d*))?(.*)", re.I | re.S)
+
+
 def _parse_version(tag):
-    numbers = re.findall(r"\d+", (tag or "")[:100])
-    return tuple(int(n) for n in numbers) if numbers else (0,)
+    """The sort key of a version or tag: its release numbers, then its stage (2.9.3rc1 and v2.9.3-rc.1 come
+    before 2.9.3, which a tuple of every number in the text would put after it), then the numbers that follow."""
+    found = _VERSION.search((tag or "")[:100])
+    if not found:
+        return (0,), 6, ()
+    release, stage, number, rest = found.groups()
+    return (tuple(int(n) for n in release.split(".")), "dabpcr".index(stage[0].lower()) if stage else 6,
+            (int(number or 0), *(int(n) for n in re.findall(r"\d+", rest))))
 
 
 def check_release(current_version, repo=None):

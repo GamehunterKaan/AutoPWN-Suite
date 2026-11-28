@@ -80,6 +80,11 @@ def TestArp(target, mode=ScanMode.Normal, *, offline=False, progress=None, shoul
 
 
 # run a port scan on target using nmap
+class PortScanFailed(SystemExit):
+    """Nmap could not scan a target. Uncaught it still ends the run with the message and status 1; the CLI
+    catches it to save the output of the hosts it scanned before."""
+
+
 def PortScan(
     target,
     log,
@@ -137,8 +142,10 @@ def PortScan(
             nm.scan(hosts=target, arguments=arguments)
     except ScanCancelled:
         raise
-    except Exception as e:
+    except ValueError as e:  # a target or option that validation refused: nothing was scanned
         raise SystemExit(_("Error: {error}").format(error=printable(str(e), multiline=True))) from e
+    except Exception as e:
+        raise PortScanFailed(_("Error: {error}").format(error=printable(str(e), multiline=True))) from e
     else:
         return nm
 
@@ -355,7 +362,8 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
 
     banner(_("Portscan results for {target}").format(target=target), "green", console)
 
-    if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
+    # A routed target has no MAC address; its detected OS is still shown.
+    if not (CurrentTargetInfo.mac == "Unknown" and CurrentTargetInfo.os == "Unknown"):
         console.print(CurrentTargetInfo.colored(), justify="center")
 
     table = Table(box=box.MINIMAL)

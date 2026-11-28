@@ -40,6 +40,9 @@ def bounded_request(call, *args, max_bytes=1_048_576, **kwargs):
         if current and not current.discovery:
             current.issue(_("A web request failed; coverage is incomplete."))
         raise
+    finally:
+        if current:
+            current.after()
     if current:
         method, url = (args[0], args[1]) if len(args) > 1 else ("GET", args[0])
         response.autopwn_observation = current.capture(response, method, url, kwargs.get("headers", {}), started)
@@ -81,7 +84,8 @@ class ProbeClient:
                                    auth=AnonymousAuth(), timeout=10, allow_redirects=False)
         if response.autopwn_truncated and url not in self.truncated_urls:
             self.truncated_urls.add(url)
-            self.log.logger("warning", f"Web response exceeded 1 MiB on {url}; content coverage is limited.")
+            from autopwn_suite.web.runtime import options
+            self.log.logger("warning", f"Web response exceeded {options()['max_response_kb']} KiB on {url}; content coverage is limited.")
         return response
 
     def baseline(self, url):

@@ -19,6 +19,10 @@ TAG = re.compile(r"v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[
 IMAGE = re.compile(r"docker\.io/[a-z0-9]+(?:[._-][a-z0-9]+)*/autopwn-suite")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 OFFICIAL_IMAGE = "docker.io/gamehunterkaan/autopwn-suite"
+REPOSITORY_URL = "https://github.com/GamehunterKaan/AutoPWN-Suite"
+# GitHub's merge commit subject; the first line of the message body is the pull request title.
+MERGED_PULL_REQUEST = re.compile(r"Merge pull request #([1-9][0-9]*) from ([^/\s]+)/(\S+)")
+LOGIN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?")
 # Standalone binaries: target name -> executable suffix.
 BINARY_TARGETS = {"linux-amd64": "", "linux-arm64": "", "windows-amd64": ".exe", "macos-arm64": ""}
 
@@ -122,7 +126,61 @@ def release_commit(repo, tag, reviewed_ref="refs/remotes/origin/main"):
     return commit
 
 
-def release_notes(changelog, tag):
+def merged_pull_requests(repo, revisions):
+    """(number, login, title) of each pull request merged into main in `revisions`, oldest first.
+
+    The login is the owner of the pull request's head branch, which is the author for a fork; branches
+    in this repository belong to its owner, except Dependabot's.
+    """
+    log = git(repo, "log", "--first-parent", "--merges", "--reverse", "--format=%s%x00%b%x1e", revisions)
+    merged = []
+    for entry in log.split("\x1e"):
+        subject, _, body = entry.strip().partition("\x00")
+        match = MERGED_PULL_REQUEST.fullmatch(subject)
+        if not match:
+            continue
+        login = "dependabot" if match[3].startswith("dependabot/") else match[2]
+        title = next((line for line in body.splitlines() if line.strip()), "")
+        if LOGIN.fullmatch(login) and title:
+            merged.append((int(match[1]), login, title))
+    return merged
+
+
+def markdown_text(title):
+    """A pull request title as inert Markdown: no HTML, no links and no mention that notifies anyone."""
+    title = " ".join(title.split())
+    title = re.sub(r"[&<>\[\]]", lambda char: {"&": "&amp;", "<": "&lt;", ">": "&gt;"}.get(char[0], "\\" + char[0]), title)
+    # A code span closes only on a backtick run of its own length, so a longer fence than any run in the
+    # title cannot be paired with a stray backtick there.
+    fence = "`" * (max(map(len, re.findall("`+", title)), default=0) + 1)
+    return re.sub(r"@[\w./-]+", lambda mention: f"{fence}{mention[0]}{fence}", title)
+
+
+def contributors_notes(repo, tag, commit):
+    """The Contributors section: who got what merged since the previous release, and who is new."""
+    try:
+        previous = git(repo, "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*", "--exclude", "*-*", f"{commit}^")
+    except subprocess.CalledProcessError:
+        return ""
+    merged = merged_pull_requests(repo, f"{previous}..{commit}") if TAG.fullmatch(previous) else []
+    if not merged:
+        return ""
+    earlier = {login for _, login, _ in merged_pull_requests(repo, previous)}
+    work, first = {}, {}
+    for number, login, title in merged:
+        work.setdefault(login, []).append(f"{markdown_text(title)} (#{number})")
+        if login not in earlier:
+            first.setdefault(login, number)
+    lines = ["### Contributors", "", "Thank you to everyone who contributed to this release:", ""]
+    lines += [f"- @{login}: {', '.join(items)}" for login, items in work.items()]
+    if first:
+        lines += ["", "### New contributors", ""]
+        lines += [f"- @{login} made their first contribution in #{number}" for login, number in first.items()]
+    lines += ["", f"**Full Changelog**: {REPOSITORY_URL}/compare/{previous}...{tag}"]
+    return "\n".join(lines) + "\n"
+
+
+def release_notes(changelog, tag, contributors=""):
     pattern = rf"^## \[{re.escape(tag[1:])}\][^\n]*\n(.*?)(?=^## |\Z)"
     match = re.search(pattern, changelog, re.MULTILINE | re.DOTALL)
     if not match or not all(heading in match[1] for heading in
@@ -133,12 +191,16 @@ def release_notes(changelog, tag):
                             match[1], re.MULTILINE | re.DOTALL)
         if not section or not section[1].strip():
             raise ValueError("Changelog needs descriptive functional and security notes")
-    return f"# AutoPWN Suite {tag}\n\n{match[1].strip()}\n"
+    notes = f"# AutoPWN Suite {tag}\n\n{match[1].strip()}\n"
+    # A Contributors section written in the changelog wins over the generated one.
+    if contributors and not re.search(r"^### Contributors", match[1], re.MULTILINE):
+        notes += f"\n{contributors}"
+    return notes
 
 
 def prepare(repo, tag, output, changelog, reviewed_ref="refs/remotes/origin/main"):
     commit = release_commit(repo, tag, reviewed_ref)
-    notes = release_notes(changelog.read_text(encoding="utf-8"), tag)
+    notes = release_notes(changelog.read_text(encoding="utf-8"), tag, contributors_notes(repo, tag, commit))
     output.mkdir(parents=True, exist_ok=True)
     if any(output.iterdir()):
         raise ValueError("Release staging directory must be empty")

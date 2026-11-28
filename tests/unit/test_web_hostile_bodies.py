@@ -24,7 +24,20 @@ from autopwn_suite.web.similarity import similarity
 from autopwn_suite.web.sqli import SQLIScanner
 from autopwn_suite.web.xss import reflection_context
 
-LIMIT_SECONDS = 2.0
+
+def _coverage_is_tracing():
+    try:
+        import coverage
+    except ImportError:
+        return False
+    return coverage.Coverage.current() is not None
+
+
+# CPU time of this process, so other test workers on the same CPUs (pytest -n auto) do not count. Branch
+# coverage tracing, which the CI test job always runs, makes this pure-Python work about three times slower
+# on Python 3.11 (the nested-forms page: 0.30 s untraced, 0.96 s traced), so the limit allows for it. The
+# unbounded versions these tests guard against took many times longer either way.
+LIMIT_SECONDS = 2.0 * (3 if _coverage_is_tracing() else 1)
 
 SQL_BODIES = [
     "microsoft odbc " * 12_000, "microsoft jet " * 12_000, "microsoft access " * 12_000, "warning " * 20_000,
@@ -39,9 +52,9 @@ ERROR_BODIES = ["a" * 100_000, "Exception:" * 10_000, "AException:" + "a" * 100_
 
 
 def seconds(call, *args):
-    started = time.perf_counter()
+    started = time.process_time()
     call(*args)
-    return time.perf_counter() - started
+    return time.process_time() - started
 
 
 @pytest.mark.unit
@@ -110,7 +123,7 @@ INACTIVE_CASES = [
 @pytest.mark.parametrize("page,context", INACTIVE_CASES)
 def test_inactive_elements_are_skipped_in_the_scanner_and_in_the_downloaded_poc(web_response, page, context):
     assert reflection_context(web_response(page, headers={"Content-Type": "text/html"}), "MARK", "MARK") == context
-    document = poc_runtime._Document("MARK")
+    document = poc_runtime._Document("MARK", "MARK")
     document.feed(page)
     assert document.active is (context is not None)
 
@@ -156,9 +169,9 @@ COMPARISONS = [(similarity, similarity_module), (poc_runtime._similarity, poc_ru
 @pytest.mark.parametrize("compare", [similarity, _similar, poc_runtime._similarity], ids=["similarity", "boolean_sqli", "poc_runtime"])
 def test_similarity_stays_fast_on_periodic_bodies(compare, size):
     one, other = periodic_pair(size)
-    started = time.perf_counter()
+    started = time.process_time()
     ratio = compare(one, other)
-    assert time.perf_counter() - started < LIMIT_SECONDS
+    assert time.process_time() - started < LIMIT_SECONDS
     assert ratio < .5
 
 
@@ -179,9 +192,9 @@ def popularity_shift_pair(size=100_000, kept=80_000):
 @pytest.mark.parametrize("compare", [similarity, _similar, poc_runtime._similarity], ids=["similarity", "boolean_sqli", "poc_runtime"])
 def test_similarity_stays_fast_when_cutting_the_texts_changes_which_characters_difflib_ignores(compare):
     one, other = popularity_shift_pair()
-    started = time.perf_counter()
+    started = time.process_time()
     ratio = compare(one, other)
-    assert time.perf_counter() - started < LIMIT_SECONDS  # 5.6 s before the work was measured again on the cut texts
+    assert time.process_time() - started < LIMIT_SECONDS  # 5.6 s before the work was measured again on the cut texts
     assert 0 <= ratio <= 1
 
 
@@ -266,9 +279,9 @@ def test_deeply_nested_forms_and_controls_stay_fast_for_the_crawler(web_response
     response = web_response(page)
     log = MagicMock()
     with patch("autopwn_suite.web.crawler.get", return_value=response), patch("autopwn_suite.web.crawler.random_user_agent", return_value=iter(["UA"])):
-        started = time.perf_counter()
+        started = time.process_time()
         link_finder("http://example.com/", log)
-    assert time.perf_counter() - started < LIMIT_SECONDS
+    assert time.process_time() - started < LIMIT_SECONDS
     if "textarea" not in page:  # newer html.parser versions read the inside of a textarea as text, older ones nest it
         assert any("coverage is incomplete" in call.args[1] for call in log.logger.call_args_list)
 

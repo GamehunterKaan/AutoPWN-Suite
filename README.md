@@ -5,7 +5,7 @@ AutoPWN Suite is a project for scanning vulnerabilities and exploiting systems a
 <table align="center">
   <tr>
     <td align="center">
-      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+      <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/poetry-tests.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/poetry-tests.yml/badge.svg" alt="tests"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/security.yml/badge.svg" alt="security policy"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml"><img src="https://github.com/GamehunterKaan/AutoPWN-Suite/actions/workflows/dynamic-analysis.yml/badge.svg" alt="dynamic analysis"></a>
       <a href="https://github.com/GamehunterKaan/AutoPWN-Suite/releases"><img src="https://img.shields.io/github/v/release/GamehunterKaan/AutoPWN-Suite?color=3ba9ee&label=release" alt="release"></a>
@@ -201,8 +201,9 @@ URL longer than 8,192 characters is not followed.
 
 SQLi and LFI checks compare against the original response and repeat promising probes before
 reporting new database errors or Unix/Windows file signatures. Reflected XSS checks require an
-unescaped payload in a script element or HTML event handler in an HTML response; JSON, plain
-text, comments and inactive HTML contexts are excluded. Browser execution and CSP bypass are
+unescaped payload to create a script element or HTML event handler, or to sit raw inside an inline
+script, in an HTML response; JSON, plain
+text, comments, inactive HTML contexts and escaped copies in a script are excluded. Browser execution and CSP bypass are
 not verified, so injection findings remain **candidates** requiring review. Directory hits are
 **observations**, with random missing-path controls suppressing soft 404 pages and blanket
 login redirects. A protected path is not itself a vulnerability.
@@ -308,9 +309,9 @@ Saved profiles retain their explicit limits when defaults change. Adjustable upp
 longer and send more requests; reaching any configured limit still reports incomplete coverage.
 
 Web speed is independent of Nmap speed: 0–5 adds minimum delays of 5 seconds, 2 seconds,
-500 ms, 100 ms, 25 ms or no delay between request starts. **Minimum request delay** can increase
-that delay; timeout controls both HTTP requests and TLS connections. These settings are saved
-with profiles and used by scheduled scans.
+500 ms, 100 ms, 25 ms or no delay between the end of one request and the start of the next.
+**Minimum request delay** can increase that delay; timeout controls both HTTP requests and TLS
+connections. These settings are saved with profiles and used by scheduled scans.
 
 Use **Resume** on an incomplete, stopped or failed scan, or **Resume scan** in its web coverage
 card. Review the suggested speed and limits, then resume the same job. Completed checks,
@@ -560,8 +561,8 @@ single-file binaries that need no Python installation: `linux-amd64`, `linux-arm
 executable and run it:
 
 ```bash
-chmod +x autopwn-suite-v2.9.2-linux-amd64
-./autopwn-suite-v2.9.2-linux-amd64 --help
+chmod +x autopwn-suite-v2.10.0-linux-amd64
+./autopwn-suite-v2.10.0-linux-amd64 --help
 ```
 
 The binaries are checksum-verified and Sigstore-signed but not code-signed for Windows or
