@@ -5,6 +5,7 @@ import email.policy
 import html
 import importlib
 import json
+import re
 import sys
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
@@ -277,7 +278,55 @@ def test_notifications_carry_the_redacted_target(dashboard, monkeypatch):
     assert "hunter2" not in str(posted) + subject + body
 
 
-BREAKERS = ["'", '"', "<", ">", "\u00a0", "\u2028", "\u3000"]
+def port_scan_job(wu, monkeypatch, *, root, **controls):
+    """Run a dashboard port scan of 192.0.2.1 through the real PortScan, with an Nmap stand-in that records
+    the command line it was given in its XML like Nmap does, and return the job and that command line."""
+    ran = []
+    def nmap(scanner, hosts, arguments, progress=None, should_stop=None):
+        ran.append(" ".join(["nmap", "-oX", "-", hosts, *arguments.split()]))
+        scanner.load_xml(f'<nmaprun args="{html.escape(ran[-1])}"><host><status state="up"/>'
+                         '<address addr="192.0.2.1" addrtype="ipv4"/></host><runstats><finished exit="success"/>'
+                         '<hosts up="1" down="0" total="1"/></runstats></nmaprun>')
+    scanner = importlib.import_module("autopwn_suite.scanner")
+    monkeypatch.setattr(scanner, "is_root", lambda: root)
+    monkeypatch.setattr(scanner, "scan_with_progress", nmap)
+    config = wu._profile_config({"skip_discovery": True, "scan_vulns": False, **controls}) | {"target": "192.0.2.1"}
+    config["nmap_flags"] = wu._build_nmap_flags(config)
+    job = wu.ScanJob("job", config["target"], config)
+    with patch.object(wu.shutil, "which", return_value="nmap"), patch.object(wu, "_notify"):
+        wu._register_scan(job)
+        wu._run_scan(job)
+    assert job.status == "completed" and len(ran) == 1
+    return job, ran[0]
+
+
+def email_commands(body):
+    return re.findall(r"<strong>Command:</strong> ([^<]*)</p>", body)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("root", [False, True])
+def test_email_shows_the_nmap_command_that_ran(dashboard, monkeypatch, root):
+    # The dashboard always sends a scan technique; without root the scanner drops it and -O.
+    wu, _ = dashboard
+    job, ran = port_scan_job(wu, monkeypatch, root=root, scan_technique="-sT" if root else "-sS", os_detection=True)
+    _, _, body = deliver_notifications(wu, job, monkeypatch)
+    assert email_commands(body) == [html.escape(ran)]
+    flags = ran.split()
+    if root:  # the chosen technique replaces -sS instead of being added after it
+        assert "-sT" in flags and "-sS" not in flags
+    else:
+        assert "-sS" not in flags and "-O" not in flags
+
+
+@pytest.mark.unit
+def test_email_of_a_web_only_scan_shows_no_nmap_command(dashboard, monkeypatch):
+    wu, _ = dashboard
+    _, _, body = deliver_notifications(wu, web_only_job(wu), monkeypatch)
+    assert email_commands(body) == [] and "nmap" not in body
+
+
+BREAKERS =["'", '"', "<", ">", "\u00a0", "\u2028", "\u3000"]
 
 
 @pytest.mark.unit

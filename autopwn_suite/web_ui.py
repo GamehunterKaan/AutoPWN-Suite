@@ -765,6 +765,8 @@ class ScanJob:
         self._lookup_results = {}
         self._targets = None
         self._completed_hosts = set()
+        # Nmap's own record of each port scan this job ran, for the e-mail report; kept across resumes.
+        self._nmap_commands: list[str] = []
         self.resume_count = 0
         self._progress = {"phase": "preparing", "detail": "Preparing scan", "percent": None,
                           "completed": None, "total": None, "host": "",
@@ -866,6 +868,15 @@ class ScanJob:
     def hosts_list(self) -> list:
         with self._lock:
             return deepcopy(list(self._hosts.values()))
+
+    def record_nmap_command(self, command: str) -> None:
+        with self._lock:
+            if command and command not in self._nmap_commands:
+                self._nmap_commands.append(command)
+
+    def nmap_commands(self) -> list:
+        with self._lock:
+            return list(self._nmap_commands)
 
     def add_web_finding(self, ip, endpoint, result):
         result = deepcopy(result)
@@ -1260,17 +1271,9 @@ def _deliver_email(job: ScanJob) -> None:
     target = job.public_target
     subject = f"[AutoPWN] Scan {job.status.upper()} — {target}"
 
-    c = job.config or {}
-    if c.get("mode") == "evade":
-        cmd_base = f"nmap {target} -sS -sV -O -Pn -T 2 -f -g 53 --data-length 10"
-    else:
-        cmd_base = f"nmap {target} -sS -sV --host-timeout {c.get('host_timeout', 240)} -Pn -O -T {c.get('speed', 3)}"
-    flags = c.get("nmap_flags", "")
-    if flags:
-        if "-O" in cmd_base and "-O" in flags:
-            flags = flags.replace("-O", "").strip()
-        if flags:
-            cmd_base += " " + flags
+    # The command lines Nmap recorded for the port scans that ran, not one rebuilt from the form: the scanner
+    # drops -sS, -O and the evasion options without root, and a web-only scan runs no Nmap at all.
+    command_html = "".join(f'<p><strong>{tr("Command:")}</strong> {_e(command)}</p>' for command in job.nmap_commands())
 
     favicon_path = _STATIC_DIR / "favicon.ico"
     _icon_data = None
@@ -1313,7 +1316,7 @@ def _deliver_email(job: ScanJob) -> None:
       <p><strong>{tr("Target:")}</strong> {_e(target)}</p>
       <p><strong>{tr("Scan ID:")}</strong> {_e(job.id)}</p>
       <p><strong>{tr("Status:")}</strong> {_e(job.status)}</p>
-      <p><strong>{tr("Command:")}</strong> {_e(cmd_base.strip())}</p>
+      {command_html}
       <p><strong>{tr("Started:")}</strong> {_e(job.started_at)}</p>
       <p><strong>{tr("Finished:")}</strong> {_e(job.finished_at or 'N/A')}</p>
     </div>
@@ -1540,6 +1543,7 @@ def _run_scan(job: ScanJob) -> None:
                     nm = PortScan(host_ip, log, speed, host_timeout, scanmode, nmap_flags,
                                   progress=lambda task, percent: job.set_progress("port_scan", task, percent=percent),
                                   should_stop=job.should_stop)
+                    job.record_nmap_command(nm.command_line())
             except ScanCancelled:
                 raise
             except SystemExit as e:

@@ -22,6 +22,11 @@ existing release summaries; they do not retroactively claim artifact signing.
   slower than the delay got none: with a 2-second delay and 3-second answers, each request went out as
   soon as the previous answer arrived. TLS handshakes are paced the same way. The README described the
   old behaviour ("between request starts") (#127).
+- The dashboard's notification e-mail shows the command line Nmap recorded for each port scan the job
+  ran, one "Command:" line per scan, instead of one rebuilt from the scan mode, speed and host timeout.
+  The rebuilt line always held `-sS` and `-O`, which the scanner drops without root; it put `-sS` in front
+  of a scan technique chosen in the form, which replaces it; and a web-only scan, which runs no Nmap, still
+  got an Nmap command. An e-mail of a scan that ran no port scan has no "Command:" line (#128).
 
 ### Security changes
 
@@ -31,6 +36,9 @@ existing release summaries; they do not retroactively claim artifact signing.
   new request is sent.
 - No security impact. The configured delay is now kept against slow targets, so a scan sends requests
   less often than before, never more often.
+- No security impact. The e-mail goes to the same recipients and the command lines come from the scan's own
+  Nmap XML; they name the Nmap executable as it was started and the hosts that were scanned, which the
+  e-mail's host sections already list.
 
 ## [2.10.0] - 2026-11-26
 
